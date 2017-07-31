@@ -1,0 +1,49 @@
+package wemi.util
+
+import java.util.*
+
+/**
+ *
+ */
+private val HexDigits = "0123456789abcdef"
+
+fun toHexString(data: ByteArray): String {
+    val chars = CharArray(data.size * 2)
+    for (i in data.indices) {
+        chars[2 * i] = HexDigits[(data[i].toInt() ushr 4) and 0xF]
+        chars[2 * i + 1] = HexDigits[data[i].toInt() and 0xF]
+    }
+    return String(chars)
+}
+
+fun fromHexString(data: CharSequence): ByteArray? {
+    val bytes = ByteArray(data.length / 2)
+    var byteI = 0
+
+    var lowByte = -1
+
+    for (c in data) {
+        if (c.isWhitespace()) continue
+        val digit = HexDigits.indexOf(c, ignoreCase = true)
+        if (digit == -1) {
+            return null
+        }
+
+        if (lowByte != -1) {
+            bytes[byteI++] = (lowByte or digit).toByte()
+            lowByte = -1
+        } else {
+            lowByte = digit shl 4
+        }
+    }
+
+    if (lowByte != -1) {
+        return null
+    }
+
+    if (byteI == bytes.size) {
+        return bytes
+    } else {
+        return Arrays.copyOf(bytes, byteI)
+    }
+}
