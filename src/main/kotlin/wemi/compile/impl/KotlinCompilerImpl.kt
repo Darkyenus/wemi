@@ -17,7 +17,7 @@ import java.io.File
 /**
  * Kotlin compiler interface implementation, DO NOT TOUCH FROM OTHER CLASSES THAN [IKotlinCompiler]!!!
  */
-class KotlinCompilerImpl : IKotlinCompiler {
+internal class KotlinCompilerImpl : IKotlinCompiler {
 
     /**
      * @param sources kotlin files to be compiled

@@ -1,10 +1,9 @@
 package wemi.boot
 
 import org.slf4j.LoggerFactory
-import wemi.WemiKotlinVersion
+import WemiKotlinVersion
 import wemi.compile.KotlinCompiler
 import wemi.dependency.*
-import wemi.util.toFile
 import java.io.File
 import java.net.URL
 
@@ -12,26 +11,10 @@ private val LOG = LoggerFactory.getLogger("BuildFiles")
 
 val BuildFileStdLib = ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-stdlib", WemiKotlinVersion))
 
-private object __ResourceHook
-
-internal val WemiClasspathFile: File = __ResourceHook.javaClass.getResource("BuildFilesKt.class").let { dotResource ->
-    val result: File?
-    if (dotResource.protocol == "file") {
-        result = File(dotResource.path.removeSuffix("wemi/boot/BuildFilesKt.class"))
-    } else {
-        result = dotResource.toFile()
-    }
-    if (result == null) {
-        throw IllegalStateException("Wemi must be launched from filesystem (current URL: $dotResource)")
-    }
-    LOG.debug("WemiClasspathFile found at {}", result)
-    result
-}
-
 /**
  * Build file is a file with .wemi extension, anywhere in current or parent directory.
  */
-fun findBuildFile(from: File): List<File>? {
+fun findBuildFile(from: File): List<File> {
     var currentDirectory: File = from
     var result: MutableList<File>? = null
 
@@ -59,7 +42,7 @@ fun findBuildFile(from: File): List<File>? {
         currentDirectory = parent
     }
 
-    return null
+    return emptyList()
 }
 
 fun prepareBuildFileCacheFolder(buildFile: File): File? {
@@ -86,11 +69,32 @@ private val M2RepositoryRegex = "///\\s*m2-repository\\s+(\\w+)\\s+at\\s+(\\w+:\
 
 private val LibraryRegex = "///\\s*build-library\\s+(\\w+)\\s*:\\s*(\\w+)\\s*:\\s*(\\w+)\\s*".toRegex()
 
-fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): File? {
+fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
     val buildFolder = prepareBuildFileCacheFolder(buildFile)
-    val buildJar = File(buildFolder, buildFile.name + "-cache.jar")
+    val resultJar = File(buildFolder, buildFile.name + "-cache.jar")
+    val classpathFile = File(buildFolder, buildFile.name + ".cp")
+    val resultClasspath = mutableListOf<File>()
 
-    if (forceCompile || !buildJar.exists() || buildJar.lastModified() < buildFile.lastModified()) {
+    var recompile = forceCompile || !resultJar.exists() || resultJar.isDirectory || resultJar.lastModified() < buildFile.lastModified()
+    recompile = recompile || !classpathFile.exists() || classpathFile.isDirectory
+
+    if (!recompile) {
+        // All seems good, try to load the result classpath
+        classpathFile.forEachLine { line ->
+            if (line.isNotBlank()) {
+                resultClasspath.add(File(line))
+            }
+        }
+        for (file in resultClasspath) {
+            if (!file.exists()) {
+                recompile = true
+                resultClasspath.clear()
+                break
+            }
+        }
+    }
+
+    if (recompile) {
         // Recompile
         val classpath = ArrayList<File>()
 
@@ -124,14 +128,42 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): File? {
         }
         classpath.addAll(artifacts)
 
-        val success = KotlinCompiler.compile(listOf(buildFile), buildJar, classpath, emptyArray(), LoggerFactory.getLogger(buildFile.name + " Build"), null)
+        val success = KotlinCompiler.compile(listOf(buildFile), resultJar, classpath, emptyArray(), LoggerFactory.getLogger("BuildScriptCompilation"), null)
         if (!success) {
             return null
         }
+
+        resultClasspath.addAll(artifacts)
+        classpathFile.writeText(artifacts.joinToString(separator = "\n") { file -> file.absolutePath })
     }
 
-    return buildJar
+    // Figure out the init class
+    return BuildFile(resultJar, resultClasspath, transformFileNameToKotlinClassName(buildFile.nameWithoutExtension))
 }
 
+private fun transformFileNameToKotlinClassName(fileNameWithoutExtension:String):String {
+    val sb = StringBuilder()
+    // If file name starts with digit, _ is prepended
+    if (fileNameWithoutExtension.isNotEmpty() && fileNameWithoutExtension[0] in '0'..'9') {
+        sb.append('_')
+    }
+    // Everything is valid java identifier
+    for (c in fileNameWithoutExtension) {
+        if (c.isJavaIdentifierPart()) {
+            sb.append(c)
+        } else {
+            sb.append("_")
+        }
+    }
+    // First letter is capitalized
+    if (sb.isNotEmpty()) {
+        sb[0] = sb[0].toUpperCase()
+    }
+    // Kt is appended
+    sb.append("Kt")
+    return sb.toString()
+}
+
+data class BuildFile(val scriptJar:File, val extraClasspath:List<File>, val initClass:String)
 
 

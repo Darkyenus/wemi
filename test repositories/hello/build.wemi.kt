@@ -13,6 +13,11 @@ val hello = project {
 }
  */
 
-fun main(args: Array<String>) {
-    println("Hello world from build!")
+val someTask = "Loaded".apply {
+    println(this)
+    println(WemiVersion)
 }
+
+/*val myProject by project {
+    println("Created new project named $name at ${projectRoot.canonicalPath}!\nAlso check this:")
+}*/

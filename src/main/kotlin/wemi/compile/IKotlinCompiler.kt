@@ -3,7 +3,8 @@ package wemi.compile
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
-import wemi.WemiKotlinVersion
+import WemiKotlinVersion
+import wemi.boot.WemiDefaultClassLoader
 import wemi.dependency.*
 import wemi.util.ForceClassLoader
 import java.io.File
@@ -34,7 +35,7 @@ internal val KotlinCompiler: IKotlinCompiler by lazy {
 
     val implementationClassName = "wemi.compile.impl.KotlinCompilerImpl"
     val loader = ForceClassLoader(artifacts.map { file -> file.toURI().toURL() }.toTypedArray(),
-            IKotlinCompiler::class.java.classLoader, implementationClassName)
+            WemiDefaultClassLoader, implementationClassName)
     val clazz = Class.forName(implementationClassName, true, loader)
 
     clazz.newInstance() as IKotlinCompiler
