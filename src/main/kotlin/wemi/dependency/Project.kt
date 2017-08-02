@@ -3,14 +3,14 @@ package wemi.dependency
 import java.io.File
 
 /**
- * Unique identifier for project/module to be resolved.
+ * Unique identifier for wemi.project/module to be resolved.
  * May have dependencies on other projects and may have artifacts.
  *
- * @param group of project (aka organisation)
- * @param name of project
- * @param version of project (aka revision)
+ * @param group of wemi.project (aka organisation)
+ * @param name of wemi.project
+ * @param version of wemi.project (aka revision)
  *
- * @param preferredRepository preferredRepository in which to search for this project first
+ * @param preferredRepository preferredRepository in which to search for this wemi.project first
  */
 class ProjectId(val group: String,
                 val name: String,
@@ -105,6 +105,6 @@ val DefaultExclusions = listOf(
 data class ProjectDependency(val project: ProjectId, val exclusions: List<ProjectExclusion> = DefaultExclusions)
 
 /**
- * Data retrieved by resolving a project
+ * Data retrieved by resolving a wemi.project
  */
 data class ResolvedProject(val id: ProjectId, val artifact: File?, val dependencies: List<ProjectDependency>, val hasError: Boolean)

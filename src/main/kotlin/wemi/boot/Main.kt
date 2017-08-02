@@ -1,7 +1,15 @@
 package wemi.boot
 
 import com.darkyen.tproll.TPLogger
+import com.darkyen.tproll.integration.JavaLoggingIntegration
+import com.darkyen.tproll.logfunctions.ConsoleLogFunction
+import com.darkyen.tproll.logfunctions.FileLogFunction
+import com.darkyen.tproll.logfunctions.LogFunctionMultiplexer
 import org.slf4j.LoggerFactory
+import wemi.CLI
+import wemi.util.WemiClasspathFile
+import wemi.util.WemiDefaultClassLoader
+import wemi.util.div
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
@@ -12,6 +20,9 @@ private val LOG = LoggerFactory.getLogger("Main")
  * Entry point for the WEMI build tool
  */
 fun main(args: Array<String>) {
+    TPLogger.attachUnhandledExceptionLogger()
+    JavaLoggingIntegration.enable()
+
     var cleanBuild = false
 
     var errors = 0
@@ -74,6 +85,11 @@ fun main(args: Array<String>) {
         return
     }
 
+    TPLogger.setLogFunction(LogFunctionMultiplexer(
+        FileLogFunction(prepareBuildFileCacheFolder(buildFiles.first())!! / "logs"),
+        ConsoleLogFunction(null, null)
+    ))
+
     val compiledBuildFiles = mutableListOf<BuildFile>()
 
     for (buildFile in buildFiles) {
@@ -105,12 +121,13 @@ fun main(args: Array<String>) {
         LOG.debug("Build file loaded")
     }
 
-    // TODO
+    CLI.init(root)
+
     for (task in tasks) {
-        LOG.info("DUMMY: Doing task {}", task)
+        CLI.evaluateKeyAndPrint(task)
     }
+
     if (interactive) {
-        LOG.info("DUMMY: Going interactive")
+        CLI.beginInteractive()
     }
 }
-

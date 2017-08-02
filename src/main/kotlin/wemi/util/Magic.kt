@@ -1,7 +1,6 @@
-package wemi.boot
+package wemi.util
 
 import org.slf4j.LoggerFactory
-import wemi.util.toFile
 import java.io.File
 
 /**

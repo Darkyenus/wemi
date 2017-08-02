@@ -50,3 +50,10 @@ fun URL.toFile(): File? {
         }
     }
 }
+
+/** Append given path to the file. It is safe to use '/' slashes for directories
+ * (this is preferred to chaining [div] calls). Do not use '\' backslash. */
+@Suppress("NOTHING_TO_INLINE")
+operator inline fun File.div(path: String): File {
+    return File(this, path)
+}

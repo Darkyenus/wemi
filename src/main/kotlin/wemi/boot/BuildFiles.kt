@@ -1,9 +1,10 @@
 package wemi.boot
 
 import org.slf4j.LoggerFactory
-import WemiKotlinVersion
+import wemi.WemiKotlinVersion
 import wemi.compile.KotlinCompiler
 import wemi.dependency.*
+import wemi.util.WemiClasspathFile
 import java.io.File
 import java.net.URL
 
@@ -72,7 +73,7 @@ private val LibraryRegex = "///\\s*build-library\\s+(\\w+)\\s*:\\s*(\\w+)\\s*:\\
 fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
     val buildFolder = prepareBuildFileCacheFolder(buildFile)
     val resultJar = File(buildFolder, buildFile.name + "-cache.jar")
-    val classpathFile = File(buildFolder, buildFile.name + ".cp")
+    val classpathFile = File(buildFolder, buildFile.name + ".classpath")
     val resultClasspath = mutableListOf<File>()
 
     var recompile = forceCompile || !resultJar.exists() || resultJar.isDirectory || resultJar.lastModified() < buildFile.lastModified()

@@ -3,8 +3,8 @@ package wemi.compile
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
-import WemiKotlinVersion
-import wemi.boot.WemiDefaultClassLoader
+import wemi.WemiKotlinVersion
+import wemi.util.WemiDefaultClassLoader
 import wemi.dependency.*
 import wemi.util.ForceClassLoader
 import java.io.File

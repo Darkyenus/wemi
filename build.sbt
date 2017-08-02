@@ -19,11 +19,13 @@ libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.25"
 
 resolvers += "jitpack" at "https://jitpack.io"
 
-libraryDependencies += "com.github.Darkyenus" % "tproll" % "v1.2.2"
+libraryDependencies += "com.github.Darkyenus" % "tproll" % "v1.2.3"
 
 libraryDependencies += "com.github.Darkyenus" % "DaveWebb" % "v1.2"
 
 libraryDependencies += "org.jetbrains.kotlin" % "kotlin-compiler" % "1.1.3-2" % Provided
+
+libraryDependencies += "org.jline" % "jline" % "3.3.0"
 
 assemblyMergeStrategy in assembly := {stuff => if (stuff.startsWith("META-INF/")) MergeStrategy.discard else MergeStrategy.first}
 
