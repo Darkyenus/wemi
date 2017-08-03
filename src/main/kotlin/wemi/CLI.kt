@@ -118,7 +118,7 @@ object CLI {
 
         if (error != null) {
             print(format("Failure ", Color.Red))
-            print(formatInput(error.scope +"/"+ error.key.name))
+            print(formatInput(error.scope.scopeToString() + "/"+ error.key.name))
             println(format(" is not set", Color.Red))
         } else {
             print(formatLabel("Done "))
@@ -153,37 +153,64 @@ object CLI {
      * (default project will be then used)
      */
     fun evaluateKey(text: String): Any? {
-        val project: Project?
-        val key: Key<*>?
-        // Parse Project
-        val split = text.indexOf('/')
-        val keyString: String
-        if (split == -1) {
-            project = defaultProject
-            if (project == null) {
-                printWarning("Can't evaluate $text - no project specified")
-                return null
-            }
-            keyString = text
-        } else {
-            val projectString = text.substring(0, split)
-            keyString = text.substring(split + 1)
+        var project: Project? = defaultProject
+        val configurations = mutableListOf<Configuration>()
 
+        var offset = 0
+
+        // Parse Project
+        val projectSlashIndex = text.indexOf('/')
+        if (projectSlashIndex != -1) {
+            val projectString = text.substring(offset, projectSlashIndex)
             project = AllProjects.findCaseInsensitive(projectString)
             if (project == null) {
                 printWarning("Can't evaluate $text - no project named '$projectString' found (Existing projects: ${AllProjects.keys.joinToString(", ")})")
                 return null
             }
+            offset = projectSlashIndex + 1
+        } else if (project == null) {
+            printWarning("Can't evaluate $text - no project specified")
+            return null
         }
+
+        // Parse Configurations
+        while (true) {
+            val nextConfigEnd = text.indexOf(':', offset)
+            if (nextConfigEnd == -1) {
+                break
+            }
+
+            val configString = text.substring(offset, nextConfigEnd)
+            val config = AllConfigurations.findCaseInsensitive(configString)
+            if (config == null) {
+                printWarning("Can't evaluate $text - no configuration named '$configString' found (Existing configurations: ${AllConfigurations.keys.joinToString(", ")})")
+                return null
+            }
+            configurations.add(config)
+            offset = nextConfigEnd + 1
+        }
+
         // Parse Key
-        key = AllKeys.findCaseInsensitive(keyString)
+        val keyString = text.substring(offset)
+        val key = AllKeys.findCaseInsensitive(keyString)
         if (key == null) {
             printWarning("Can't evaluate $text - no key named '$keyString' found (Existing keys: ${AllKeys.keys.joinToString(", ")})")
             return null
         }
 
         return project.run {
-            key.get()
+            evaluateInNestedScope(key, configurations, 0)
+        }
+    }
+
+    // Now this is some mind-bending stuff!
+    private fun <Value> Scope.evaluateInNestedScope(key:Key<Value>, all:List<Configuration>, index:Int):Value {
+        if (index == all.size) {
+            return key.get()
+        } else {
+            return with (all[index]) {
+                evaluateInNestedScope(key, all, index + 1)
+            }
         }
     }
 

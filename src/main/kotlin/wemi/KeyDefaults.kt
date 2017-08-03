@@ -12,7 +12,8 @@ object KeyDefaults {
         val root = Keys.projectRoot.get()
         listOf(root / "src/main/kotlin", root / "src/main/java")
     }
-    val SourceExtensionsList = listOf("java", "kt")
+    val SourceExtensionsJavaList = listOf("java")
+    val SourceExtensionsKotlinList = listOf("kt", "kts")
     val SourceExtensions: LazyKeyValue<Collection<String>> = { SourceExtensionsList }
     val SourceFiles: LazyKeyValue<Collection<File>> = {
         val directories = Keys.sourceDirectories.get()
@@ -53,6 +54,10 @@ object KeyDefaults {
     }
     val Compile: LazyKeyValue<File> = {
         val output = Keys.compileOutputFile.get()
+        val sources = Keys.sourceFiles.get()
+        //TODO
+
+
         if (KotlinCompiler.compile(Keys.sourceFiles.get().toList(),
                 output,
                 Keys.classpath.get().toList(),
@@ -63,7 +68,7 @@ object KeyDefaults {
         } else throw WemiException("Compilation failed", showStacktrace = false)
     }
     val RunDirectory: LazyKeyValue<File> = { Keys.projectRoot.get() }
-    val RunOptionsList = listOf("-ea")
+    val RunOptionsList = listOf("-ea", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005")
     val RunOptions: LazyKeyValue<Collection<String>> = { RunOptionsList }
     val RunArguments: LazyKeyValue<Collection<String>> = { emptyList() }
     val Run: LazyKeyValue<Process> = {

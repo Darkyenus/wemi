@@ -21,7 +21,6 @@ import wemi.KeyDefaults.SourceExtensions
 import wemi.KeyDefaults.SourceFiles
 import java.io.File
 import java.util.*
-import kotlin.collections.HashMap
 import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
 
@@ -33,104 +32,6 @@ internal object BuildScriptData {
     val AllKeys: MutableMap<String, Key<Any>> = Collections.synchronizedMap(mutableMapOf<String, Key<Any>>())
     val AllConfigurations: MutableMap<String, Configuration> = Collections.synchronizedMap(mutableMapOf<String, Configuration>())
 }
-
-typealias LazyKeyValue<Value> = ConfigurationHolder.() -> Value
-
-abstract class ConfigurationHolder(val parent: ConfigurationHolder?) {
-    abstract val name:String
-
-    private val keyValueBinding = HashMap<Key<*>, LazyKeyValue<Any?>>()
-
-    infix fun <Value> Key<Value>.set(lazyValue:LazyKeyValue<Value>) {
-        @Suppress("UNCHECKED_CAST")
-        synchronized(keyValueBinding) {
-            keyValueBinding.put(this as Key<Any>, lazyValue as LazyKeyValue<Any?>)
-        }
-    }
-
-    operator fun <Value> Key<Collection<Value>>.plusAssign(lazyValue:LazyKeyValue<Value>) {
-        @Suppress("UNCHECKED_CAST")
-        synchronized(keyValueBinding) {
-            val previous = keyValueBinding[this] as LazyKeyValue<Collection<Value>>?
-
-            val combiner:ConfigurationHolder.()->Collection<Value> = {
-                val parentValue = parent?.run { this@plusAssign.getOrNull() }
-                val previousValue = previous
-
-                val collection = mutableListOf<Value>()
-                if (parentValue != null) {
-                    collection.addAll(parentValue)
-                }
-                if (previousValue != null) {
-                    collection.addAll(previousValue())
-                }
-                collection.add(lazyValue())
-                collection
-            }
-
-            keyValueBinding.put(this as Key<Any>, combiner)
-        }
-    }
-
-    private inline fun <Value>unpack(binding:LazyKeyValue<Value>):Value {
-        //TODO something more clever?
-        return this.binding()
-    }
-
-    private inline fun <Value, Output>getKeyValue(key: Key<Value>, otherwise:()->Output):Output where Value : Output {
-        var holder: ConfigurationHolder = this@ConfigurationHolder
-        while(true) {
-            synchronized(holder.keyValueBinding) {
-                if (holder.keyValueBinding.containsKey(key)) {
-                    @Suppress("UNCHECKED_CAST")
-                    val retrievedValue = keyValueBinding[key] as LazyKeyValue<Value>
-                    return holder.unpack(retrievedValue)
-                }
-            }
-            holder = holder.parent?:break
-        }
-
-        return otherwise()
-    }
-
-    /** Return the value bound to this wemi.key in this scope.
-     * Throws exception if no value set. */
-    fun <Value> Key<Value>.get():Value {
-        return getKeyValue(this) {
-            // We have to check default value
-            if (hasDefaultValue) {
-                @Suppress("UNCHECKED_CAST")
-                return defaultValue as Value
-            } else {
-                throw WemiException.KeyNotAssignedException(this, this@ConfigurationHolder.name)
-            }
-        }
-    }
-
-    /** Return the value bound to this wemi.key in this scope.
-     * Returns [unset] if no value set.
-     * @param acceptDefault if wemi.key has default value, return that, otherwise return [unset] */
-    fun <Value> Key<Value>.getOrElse(unset:Value, acceptDefault:Boolean = true):Value {
-        return getKeyValue(this) {
-            // We have to check default value
-            @Suppress("UNCHECKED_CAST")
-            if (acceptDefault && this.hasDefaultValue) {
-                return this.defaultValue as Value
-            } else {
-                return unset
-            }
-        }
-    }
-
-    /** Return the value bound to this wemi.key in this scope.
-     * Returns `null` if no value set. */
-    fun <Value> Key<Value>.getOrNull():Value? {
-        return getKeyValue(this) {
-            this.defaultValue
-        }
-    }
-}
-
 
 class ProjectDelegate internal constructor(
         private val projectRoot: File,
@@ -208,7 +109,8 @@ class KeyDelegate<Value> internal constructor(
 
 class ConfigurationDelegate internal constructor(
         private val description: String,
-        private val parent: ConfigurationHolder?) : ReadOnlyProperty<Any?, Configuration> {
+        private val parent: Configuration?,
+        private val initializer: Configuration.() -> Unit) : ReadOnlyProperty<Any?, Configuration> {
 
     private lateinit var configuration: Configuration
 
@@ -222,6 +124,7 @@ class ConfigurationDelegate internal constructor(
 
             BuildScriptData.AllConfigurations.put(configuration.name, configuration)
         }
+        configuration.initializer()
         return this
     }
 

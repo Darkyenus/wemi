@@ -55,9 +55,12 @@ class Key<out Value> internal constructor(val name:String,
     override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} - $description"
 }
 
+typealias LazyKeyValue<Value> = Scope.() -> Value
+
 class Configuration internal constructor(override val name: String,
-                    val description: String,
-                    parent: ConfigurationHolder?) : ConfigurationHolder(parent), WithDescriptiveString {
+                                         val description: String,
+                                         parent: Configuration?) : BindingHolder(parent), WithDescriptiveString {
+
     override fun toString(): String {
         return name
     }
@@ -65,10 +68,157 @@ class Configuration internal constructor(override val name: String,
     override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} - \"$description\""
 }
 
-class Project internal constructor(override val name: String, val projectRoot: File) : ConfigurationHolder(null), WithDescriptiveString {
+class Project internal constructor(override val name: String, val projectRoot: File) : BindingHolder(null), WithDescriptiveString, Scope {
+    override fun scopeToString(): String = name + "/"
+
     override fun toString(): String = name
 
     override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} at $projectRoot"
+
+    override val scopeBindingHolder: BindingHolder
+        get() = this
+    override val scopeParent: Scope?
+        get() = null
+}
+
+interface Scope {
+
+    val scopeBindingHolder: BindingHolder
+
+    val scopeParent:Scope?
+
+    //TODO val scopeCache:ScopeCache which will store other existing scope combinations and will cache resolved key values
+
+    fun <Result> with(configuration: Configuration, action: Scope.() -> Result):Result {
+        val scope = ConfigurationScope(configuration, this)
+        return scope.action()
+    }
+
+    private inline fun <Value>unpack(key: Key<Value>, binding:LazyKeyValue<Value>, reverseAdditions:ArrayList<List<LazyKeyValue<Value>>>?):Value {
+        //TODO caching
+
+        var result = this.binding()
+        if (reverseAdditions != null) {
+            if (result !is Collection<*>) {
+                throw WemiException("Key $key has additions but isn't a collection key!")
+            }
+
+            val compounded = when (result) {
+                is Set<*> ->
+                    result.toMutableSet()
+                else ->
+                    result.toMutableList()
+            }
+
+            var i = reverseAdditions.lastIndex
+            while (i >= 0) {
+                for (lazyAddition in reverseAdditions[i]) {
+                    compounded.add(this.lazyAddition())
+                }
+                i--
+            }
+            @Suppress("UNCHECKED_CAST")
+            result = compounded as Value
+        }
+
+        return result
+    }
+
+    private inline fun <Value, Output> getKeyValue(key: Key<Value>, otherwise:()->Output):Output where Value : Output {
+        var allAdditions:ArrayList<List<LazyKeyValue<Value>>>? = null
+
+        var scope:Scope = this
+        while (true) {
+            var holder: BindingHolder = scope.scopeBindingHolder
+            while(true) {
+                @Suppress("UNCHECKED_CAST")
+                synchronized(holder.bindLock) {
+                    val additions = holder.bindAdditions[key] as List<LazyKeyValue<Value>>?
+                    if (additions != null) {
+                        if (allAdditions == null) {
+                            allAdditions = ArrayList()
+                        }
+                        allAdditions!!.add(additions)
+                    }
+
+                    val lazyValue = holder.binding[key] as LazyKeyValue<Value>?
+                    if (lazyValue != null) {
+                        return unpack(key, lazyValue, allAdditions)
+                    }
+                }
+                holder = holder.parent?:break
+            }
+            scope = scope.scopeParent?:break
+        }
+
+        return otherwise()
+    }
+
+    /** Return the value bound to this wemi.key in this scope.
+     * Throws exception if no value set. */
+    fun <Value> Key<Value>.get():Value {
+        return getKeyValue(this) {
+            // We have to check default value
+            if (hasDefaultValue) {
+                @Suppress("UNCHECKED_CAST")
+                defaultValue as Value
+            } else {
+                throw WemiException.KeyNotAssignedException(this, this@Scope)
+            }
+        }
+    }
+
+    /** Return the value bound to this wemi.key in this scope.
+     * Returns [unset] if no value set.
+     * @param acceptDefault if wemi.key has default value, return that, otherwise return [unset] */
+    fun <Value> Key<Value>.getOrElse(unset:Value, acceptDefault:Boolean = true):Value {
+        return getKeyValue(this) {
+            // We have to check default value
+            @Suppress("UNCHECKED_CAST")
+            if (acceptDefault && this.hasDefaultValue) {
+                this.defaultValue as Value
+            } else {
+                unset
+            }
+        }
+    }
+
+    /** Return the value bound to this wemi.key in this scope.
+     * Returns `null` if no value set. */
+    fun <Value> Key<Value>.getOrNull():Value? {
+        return getKeyValue(this) {
+            this.defaultValue
+        }
+    }
+
+    fun scopeToString():String
+}
+
+internal class ConfigurationScope(override val scopeBindingHolder: Configuration, override val scopeParent:Scope) : Scope {
+    override fun scopeToString(): String = scopeParent.scopeToString() + scopeBindingHolder.name + ":"
+}
+
+sealed class BindingHolder(val parent: BindingHolder?) {
+    abstract val name:String
+
+    internal val bindLock = Object()
+    internal val binding = HashMap<Key<*>, LazyKeyValue<Any?>>()
+    internal val bindAdditions = HashMap<Key<*>, MutableList<LazyKeyValue<Any?>>>()
+
+    infix fun <Value> Key<Value>.set(lazyValue:LazyKeyValue<Value>) {
+        @Suppress("UNCHECKED_CAST")
+        synchronized(bindLock) {
+            binding.put(this as Key<Any>, lazyValue as LazyKeyValue<Any?>)
+        }
+    }
+
+    operator fun <Value> Key<Collection<Value>>.plusAssign(lazyValue:LazyKeyValue<Value>) {
+        @Suppress("UNCHECKED_CAST")
+        synchronized(bindLock) {
+            val additions = bindAdditions.getOrPut(this as Key<Any>) { mutableListOf<LazyKeyValue<Any?>>() }
+            additions.add(lazyValue)
+        }
+    }
 }
 
 fun project(projectRoot: File, initializer: Project.() -> Unit): ProjectDelegate {
@@ -83,8 +233,8 @@ fun <Value>key(description: String, cached: Boolean = false): KeyDelegate<Value>
     return KeyDelegate(description, false, null, cached)
 }
 
-fun configuration(description: String, parent: ConfigurationHolder?): ConfigurationDelegate {
-    return ConfigurationDelegate(description, parent)
+fun configuration(description: String, parent: Configuration?, initializer: Configuration.() -> Unit): ConfigurationDelegate {
+    return ConfigurationDelegate(description, parent, initializer)
 }
 
 /** Convenience ProjectDependency creator. */
@@ -113,7 +263,7 @@ fun dependency(groupNameVersion:String, preferredRepository: Repository?, vararg
     return dependency(group, name, version, preferredRepository, *attributes)
 }
 
-fun ConfigurationHolder.kotlinDependency(name: String):ProjectDependency {
+fun Scope.kotlinDependency(name: String):ProjectDependency {
     return ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-"+name, Keys.kotlinVersion.get()))
 }
 

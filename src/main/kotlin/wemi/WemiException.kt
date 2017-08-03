@@ -15,5 +15,5 @@ open class WemiException : RuntimeException {
         this.showStacktrace = showStacktrace
     }
 
-    class KeyNotAssignedException(val key:Key<*>, val scope:String):WemiException("'${key.name}' not assigned in $scope", showStacktrace = false)
+    class KeyNotAssignedException(val key:Key<*>, val scope:Scope):WemiException("'${key.name}' not assigned in $scope", showStacktrace = false)
 }

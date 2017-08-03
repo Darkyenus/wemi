@@ -1,6 +1,6 @@
 @file:Suppress("NOTHING_TO_INLINE", "unused")
 
-import wemi.ConfigurationHolder
+import wemi.BindingHolder
 import wemi.Project
 import wemi.dependency.ProjectAttribute
 import wemi.dependency.Repository
@@ -24,10 +24,10 @@ typealias ProjectExclusion = wemi.dependency.ProjectExclusion
 inline fun project(projectRoot: File = File("."), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, initializer)
 inline fun <Value>key(description: String, defaultValue: Value, cached:Boolean = false) = wemi.key(description, defaultValue, cached)
 inline fun <Value>key(description: String, cached:Boolean = false) = wemi.key<Value>(description, cached)
-inline fun configuration(description: String, parent: ConfigurationHolder? = null) = wemi.configuration(description, parent)
+inline fun configuration(description: String, parent: BindingHolder? = null) = wemi.configuration(description, parent)
 inline fun dependency(group:String, name:String, version:String, preferredRepository: Repository? = null, vararg attributes:Pair<ProjectAttribute, String>) = wemi.dependency(group, name, version, preferredRepository, *attributes)
 inline fun dependency(groupNameVersion:String, preferredRepository: Repository? = null, vararg attributes:Pair<ProjectAttribute, String>) = wemi.dependency(groupNameVersion, preferredRepository, *attributes)
-inline fun ConfigurationHolder.kotlinDependency(name: String) = _kotlinDependency(name)
+inline fun BindingHolder.kotlinDependency(name: String) = _kotlinDependency(name)
 inline fun repository(name: String, url:String, checksum: Repository.M2.Checksum = Repository.M2.Checksum.SHA1) = wemi.repository(name, url, checksum)
 
 // Keys
