@@ -75,12 +75,12 @@ fun project(projectRoot: File, initializer: Project.() -> Unit): ProjectDelegate
     return ProjectDelegate(projectRoot, initializer)
 }
 
-fun <Value>key(description: String, defaultValue: Value): KeyDelegate<Value> {
-    return KeyDelegate(description, true, defaultValue)
+fun <Value>key(description: String, defaultValue: Value, cached:Boolean = false): KeyDelegate<Value> {
+    return KeyDelegate(description, true, defaultValue, cached)
 }
 
-fun <Value>key(description: String): KeyDelegate<Value> {
-    return KeyDelegate(description, false, null)
+fun <Value>key(description: String, cached: Boolean = false): KeyDelegate<Value> {
+    return KeyDelegate(description, false, null, cached)
 }
 
 fun configuration(description: String, parent: ConfigurationHolder?): ConfigurationDelegate {
@@ -97,8 +97,8 @@ fun dependency(group:String, name:String, version:String, preferredRepository: R
  *          If the amount of ':'s isn't exactly 2, or one of the triplet is empty, runtime exception is thrown. */
 fun dependency(groupNameVersion:String, preferredRepository: Repository?, vararg attributes:Pair<ProjectAttribute, String>): ProjectDependency {
     val first = groupNameVersion.indexOf(':')
-    val second = groupNameVersion.indexOf(':', startIndex = maxOf(first, 0))
-    val third = groupNameVersion.indexOf(':', startIndex = maxOf(second, 0))
+    val second = groupNameVersion.indexOf(':', startIndex = maxOf(first + 1, 0))
+    val third = groupNameVersion.indexOf(':', startIndex = maxOf(second + 1, 0))
     if (first < 0 || second < 0 || third >= 0) {
         throw WemiException("groupNameVersion must contain exactly two semicolons: '$groupNameVersion'")
     }

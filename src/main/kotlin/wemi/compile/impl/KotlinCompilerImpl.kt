@@ -9,9 +9,12 @@ import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.jetbrains.kotlin.config.Services
 import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.slf4j.Marker
 import wemi.compile.IKotlinCompiler
 import java.io.File
+
+private val LOG = LoggerFactory.getLogger("KotlinCompilerImpl")
 
 @Suppress("unused")
 /**
@@ -44,6 +47,8 @@ internal class KotlinCompilerImpl : IKotlinCompiler {
         for (source in sources) {
             args.freeArgs.add(source.absolutePath)
         }
+
+        LOG.trace("Invoking kotlin compiler with destination:{}, classpath:{}, freeArgs:{}", args.destination, args.classpath, args.freeArgs)
 
         val exitCode = compiler.exec(createLoggingMessageCollector(logger, loggerMarker), Services.EMPTY, args)
         return exitCode == ExitCode.OK

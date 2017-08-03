@@ -15,7 +15,7 @@ private object __ResourceHook
 internal val WemiClasspathFile: File = __ResourceHook.javaClass.getResource("MagicKt.class").let { dotResource ->
     val result: File?
     if (dotResource.protocol == "file") {
-        result = File(dotResource.path.removeSuffix("wemi/boot/MagicKt.class"))
+        result = File(dotResource.path.removeSuffix("wemi/util/MagicKt.class"))
     } else {
         result = dotResource.toFile()
     }

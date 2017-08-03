@@ -129,7 +129,7 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
         }
         classpath.addAll(artifacts)
 
-        val success = KotlinCompiler.compile(listOf(buildFile), resultJar, classpath, emptyArray(), LoggerFactory.getLogger("BuildScriptCompilation"), null)
+        val success = KotlinCompiler.compile(listOf(buildFile), resultJar, classpath, arrayOf("-no-stdlib"), LoggerFactory.getLogger("BuildScriptCompilation"), null)
         if (!success) {
             return null
         }

@@ -5,7 +5,9 @@ import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
 import org.jline.reader.impl.DefaultParser
+import org.jline.terminal.Terminal
 import org.jline.terminal.TerminalBuilder
+import org.slf4j.LoggerFactory
 import wemi.util.WithDescriptiveString
 import wemi.util.findCaseInsensitive
 import wemi.util.formatTimeDuration
@@ -18,7 +20,9 @@ import java.io.IOException
 
 object CLI {
 
-    val Terminal = TerminalBuilder.terminal()
+    private val LOG = LoggerFactory.getLogger(javaClass)
+
+    val Terminal: Terminal = TerminalBuilder.terminal()
 
     private var defaultProject: Project? = null
         set(value) {
@@ -98,24 +102,45 @@ object CLI {
 
 
     fun printWarning(text: CharSequence) {
-        println(format(text, foreground = Color.Yellow, background = Color.Red))
+        println(format(text, foreground = Color.Red))
     }
 
     fun evaluateKeyAndPrint(text: String) {
         val beginTime = System.currentTimeMillis()
-        val result = evaluateKey(text)
+        var result: Any? = null
+        var error:WemiException.KeyNotAssignedException? = null
+        try {
+            result = evaluateKey(text)
+        } catch (e:WemiException.KeyNotAssignedException) {
+            error = e
+        }
         val duration = System.currentTimeMillis() - beginTime
-        print(formatLabel("Done "))
-        if (result == null) {
-            println(formatInput(text))
+
+        if (error != null) {
+            print(format("Failure ", Color.Red))
+            print(formatInput(error.scope +"/"+ error.key.name))
+            println(format(" is not set", Color.Red))
         } else {
+            print(formatLabel("Done "))
             print(formatInput(text))
-            print(formatLabel(": "))
-            println(formatValue(result.toString()))
+            if (result == null) {
+                println()
+                // Done
+            } else if (result is Collection<*>){
+                print(formatLabel(" ("))
+                print(result.size)
+                println(formatLabel("): "))
+                for (item:Any? in result) {
+                    println("  "+formatValue(item.toString()))
+                }
+            } else {
+                print(formatLabel(": "))
+                println(formatValue(result.toString()))
+            }
         }
 
         if (duration > 100) {
-            print(format("\tin " + formatTimeDuration(duration), Color.Cyan))
+            println(format("\tin " + formatTimeDuration(duration), Color.Cyan))
         }
     }
 
@@ -158,7 +183,7 @@ object CLI {
         }
 
         return project.run {
-            key.getOrNull()
+            key.get()
         }
     }
 
@@ -190,8 +215,19 @@ object CLI {
                         "in a configuration, prefix it with its name and slash, for example: desktop/run")
                 return
             }
-            else ->
-                evaluateKeyAndPrint(command)
+            else -> {
+                try {
+                    evaluateKeyAndPrint(command)
+                } catch (we:WemiException) {
+                    val message = we.message
+                    if (we.showStacktrace || message == null || message.isBlank()) {
+                        LOG.error("Error while evaluating $command", we)
+                    } else {
+                        printWarning(message)
+                        LOG.debug("Error while evaluating $command", we)
+                    }
+                }
+            }
         }
     }
 
@@ -227,7 +263,8 @@ object CLI {
                 break
             }
         }
-        println(format("Bye! "+ ByeSuffixes.random(), Color.values().random()))
+
+        printBye()
         System.out.flush()
         System.err.flush()
     }
@@ -261,6 +298,21 @@ object CLI {
 
     private fun <T> Array<T>.random():T {
         return get(Random.nextInt(size))
+    }
+
+    private fun printBye() {
+        when (Random.nextInt(3)) {
+            0 -> {
+                println(format("Bye!", Color.values().random()))
+            }
+            1 -> {
+                println(format("Bye! "+ ByeSuffixes.random(), Color.values().random()))
+            }
+            2 -> {
+                println("" + format("B", Color.Red) + format("y", Color.Green) + format("e", Color.Yellow) + format("!", Color.Blue) + " " + ByeSuffixes.random())
+            }
+        }
+
     }
 
     private val ByeSuffixes = arrayOf("😀", "😃", "😄", "😊", "🙂", "🙃", "😋", "🤓", "😎", "👽", "😺", "😸", "👋", "👍", "👊", "🤘", "🖖", "🐶", "🐻", "🐼", "🐨", "🐒", "🐸", "🐙", "🐺", "🐲", "🏂", "🏄", "👾", "💎", "🎈", "🎉")

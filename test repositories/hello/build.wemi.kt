@@ -13,4 +13,6 @@ val hello by project {
 
     libraryDependencies += { dependency("com.h2database:h2:1.4.196") }
 
+    mainClass set { "HelloWemiKt" }
+
 }

@@ -3,16 +3,27 @@
 package wemi
 
 import org.slf4j.LoggerFactory
-import wemi.dependency.DefaultRepositories
-import wemi.dependency.ProjectDependency
-import wemi.dependency.Repository
+import wemi.KeyDefaults.BuildDirectory
+import wemi.KeyDefaults.Classpath
+import wemi.KeyDefaults.Compile
+import wemi.KeyDefaults.CompileOutputFile
+import wemi.KeyDefaults.CompilerOptions
+import wemi.KeyDefaults.JavaExecutable
+import wemi.KeyDefaults.JavaHome
+import wemi.KeyDefaults.LibraryDependencies
+import wemi.KeyDefaults.Repositories
+import wemi.KeyDefaults.Run
+import wemi.KeyDefaults.RunArguments
+import wemi.KeyDefaults.RunDirectory
+import wemi.KeyDefaults.RunOptions
+import wemi.KeyDefaults.SourceDirectories
+import wemi.KeyDefaults.SourceExtensions
+import wemi.KeyDefaults.SourceFiles
 import java.io.File
 import java.util.*
+import kotlin.collections.HashMap
 import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
-
-import wemi.util.div
-import kotlin.collections.HashMap
 
 private val LOG = LoggerFactory.getLogger("Wemi")
 
@@ -40,13 +51,21 @@ abstract class ConfigurationHolder(val parent: ConfigurationHolder?) {
     operator fun <Value> Key<Collection<Value>>.plusAssign(lazyValue:LazyKeyValue<Value>) {
         @Suppress("UNCHECKED_CAST")
         synchronized(keyValueBinding) {
+            val previous = keyValueBinding[this] as LazyKeyValue<Collection<Value>>?
+
             val combiner:ConfigurationHolder.()->Collection<Value> = {
                 val parentValue = parent?.run { this@plusAssign.getOrNull() }
-                if (parentValue == null) {
-                    listOf(lazyValue())
-                } else {
-                    parentValue + lazyValue()
+                val previousValue = previous
+
+                val collection = mutableListOf<Value>()
+                if (parentValue != null) {
+                    collection.addAll(parentValue)
                 }
+                if (previousValue != null) {
+                    collection.addAll(previousValue())
+                }
+                collection.add(lazyValue())
+                collection
             }
 
             keyValueBinding.put(this as Key<Any>, combiner)
@@ -83,7 +102,7 @@ abstract class ConfigurationHolder(val parent: ConfigurationHolder?) {
                 @Suppress("UNCHECKED_CAST")
                 return defaultValue as Value
             } else {
-                throw WemiException("$name is not assigned in ${this@ConfigurationHolder.name}")
+                throw WemiException.KeyNotAssignedException(this, this@ConfigurationHolder.name)
             }
         }
     }
@@ -137,12 +156,24 @@ class ProjectDelegate internal constructor(
             Keys.projectName set { project.name }
             Keys.projectRoot set { project.projectRoot }
 
-            Keys.buildDirectory set DefaultTaskImplementations.BuildDirectory
-            Keys.sourceDirectories set DefaultTaskImplementations.SourceDirectories
-            Keys.sourceExtensions set DefaultTaskImplementations.SourceExtensions
-            Keys.sourceFiles set DefaultTaskImplementations.SourceFiles
-            Keys.repositories set DefaultTaskImplementations.Repositories
-            Keys.libraryDependencies set DefaultTaskImplementations.LibraryDependencies
+            Keys.buildDirectory set KeyDefaults.BuildDirectory
+            Keys.sourceDirectories set KeyDefaults.SourceDirectories
+            Keys.sourceExtensions set KeyDefaults.SourceExtensions
+            Keys.sourceFiles set KeyDefaults.SourceFiles
+            Keys.repositories set KeyDefaults.Repositories
+            Keys.libraryDependencies set KeyDefaults.LibraryDependencies
+            Keys.classpath set KeyDefaults.Classpath
+            Keys.javaHome set KeyDefaults.JavaHome
+            Keys.javaExecutable set KeyDefaults.JavaExecutable
+            Keys.compilerOptions set KeyDefaults.CompilerOptions
+            Keys.compileOutputFile set KeyDefaults.CompileOutputFile
+            Keys.compile set KeyDefaults.Compile
+
+            //Keys.mainClass TODO Detect main class?
+            Keys.runDirectory set KeyDefaults.RunDirectory
+            Keys.runOptions set KeyDefaults.RunOptions
+            Keys.runArguments set KeyDefaults.RunArguments
+            Keys.run set KeyDefaults.Run
         }
         this.project.initializer()
         return this
@@ -154,7 +185,8 @@ class ProjectDelegate internal constructor(
 class KeyDelegate<Value> internal constructor(
         private val description:String,
         private val hasDefaultValue:Boolean,
-        private val defaultValue:Value?) : ReadOnlyProperty<Any?, Key<Value>> {
+        private val defaultValue:Value?,
+        private val cached:Boolean) : ReadOnlyProperty<Any?, Key<Value>> {
 
     private lateinit var key: Key<Value>
 
@@ -194,36 +226,4 @@ class ConfigurationDelegate internal constructor(
     }
 
     override fun getValue(thisRef: Any?, property: KProperty<*>): Configuration = configuration
-}
-
-object DefaultTaskImplementations {
-    val BuildDirectory:LazyKeyValue<File> = { Keys.projectRoot.get() / "build" }
-    val SourceDirectories:LazyKeyValue<Collection<File>> = {
-        val root = Keys.projectRoot.get()
-        listOf(root / "src/main/kotlin", root / "src/main/java")
-    }
-    val SourceExtensionsList = listOf("java", "kt")
-    val SourceExtensions:LazyKeyValue<Collection<String>> = { SourceExtensionsList }
-    val SourceFiles:LazyKeyValue<Collection<File>> = {
-        val directories = Keys.sourceDirectories.get()
-        val extensions = Keys.sourceExtensions.get()
-        val result = mutableListOf<File>()
-
-        for (sourceDir in directories) {
-            sourceDir.walkTopDown().forEach { file ->
-                val ext = file.extension
-                if (!file.isDirectory && extensions.any { it.equals(ext, ignoreCase = true) }) {
-                    result.add(file)
-                }
-            }
-        }
-
-        result
-    }
-    val Repositories:LazyKeyValue<Collection<Repository>> = {
-        DefaultRepositories
-    }
-    val LibraryDependencies:LazyKeyValue<Collection<ProjectDependency>> = {
-        listOf(kotlinDependency("stdlib"))
-    }
 }

@@ -22,8 +22,8 @@ typealias ProjectExclusion = wemi.dependency.ProjectExclusion
 
 // Functions
 inline fun project(projectRoot: File = File("."), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, initializer)
-inline fun <Value>key(description: String, defaultValue: Value) = wemi.key(description, defaultValue)
-inline fun <Value>key(description: String) = wemi.key<Value>(description)
+inline fun <Value>key(description: String, defaultValue: Value, cached:Boolean = false) = wemi.key(description, defaultValue, cached)
+inline fun <Value>key(description: String, cached:Boolean = false) = wemi.key<Value>(description, cached)
 inline fun configuration(description: String, parent: ConfigurationHolder? = null) = wemi.configuration(description, parent)
 inline fun dependency(group:String, name:String, version:String, preferredRepository: Repository? = null, vararg attributes:Pair<ProjectAttribute, String>) = wemi.dependency(group, name, version, preferredRepository, *attributes)
 inline fun dependency(groupNameVersion:String, preferredRepository: Repository? = null, vararg attributes:Pair<ProjectAttribute, String>) = wemi.dependency(groupNameVersion, preferredRepository, *attributes)
@@ -56,3 +56,19 @@ val repositories
         inline get() = wemi.Keys.repositories
 val libraryDependencies
         inline get() = wemi.Keys.libraryDependencies
+val classpath
+        inline get() = wemi.Keys.classpath
+
+val kotlinVersion
+        inline get() = wemi.Keys.kotlinVersion
+val compilerOptions
+        inline get() = wemi.Keys.compilerOptions
+
+val compileOutputFile
+        inline get() = wemi.Keys.compileOutputFile
+val compile
+        inline get() = wemi.Keys.compile
+val mainClass
+        inline get() = wemi.Keys.mainClass
+val run
+        inline get() = wemi.Keys.run
