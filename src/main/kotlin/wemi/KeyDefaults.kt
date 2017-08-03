@@ -1,5 +1,6 @@
 package wemi
 
+import configuration
 import org.slf4j.LoggerFactory
 import wemi.compile.KotlinCompiler
 import wemi.dependency.*
@@ -12,20 +13,32 @@ object KeyDefaults {
         val root = Keys.projectRoot.get()
         listOf(root / "src/main/kotlin", root / "src/main/java")
     }
-    val SourceExtensionsJavaList = listOf("java")
-    val SourceExtensionsKotlinList = listOf("kt", "kts")
-    val SourceExtensions: LazyKeyValue<Collection<String>> = { SourceExtensionsList }
-    val SourceFiles: LazyKeyValue<Collection<File>> = {
-        val directories = Keys.sourceDirectories.get()
-        val extensions = Keys.sourceExtensions.get()
-        val result = mutableListOf<File>()
 
-        for (sourceDir in directories) {
-            sourceDir.walkTopDown().forEach { file ->
+    val SourceExtensionsJavaList = listOf("java")
+    val javaSources by configuration("Configuration used when collecting Java sources") {
+        Keys.sourceExtensions set { SourceExtensionsJavaList }
+    }
+
+    val SourceExtensionsKotlinList = listOf("kt", "kts")
+    val kotlinSources by configuration("Configuration used when collecting Kotlin sources") {
+        Keys.sourceExtensions set { SourceExtensionsKotlinList }
+    }
+
+    val SourceFiles: LazyKeyValue<Map<File, Collection<File>>> = {
+        val roots = Keys.sourceRoots.get()
+        val extensions = Keys.sourceExtensions.get()
+        val result = mutableMapOf<File, ArrayList<File>>()
+
+        for (root in roots) {
+            val files = ArrayList<File>()
+            root.walkTopDown().forEach { file ->
                 val ext = file.extension
                 if (!file.isDirectory && extensions.any { it.equals(ext, ignoreCase = true) }) {
-                    result.add(file)
+                    files.add(file)
                 }
+            }
+            if (files.isNotEmpty()) {
+                result.put(root, files)
             }
         }
 
@@ -49,23 +62,41 @@ object KeyDefaults {
         CompilerOptionsList
     }
 
-    val CompileOutputFile: LazyKeyValue<File> = {
+    val CompileOutputDirectory: LazyKeyValue<File> = {
         Keys.buildDirectory.get() / "classes"
     }
     val Compile: LazyKeyValue<File> = {
-        val output = Keys.compileOutputFile.get()
-        val sources = Keys.sourceFiles.get()
-        //TODO
+        val output = Keys.compileOutputDirectory.get()
+        val javaSources = with (javaSources) { Keys.sourceFiles.get() }
+        val kotlinSources = with (kotlinSources) { Keys.sourceFiles.get() }
 
+        // Compile Kotlin
+        if (kotlinSources.isNotEmpty()) {
+            val sources:MutableList<File> = mutableListOf()
+            for ((_, files) in kotlinSources) {
+                sources.addAll(files)
+            }
+            for ((root, _) in javaSources) {
+                sources.add(root)
+            }
 
-        if (KotlinCompiler.compile(Keys.sourceFiles.get().toList(),
-                output,
-                Keys.classpath.get().toList(),
-                Keys.compilerOptions.get().toTypedArray(),
-                LoggerFactory.getLogger("ProjectCompilation"),
-                null)) {
-            output
-        } else throw WemiException("Compilation failed", showStacktrace = false)
+            if (!KotlinCompiler.compile(
+                    sources,
+                    output,
+                    Keys.classpath.get().toList(),
+                    Keys.compilerOptions.get().toTypedArray(),
+                    LoggerFactory.getLogger("ProjectCompilation"),
+                    null)) {
+                throw WemiException("Compilation failed", showStacktrace = false)
+            }
+        }
+
+        // Compile Java
+        if (javaSources.isNotEmpty()) {
+            // TODO
+        }
+
+        output
     }
     val RunDirectory: LazyKeyValue<File> = { Keys.projectRoot.get() }
     val RunOptionsList = listOf("-ea", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005")

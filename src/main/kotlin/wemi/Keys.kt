@@ -18,9 +18,9 @@ object Keys {
 
     val projectRoot by key<File>("Root directory of the project")
     val buildDirectory by key<File>("Directory in which Wemi stores cache and processed data")
-    val sourceDirectories by key<Collection<File>>("Directories which are source roots for the project")
-    val sourceExtensions by key<Collection<String>>("Files with these extensions in sourceDirectories are considered to be sources (Stored without .)")
-    val sourceFiles by key<Collection<File>>("Files to be compiled. Usually derived from sourceDirectories")
+    val sourceRoots by key<Collection<File>>("Directories which are source roots for the project")
+    val sourceExtensions by key<Collection<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)")
+    val sourceFiles by key<Map<File, Collection<File>>>("Files to be compiled. Usually derived from sourceRoots. Maps source root -> source files")
 
     val repositories by key<Collection<Repository>>("Repositories to be used when resolving dependencies")
     val libraryDependencies by key<Collection<ProjectDependency>>("Libraries that the project depends on")
@@ -30,7 +30,7 @@ object Keys {
     val javaExecutable by key<File>("Java executable, used for running the project")
     val kotlinVersion by key<String>("Kotlin version used for compilation and standard libraries", WemiKotlinVersion)
     val compilerOptions by key<Collection<String>>("Options passed to the compiler")
-    val compileOutputFile by key<File>("File or directory to which compile key compiles")
+    val compileOutputDirectory by key<File>("Directory to which compile key compiles")
     val compile by key<File>("Compile sources and return the result")
 
     val mainClass by key<String>("Main class of the project")

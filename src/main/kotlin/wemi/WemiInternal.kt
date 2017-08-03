@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory
 import wemi.KeyDefaults.BuildDirectory
 import wemi.KeyDefaults.Classpath
 import wemi.KeyDefaults.Compile
-import wemi.KeyDefaults.CompileOutputFile
+import wemi.KeyDefaults.CompileOutputDirectory
 import wemi.KeyDefaults.CompilerOptions
 import wemi.KeyDefaults.JavaExecutable
 import wemi.KeyDefaults.JavaHome
@@ -17,7 +17,6 @@ import wemi.KeyDefaults.RunArguments
 import wemi.KeyDefaults.RunDirectory
 import wemi.KeyDefaults.RunOptions
 import wemi.KeyDefaults.SourceDirectories
-import wemi.KeyDefaults.SourceExtensions
 import wemi.KeyDefaults.SourceFiles
 import java.io.File
 import java.util.*
@@ -58,8 +57,7 @@ class ProjectDelegate internal constructor(
             Keys.projectRoot set { project.projectRoot }
 
             Keys.buildDirectory set KeyDefaults.BuildDirectory
-            Keys.sourceDirectories set KeyDefaults.SourceDirectories
-            Keys.sourceExtensions set KeyDefaults.SourceExtensions
+            Keys.sourceRoots set KeyDefaults.SourceDirectories
             Keys.sourceFiles set KeyDefaults.SourceFiles
             Keys.repositories set KeyDefaults.Repositories
             Keys.libraryDependencies set KeyDefaults.LibraryDependencies
@@ -67,7 +65,7 @@ class ProjectDelegate internal constructor(
             Keys.javaHome set KeyDefaults.JavaHome
             Keys.javaExecutable set KeyDefaults.JavaExecutable
             Keys.compilerOptions set KeyDefaults.CompilerOptions
-            Keys.compileOutputFile set KeyDefaults.CompileOutputFile
+            Keys.compileOutputDirectory set KeyDefaults.CompileOutputDirectory
             Keys.compile set KeyDefaults.Compile
 
             //Keys.mainClass TODO Detect main class?
