@@ -7,6 +7,7 @@ import wemi.util.div
 import wemi.Configurations.javaCompilation
 import wemi.Configurations.kotlinCompilation
 import java.io.File
+import java.nio.charset.StandardCharsets
 import java.util.*
 
 object KeyDefaults {
@@ -64,6 +65,13 @@ object KeyDefaults {
                 somethingDeleted = true
             }
         }
+
+        for ((_, project) in AllProjects) {
+            if (project.scopeCache.cleanCache()) {
+                somethingDeleted = true
+            }
+        }
+
         somethingDeleted
     }
     val JavaHome: LazyKeyValue<File> = {wemi.run.JavaHome}
@@ -115,7 +123,8 @@ object KeyDefaults {
 
         // Compile Java
         if (javaSources.isNotEmpty()) {
-            val (compiler, fileManager) = with(javaCompilation) { Keys.javaCompiler.get() }
+            val compiler = with(javaCompilation) { Keys.javaCompiler.get() }
+            val fileManager = compiler.getStandardFileManager(null, Locale.getDefault(), StandardCharsets.UTF_8)
             val writerSb = StringBuilder()
             val writer = StringBuilderWriter(writerSb)
             val options = with (javaCompilation) { Keys.compilerOptions.get() }
@@ -126,11 +135,17 @@ object KeyDefaults {
             val headersOut = with (javaCompilation) { Keys.outputHeadersDirectory.get() }
             headersOut.mkdirs()
 
+            val pathSeparator = System.getProperty("path.separator", ":")
             val compilerOptions = options.toMutableList()
             compilerOptions.add("-classpath")
-            compilerOptions.add(classpath.joinToString(System.getProperty("path.separator", ":")) { it.absolutePath })
+            val classpathString = classpath.joinToString(pathSeparator) { it.absolutePath }
+            if (kotlinSources.isNotEmpty()) {
+                compilerOptions.add(classpathString + pathSeparator + output.absolutePath)
+            } else {
+                compilerOptions.add(classpathString)
+            }
             compilerOptions.add("-sourcepath")
-            compilerOptions.add(javaSources.keys.joinToString(System.getProperty("path.separator", ":")) { it.absolutePath })
+            compilerOptions.add(javaSources.keys.joinToString(pathSeparator) { it.absolutePath })
             compilerOptions.add("-d")
             compilerOptions.add(output.absolutePath)
             compilerOptions.add("-s")
@@ -164,7 +179,7 @@ object KeyDefaults {
     val RunOptionsList = listOf("-ea", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005")
     val RunOptions: LazyKeyValue<Collection<String>> = { RunOptionsList }
     val RunArguments: LazyKeyValue<Collection<String>> = { emptyList() }
-    val Run: LazyKeyValue<Process> = {
+    val Run: LazyKeyValue<Int> = {
         val javaExecutable = Keys.javaExecutable.get()
         val compileOutput = Keys.compile.get()
         val classpath = Keys.classpath.get()
@@ -172,7 +187,8 @@ object KeyDefaults {
         val mainClass = Keys.mainClass.get()
         val options = Keys.runOptions.get()
         val arguments = Keys.runArguments.get()
-        wemi.run.runJava(javaExecutable, directory, classpath + compileOutput, mainClass, options, arguments)
+        val process = wemi.run.runJava(javaExecutable, directory, classpath + compileOutput, mainClass, options, arguments)
+        process.waitFor()
     }
 
     fun Project.applyDefaults() {

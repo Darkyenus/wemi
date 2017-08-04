@@ -27,9 +27,9 @@ object Keys {
 
     val repositories by key<Collection<Repository>>("Repositories to be used when resolving dependencies")
     val libraryDependencies by key<Collection<ProjectDependency>>("Libraries that the project depends on")
-    val classpath by key<Collection<File>>("Classpath of the project")
+    val classpath by key<Collection<File>>("Classpath of the project", cached = true)
 
-    val clean by key<Boolean>("Clean compile directories, returns true if something cleaned, false if already clean")
+    val clean by key<Boolean>("Clean compile directories and internal cache, returns true if something cleaned, false if already clean")
 
     val javaHome by key<File>("Java home to use for compilation/running etc.")
     val javaExecutable by key<File>("Java executable, used for running the project")
@@ -38,14 +38,14 @@ object Keys {
     val outputClassesDirectory by key<File>("Directory to which compile key outputs classes")
     val outputSourcesDirectory by key<File>("Directory to which compile key outputs sources")
     val outputHeadersDirectory by key<File>("Directory to which compile key outputs headers")
-    val kotlinCompiler by key<IKotlinCompiler>("Kotlin compiler")
-    val javaCompiler by key<Pair<JavaCompiler, StandardJavaFileManager>>("Java compiler and its file manager")
+    val kotlinCompiler by key<IKotlinCompiler>("Kotlin compiler", cached = true)
+    val javaCompiler by key<JavaCompiler>("Java compiler", cached = true)
     val compile by key<File>("Compile sources and return the result")
 
     val mainClass by key<String>("Main class of the project")
     val runDirectory by key<File>("Initial working directory of the project launched by 'run'")
     val runOptions by key<Collection<String>>("Options given to 'java' when running the project")
     val runArguments by key<Collection<String>>("Options given to the application when running the project")
-    val run by key<Process>("Compile and run the project")
+    val run by key<Int>("Compile and run the project, return exit code")
 
 }

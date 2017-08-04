@@ -15,7 +15,6 @@ public class Greeter {
 
     public void greet(String name) {
         final Random random = HelloWemiKt.getRandom();
-        System.out.println("Using random: "+random);
         System.out.println(this.greetings[random.nextInt(this.greetings.length)].replace("{}", name));
     }
 }

@@ -1,4 +1,4 @@
-import com.hello.Greeter
+package com.hello
 
 /**
  *

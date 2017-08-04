@@ -44,6 +44,7 @@ class ProjectDelegate internal constructor(
         }
         this.project.applyDefaults()
         this.project.initializer()
+        this.project.locked = true
         return this
     }
 
@@ -59,7 +60,7 @@ class KeyDelegate<Value> internal constructor(
     private lateinit var key: Key<Value>
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): KeyDelegate<Value> {
-        this.key = Key(property.name, description, hasDefaultValue, defaultValue)
+        this.key = Key(property.name, description, hasDefaultValue, defaultValue, cached)
         @Suppress("UNCHECKED_CAST")
         synchronized(BuildScriptData.AllKeys) {
             val existing = BuildScriptData.AllKeys[this.key.name]
@@ -92,8 +93,71 @@ class ConfigurationDelegate internal constructor(
             BuildScriptData.AllConfigurations.put(configuration.name, configuration)
         }
         configuration.initializer()
+        configuration.locked = true
         return this
     }
 
     override fun getValue(thisRef: Any?, property: KProperty<*>): Configuration = configuration
+}
+
+open class ScopeCache internal constructor(internal val bindingHolder: BindingHolder,
+                  internal val parentScope:Scope?) {
+
+    private val scopes:MutableMap<Configuration, ConfigurationScope> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        mutableMapOf<Configuration, ConfigurationScope>()
+    }
+
+    private var valueCache:MutableMap<Key<*>, Any?>? = null
+
+    internal fun scope(me:Scope, configuration:Configuration):Scope {
+        val scopes = scopes
+        synchronized(scopes) {
+            return scopes.getOrPut(configuration) {
+                ConfigurationScope(configuration, me)
+            }
+        }
+    }
+
+    internal fun <Value>getCached(key:Key<Value>):Value? {
+        synchronized(this) {
+            val valueCache = this.valueCache ?: return null
+            @Suppress("UNCHECKED_CAST")
+            return valueCache[key] as Value
+        }
+    }
+
+    internal fun <Value>putCached(key:Key<Value>, value:Value) {
+        synchronized(this) {
+            val maybeNullCache = valueCache
+            val cache:MutableMap<Key<*>, Any?>
+            if (maybeNullCache == null) {
+                cache = mutableMapOf()
+                this.valueCache = cache
+            } else {
+                cache = maybeNullCache
+            }
+
+            cache.put(key, value)
+        }
+    }
+
+    internal fun cleanCache():Boolean {
+        synchronized(this) {
+            if (valueCache != null) {
+                valueCache = null
+                return true
+            }
+            return false
+        }
+    }
+}
+
+private class ConfigurationScope(
+        bindingHolder: Configuration,
+        parentScope:Scope) : ScopeCache(bindingHolder, parentScope), Scope {
+
+    override val scopeCache: ScopeCache
+        get() = this
+
+    override fun scopeToString(): String = parentScope!!.scopeToString() + bindingHolder.name + ":"
 }

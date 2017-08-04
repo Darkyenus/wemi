@@ -31,7 +31,8 @@ class Key<out Value> internal constructor(val name:String,
                                            * Needed, because we don't know whether or not is [Value] nullable
                                            * or not, so we need to know if we should return null or not. */
                                           internal val hasDefaultValue:Boolean,
-                                          internal val defaultValue:Value?) : WithDescriptiveString {
+                                          internal val defaultValue:Value?,
+                                          internal val cached:Boolean) : WithDescriptiveString {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -75,28 +76,19 @@ class Project internal constructor(override val name: String, val projectRoot: F
 
     override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} at $projectRoot"
 
-    override val scopeBindingHolder: BindingHolder
-        get() = this
-    override val scopeParent: Scope?
-        get() = null
+    override val scopeCache: ScopeCache = ScopeCache(this, null)
 }
 
 interface Scope {
 
-    val scopeBindingHolder: BindingHolder
-
-    val scopeParent:Scope?
-
-    //TODO val scopeCache:ScopeCache which will store other existing scope combinations and will cache resolved key values
+    val scopeCache:ScopeCache
 
     fun <Result> with(configuration: Configuration, action: Scope.() -> Result):Result {
-        val scope = ConfigurationScope(configuration, this)
+        val scope = scopeCache.scope(this, configuration)
         return scope.action()
     }
 
-    private inline fun <Value>unpack(key: Key<Value>, binding:LazyKeyValue<Value>, reverseAdditions:ArrayList<List<LazyKeyValue<Value>>>?):Value {
-        //TODO caching
-
+    private inline fun <Value>unpack(scope: Scope, key: Key<Value>, binding:LazyKeyValue<Value>, reverseAdditions:ArrayList<List<LazyKeyValue<Value>>>?):Value {
         var result = this.binding()
         if (reverseAdditions != null) {
             if (result !is Collection<*>) {
@@ -121,34 +113,42 @@ interface Scope {
             result = compounded as Value
         }
 
+        scope.scopeCache.putCached(key, result)
+
         return result
     }
 
     private inline fun <Value, Output> getKeyValue(key: Key<Value>, otherwise:()->Output):Output where Value : Output {
+        val cachedKey = key.cached
         var allAdditions:ArrayList<List<LazyKeyValue<Value>>>? = null
 
         var scope:Scope = this
         while (true) {
-            var holder: BindingHolder = scope.scopeBindingHolder
+            val scopeCache = scope.scopeCache
+            if (cachedKey) {
+                val maybeCachedValue = scopeCache.getCached(key)
+                if (maybeCachedValue != null) {
+                    return maybeCachedValue
+                }
+            }
+            var holder: BindingHolder = scopeCache.bindingHolder
+            @Suppress("UNCHECKED_CAST")
             while(true) {
-                @Suppress("UNCHECKED_CAST")
-                synchronized(holder.bindLock) {
-                    val additions = holder.bindAdditions[key] as List<LazyKeyValue<Value>>?
-                    if (additions != null) {
-                        if (allAdditions == null) {
-                            allAdditions = ArrayList()
-                        }
-                        allAdditions!!.add(additions)
+                val additions = holder.bindAdditions[key] as List<LazyKeyValue<Value>>?
+                if (additions != null) {
+                    if (allAdditions == null) {
+                        allAdditions = ArrayList()
                     }
+                    allAdditions.add(additions)
+                }
 
-                    val lazyValue = holder.binding[key] as LazyKeyValue<Value>?
-                    if (lazyValue != null) {
-                        return unpack(key, lazyValue, allAdditions)
-                    }
+                val lazyValue = holder.binding[key] as LazyKeyValue<Value>?
+                if (lazyValue != null) {
+                    return unpack(scope, key, lazyValue, allAdditions)
                 }
                 holder = holder.parent?:break
             }
-            scope = scope.scopeParent?:break
+            scope = scopeCache.parentScope ?:break
         }
 
         return otherwise()
@@ -194,30 +194,28 @@ interface Scope {
     fun scopeToString():String
 }
 
-internal class ConfigurationScope(override val scopeBindingHolder: Configuration, override val scopeParent:Scope) : Scope {
-    override fun scopeToString(): String = scopeParent.scopeToString() + scopeBindingHolder.name + ":"
-}
-
 sealed class BindingHolder(val parent: BindingHolder?) {
     abstract val name:String
 
-    internal val bindLock = Object()
     internal val binding = HashMap<Key<*>, LazyKeyValue<Any?>>()
     internal val bindAdditions = HashMap<Key<*>, MutableList<LazyKeyValue<Any?>>>()
+    internal var locked = false
+
+    internal fun ensureUnlocked() {
+        if (locked) throw IllegalStateException("Binding holder $name is already locked")
+    }
 
     infix fun <Value> Key<Value>.set(lazyValue:LazyKeyValue<Value>) {
+        ensureUnlocked()
         @Suppress("UNCHECKED_CAST")
-        synchronized(bindLock) {
-            binding.put(this as Key<Any>, lazyValue as LazyKeyValue<Any?>)
-        }
+        binding.put(this as Key<Any>, lazyValue as LazyKeyValue<Any?>)
     }
 
     operator fun <Value> Key<Collection<Value>>.plusAssign(lazyValue:LazyKeyValue<Value>) {
+        ensureUnlocked()
         @Suppress("UNCHECKED_CAST")
-        synchronized(bindLock) {
-            val additions = bindAdditions.getOrPut(this as Key<Any>) { mutableListOf<LazyKeyValue<Any?>>() }
-            additions.add(lazyValue)
-        }
+        val additions = bindAdditions.getOrPut(this as Key<Any>) { mutableListOf<LazyKeyValue<Any?>>() }
+        additions.add(lazyValue)
     }
 }
 

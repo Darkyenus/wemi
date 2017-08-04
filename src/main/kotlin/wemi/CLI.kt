@@ -328,19 +328,21 @@ object CLI {
     }
 
     private fun printBye() {
-        when (Random.nextInt(3)) {
-            0 -> {
-                println(format("Bye!", Color.values().random()))
-            }
-            1 -> {
-                println(format("Bye! "+ ByeSuffixes.random(), Color.values().random()))
-            }
-            2 -> {
-                println("" + format("B", Color.Red) + format("y", Color.Green) + format("e", Color.Yellow) + format("!", Color.Blue) + " " + ByeSuffixes.random())
-            }
-        }
+        val ByeBodies = arrayOf(
+                format("Bye! ", Color.Red),
+                format("Bye! ", Color.Cyan),
+                format("Bye! ", Color.Green),
+                format("Bye! ", Color.Blue),
+                format("Bye! ", Color.Yellow),
+                format("Bye! ", Color.Magenta),
+                "" + format("B", Color.Red) + format("y", Color.Green) + format("e", Color.Yellow) + format("!", Color.Blue) + " ",
+                "" + format("B", Color.Green) + format("y", Color.Red) + format("e", Color.White) + format("!", Color.Green) + " ",
+                "" + format("B", Color.Cyan) + format("y", Color.Magenta) + format("e", Color.Yellow) + format("!", Color.Black) + " "
+        )
+        val ByeSuffixes = arrayOf("😀", "😃", "😄", "😊", "🙂", "🙃", "😋", "🤓", "😎", "👽", "😺", "😸", "👋", "👍", "👊", "🤘", "🖖", "🐶", "🐻", "🐼", "🐨", "🐒", "🐸", "🐙", "🐺", "🐲", "🏂", "🏄", "👾", "💎", "🎈", "🎉")
 
+        print(ByeBodies.random())
+        println(ByeSuffixes.random())
     }
 
-    private val ByeSuffixes = arrayOf("😀", "😃", "😄", "😊", "🙂", "🙃", "😋", "🤓", "😎", "👽", "😺", "😸", "👋", "👍", "👊", "🤘", "🖖", "🐶", "🐻", "🐼", "🐨", "🐒", "🐸", "🐙", "🐺", "🐲", "🏂", "🏄", "👾", "💎", "🎈", "🎉")
 }
