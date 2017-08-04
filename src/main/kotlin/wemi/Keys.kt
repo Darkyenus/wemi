@@ -5,7 +5,6 @@ import wemi.dependency.ProjectDependency
 import wemi.dependency.Repository
 import java.io.File
 import javax.tools.JavaCompiler
-import javax.tools.StandardJavaFileManager
 
 /**
  *
