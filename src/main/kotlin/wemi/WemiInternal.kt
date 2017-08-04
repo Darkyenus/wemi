@@ -3,21 +3,7 @@
 package wemi
 
 import org.slf4j.LoggerFactory
-import wemi.KeyDefaults.BuildDirectory
-import wemi.KeyDefaults.Classpath
-import wemi.KeyDefaults.Compile
-import wemi.KeyDefaults.CompileOutputDirectory
-import wemi.KeyDefaults.CompilerOptions
-import wemi.KeyDefaults.JavaExecutable
-import wemi.KeyDefaults.JavaHome
-import wemi.KeyDefaults.LibraryDependencies
-import wemi.KeyDefaults.Repositories
-import wemi.KeyDefaults.Run
-import wemi.KeyDefaults.RunArguments
-import wemi.KeyDefaults.RunDirectory
-import wemi.KeyDefaults.RunOptions
-import wemi.KeyDefaults.SourceDirectories
-import wemi.KeyDefaults.SourceFiles
+import wemi.KeyDefaults.applyDefaults
 import java.io.File
 import java.util.*
 import kotlin.properties.ReadOnlyProperty
@@ -55,25 +41,8 @@ class ProjectDelegate internal constructor(
         this.project.apply {
             Keys.projectName set { project.name }
             Keys.projectRoot set { project.projectRoot }
-
-            Keys.buildDirectory set KeyDefaults.BuildDirectory
-            Keys.sourceRoots set KeyDefaults.SourceDirectories
-            Keys.sourceFiles set KeyDefaults.SourceFiles
-            Keys.repositories set KeyDefaults.Repositories
-            Keys.libraryDependencies set KeyDefaults.LibraryDependencies
-            Keys.classpath set KeyDefaults.Classpath
-            Keys.javaHome set KeyDefaults.JavaHome
-            Keys.javaExecutable set KeyDefaults.JavaExecutable
-            Keys.compilerOptions set KeyDefaults.CompilerOptions
-            Keys.compileOutputDirectory set KeyDefaults.CompileOutputDirectory
-            Keys.compile set KeyDefaults.Compile
-
-            //Keys.mainClass TODO Detect main class?
-            Keys.runDirectory set KeyDefaults.RunDirectory
-            Keys.runOptions set KeyDefaults.RunOptions
-            Keys.runArguments set KeyDefaults.RunArguments
-            Keys.run set KeyDefaults.Run
         }
+        this.project.applyDefaults()
         this.project.initializer()
         return this
     }

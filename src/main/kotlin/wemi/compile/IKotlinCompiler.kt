@@ -9,7 +9,7 @@ import wemi.dependency.*
 import wemi.util.ForceClassLoader
 import java.io.File
 
-internal interface IKotlinCompiler {
+interface IKotlinCompiler {
     /**
      * @param sources kotlin files to be compiled
      * @param destination for generated class files, folder or .jar file
@@ -28,7 +28,7 @@ private val KotlinCompilerImplementationDependencies = listOf(
         ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-compiler", WemiKotlinVersion))
 )
 
-internal val KotlinCompiler: IKotlinCompiler by lazy {
+val KotlinCompiler: IKotlinCompiler by lazy {
     val repositoryChain = createRepositoryChain(DefaultRepositories)
     val artifacts = DependencyResolver.resolveArtifacts(KotlinCompilerImplementationDependencies, repositoryChain)
             ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")

@@ -118,7 +118,7 @@ object CLI {
 
         if (error != null) {
             print(format("Failure ", Color.Red))
-            print(formatInput(error.scope.scopeToString() + "/"+ error.key.name))
+            print(formatInput(error.scope.scopeToString() + error.key.name))
             println(format(" is not set", Color.Red))
         } else {
             print(formatLabel("Done "))

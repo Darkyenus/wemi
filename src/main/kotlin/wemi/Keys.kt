@@ -1,8 +1,11 @@
 package wemi
 
+import wemi.compile.IKotlinCompiler
 import wemi.dependency.ProjectDependency
 import wemi.dependency.Repository
 import java.io.File
+import javax.tools.JavaCompiler
+import javax.tools.StandardJavaFileManager
 
 /**
  *
@@ -26,11 +29,17 @@ object Keys {
     val libraryDependencies by key<Collection<ProjectDependency>>("Libraries that the project depends on")
     val classpath by key<Collection<File>>("Classpath of the project")
 
+    val clean by key<Boolean>("Clean compile directories, returns true if something cleaned, false if already clean")
+
     val javaHome by key<File>("Java home to use for compilation/running etc.")
     val javaExecutable by key<File>("Java executable, used for running the project")
     val kotlinVersion by key<String>("Kotlin version used for compilation and standard libraries", WemiKotlinVersion)
     val compilerOptions by key<Collection<String>>("Options passed to the compiler")
-    val compileOutputDirectory by key<File>("Directory to which compile key compiles")
+    val outputClassesDirectory by key<File>("Directory to which compile key outputs classes")
+    val outputSourcesDirectory by key<File>("Directory to which compile key outputs sources")
+    val outputHeadersDirectory by key<File>("Directory to which compile key outputs headers")
+    val kotlinCompiler by key<IKotlinCompiler>("Kotlin compiler")
+    val javaCompiler by key<Pair<JavaCompiler, StandardJavaFileManager>>("Java compiler and its file manager")
     val compile by key<File>("Compile sources and return the result")
 
     val mainClass by key<String>("Main class of the project")
@@ -38,4 +47,5 @@ object Keys {
     val runOptions by key<Collection<String>>("Options given to 'java' when running the project")
     val runArguments by key<Collection<String>>("Options given to the application when running the project")
     val run by key<Process>("Compile and run the project")
+
 }

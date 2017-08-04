@@ -4,6 +4,8 @@ import com.hello.Greeter
  *
  */
 
+val Random = java.util.Random()
+
 fun main(args: Array<String>) {
     println("Hello from compiled Wemi file!")
 

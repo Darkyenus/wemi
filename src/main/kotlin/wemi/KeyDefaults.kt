@@ -1,13 +1,16 @@
 package wemi
 
-import configuration
+import com.darkyen.tproll.util.StringBuilderWriter
 import org.slf4j.LoggerFactory
-import wemi.compile.KotlinCompiler
 import wemi.dependency.*
 import wemi.util.div
+import wemi.Configurations.javaCompilation
+import wemi.Configurations.kotlinCompilation
 import java.io.File
+import java.util.*
 
 object KeyDefaults {
+
     val BuildDirectory: LazyKeyValue<File> = { Keys.projectRoot.get() / "build" }
     val SourceDirectories: LazyKeyValue<Collection<File>> = {
         val root = Keys.projectRoot.get()
@@ -15,14 +18,7 @@ object KeyDefaults {
     }
 
     val SourceExtensionsJavaList = listOf("java")
-    val javaSources by configuration("Configuration used when collecting Java sources") {
-        Keys.sourceExtensions set { SourceExtensionsJavaList }
-    }
-
     val SourceExtensionsKotlinList = listOf("kt", "kts")
-    val kotlinSources by configuration("Configuration used when collecting Kotlin sources") {
-        Keys.sourceExtensions set { SourceExtensionsKotlinList }
-    }
 
     val SourceFiles: LazyKeyValue<Map<File, Collection<File>>> = {
         val roots = Keys.sourceRoots.get()
@@ -55,20 +51,43 @@ object KeyDefaults {
         val artifacts = DependencyResolver.resolveArtifacts(Keys.libraryDependencies.get(), repositories)
         artifacts ?: throw WemiException("Failed to resolve all artifacts")
     }
+    val Clean:LazyKeyValue<Boolean> = {
+        val folders = arrayOf(
+                Keys.outputClassesDirectory.get(),
+                Keys.outputSourcesDirectory.get(),
+                Keys.outputHeadersDirectory.get()
+        )
+        var somethingDeleted = false
+        for (folder in folders) {
+            if (folder.exists()) {
+                folder.deleteRecursively()
+                somethingDeleted = true
+            }
+        }
+        somethingDeleted
+    }
     val JavaHome: LazyKeyValue<File> = {wemi.run.JavaHome}
     val JavaExecutable: LazyKeyValue<File> = {wemi.run.javaExecutable(Keys.javaHome.get())}
-    val CompilerOptionsList = listOf("-no-stdlib")
-    val CompilerOptions: LazyKeyValue<Collection<String>> = {
-        CompilerOptionsList
-    }
+    val KotlinCompilerOptionsList = listOf("-no-stdlib")
+    val JavaCompilerOptionsList = listOf("-g")
 
-    val CompileOutputDirectory: LazyKeyValue<File> = {
+    val OutputClassesDirectory: LazyKeyValue<File> = {
         Keys.buildDirectory.get() / "classes"
     }
+    val OutputSourcesDirectory: LazyKeyValue<File> = {
+        Keys.buildDirectory.get() / "sources"
+    }
+    val OutputHeadersDirectory: LazyKeyValue<File> = {
+        Keys.buildDirectory.get() / "headers"
+    }
+
+    private val LOG = LoggerFactory.getLogger("Compile")
     val Compile: LazyKeyValue<File> = {
-        val output = Keys.compileOutputDirectory.get()
-        val javaSources = with (javaSources) { Keys.sourceFiles.get() }
-        val kotlinSources = with (kotlinSources) { Keys.sourceFiles.get() }
+        val output = Keys.outputClassesDirectory.get()
+        val javaSources = with (javaCompilation) { Keys.sourceFiles.get() }
+        val kotlinSources = with (kotlinCompilation) { Keys.sourceFiles.get() }
+
+        val classpath = Keys.classpath.get()
 
         // Compile Kotlin
         if (kotlinSources.isNotEmpty()) {
@@ -80,20 +99,63 @@ object KeyDefaults {
                 sources.add(root)
             }
 
-            if (!KotlinCompiler.compile(
+            val compiler = with (kotlinCompilation) { Keys.kotlinCompiler.get() }
+            val options = with (kotlinCompilation) { Keys.compilerOptions.get() }
+
+            if (!compiler.compile(
                     sources,
                     output,
-                    Keys.classpath.get().toList(),
-                    Keys.compilerOptions.get().toTypedArray(),
+                    classpath.toList(),
+                    options.toTypedArray(),
                     LoggerFactory.getLogger("ProjectCompilation"),
                     null)) {
-                throw WemiException("Compilation failed", showStacktrace = false)
+                throw WemiException("Kotlin compilation failed", showStacktrace = false)
             }
         }
 
         // Compile Java
         if (javaSources.isNotEmpty()) {
-            // TODO
+            val (compiler, fileManager) = with(javaCompilation) { Keys.javaCompiler.get() }
+            val writerSb = StringBuilder()
+            val writer = StringBuilderWriter(writerSb)
+            val options = with (javaCompilation) { Keys.compilerOptions.get() }
+
+            output.mkdirs()
+            val sourcesOut = with (javaCompilation) { Keys.outputSourcesDirectory.get() }
+            sourcesOut.mkdirs()
+            val headersOut = with (javaCompilation) { Keys.outputHeadersDirectory.get() }
+            headersOut.mkdirs()
+
+            val compilerOptions = options.toMutableList()
+            compilerOptions.add("-classpath")
+            compilerOptions.add(classpath.joinToString(System.getProperty("path.separator", ":")) { it.absolutePath })
+            compilerOptions.add("-sourcepath")
+            compilerOptions.add(javaSources.keys.joinToString(System.getProperty("path.separator", ":")) { it.absolutePath })
+            compilerOptions.add("-d")
+            compilerOptions.add(output.absolutePath)
+            compilerOptions.add("-s")
+            compilerOptions.add(sourcesOut.absolutePath)
+            compilerOptions.add("-h")
+            compilerOptions.add(headersOut.absolutePath)
+
+            val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.values.flatten())
+
+            val success = compiler.getTask(
+                    writer,
+                    fileManager,
+                    null,
+                    compilerOptions,
+                    null,
+                    javaFiles
+            ).call()
+
+            if (!writerSb.isNullOrBlank()) {
+                LOG.info("{}", writerSb)
+            }
+
+            if (!success) {
+                throw WemiException("Java compilation failed", showStacktrace = false)
+            }
         }
 
         output
@@ -111,5 +173,29 @@ object KeyDefaults {
         val options = Keys.runOptions.get()
         val arguments = Keys.runArguments.get()
         wemi.run.runJava(javaExecutable, directory, classpath + compileOutput, mainClass, options, arguments)
+    }
+
+    fun Project.applyDefaults() {
+        Keys.buildDirectory set BuildDirectory
+        Keys.sourceRoots set SourceDirectories
+        Keys.sourceFiles set SourceFiles
+        Keys.repositories set Repositories
+        Keys.libraryDependencies set LibraryDependencies
+        Keys.classpath set Classpath
+
+        Keys.clean set Clean
+
+        Keys.javaHome set JavaHome
+        Keys.javaExecutable set JavaExecutable
+        Keys.outputClassesDirectory set OutputClassesDirectory
+        Keys.outputSourcesDirectory set OutputSourcesDirectory
+        Keys.outputHeadersDirectory set OutputHeadersDirectory
+        Keys.compile set Compile
+
+        //Keys.mainClass TODO Detect main class?
+        Keys.runDirectory set RunDirectory
+        Keys.runOptions set RunOptions
+        Keys.runArguments set RunArguments
+        Keys.run set Run
     }
 }

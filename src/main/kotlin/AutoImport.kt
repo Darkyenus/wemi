@@ -65,7 +65,7 @@ val compilerOptions
         inline get() = wemi.Keys.compilerOptions
 
 val compileOutputFile
-        inline get() = wemi.Keys.compileOutputDirectory
+        inline get() = wemi.Keys.outputClassesDirectory
 val compile
         inline get() = wemi.Keys.compile
 val mainClass
