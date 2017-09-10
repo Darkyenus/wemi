@@ -8,6 +8,7 @@ import org.jline.reader.impl.DefaultParser
 import org.jline.terminal.Terminal
 import org.jline.terminal.TerminalBuilder
 import org.slf4j.LoggerFactory
+import wemi.util.MatchUtils
 import wemi.util.WithDescriptiveString
 import wemi.util.findCaseInsensitive
 import wemi.util.formatTimeDuration
@@ -105,6 +106,26 @@ object CLI {
         println(format(text, foreground = Color.Red))
     }
 
+    fun printWarning(text: CharSequence, input:String, possibilities:Collection<String>) {
+        println(format(text, foreground = Color.Red))
+
+        val matchResult = MatchUtils.match(possibilities.toTypedArray(), { it.toLowerCase() }, input.toLowerCase())
+        if (matchResult.results.isNotEmpty()) {
+            val sb = StringBuilder()
+            sb.append("  Did you mean ")
+            sb.append(matchResult.results[0])
+            for (i in 1..matchResult.results.size - 2) {
+                sb.append(", ").append(matchResult.results[i])
+            }
+            if (matchResult.results.size >= 2) {
+                sb.append(" or ").append(matchResult.results.last())
+            }
+            sb.append('?')
+
+            println(format(sb, foreground = Color.Yellow))
+        }
+    }
+
     fun evaluateKeyAndPrint(text: String) {
         val beginTime = System.currentTimeMillis()
         var result: Any? = null
@@ -123,6 +144,7 @@ object CLI {
         } else {
             print(formatLabel("Done "))
             print(formatInput(text))
+            @Suppress("CascadeIf")
             if (result == null) {
                 println()
                 // Done
@@ -164,7 +186,7 @@ object CLI {
             val projectString = text.substring(offset, projectSlashIndex)
             project = AllProjects.findCaseInsensitive(projectString)
             if (project == null) {
-                printWarning("Can't evaluate $text - no project named '$projectString' found (Existing projects: ${AllProjects.keys.joinToString(", ")})")
+                printWarning("Can't evaluate $text - no project named '$projectString' found", projectString, AllProjects.keys)
                 return null
             }
             offset = projectSlashIndex + 1
@@ -183,7 +205,7 @@ object CLI {
             val configString = text.substring(offset, nextConfigEnd)
             val config = AllConfigurations.findCaseInsensitive(configString)
             if (config == null) {
-                printWarning("Can't evaluate $text - no configuration named '$configString' found (Existing configurations: ${AllConfigurations.keys.joinToString(", ")})")
+                printWarning("Can't evaluate $text - no configuration named '$configString' found", configString, AllConfigurations.keys)
                 return null
             }
             configurations.add(config)
@@ -194,7 +216,7 @@ object CLI {
         val keyString = text.substring(offset)
         val key = AllKeys.findCaseInsensitive(keyString)
         if (key == null) {
-            printWarning("Can't evaluate $text - no key named '$keyString' found (Existing keys: ${AllKeys.keys.joinToString(", ")})")
+            printWarning("Can't evaluate $text - no key named '$keyString' found", keyString, AllKeys.keys)
             return null
         }
 
@@ -205,17 +227,17 @@ object CLI {
 
     // Now this is some mind-bending stuff!
     private fun <Value> Scope.evaluateInNestedScope(key:Key<Value>, all:List<Configuration>, index:Int):Value {
-        if (index == all.size) {
-            return key.get()
+        return if (index == all.size) {
+            key.get()
         } else {
-            return with (all[index]) {
+            with (all[index]) {
                 evaluateInNestedScope(key, all, index + 1)
             }
         }
     }
 
     fun evaluateCommand(command:String) {
-        if (command.isNullOrBlank()) {
+        if (command.isBlank()) {
             return
         }
 
@@ -298,12 +320,12 @@ object CLI {
 
     enum class Color(internal val offset: Int) {
         Black(0),
-        Red(1),
-        Green(2),
-        Yellow(3),
-        Blue(4),
+        Red(1), // Error
+        Green(2), // Label
+        Yellow(3), // Suggestion
+        Blue(4), // Value
         Magenta(5),
-        Cyan(6),
+        Cyan(6), // Time
         White(7)
     }
 

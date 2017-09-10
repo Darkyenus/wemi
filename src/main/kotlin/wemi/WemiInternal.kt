@@ -141,13 +141,11 @@ open class ScopeCache internal constructor(internal val bindingHolder: BindingHo
         }
     }
 
-    internal fun cleanCache():Boolean {
+    internal fun cleanCache():Int {
         synchronized(this) {
-            if (valueCache != null) {
-                valueCache = null
-                return true
-            }
-            return false
+            val valueCache = this.valueCache
+            this.valueCache = null
+            return valueCache?.size ?: 0
         }
     }
 }
@@ -155,6 +153,8 @@ open class ScopeCache internal constructor(internal val bindingHolder: BindingHo
 private class ConfigurationScope(
         bindingHolder: Configuration,
         parentScope:Scope) : ScopeCache(bindingHolder, parentScope), Scope {
+
+    override fun previous(): Scope = parentScope!!
 
     override val scopeCache: ScopeCache
         get() = this

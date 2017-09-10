@@ -72,6 +72,8 @@ class Configuration internal constructor(override val name: String,
 class Project internal constructor(override val name: String, val projectRoot: File) : BindingHolder(null), WithDescriptiveString, Scope {
     override fun scopeToString(): String = name + "/"
 
+    override fun previous(): Scope = NullScope
+
     override fun toString(): String = name
 
     override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} at $projectRoot"
@@ -191,7 +193,25 @@ interface Scope {
         }
     }
 
+    fun previous():Scope
+
     fun scopeToString():String
+}
+
+/** Immutable empty Scope returned by previous() on root scopes. */
+private object NullScope : BindingHolder(null), Scope {
+    override val name: String
+        get() = "NullScope"
+
+    override val scopeCache: ScopeCache = ScopeCache(this, null)
+
+    override fun previous(): Scope = this
+
+    override fun scopeToString(): String = name
+
+    init {
+        locked = true
+    }
 }
 
 sealed class BindingHolder(val parent: BindingHolder?) {
@@ -214,7 +234,7 @@ sealed class BindingHolder(val parent: BindingHolder?) {
     operator fun <Value> Key<Collection<Value>>.plusAssign(lazyValue:LazyKeyValue<Value>) {
         ensureUnlocked()
         @Suppress("UNCHECKED_CAST")
-        val additions = bindAdditions.getOrPut(this as Key<Any>) { mutableListOf<LazyKeyValue<Any?>>() }
+        val additions = bindAdditions.getOrPut(this as Key<Any>) { mutableListOf() }
         additions.add(lazyValue)
     }
 }
