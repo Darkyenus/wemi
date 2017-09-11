@@ -7,6 +7,3 @@ Pushing into the override could be using a new method `withOverride`. Questions:
 	- Is this the most flexible approach? Would not it be better to allow some sort of "surgical override"?
 	- Or allow key scoping? "Stacktrace" scoping?
 	- Or maybe mutable configurations? Temporary anonymous override configurations?
-1. Replace `+=` with more general `modify`, which would accept a special version of `LazyKeyValue`,
-which would pass previous value of the key (evaluated) to be modified. On this, convenience methods `add` (in place of `+=`)
-and `remove` could be implemented.

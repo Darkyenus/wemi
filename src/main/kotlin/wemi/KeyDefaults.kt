@@ -23,16 +23,16 @@ import kotlin.collections.ArrayList
 
 object KeyDefaults {
 
-    val BuildDirectory: LazyKeyValue<File> = { Keys.projectRoot.get() / "build" }
+    val BuildDirectory: BoundKeyValue<File> = { Keys.projectRoot.get() / "build" }
 
-    val SourceBaseScopeMain:LazyKeyValue<File> = { Keys.projectRoot.get() / "src/main" }
-    val SourceBaseScopeTest:LazyKeyValue<File> = { Keys.projectRoot.get() / "src/test" }
+    val SourceBaseScopeMain: BoundKeyValue<File> = { Keys.projectRoot.get() / "src/main" }
+    val SourceBaseScopeTest: BoundKeyValue<File> = { Keys.projectRoot.get() / "src/test" }
 
-    val SourceRootsJavaKotlin: LazyKeyValue<Collection<File>> = {
+    val SourceRootsJavaKotlin: BoundKeyValue<Collection<File>> = {
         val base = Keys.sourceBase.get()
         listOf(base / "kotlin", base / "java")
     }
-    val ResourceRoots: LazyKeyValue<Collection<File>> = {
+    val ResourceRoots: BoundKeyValue<Collection<File>> = {
         val base = Keys.sourceBase.get()
         listOf(base / "resources")
     }
@@ -40,7 +40,7 @@ object KeyDefaults {
     val SourceExtensionsJavaList = listOf("java")
     val SourceExtensionsKotlinList = listOf("kt", "kts")
 
-    val SourceFiles: LazyKeyValue<Collection<LocatedFile>> = {
+    val SourceFiles: BoundKeyValue<Collection<LocatedFile>> = {
         val roots = Keys.sourceRoots.get()
         val extensions = Keys.sourceExtensions.get()
         val result = ArrayList<LocatedFile>()
@@ -55,7 +55,7 @@ object KeyDefaults {
         result
     }
 
-    val ResourceFiles: LazyKeyValue<Collection<LocatedFile>> = {
+    val ResourceFiles: BoundKeyValue<Collection<LocatedFile>> = {
         val roots = Keys.resourceRoots.get()
         val result = ArrayList<LocatedFile>()
 
@@ -66,19 +66,19 @@ object KeyDefaults {
         result
     }
 
-    val Repositories: LazyKeyValue<Collection<Repository>> = {
+    val Repositories: BoundKeyValue<Collection<Repository>> = {
         DefaultRepositories
     }
-    val LibraryDependencies: LazyKeyValue<Collection<ProjectDependency>> = {
+    val LibraryDependencies: BoundKeyValue<Collection<ProjectDependency>> = {
         listOf(kotlinDependency("stdlib"))
     }
-    val ExternalClasspath: LazyKeyValue<Collection<LocatedFile>> = {
+    val ExternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
         val repositories = createRepositoryChain(Keys.repositories.get())
         val artifacts = DependencyResolver.resolveArtifacts(Keys.libraryDependencies.get(), repositories)
                 ?: throw WemiException("Failed to resolve all artifacts")
         artifacts.map { LocatedFile(it) }
     }
-    val InternalClasspath: LazyKeyValue<Collection<LocatedFile>> = {
+    val InternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
         val compiled = Keys.compile.get()
         val resources = Keys.resourceFiles.get()
 
@@ -88,10 +88,10 @@ object KeyDefaults {
 
         classpath
     }
-    val Classpath: LazyKeyValue<Collection<LocatedFile>> = {
+    val Classpath: BoundKeyValue<Collection<LocatedFile>> = {
         Keys.externalClasspath.get() + Keys.internalClasspath.get()
     }
-    val Clean:LazyKeyValue<Int> = {
+    val Clean: BoundKeyValue<Int> = {
         val folders = arrayOf(
                 Keys.outputClassesDirectory.get(),
                 Keys.outputSourcesDirectory.get(),
@@ -111,23 +111,23 @@ object KeyDefaults {
 
         clearedCount
     }
-    val JavaHome: LazyKeyValue<File> = {wemi.run.JavaHome}
-    val JavaExecutable: LazyKeyValue<File> = {wemi.run.javaExecutable(Keys.javaHome.get())}
+    val JavaHome: BoundKeyValue<File> = {wemi.run.JavaHome}
+    val JavaExecutable: BoundKeyValue<File> = {wemi.run.javaExecutable(Keys.javaHome.get())}
     val KotlinCompilerOptionsList = listOf("-no-stdlib")
     val JavaCompilerOptionsList = listOf("-g")
 
-    val OutputClassesDirectory: LazyKeyValue<File> = {
+    val OutputClassesDirectory: BoundKeyValue<File> = {
         Keys.buildDirectory.get() / "classes"
     }
-    val OutputSourcesDirectory: LazyKeyValue<File> = {
+    val OutputSourcesDirectory: BoundKeyValue<File> = {
         Keys.buildDirectory.get() / "sources"
     }
-    val OutputHeadersDirectory: LazyKeyValue<File> = {
+    val OutputHeadersDirectory: BoundKeyValue<File> = {
         Keys.buildDirectory.get() / "headers"
     }
 
     private val CompileLOG = LoggerFactory.getLogger("Compile")
-    val Compile: LazyKeyValue<File> = {
+    val Compile: BoundKeyValue<File> = {
         with (Configurations.compiling) {
             val output = Keys.outputClassesDirectory.get()
             val javaSources = with (compilingJava) { Keys.sourceFiles.get() }
@@ -216,11 +216,11 @@ object KeyDefaults {
             output
         }
     }
-    val RunDirectory: LazyKeyValue<File> = { Keys.projectRoot.get() }
+    val RunDirectory: BoundKeyValue<File> = { Keys.projectRoot.get() }
     val RunOptionsList = listOf("-ea", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005")
-    val RunOptions: LazyKeyValue<Collection<String>> = { RunOptionsList }
-    val RunArguments: LazyKeyValue<Collection<String>> = { emptyList() }
-    val Run: LazyKeyValue<Int> = {
+    val RunOptions: BoundKeyValue<Collection<String>> = { RunOptionsList }
+    val RunArguments: BoundKeyValue<Collection<String>> = { emptyList() }
+    val Run: BoundKeyValue<Int> = {
         with (Configurations.running) {
             val javaExecutable = Keys.javaExecutable.get()
             val classpath = Keys.classpath.get()
@@ -236,7 +236,7 @@ object KeyDefaults {
         }
     }
 
-    val AssemblyMergeStrategy: LazyKeyValue<(String) -> MergeStrategy> = {
+    val AssemblyMergeStrategy: BoundKeyValue<(String) -> MergeStrategy> = {
         { name ->
             // Based on https://github.com/sbt/sbt-assembly logic
             if (FileRecognition.isReadme(name) || FileRecognition.isLicenseFile(name)) {
@@ -250,7 +250,7 @@ object KeyDefaults {
             }
         }
     }
-    val AssemblyRenameFunction: LazyKeyValue<(File, String) -> String?> = {
+    val AssemblyRenameFunction: BoundKeyValue<(File, String) -> String?> = {
         { root, name ->
             val injectedName = root.nameWithoutExtension
             val extensionSeparator = name.lastIndexOf('.')
@@ -262,7 +262,7 @@ object KeyDefaults {
         }
     }
     private val AssemblyLOG = LoggerFactory.getLogger("Assembly")
-    val Assembly: LazyKeyValue<File> = {
+    val Assembly: BoundKeyValue<File> = {
         val loadedSources = mutableMapOf<String, MutableList<AssemblySource>>()
 
         fun addSource(locatedFile: LocatedFile, own:Boolean) {

@@ -11,7 +11,7 @@ val hello by project {
 
     startYear set {2017}
 
-    libraryDependencies += { dependency("com.h2database:h2:1.4.196") }
+    libraryDependencies add { dependency("com.h2database:h2:1.4.196") }
 
     mainClass set { "com.hello.HelloWemiKt" }
 

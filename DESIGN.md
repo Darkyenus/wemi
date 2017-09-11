@@ -70,7 +70,7 @@ val calculator by project {
     projectName set {"scientific-calculator"}
     projectVersion set {"3.14"}
 
-    libraryDependencies += { dependency("com.example:math:6.28") }
+    libraryDependencies add { dependency("com.example:math:6.28") }
 
     mainClass set { "com.example.CalculatorMainKt" }
 }
@@ -80,7 +80,7 @@ the syntax and is not important to know for general usage. Above example declare
 for later reference in code stored in the `calculator` variable. Rest of the example shows how the keys are bound:
 When in the project or configuration initializer, write `<key> set { <value> }`. This works only in the scope of
 project or configuration and the braces around value are mandatory and intentional - they signify that the `<value>` is not
-evaluated immediately, but later and possibly multiple times. Keys of type `Collection` can be also set using the `+=` command,
+evaluated immediately, but later and possibly multiple times. Keys of type `Collection` can be also set using the `add` command,
 more on that in the section about *scopes*.
 
 Configuration definition may look like this:
@@ -168,12 +168,14 @@ val bush by project {
 | `bush/booing:fooing:fruit`         | Orange          |
 | `tree/booing:mooing:fooing:fruit`         | Orange          |
 
-As mentioned above, there is one more mode of operation, appending, which is achieved using method `+=` instead of `set`.
+As mentioned above, there is one more feature, modifying, in our case appending, which is achieved using method `add` instead of `set`.
 This is useful when you want to add more elements to a `Collection` bound to a key.
 The querying for these keys is similar to how standard keys are used, but when the value bound by `set` is reached,
-the order is queried from that point backwards and all `+=` added elements are added to the resulting collection.
+the order is queried from that point backwards and all `add` added elements are added to the resulting collection.
 Note that there must be a point with some concrete set value, if all binding holders have only addition and none has
 concrete binding, the query will fail.
+Appending however is just a special case of modifying, which allows to arbitrarily modify the value returned by
+querying deeper scope. To do that, use method `modify` - the previous value will be available as an argument to the key-setting function.
 
 ## Build script
 All of the build definitions are inside a build script. Build script is a file, typically in a root directory of a project,

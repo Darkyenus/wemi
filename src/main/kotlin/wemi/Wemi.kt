@@ -56,7 +56,10 @@ class Key<out Value> internal constructor(val name:String,
     override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} - $description"
 }
 
-typealias LazyKeyValue<Value> = Scope.() -> Value
+/** Standard function type that is bound as value to the key in [BindingHolder] */
+typealias BoundKeyValue<Value> = Scope.() -> Value
+/** Value modifier that can be additionally bound to a key in [BindingHolder] */
+typealias BoundKeyValueModifier<Value> = Scope.(Value) -> Value
 
 class Configuration internal constructor(override val name: String,
                                          val description: String,
@@ -90,29 +93,18 @@ interface Scope {
         return scope.action()
     }
 
-    private inline fun <Value>unpack(scope: Scope, key: Key<Value>, binding:LazyKeyValue<Value>, reverseAdditions:ArrayList<List<LazyKeyValue<Value>>>?):Value {
+    private inline fun <Value>unpack(scope: Scope, key: Key<Value>, binding: BoundKeyValue<Value>, reverseModifiers:ArrayList<BoundKeyValueModifier<Value>>?):Value {
         var result = this.binding()
-        if (reverseAdditions != null) {
+        if (reverseModifiers != null) {
             if (result !is Collection<*>) {
                 throw WemiException("Key $key has additions but isn't a collection key!")
             }
 
-            val compounded = when (result) {
-                is Set<*> ->
-                    result.toMutableSet()
-                else ->
-                    result.toMutableList()
-            }
-
-            var i = reverseAdditions.lastIndex
+            var i = reverseModifiers.lastIndex
             while (i >= 0) {
-                for (lazyAddition in reverseAdditions[i]) {
-                    compounded.add(this.lazyAddition())
-                }
+                result = reverseModifiers[i].invoke(this, result)
                 i--
             }
-            @Suppress("UNCHECKED_CAST")
-            result = compounded as Value
         }
 
         scope.scopeCache.putCached(key, result)
@@ -122,7 +114,7 @@ interface Scope {
 
     private inline fun <Value, Output> getKeyValue(key: Key<Value>, otherwise:()->Output):Output where Value : Output {
         val cachedKey = key.cached
-        var allAdditions:ArrayList<List<LazyKeyValue<Value>>>? = null
+        var allModifiersReverse:ArrayList<BoundKeyValueModifier<Value>>? = null
 
         var scope:Scope = this
         while (true) {
@@ -136,17 +128,22 @@ interface Scope {
             var holder: BindingHolder = scopeCache.bindingHolder
             @Suppress("UNCHECKED_CAST")
             while(true) {
-                val additions = holder.bindAdditions[key] as List<LazyKeyValue<Value>>?
-                if (additions != null) {
-                    if (allAdditions == null) {
-                        allAdditions = ArrayList()
+                val holderModifiers = holder.modifierBindings[key] as ArrayList<BoundKeyValueModifier<Value>>?
+                if (holderModifiers != null) {
+                    if (allModifiersReverse == null) {
+                        allModifiersReverse = ArrayList()
                     }
-                    allAdditions.add(additions)
+                    allModifiersReverse.ensureCapacity(holderModifiers.size)
+                    var i = holderModifiers.size - 1
+                    while (i >= 0) {
+                        allModifiersReverse.add(holderModifiers[i])
+                        i--
+                    }
                 }
 
-                val lazyValue = holder.binding[key] as LazyKeyValue<Value>?
+                val lazyValue = holder.binding[key] as BoundKeyValue<Value>?
                 if (lazyValue != null) {
-                    return unpack(scope, key, lazyValue, allAdditions)
+                    return unpack(scope, key, lazyValue, allModifiersReverse)
                 }
                 holder = holder.parent?:break
             }
@@ -217,25 +214,38 @@ private object NullScope : BindingHolder(null), Scope {
 sealed class BindingHolder(val parent: BindingHolder?) {
     abstract val name:String
 
-    internal val binding = HashMap<Key<*>, LazyKeyValue<Any?>>()
-    internal val bindAdditions = HashMap<Key<*>, MutableList<LazyKeyValue<Any?>>>()
+    internal val binding = HashMap<Key<*>, BoundKeyValue<Any?>>()
+    internal val modifierBindings = HashMap<Key<*>, ArrayList<BoundKeyValueModifier<Any?>>>()
     internal var locked = false
 
-    internal fun ensureUnlocked() {
+    private fun ensureUnlocked() {
         if (locked) throw IllegalStateException("Binding holder $name is already locked")
     }
 
-    infix fun <Value> Key<Value>.set(lazyValue:LazyKeyValue<Value>) {
+    infix fun <Value> Key<Value>.set(lazyValue: BoundKeyValue<Value>) {
         ensureUnlocked()
         @Suppress("UNCHECKED_CAST")
-        binding.put(this as Key<Any>, lazyValue as LazyKeyValue<Any?>)
+        binding.put(this as Key<Any>, lazyValue as BoundKeyValue<Any?>)
     }
 
-    operator fun <Value> Key<Collection<Value>>.plusAssign(lazyValue:LazyKeyValue<Value>) {
+    infix fun <Value> Key<Value>.modify(lazyValueModifier: BoundKeyValueModifier<Value>) {
         ensureUnlocked()
         @Suppress("UNCHECKED_CAST")
-        val additions = bindAdditions.getOrPut(this as Key<Any>) { mutableListOf() }
-        additions.add(lazyValue)
+        val modifiers = modifierBindings.getOrPut(this as Key<Any>) { ArrayList() } as ArrayList<BoundKeyValueModifier<*>>
+        modifiers.add(lazyValueModifier)
+    }
+
+    infix fun <Value> Key<Collection<Value>>.add(lazyValueModifier: BoundKeyValue<Value>) {
+        this.modify { collection:Collection<Value> ->
+            //TODO Optimize?
+            collection + lazyValueModifier()
+        }
+    }
+
+    infix fun <Value> Key<Collection<Value>>.remove(lazyValueModifier: BoundKeyValue<Value>) {
+        this.modify { collection:Collection<Value> ->
+            collection - lazyValueModifier()
+        }
     }
 }
 
