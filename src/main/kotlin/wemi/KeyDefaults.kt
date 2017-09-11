@@ -228,7 +228,10 @@ object KeyDefaults {
             val mainClass = Keys.mainClass.get()
             val options = Keys.runOptions.get()
             val arguments = Keys.runArguments.get()
-            val process = wemi.run.runJava(javaExecutable, directory, classpath.map { it.root }.distinct(), mainClass, options, arguments)
+
+            val modifiedClasspath = classpath.map { it.classpathEntry }.distinct()
+
+            val process = wemi.run.runJava(javaExecutable, directory, modifiedClasspath, mainClass, options, arguments)
             process.waitFor()
         }
     }

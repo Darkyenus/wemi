@@ -102,23 +102,23 @@ object CLI {
     }
 
 
-    fun printWarning(text: CharSequence) {
+    private fun printWarning(text: CharSequence) {
         println(format(text, foreground = Color.Red))
     }
 
-    fun printWarning(text: CharSequence, input:String, possibilities:Collection<String>) {
+    private fun printWarning(text: CharSequence, input:String, possibilities:Collection<String>) {
         println(format(text, foreground = Color.Red))
 
         val matchResult = MatchUtils.match(possibilities.toTypedArray(), { it.toLowerCase() }, input.toLowerCase())
-        if (matchResult.results.isNotEmpty()) {
+        if (matchResult.isNotEmpty()) {
             val sb = StringBuilder()
             sb.append("  Did you mean ")
-            sb.append(matchResult.results[0])
-            for (i in 1..matchResult.results.size - 2) {
-                sb.append(", ").append(matchResult.results[i])
+            sb.append(matchResult[0])
+            for (i in 1..matchResult.size - 2) {
+                sb.append(", ").append(matchResult[i])
             }
-            if (matchResult.results.size >= 2) {
-                sb.append(" or ").append(matchResult.results.last())
+            if (matchResult.size >= 2) {
+                sb.append(" or ").append(matchResult.last())
             }
             sb.append('?')
 

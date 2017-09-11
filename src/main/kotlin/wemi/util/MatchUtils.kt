@@ -69,121 +69,55 @@ object MatchUtils {
         return true
     }
 
-    inline fun <reified T> match(from: Array<T>, noinline toString: (T) -> CharSequence, target: CharSequence): MatchResult<T> {
+    inline fun <reified T> match(from: Array<T>, noinline toString: (T) -> CharSequence, target: CharSequence): Array<T> {
         return match(T::class.java, from, toString, target)
     }
 
-    fun <T> match(type:Class<T>, from: Array<T>, toString: (T) -> CharSequence, target: CharSequence): MatchResult<T> {
+    fun <T> match(type:Class<T>, from: Array<T>, toString: (T) -> CharSequence, target: CharSequence): Array<T> {
         val BAD_SCORE = 1000
+        var bestScore = BAD_SCORE
 
-        //Insert only search
         var considerOnlyPerfectMatches = false
         val scores = IntArray(from.size)
-        var goodScores = 0
         for (i in from.indices) {
             val item = from[i]
             val itemName = toString(item)
             if (considerOnlyPerfectMatches) {
                 if (contentEquals(target, itemName)) {
                     scores[i] = 0
-                    goodScores++
                 } else {
                     scores[i] = BAD_SCORE
                 }
             } else {
-                val score = levenshteinDistance(target, itemName, 1, BAD_SCORE, BAD_SCORE)
+                val score = levenshteinDistance(target, itemName, 2, 9, 7)
+                if (score < bestScore) {
+                    bestScore = score
+                }
                 if (score == 0) {
                     //Perfect match, continue searching, there may be dupes
                     considerOnlyPerfectMatches = true
-                }
-                if (score < BAD_SCORE) {
-                    goodScores++
                 }
                 scores[i] = score
             }
         }
 
-        if (goodScores == 1) {
-            //Clear winner however bad it may be
-            for (i in from.indices) {
-                if (scores[i] < BAD_SCORE) {
-                    return MatchResult(from[i], type)
-                }
-            }
-            assert(false)
-        }
+        val worstShownScore = if (considerOnlyPerfectMatches) bestScore else bestScore * 2
 
-        var findCanBeUnambiguous = true
-
-        if (goodScores == 0) {
-            //No good scores, search again with weights allowing other edits than adding
-            findCanBeUnambiguous = false
-            for (i in from.indices) {
-                scores[i] = levenshteinDistance(target, toString(from[i]), 1, 6, 3)
-            }
-        }
-
-        var bestScore = BAD_SCORE
-        var bestScoreAmbiguityThreshold = BAD_SCORE
-        var bestScoreIndex = -1
-        var bestScoreIsUnambiguous = false
-
+        val resultItems = ArrayList<MatchResultItem>()
         for (i in from.indices) {
             val score = scores[i]
-            if (score < bestScore) {
-                bestScoreAmbiguityThreshold = bestScore + Math.max(bestScore / 3, 2)
-                bestScoreIsUnambiguous = bestScore < bestScoreAmbiguityThreshold
-                bestScore = score
-                bestScoreIndex = i
-            } else if (score < bestScoreAmbiguityThreshold) {
-                bestScoreIsUnambiguous = false
+            if (score <= worstShownScore) {
+                resultItems.add(MatchResultItem(i, score))
             }
         }
+        Collections.sort<MatchResultItem>(resultItems)
 
-        if (bestScoreIsUnambiguous && findCanBeUnambiguous) {
-            return MatchResult(from[bestScoreIndex], type)
-        } else {
-            val results = ArrayList<MatchResultItem>()
-            for (i in from.indices) {
-                val score = scores[i]
-                if (score < BAD_SCORE) {
-                    results.add(MatchResultItem(i, score))
-                }
-            }
-            Collections.sort<MatchResultItem>(results)
-
-            val resultItems = Math.min(8, results.size)
-
-            @Suppress("UNCHECKED_CAST")
-            val resultArray = java.lang.reflect.Array.newInstance(type, resultItems) as Array<T>
-            for (i in 0 until resultItems) {
-                resultArray[i] = from[results[i].index]
-            }
-            return MatchResult(resultArray)
+        @Suppress("UNCHECKED_CAST")
+        val result = java.lang.reflect.Array.newInstance(type, minOf(8, resultItems.size)) as Array<T>
+        for (i in result.indices) {
+            result[i] = from[resultItems[i].index]
         }
-    }
-
-    class MatchResult<T> {
-
-        val isDefinite: Boolean
-        val results: Array<T>
-
-        internal constructor(results: Array<T>) {
-            this.isDefinite = false
-            this.results = results
-        }
-
-        internal constructor(result: T, type:Class<T>) {
-            this.isDefinite = true
-
-            @Suppress("UNCHECKED_CAST")
-            this.results = java.lang.reflect.Array.newInstance(type, 1) as Array<T>
-            this.results[0] = result
-        }
-
-        fun result(): T {
-            return results[0]
-        }
+        return result
     }
 
     private class MatchResultItem(val index: Int, val score: Int) : Comparable<MatchResultItem> {

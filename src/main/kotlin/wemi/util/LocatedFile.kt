@@ -12,11 +12,12 @@ import java.io.File
  * @property file represented
  * @property path to the file, *without* leading '/', including the file name
  * @property root to which [path] is relative to
+ * @property simple is true if the (File) constructor has been used and the file is not really "located"
  */
-class LocatedFile private constructor(val file: File, val root:File, val path: String) {
+class LocatedFile private constructor(val file: File, val root:File, val path: String, val simple:Boolean) {
 
-    constructor(file:File) : this(file, file.parentFile, file.name)
-    constructor(file:File, location: String, root:File) : this(file, root, location)
+    constructor(file:File) : this(file, file.parentFile, file.name, true)
+    constructor(file:File, location: String, root:File) : this(file, root, location, false)
 
     init {
         assert(!file.isDirectory) {"LocatedFile.file must not be a directory: " + this}
@@ -27,11 +28,12 @@ class LocatedFile private constructor(val file: File, val root:File, val path: S
     operator inline fun component2():  String? = path
     operator inline fun component3():  File? = root
 
+    val classpathEntry:File
+        get() = if (simple) file else root
+
     override fun toString(): String {
         return root.absolutePath+"//"+path
     }
-
-
 }
 
 fun constructLocatedFiles(from: File, to: MutableCollection<LocatedFile>) {
