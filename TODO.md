@@ -1,47 +1,12 @@
-What if configurations
-	- were not assigned to project
-	- but could be
-	- were scoped to single project - with default global
-	
-project/test,debug:run
-
-Configuration - may have parent configuration
-
-val normalEyes by configuration {
-	plain old global configuration layer
-}
-
-val specialEyes by configuration(extends:normalEyes) {
-	plain old global configuration layer, which inherits all keys of normalEyes
-}
-
-val shepardProject by project {
-	specialEyes extend {
-		configuration actually used when specialEyes if requested to be applied to the shepardProject
-		inherits all keys of specialEyes
-		all keys are 
-		some key settings...
-	}
-	
-	normal stuff
-}
-
-shepardProject/specialEyes:debug:test:run
-
-Key eval syntax:
-(<project>"/")?(<config>":")*<key>
-
-Collection MUST be first declared globally and only then it can be specified.
-
-Project can be present, but does not have to be if default project is set, it will be used instead.
-None or multiple configs can be used, each only once.
-Which key is used is defined by order - closer to the key name = more priority.
-If "test" config has the key, it is used and search is ended. If "debug", that is used.
-Then "specialEyes", then project and finally default value.
-If the key does not have a default value, its evaluation fails.
-
-Collection values are slightly more complicated, doing += just appends the value to the current value and the value that
-would be used if this key was not set in this scope.
-"More buried value is, earlier in the list it is."
-
-However this chain works only by using +=, (maybe append and -= / remove in the future), doing hard "set" ends the chain.
+# Things to do next
+1. Change how requested scopes work. Currently, the scopes are appended, one by one.
+Change this into two "stacks" of scope, standard and override scope. Standard stack is on the left and grows to the right.
+Override stack is on the right and grows to the left. This allows to selectively override any key, even if the used key
+pushes its own scope. The syntax could be like this: `project/normalLow:normalHigh::overrideLow:overrideHigh:key`.
+Pushing into the override could be using a new method `withOverride`. Questions:
+	- Is this the most flexible approach? Would not it be better to allow some sort of "surgical override"?
+	- Or allow key scoping? "Stacktrace" scoping?
+	- Or maybe mutable configurations? Temporary anonymous override configurations?
+1. Replace `+=` with more general `modify`, which would accept a special version of `LazyKeyValue`,
+which would pass previous value of the key (evaluated) to be modified. On this, convenience methods `add` (in place of `+=`)
+and `remove` could be implemented.

@@ -25,7 +25,7 @@ fun findBuildFile(from: File): List<File> {
             for (file in files) {
                 if (file.isFile && !file.isHidden && (file.name.endsWith(".wemi", ignoreCase = true) || file.name.endsWith(".wemi.kt", ignoreCase = true))) {
                     if (result == null) {
-                        result = ArrayList<File>()
+                        result = ArrayList()
                     }
                     result.add(file)
                 }
