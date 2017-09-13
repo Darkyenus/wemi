@@ -97,7 +97,11 @@ internal object MavenDependencyResolver {
 
     private fun retrieveFile(path: String, repository: Repository.M2): Pair<ByteArray?, File?> {
         val url = repository.url / path
-        LOG.debug("Retrieving file '{}' from {}", path, repository)
+        if (repository.local) {
+            LOG.debug("Retrieving file '{}' from {}", path, repository)
+        } else {
+            LOG.info("Retrieving file '{}' from {}", path, repository)
+        }
 
         // Download
         val webb = Webb(null)

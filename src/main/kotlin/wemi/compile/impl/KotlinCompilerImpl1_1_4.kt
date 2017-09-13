@@ -11,16 +11,16 @@ import org.jetbrains.kotlin.config.Services
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
-import wemi.compile.IKotlinCompiler
+import wemi.compile.KotlinCompiler
 import java.io.File
 
 private val LOG = LoggerFactory.getLogger("KotlinCompilerImpl")
 
 @Suppress("unused")
 /**
- * Kotlin compiler interface implementation, DO NOT TOUCH FROM OTHER CLASSES THAN [IKotlinCompiler]!!!
+ * Kotlin compiler interface implementation, DO NOT TOUCH FROM OTHER CLASSES THAN [KotlinCompiler]!!!
  */
-internal class KotlinCompilerImpl : IKotlinCompiler {
+internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
 
     /**
      * @param sources kotlin files to be compiled
@@ -33,7 +33,7 @@ internal class KotlinCompilerImpl : IKotlinCompiler {
                          classpath: List<File>,
                          arguments: Array<String>,
                          logger: Logger,
-                         loggerMarker: Marker?): Boolean {
+                         loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
 
         val args = K2JVMCompilerArguments()
 
@@ -51,7 +51,12 @@ internal class KotlinCompilerImpl : IKotlinCompiler {
         LOG.trace("Invoking kotlin compiler with destination:{}, classpath:{}, freeArgs:{}", args.destination, args.classpath, args.freeArgs)
 
         val exitCode = compiler.exec(createLoggingMessageCollector(logger, loggerMarker), Services.EMPTY, args)
-        return exitCode == ExitCode.OK
+        return when (exitCode) {
+            ExitCode.OK -> KotlinCompiler.CompileExitStatus.OK
+            ExitCode.COMPILATION_ERROR -> KotlinCompiler.CompileExitStatus.COMPILATION_ERROR
+            ExitCode.INTERNAL_ERROR -> KotlinCompiler.CompileExitStatus.INTERNAL_ERROR
+            ExitCode.SCRIPT_EXECUTION_ERROR -> KotlinCompiler.CompileExitStatus.INTERNAL_ERROR
+        }
     }
 
     fun createLoggingMessageCollector(log: Logger, marker: Marker? = null): MessageCollector {

@@ -37,7 +37,7 @@ public final class ForceClassLoader extends URLClassLoader {
                 }
 
                 result = defineClass(name, buffer, 0, offset);
-            } catch (IOException ex) {
+            } catch (Exception ex) {
                 throw new ClassNotFoundException("Could not force-load class " + name, ex);
             }
         }

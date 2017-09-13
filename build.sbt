@@ -23,7 +23,7 @@ libraryDependencies += "com.github.Darkyenus" % "tproll" % "v1.2.3"
 
 libraryDependencies += "com.github.Darkyenus" % "DaveWebb" % "v1.2"
 
-libraryDependencies += "org.jetbrains.kotlin" % "kotlin-compiler" % "1.1.3-2" % Provided
+libraryDependencies += "org.jetbrains.kotlin" % "kotlin-compiler" % "1.1.4" % Provided
 
 libraryDependencies += "org.jline" % "jline" % "3.3.0"
 

@@ -1,7 +1,10 @@
 package wemi
 
 import configuration
-import wemi.compile.KotlinCompiler
+import wemi.KeyDefaults.SourceBaseScopeTest
+import wemi.KeyDefaults.SourceRootsJavaKotlin
+import wemi.compile.KotlinCompilerVersion
+import wemi.compile.kotlinCompiler
 import javax.tools.ToolProvider
 
 /**
@@ -32,7 +35,7 @@ object Configurations {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { KeyDefaults.SourceExtensionsKotlinList }
         Keys.kotlinCompiler set {
-            KotlinCompiler
+            kotlinCompiler(KotlinCompilerVersion.Version1_1_4)
         }
         Keys.compilerOptions set { KeyDefaults.KotlinCompilerOptionsList }
     }

@@ -3,6 +3,7 @@ package wemi.boot
 import org.slf4j.LoggerFactory
 import wemi.WemiKotlinVersion
 import wemi.compile.KotlinCompiler
+import wemi.compile.kotlinCompiler
 import wemi.dependency.*
 import wemi.util.WemiClasspathFile
 import java.io.File
@@ -10,7 +11,7 @@ import java.net.URL
 
 private val LOG = LoggerFactory.getLogger("BuildFiles")
 
-val BuildFileStdLib = ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-stdlib", WemiKotlinVersion))
+val BuildFileStdLib = ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-stdlib", WemiKotlinVersion.string))
 
 /**
  * Build file is a file with .wemi extension, anywhere in current or parent directory.
@@ -129,8 +130,8 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
         }
         classpath.addAll(artifacts)
 
-        val success = KotlinCompiler.compile(listOf(buildFile), resultJar, classpath, arrayOf("-no-stdlib"), LoggerFactory.getLogger("BuildScriptCompilation"), null)
-        if (!success) {
+        val status = kotlinCompiler(WemiKotlinVersion).compile(listOf(buildFile), resultJar, classpath, arrayOf("-no-stdlib"), LoggerFactory.getLogger("BuildScriptCompilation"), null)
+        if (status != KotlinCompiler.CompileExitStatus.OK) {
             return null
         }
 

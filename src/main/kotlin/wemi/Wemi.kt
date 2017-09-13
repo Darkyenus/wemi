@@ -2,6 +2,7 @@
 
 package wemi
 
+import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
 import wemi.util.WithDescriptiveString
 import java.io.File
@@ -10,7 +11,7 @@ import java.net.URL
 /** Version of Wemi build system */
 val WemiVersion = "0.0"
 /** Version of Kotlin used for build scripts */
-val WemiKotlinVersion = "1.1.3-2"
+val WemiKotlinVersion = KotlinCompilerVersion.Version1_1_4
 
 /** Immutable view into the list of loaded projects. */
 val AllProjects:Map<String, Project>
@@ -292,7 +293,7 @@ fun dependency(groupNameVersion:String, preferredRepository: Repository?, vararg
 }
 
 fun Scope.kotlinDependency(name: String):ProjectDependency {
-    return ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-"+name, Keys.kotlinVersion.get()))
+    return ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-"+name, Keys.kotlinVersion.get().string))
 }
 
 fun repository(name: String, url:String, checksum: Repository.M2.Checksum):Repository.M2 {

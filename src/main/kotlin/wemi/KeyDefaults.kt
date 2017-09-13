@@ -7,6 +7,7 @@ import wemi.Configurations.compilingKotlin
 import wemi.assembly.AssemblySource
 import wemi.assembly.FileRecognition
 import wemi.assembly.MergeStrategy
+import wemi.compile.KotlinCompiler
 import wemi.dependency.*
 import wemi.util.LocatedFile
 import wemi.util.constructLocatedFiles
@@ -150,14 +151,15 @@ object KeyDefaults {
                 val compiler = with (compilingKotlin) { Keys.kotlinCompiler.get() }
                 val options = with (compilingKotlin) { Keys.compilerOptions.get() }
 
-                if (!compiler.compile(
+                val status = compiler.compile(
                         sources,
                         output,
                         externalClasspath.map { it.file }.toList(),
                         options.toTypedArray(),
                         LoggerFactory.getLogger("ProjectCompilation"),
-                        null)) {
-                    throw WemiException("Kotlin compilation failed", showStacktrace = false)
+                        null)
+                if (status != KotlinCompiler.CompileExitStatus.OK) {
+                    throw WemiException("Kotlin compilation failed: $status", showStacktrace = false)
                 }
             }
 
