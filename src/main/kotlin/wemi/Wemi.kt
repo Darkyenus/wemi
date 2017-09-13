@@ -2,6 +2,8 @@
 
 package wemi
 
+import wemi.compile.CompilerFlag
+import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
 import wemi.util.WithDescriptiveString
@@ -97,10 +99,6 @@ interface Scope {
     private inline fun <Value>unpack(scope: Scope, key: Key<Value>, binding: BoundKeyValue<Value>, reverseModifiers:ArrayList<BoundKeyValueModifier<Value>>?):Value {
         var result = this.binding()
         if (reverseModifiers != null) {
-            if (result !is Collection<*>) {
-                throw WemiException("Key $key has additions but isn't a collection key!")
-            }
-
             var i = reverseModifiers.lastIndex
             while (i >= 0) {
                 result = reverseModifiers[i].invoke(this, result)
@@ -248,6 +246,31 @@ sealed class BindingHolder(val parent: BindingHolder?) {
             collection - lazyValueModifier()
         }
     }
+
+    //region CompilerFlags utility methods
+    operator fun <Type> Key<CompilerFlags>.get(flag:CompilerFlag<Type>):CompilerFlagKeySetting<Type> {
+        return CompilerFlagKeySetting(this, flag)
+    }
+
+    operator fun <Type> Key<CompilerFlags>.set(flag: CompilerFlag<Type>, value:Type) {
+        this.modify { flags: CompilerFlags ->
+            flags[flag] = value
+            flags
+        }
+    }
+
+    operator fun <Type> CompilerFlagKeySetting<Collection<Type>>.plusAssign(value:Type) {
+        key.modify { flags: CompilerFlags ->
+            flags[flag] = (flags[flag]?: emptyList()) + value
+            flags
+        }
+    }
+
+
+    class CompilerFlagKeySetting<Type> internal constructor(
+            internal val key:Key<CompilerFlags>,
+            internal val flag:CompilerFlag<Type>)
+    //endregion
 }
 
 fun project(projectRoot: File, initializer: Project.() -> Unit): ProjectDelegate {

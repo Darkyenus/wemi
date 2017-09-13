@@ -3,8 +3,7 @@ package wemi
 import configuration
 import wemi.KeyDefaults.SourceBaseScopeTest
 import wemi.KeyDefaults.SourceRootsJavaKotlin
-import wemi.compile.KotlinCompilerVersion
-import wemi.compile.kotlinCompiler
+import wemi.compile.*
 import javax.tools.ToolProvider
 
 /**
@@ -28,15 +27,13 @@ object Configurations {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { KeyDefaults.SourceExtensionsJavaList }
         Keys.javaCompiler set { ToolProvider.getSystemJavaCompiler() }
-        Keys.compilerOptions set { KeyDefaults.JavaCompilerOptionsList }
+        Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
     }
 
     val compilingKotlin by configuration("Configuration used when compiling Kotlin sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { KeyDefaults.SourceExtensionsKotlinList }
-        Keys.kotlinCompiler set {
-            kotlinCompiler(KotlinCompilerVersion.Version1_1_4)
-        }
-        Keys.compilerOptions set { KeyDefaults.KotlinCompilerOptionsList }
+        Keys.kotlinCompiler set { kotlinCompiler(WemiKotlinVersion) }
+        Keys.compilerOptions[KotlinJVMCompilerFlags.noStdlib] = true
     }
 }

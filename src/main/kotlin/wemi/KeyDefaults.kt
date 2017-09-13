@@ -7,6 +7,7 @@ import wemi.Configurations.compilingKotlin
 import wemi.assembly.AssemblySource
 import wemi.assembly.FileRecognition
 import wemi.assembly.MergeStrategy
+import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.JavaCompilerFlags
 import wemi.dependency.*
@@ -115,8 +116,6 @@ object KeyDefaults {
     }
     val JavaHome: BoundKeyValue<File> = {wemi.run.JavaHome}
     val JavaExecutable: BoundKeyValue<File> = {wemi.run.javaExecutable(Keys.javaHome.get())}
-    val KotlinCompilerOptionsList = listOf("-no-stdlib")
-    val JavaCompilerOptionsList = listOf("-g")
 
     val OutputClassesDirectory: BoundKeyValue<File> = {
         Keys.buildDirectory.get() / "classes"
@@ -534,6 +533,7 @@ object KeyDefaults {
         Keys.outputClassesDirectory set OutputClassesDirectory
         Keys.outputSourcesDirectory set OutputSourcesDirectory
         Keys.outputHeadersDirectory set OutputHeadersDirectory
+        Keys.compilerOptions set { CompilerFlags() }
         Keys.compile set Compile
 
         //Keys.mainClass TODO Detect main class?
