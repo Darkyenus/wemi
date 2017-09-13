@@ -2,6 +2,7 @@ package wemi
 
 import wemi.assembly.AssemblySource
 import wemi.assembly.MergeStrategy
+import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.ProjectDependency
@@ -43,7 +44,7 @@ object Keys {
     val javaHome by key<File>("Java home to use for compilation/running etc.")
     val javaExecutable by key<File>("Java executable, used for running the project")
     val kotlinVersion by key<KotlinCompilerVersion>("Kotlin version used for compilation and standard libraries", WemiKotlinVersion)
-    val compilerOptions by key<Collection<String>>("Options passed to the compiler")
+    val compilerOptions by key<CompilerFlags>("Options passed to the compiler")
     val outputClassesDirectory by key<File>("Directory to which compile key outputs classes")
     val outputSourcesDirectory by key<File>("Directory to which compile key outputs sources")
     val outputHeadersDirectory by key<File>("Directory to which compile key outputs headers")

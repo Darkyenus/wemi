@@ -8,6 +8,7 @@ import wemi.assembly.AssemblySource
 import wemi.assembly.FileRecognition
 import wemi.assembly.MergeStrategy
 import wemi.compile.KotlinCompiler
+import wemi.compile.JavaCompilerFlags
 import wemi.dependency.*
 import wemi.util.LocatedFile
 import wemi.util.constructLocatedFiles
@@ -149,18 +150,14 @@ object KeyDefaults {
                 sources.addAll(javaSourceRoots)
 
                 val compiler = with (compilingKotlin) { Keys.kotlinCompiler.get() }
-                val options = with (compilingKotlin) { Keys.compilerOptions.get() }
+                val compilerFlags = with (compilingKotlin) { Keys.compilerOptions.get() }
 
-                val status = compiler.compile(
-                        sources,
-                        output,
-                        externalClasspath.map { it.file }.toList(),
-                        options.toTypedArray(),
-                        LoggerFactory.getLogger("ProjectCompilation"),
-                        null)
-                if (status != KotlinCompiler.CompileExitStatus.OK) {
-                    throw WemiException("Kotlin compilation failed: $status", showStacktrace = false)
+                val compileResult = compiler.compile(javaSources + kotlinSources, externalClasspath.map { it.file }.toList(), output, compilerFlags, LoggerFactory.getLogger("ProjectCompilation"), null)
+                if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
+                    throw WemiException("Kotlin compilation failed: "+compileResult, showStacktrace = false)
                 }
+
+                compilerFlags.warnAboutUnusedFlags("Kotlin compiler")
             }
 
             // Compile Java
@@ -169,7 +166,7 @@ object KeyDefaults {
                 val fileManager = compiler.getStandardFileManager(null, Locale.getDefault(), StandardCharsets.UTF_8)
                 val writerSb = StringBuilder()
                 val writer = StringBuilderWriter(writerSb)
-                val options = with (compilingJava) { Keys.compilerOptions.get() }
+                val compilerFlags = with (compilingJava) { Keys.compilerOptions.get() }
 
                 output.mkdirs()
                 val sourcesOut = with (compilingJava) { Keys.outputSourcesDirectory.get() }
@@ -178,7 +175,10 @@ object KeyDefaults {
                 headersOut.mkdirs()
 
                 val pathSeparator = System.getProperty("path.separator", ":")
-                val compilerOptions = options.toMutableList()
+                val compilerOptions = ArrayList<String>()
+                compilerFlags.use(JavaCompilerFlags.customFlags) {
+                    compilerOptions.addAll(it)
+                }
                 compilerOptions.add("-classpath")
                 val classpathString = externalClasspath.joinToString(pathSeparator) { it.file.absolutePath }
                 if (kotlinSources.isNotEmpty()) {
@@ -213,6 +213,8 @@ object KeyDefaults {
                 if (!success) {
                     throw WemiException("Java compilation failed", showStacktrace = false)
                 }
+
+                compilerFlags.warnAboutUnusedFlags("Java compiler")
             }
 
             output

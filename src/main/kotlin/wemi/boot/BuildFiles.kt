@@ -1,10 +1,12 @@
 package wemi.boot
 
 import org.slf4j.LoggerFactory
+import wemi.Keys.kotlinCompiler
 import wemi.WemiKotlinVersion
 import wemi.compile.KotlinCompiler
-import wemi.compile.kotlinCompiler
+import wemi.compile.*
 import wemi.dependency.*
+import wemi.util.LocatedFile
 import wemi.util.WemiClasspathFile
 import java.io.File
 import java.net.URL
@@ -130,7 +132,10 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
         }
         classpath.addAll(artifacts)
 
-        val status = kotlinCompiler(WemiKotlinVersion).compile(listOf(buildFile), resultJar, classpath, arrayOf("-no-stdlib"), LoggerFactory.getLogger("BuildScriptCompilation"), null)
+        val flags = CompilerFlags()
+        flags[KotlinJVMCompilerFlags.noStdlib] = true
+
+        val status = kotlinCompiler(WemiKotlinVersion).compile(listOf(LocatedFile(buildFile)), classpath, resultJar, flags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
         if (status != KotlinCompiler.CompileExitStatus.OK) {
             return null
         }
