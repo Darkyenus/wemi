@@ -319,6 +319,12 @@ fun Scope.kotlinDependency(name: String):ProjectDependency {
     return ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-"+name, Keys.kotlinVersion.get().string))
 }
 
+val Scope.KotlinStdlib:ProjectDependency
+    get() = kotlinDependency("stdlib")
+
+val Scope.KotlinReflect:ProjectDependency
+    get() = kotlinDependency("reflect")
+
 fun repository(name: String, url:String, checksum: Repository.M2.Checksum):Repository.M2 {
     val usedUrl = URL(url)
     return Repository.M2(name,

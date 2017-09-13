@@ -73,7 +73,7 @@ object KeyDefaults {
         DefaultRepositories
     }
     val LibraryDependencies: BoundKeyValue<Collection<ProjectDependency>> = {
-        listOf(kotlinDependency("stdlib"))
+        listOf(KotlinStdlib)
     }
     val ExternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
         val repositories = createRepositoryChain(Keys.repositories.get())

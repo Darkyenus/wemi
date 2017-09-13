@@ -97,13 +97,9 @@ object KotlinJVMCompilerFlags {
     val jdkHome = CompilerFlag<String>("jdkHome", "Path to JDK home directory to include into classpath, if differs from default JAVA_HOME")
     //TODO probably not needed
     val noJdk = CompilerFlag<Boolean>("noJdk", "Don't include Java runtime into classpath")
-    //TODO Probably not needed
-    val noStdlib = CompilerFlag<Boolean>("noStdlib", "Don't include Kotlin runtime into classpath")
-    //TODO Probably not needed
-    val noReflect = CompilerFlag<Boolean>("noReflect", "Don't include Kotlin reflection implementation into classpath")
     val moduleName = CompilerFlag<String>("moduleName", "Module name")
 
-    enum class BytecodeTarget(string: String) {
+    enum class BytecodeTarget(val string: String) {
         JAVA_1_6("1.6"),
         JAVA_1_8("1.8")
     }

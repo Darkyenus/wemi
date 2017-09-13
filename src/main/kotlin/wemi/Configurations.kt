@@ -34,6 +34,5 @@ object Configurations {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { KeyDefaults.SourceExtensionsKotlinList }
         Keys.kotlinCompiler set { kotlinCompiler(WemiKotlinVersion) }
-        Keys.compilerOptions[KotlinJVMCompilerFlags.noStdlib] = true
     }
 }

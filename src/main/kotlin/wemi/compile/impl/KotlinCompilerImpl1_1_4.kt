@@ -49,7 +49,7 @@ import java.util.*
  */
 internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
 
-    private fun KotlinCompilerFlags.FeatureState.internal():LanguageFeature.State {
+    private fun KotlinCompilerFlags.FeatureState.internal(): LanguageFeature.State {
         return when (this) {
             KotlinCompilerFlags.FeatureState.Enabled -> LanguageFeature.State.ENABLED
             KotlinCompilerFlags.FeatureState.EnabledWithWarning -> LanguageFeature.State.ENABLED_WITH_WARNING
@@ -58,14 +58,14 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         }
     }
 
-    private fun KotlinJVMCompilerFlags.BytecodeTarget.internal():JvmTarget {
+    private fun KotlinJVMCompilerFlags.BytecodeTarget.internal(): JvmTarget {
         return when (this) {
             KotlinJVMCompilerFlags.BytecodeTarget.JAVA_1_6 -> JvmTarget.JVM_1_6
             KotlinJVMCompilerFlags.BytecodeTarget.JAVA_1_8 -> JvmTarget.JVM_1_8
         }
     }
 
-    private fun parseVersion(configuration: CompilerConfiguration, value: String?, versionOf: String): LanguageVersion? {
+    private fun parseVersion(value: String?, versionOf: String, messageCollector: MessageCollector): LanguageVersion? {
         val version = LanguageVersion.fromVersionString(value ?: return null)
         if (version != null) {
             return version
@@ -74,145 +74,70 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         val versionStrings = LanguageVersion.values().map { it.description }
         val message = "Unknown " + versionOf + " version: " + value + "\n" +
                 "Supported " + versionOf + " versions: " + versionStrings.joinToString(", ")
-        configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY).report(ERROR, message, null)
+        messageCollector.report(ERROR, message, null)
         return null
     }
 
-    override fun compile(sources: List<LocatedFile>,
-                         classpath: List<File>,
-                         destination: File,
-                         flags: CompilerFlags,
-                         logger: Logger,
-                         loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
+    private fun setupLanguageVersionSettings(configuration: CompilerConfiguration, flags: CompilerFlags, messageCollector: MessageCollector) {
+        var languageVersion = parseVersion(flags.useOrNull(KotlinCompilerFlags.languageVersion), "language", messageCollector)
+        var apiVersion = parseVersion(flags.useOrNull(KotlinCompilerFlags.apiVersion), "API", messageCollector)
 
-        val messageCollector = createLoggingMessageCollector(logger, loggerMarker)
-        val groupingCollector = GroupingMessageCollector(messageCollector)
-
-        val services = Services.EMPTY
-
-        val configuration = CompilerConfiguration()
-        configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, groupingCollector)
-
-        //setupCommonArgumentsAndServices
-        flags.use(KotlinCompilerFlags.noInline) {
-            configuration.put(CommonConfigurationKeys.DISABLE_INLINE, it)
-        }
-        flags.use(KotlinCompilerFlags.intellijPluginRoot) {
-            configuration.put(CLIConfigurationKeys.INTELLIJ_PLUGIN_ROOT, it)
-        }
-        flags.use(KotlinCompilerFlags.reportOutputFiles) {
-            configuration.put(CommonConfigurationKeys.REPORT_OUTPUT_FILES, it)
+        if (languageVersion == null) {
+            // If only "-api-version" is specified, language version is assumed to be the latest stable
+            languageVersion = LanguageVersion.LATEST_STABLE
         }
 
-        //setupLanguageVersionSettings(configuration, arguments);
-        run {
-            var languageVersion = parseVersion(configuration, flags.useOrNull(KotlinCompilerFlags.languageVersion), "language")
-            var apiVersion = parseVersion(configuration, flags.useOrNull(KotlinCompilerFlags.apiVersion), "API")
+        if (apiVersion == null) {
+            // If only "-language-version" is specified, API version is assumed to be equal to the language version
+            // (API version cannot be greater than the language version)
+            apiVersion = languageVersion
+        } else {
+            configuration.put(CLIConfigurationKeys.IS_API_VERSION_EXPLICIT, true)
+        }
 
-            if (languageVersion == null) {
-                // If only "-api-version" is specified, language version is assumed to be the latest stable
-                languageVersion = LanguageVersion.LATEST_STABLE
-            }
-
-            if (apiVersion == null) {
-                // If only "-language-version" is specified, API version is assumed to be equal to the language version
-                // (API version cannot be greater than the language version)
-                apiVersion = languageVersion
-            } else {
-                configuration.put(CLIConfigurationKeys.IS_API_VERSION_EXPLICIT, true)
-            }
-
-            if (apiVersion > languageVersion) {
-                configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY).report(
-                        ERROR,
-                        "-api-version (" + apiVersion.versionString + ") cannot be greater than " +
-                                "-language-version (" + languageVersion.versionString + ")", null
-                )
-            }
-
-            if (!languageVersion.isStable) {
-                configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY).report(
-                        STRONG_WARNING,
-                        "Language version " + languageVersion.versionString + " is experimental, there are " +
-                                "no backwards compatibility guarantees for new language and library features", null
-                )
-            }
-
-            val extraLanguageFeatures = HashMap<LanguageFeature, LanguageFeature.State>(0)
-            flags.use(KotlinCompilerFlags.multiPlatform) {
-                extraLanguageFeatures.put(LanguageFeature.MultiPlatformProjects, it.internal())
-            }
-
-            flags.use(KotlinCompilerFlags.coroutinesState) {
-                extraLanguageFeatures.put(LanguageFeature.Coroutines, it.internal())
-            }
-
-            val configureAnalysisFlags = HashMap<AnalysisFlag<*>, Any?>()
-            configureAnalysisFlags.put(AnalysisFlag.skipMetadataVersionCheck, flags.useDefault(KotlinCompilerFlags.skipMetadataVersionCheck, false))
-            configureAnalysisFlags.put(AnalysisFlag.multiPlatformDoNotCheckImpl, flags.useDefault(KotlinCompilerFlags.multiPlatformDoNotCheckImpl, false))
-            configureAnalysisFlags.put(AnalysisFlag.loadJsr305Annotations, when (flags.useDefault(KotlinJVMCompilerFlags.jsr305GlobalReportLevel, KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Ignore)) {
-                KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Ignore -> Jsr305State.IGNORE
-                KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Warn -> Jsr305State.WARN
-                KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Enable -> Jsr305State.ENABLE
-            })
-
-            configuration.languageVersionSettings = LanguageVersionSettingsImpl(
-                    languageVersion,
-                    ApiVersion.createByLanguageVersion(apiVersion),
-                    configureAnalysisFlags,
-                    extraLanguageFeatures
+        if (apiVersion > languageVersion) {
+            messageCollector.report(
+                    ERROR,
+                    "-api-version (" + apiVersion.versionString + ") cannot be greater than " +
+                            "-language-version (" + languageVersion.versionString + ")", null
             )
         }
 
-        //setupPlatformSpecificArgumentsAndServices(configuration, arguments, services)
-        run {
-            if (IncrementalCompilation.isEnabled()) {
-                val components = services.get(IncrementalCompilationComponents::class.java)
-                if (components != null) {
-                    configuration.put(JVMConfigurationKeys.INCREMENTAL_COMPILATION_COMPONENTS, components)
-                }
-            }
-
-            flags.use(KotlinJVMCompilerFlags.additionalJavaModules) {
-                configuration.addAll(JVMConfigurationKeys.ADDITIONAL_JAVA_MODULES, it.toList())
-            }
+        if (!languageVersion.isStable) {
+            messageCollector.report(
+                    STRONG_WARNING,
+                    "Language version " + languageVersion.versionString + " is experimental, there are " +
+                            "no backwards compatibility guarantees for new language and library features", null
+            )
         }
 
-        try {
-            val exitStatus:KotlinCompiler.CompileExitStatus
-            val canceledStatus = services.get(CompilationCanceledStatus::class.java)
-            ProgressIndicatorAndCompilationCanceledStatus.setCompilationCanceledStatus(canceledStatus)
-
-            val rootDisposable = Disposer.newDisposable()
-            try {
-                setIdeaIoUseFallback()
-                val code = doExecute(sources, classpath, destination, flags, configuration, rootDisposable)
-                exitStatus = if (groupingCollector.hasErrors()) COMPILATION_ERROR else code
-            } catch (e: CompilationCanceledException) {
-                messageCollector.report(INFO, "Compilation was canceled", null)
-                return CANCELLED
-            } catch (e: RuntimeException) {
-                val cause = e.cause
-                if (cause is CompilationCanceledException) {
-                    messageCollector.report(INFO, "Compilation was canceled", null)
-                    return CANCELLED
-                } else {
-                    throw e
-                }
-            } finally {
-                Disposer.dispose(rootDisposable)
-            }
-
-            return exitStatus
-        } catch (t: Throwable) {
-            MessageCollectorUtil.reportException(groupingCollector, t)
-            return INTERNAL_ERROR
-        } finally {
-            groupingCollector.flush()
+        val extraLanguageFeatures = HashMap<LanguageFeature, LanguageFeature.State>(0)
+        flags.use(KotlinCompilerFlags.multiPlatform) {
+            extraLanguageFeatures.put(LanguageFeature.MultiPlatformProjects, it.internal())
         }
+
+        flags.use(KotlinCompilerFlags.coroutinesState) {
+            extraLanguageFeatures.put(LanguageFeature.Coroutines, it.internal())
+        }
+
+        val configureAnalysisFlags = HashMap<AnalysisFlag<*>, Any?>()
+        configureAnalysisFlags.put(AnalysisFlag.skipMetadataVersionCheck, flags.useDefault(KotlinCompilerFlags.skipMetadataVersionCheck, false))
+        configureAnalysisFlags.put(AnalysisFlag.multiPlatformDoNotCheckImpl, flags.useDefault(KotlinCompilerFlags.multiPlatformDoNotCheckImpl, false))
+        configureAnalysisFlags.put(AnalysisFlag.loadJsr305Annotations, when (flags.useDefault(KotlinJVMCompilerFlags.jsr305GlobalReportLevel, KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Ignore)) {
+            KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Ignore -> Jsr305State.IGNORE
+            KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Warn -> Jsr305State.WARN
+            KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Enable -> Jsr305State.ENABLE
+        })
+
+        configuration.languageVersionSettings = LanguageVersionSettingsImpl(
+                languageVersion,
+                ApiVersion.createByLanguageVersion(apiVersion),
+                configureAnalysisFlags,
+                extraLanguageFeatures
+        )
     }
 
-    fun setupJdkClasspathRoots(flags: CompilerFlags, configuration: CompilerConfiguration, messageCollector:MessageCollector): KotlinCompiler.CompileExitStatus {
+    private fun setupJdkClasspathRoots(configuration: CompilerConfiguration, flags: CompilerFlags, messageCollector: MessageCollector): KotlinCompiler.CompileExitStatus {
         try {
             val noJdk = flags.useDefault(KotlinJVMCompilerFlags.noJdk, false)
             val jdkHomeArgs = flags.useOrNull(KotlinJVMCompilerFlags.jdkHome)
@@ -232,8 +157,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
                 }
                 messageCollector.report(LOGGING, "Using JDK home directory $jdkHome")
                 jdkHome to PathUtil.getJdkClassesRoots(jdkHome)
-            }
-            else {
+            } else {
                 File(System.getProperty("java.home")) to PathUtil.getJdkClassesRootsFromCurrentJre()
             }
 
@@ -253,86 +177,49 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         }
     }
 
-    fun doExecute(sources: List<LocatedFile>, classpath: List<File>, destination: File, flags: CompilerFlags,
-                  configuration: CompilerConfiguration, rootDisposable: Disposable): KotlinCompiler.CompileExitStatus {
-        val messageCollector = configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
-
-        //TODO
-        val paths = PathUtil.getKotlinPathsForCompiler() //if (arguments.kotlinHome != null) KotlinPathsFromHomeDir(File(arguments.kotlinHome))
-
-        messageCollector.report(LOGGING, "Using Kotlin home directory ${paths.homePath}")
-        val reportPerf = flags.useDefault(KotlinJVMCompilerFlags.reportPerf, false)
-        PerformanceCounter.setTimeCounterEnabled(reportPerf)
-
-        setupJdkClasspathRoots(flags, configuration, messageCollector).let {
-            if (it != OK) return it
+    private fun setupCommonConfiguration(configuration: CompilerConfiguration, flags: CompilerFlags, messageCollector: MessageCollector): KotlinCompiler.CompileExitStatus {
+        flags.use(KotlinCompilerFlags.noInline) {
+            configuration.put(CommonConfigurationKeys.DISABLE_INLINE, it)
+        }
+        flags.use(KotlinCompilerFlags.intellijPluginRoot) {
+            configuration.put(CLIConfigurationKeys.INTELLIJ_PLUGIN_ROOT, it)
+        }
+        flags.use(KotlinCompilerFlags.reportOutputFiles) {
+            configuration.put(CommonConfigurationKeys.REPORT_OUTPUT_FILES, it)
         }
 
         try {
-            loadPlugins(flags, configuration)
-        }
-        catch (e: PluginCliOptionProcessingException) {
+            loadPlugins(configuration, flags)
+        } catch (e: PluginCliOptionProcessingException) {
             val message = e.message + "\n\n" + cliPluginUsageString(e.pluginId, e.options)
             messageCollector.report(ERROR, message)
             return INTERNAL_ERROR
-        }
-        catch (e: CliOptionProcessingException) {
+        } catch (e: CliOptionProcessingException) {
             messageCollector.report(ERROR, e.message!!)
             return INTERNAL_ERROR
-        }
-        catch (t: Throwable) {
+        } catch (t: Throwable) {
             MessageCollectorUtil.reportException(messageCollector, t)
             return INTERNAL_ERROR
         }
 
-        //TODO this is fishy
-        for (source in sources) {
-            if (source.file.extension == "java") {
-                configuration.addJavaSourceRoot(source.file)
-            } else {
-                configuration.addKotlinSourceRoot(source.file.absolutePath)
-                if (source.file.isDirectory) {
-                    configuration.addJavaSourceRoot(source.file)
-                }
-            }
-        }
-
-        //K2JVMCompiler.configureContentRoots(paths, arguments, configuration)
-        run {
-            for (classpathItem in classpath) {
-                configuration.add(JVMConfigurationKeys.CONTENT_ROOTS, JvmClasspathRoot(classpathItem))
-            }
-
-            for (modularRoot in flags.useOrNull(KotlinJVMCompilerFlags.javaModulePath)?.split(File.pathSeparatorChar).orEmpty()) {
-                configuration.add(JVMConfigurationKeys.CONTENT_ROOTS, JvmModulePathRoot(File(modularRoot)))
-            }
-
-            val isModularJava = configuration.get(JVMConfigurationKeys.JDK_HOME).let { it != null && CoreJrtFileSystem.isModularJdk(it) }
-            fun addRoot(moduleName: String, file: File) {
-                if (isModularJava) {
-                    configuration.add(JVMConfigurationKeys.CONTENT_ROOTS, JvmModulePathRoot(file))
-                    configuration.add(JVMConfigurationKeys.ADDITIONAL_JAVA_MODULES, moduleName)
-                }
-                else {
-                    configuration.add(JVMConfigurationKeys.CONTENT_ROOTS, JvmClasspathRoot(file))
-                }
-            }
-
-            val noStdLib = flags.useDefault(KotlinJVMCompilerFlags.noStdlib, false)
-            val noReflect = flags.useDefault(KotlinJVMCompilerFlags.noReflect, false)
-            if (!noStdLib) {
-                addRoot("kotlin.stdlib", paths.stdlibPath)
-                addRoot("kotlin.script.runtime", paths.scriptRuntimePath)
-            }
-            // "-no-stdlib" implies "-no-reflect": otherwise we would be able to transitively read stdlib classes through kotlin-reflect,
-            // which is likely not what user wants since s/he manually provided "-no-stdlib"
-            if (!noReflect && !noStdLib) {
-                addRoot("kotlin.reflect", paths.reflectPath)
-            }
-        }
-
         configuration.put(CommonConfigurationKeys.MODULE_NAME, flags.useDefault(KotlinJVMCompilerFlags.moduleName, JvmAbi.DEFAULT_MODULE_NAME))
 
+        configuration.put(CLIConfigurationKeys.ALLOW_KOTLIN_PACKAGE, flags.useDefault(KotlinCompilerFlags.allowKotlinPackage, false))
+
+        return OK
+    }
+
+    private fun setupJVMConfiguration(configuration: CompilerConfiguration, flags: CompilerFlags, services: Services, messageCollector: MessageCollector) {
+        if (IncrementalCompilation.isEnabled()) {
+            val components = services.get(IncrementalCompilationComponents::class.java)
+            if (components != null) {
+                configuration.put(JVMConfigurationKeys.INCREMENTAL_COMPILATION_COMPONENTS, components)
+            }
+        }
+
+        flags.use(KotlinJVMCompilerFlags.additionalJavaModules) {
+            configuration.addAll(JVMConfigurationKeys.ADDITIONAL_JAVA_MODULES, it.toList())
+        }
 
         flags.use(KotlinJVMCompilerFlags.includeRuntime) {
             configuration.put(JVMConfigurationKeys.INCLUDE_RUNTIME, it)
@@ -354,14 +241,10 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         configuration.put(JVMConfigurationKeys.SKIP_RUNTIME_VERSION_CHECK, flags.useDefault(KotlinJVMCompilerFlags.skipRuntimeVersionCheck, false))
         val useOldClassFilesReading = flags.useDefault(KotlinJVMCompilerFlags.useOldClassFilesReading, false)
         configuration.put(JVMConfigurationKeys.USE_FAST_CLASS_FILES_READING, !useOldClassFilesReading)
-
         if (useOldClassFilesReading) {
-            configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
-                    .report(INFO, "Using the old java class files reading implementation")
+            messageCollector.report(INFO, "Using the old java class files reading implementation")
         }
 
-        configuration.put(CLIConfigurationKeys.ALLOW_KOTLIN_PACKAGE, flags.useDefault(KotlinCompilerFlags.allowKotlinPackage, false))
-        configuration.put(CLIConfigurationKeys.REPORT_PERF, reportPerf)
         configuration.put(JVMConfigurationKeys.USE_SINGLE_MODULE, flags.useDefault(KotlinJVMCompilerFlags.singleModule, false))
         configuration.put(JVMConfigurationKeys.ADD_BUILT_INS_FROM_COMPILER_TO_DEPENDENCIES, flags.useDefault(KotlinJVMCompilerFlags.addCompilerBuiltIns, false))
         configuration.put(JVMConfigurationKeys.CREATE_BUILT_INS_FROM_MODULE_DEPENDENCIES, flags.useDefault(KotlinJVMCompilerFlags.loadBuiltInsFromDependencies, false))
@@ -369,23 +252,124 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         flags.use(KotlinJVMCompilerFlags.declarationsOutputPath) {
             configuration.put(JVMConfigurationKeys.DECLARATIONS_JSON_PATH, it)
         }
+    }
 
-        messageCollector.report(LOGGING, "Configuring the compilation environment")
-        try {
-            if (destination.endsWith(".jar")) {
-                configuration.put(JVMConfigurationKeys.OUTPUT_JAR, destination)
+    private fun setupReportPerf(configuration: CompilerConfiguration, flags: CompilerFlags): Boolean {
+        val reportPerf = flags.useDefault(KotlinJVMCompilerFlags.reportPerf, false)
+        PerformanceCounter.setTimeCounterEnabled(reportPerf)
+        configuration.put(CLIConfigurationKeys.REPORT_PERF, reportPerf)
+        return reportPerf
+    }
+
+    private fun setupSources(configuration: CompilerConfiguration, sources: List<LocatedFile>) {
+        //TODO this is fishy
+        for (source in sources) {
+            if (source.file.extension == "java") {
+                configuration.addJavaSourceRoot(source.file)
             } else {
-                configuration.put(JVMConfigurationKeys.OUTPUT_DIRECTORY, destination)
+                configuration.addKotlinSourceRoot(source.file.absolutePath)
+                if (source.file.isDirectory) {
+                    configuration.addJavaSourceRoot(source.file)
+                }
+            }
+        }
+    }
+
+    private fun setupClasspath(configuration: CompilerConfiguration, flags: CompilerFlags, classpath: List<File>) {
+        for (classpathItem in classpath) {
+            configuration.add(JVMConfigurationKeys.CONTENT_ROOTS, JvmClasspathRoot(classpathItem))
+        }
+
+        for (modularRoot in flags.useOrNull(KotlinJVMCompilerFlags.javaModulePath)?.split(File.pathSeparatorChar).orEmpty()) {
+            configuration.add(JVMConfigurationKeys.CONTENT_ROOTS, JvmModulePathRoot(File(modularRoot)))
+        }
+    }
+
+    private fun setupDestination(configuration: CompilerConfiguration, destination: File) {
+        if (destination.endsWith(".jar")) {
+            configuration.put(JVMConfigurationKeys.OUTPUT_JAR, destination)
+        } else {
+            configuration.put(JVMConfigurationKeys.OUTPUT_DIRECTORY, destination)
+        }
+    }
+
+    override fun compile(sources: List<LocatedFile>,
+                         classpath: List<File>,
+                         destination: File,
+                         flags: CompilerFlags,
+                         logger: Logger,
+                         loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
+
+        val messageCollector = GroupingMessageCollector(createLoggingMessageCollector(logger, loggerMarker))
+
+        val services = Services.EMPTY
+
+        try {
+            val exitStatus: KotlinCompiler.CompileExitStatus
+            val canceledStatus = services.get(CompilationCanceledStatus::class.java)
+            ProgressIndicatorAndCompilationCanceledStatus.setCompilationCanceledStatus(canceledStatus)
+
+            val rootDisposable = Disposer.newDisposable()
+            try {
+                setIdeaIoUseFallback()
+
+                val configuration = CompilerConfiguration()
+                configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
+
+                val reportPerf = setupReportPerf(configuration, flags)
+                setupJdkClasspathRoots(configuration, flags, messageCollector).let { if (it != OK) return it }
+                setupLanguageVersionSettings(configuration, flags, messageCollector)
+                setupCommonConfiguration(configuration, flags, messageCollector).let { if (it != OK) return it }
+                setupJVMConfiguration(configuration, flags, services, messageCollector)
+                setupSources(configuration, sources)
+                setupClasspath(configuration, flags, classpath)
+                setupDestination(configuration, destination)
+
+                val code = doCompile(configuration, rootDisposable, flags, messageCollector)
+                exitStatus = if (messageCollector.hasErrors()) COMPILATION_ERROR else code
+
+                if (reportPerf) {
+                    K2JVMCompiler.reportGCTime(configuration)
+                    K2JVMCompiler.reportCompilationTime(configuration)
+                    PerformanceCounter.report { s -> K2JVMCompiler.reportPerf(configuration, s) }
+                }
+            } catch (e: CompilationCanceledException) {
+                messageCollector.report(INFO, "Compilation was canceled", null)
+                return CANCELLED
+            } catch (e: RuntimeException) {
+                val cause = e.cause
+                if (cause is CompilationCanceledException) {
+                    messageCollector.report(INFO, "Compilation was canceled", null)
+                    return CANCELLED
+                } else {
+                    throw e
+                }
+            } finally {
+                Disposer.dispose(rootDisposable)
             }
 
+            return exitStatus
+        } catch (t: Throwable) {
+            MessageCollectorUtil.reportException(messageCollector, t)
+            return INTERNAL_ERROR
+        } finally {
+            messageCollector.flush()
+        }
+    }
+
+    private fun doCompile(configuration: CompilerConfiguration, rootDisposable: Disposable, flags: CompilerFlags, messageCollector: MessageCollector): KotlinCompiler.CompileExitStatus {
+        try {
             val environment = KotlinCoreEnvironment.createForProduction(rootDisposable, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES)
 
             if (messageCollector.hasErrors()) {
                 return COMPILATION_ERROR
             }
 
-            registerJavacIfNeeded(environment, flags).let {
-                if (!it) return COMPILATION_ERROR
+            if (flags.useDefault(KotlinJVMCompilerFlags.useJavac, false)) {
+                environment.configuration.put(JVMConfigurationKeys.USE_JAVAC, true)
+                if (!environment.registerJavac(arguments = flags.useOrNull(KotlinJVMCompilerFlags.javacArguments))) {
+                    return COMPILATION_ERROR
+                }
             }
 
             if (environment.getSourceFiles().isEmpty()) {
@@ -395,44 +379,22 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
 
             KotlinToJVMBytecodeCompiler.compileBunchOfSources(environment)
 
-            compileJavaFilesIfNeeded(environment, flags).let {
-                if (!it) return COMPILATION_ERROR
+            if (flags.useDefault(KotlinJVMCompilerFlags.useJavac, false)) {
+                val javac = JavacWrapper.getInstance(environment.project)
+                if (!javac.compile()) {
+                    return COMPILATION_ERROR
+                }
             }
 
-            if (reportPerf) {
-                K2JVMCompiler.reportGCTime(configuration)
-                K2JVMCompiler.reportCompilationTime(configuration)
-                PerformanceCounter.report { s -> K2JVMCompiler.reportPerf(configuration, s) }
-            }
             return OK
-        }
-        catch (e: CompilationException) {
-            messageCollector.report(
-                    EXCEPTION,
-                    OutputMessageUtil.renderException(e),
-                    MessageUtil.psiElementToMessageLocation(e.element)
-            )
+        } catch (e: CompilationException) {
+            messageCollector.report(EXCEPTION, OutputMessageUtil.renderException(e),
+                    MessageUtil.psiElementToMessageLocation(e.element))
             return INTERNAL_ERROR
         }
     }
 
-    private fun registerJavacIfNeeded(environment: KotlinCoreEnvironment, flags: CompilerFlags): Boolean {
-        if (flags.useDefault(KotlinJVMCompilerFlags.useJavac, false)) {
-            environment.configuration.put(JVMConfigurationKeys.USE_JAVAC, true)
-            return environment.registerJavac(arguments = flags.useOrNull(KotlinJVMCompilerFlags.javacArguments))
-        }
-
-        return true
-    }
-
-    private fun compileJavaFilesIfNeeded(environment: KotlinCoreEnvironment, flags: CompilerFlags): Boolean  {
-        if (flags.useDefault(KotlinJVMCompilerFlags.useJavac, false)) {
-            return JavacWrapper.getInstance(environment.project).use { it.compile() }
-        }
-        return true
-    }
-
-    fun loadPlugins(flags: CompilerFlags, configuration: CompilerConfiguration) {
+    private fun loadPlugins(configuration: CompilerConfiguration, flags: CompilerFlags) {
         val classLoader = PluginURLClassLoader(
                 flags.useOrNull(KotlinCompilerFlags.pluginClasspaths)
                         ?.map { File(it).toURI().toURL() }
@@ -445,22 +407,12 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         componentRegistrars.addAll(BundledCompilerPlugins.componentRegistrars)
         configuration.addAll(ComponentRegistrar.PLUGIN_COMPONENT_REGISTRARS, componentRegistrars)
 
-        processPluginOptions(flags, configuration, classLoader)
-    }
-
-    private fun processPluginOptions(
-            flags: CompilerFlags,
-            configuration: CompilerConfiguration,
-            classLoader: ClassLoader
-    ) {
-        val optionValuesByPlugin = flags.useOrNull(KotlinCompilerFlags.pluginOptions)?.map{ org.jetbrains.kotlin.compiler.plugin.parsePluginOption(it) }?.groupBy {
+        val optionValuesByPlugin = flags.useOrNull(KotlinCompilerFlags.pluginOptions)?.map { parsePluginOption(it) }?.groupBy {
             if (it == null) throw CliOptionProcessingException("Wrong plugin option format: $it, should be ${CommonCompilerArguments.PLUGIN_OPTION_FORMAT}")
             it.pluginId
         } ?: mapOf()
-
         val commandLineProcessors = ServiceLoader.load(CommandLineProcessor::class.java, classLoader).toMutableList()
         commandLineProcessors.addAll(BundledCompilerPlugins.commandLineProcessors)
-
         for (processor in commandLineProcessors) {
             val declaredOptions = processor.pluginOptions.associateBy { it.name }
             val optionsToValues = MultiMap<CliOption, CliOptionValue>()
@@ -500,8 +452,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         override fun loadClass(name: String, resolve: Boolean): Class<*> {
             return try {
                 childClassLoader.findClass(name)
-            }
-            catch (e: ClassNotFoundException) {
+            } catch (e: ClassNotFoundException) {
                 super.loadClass(name, resolve)
             }
         }
@@ -518,8 +469,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
 
                 return try {
                     super.findClass(name)
-                }
-                catch (e: ClassNotFoundException) {
+                } catch (e: ClassNotFoundException) {
                     onFail.loadClass(name)
                 }
             }
