@@ -1,6 +1,9 @@
 package wemi.compile.impl
 
+import com.intellij.core.CoreFileTypeRegistry
+import com.intellij.mock.MockProject
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.fileTypes.FileTypeRegistry
 import com.intellij.openapi.util.Disposer
 import com.intellij.util.containers.MultiMap
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
@@ -21,6 +24,7 @@ import org.jetbrains.kotlin.cli.jvm.modules.CoreJrtFileSystem
 import org.jetbrains.kotlin.codegen.CompilationException
 import org.jetbrains.kotlin.compiler.plugin.*
 import org.jetbrains.kotlin.config.*
+import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.javac.JavacWrapper
 import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.load.kotlin.incremental.components.IncrementalCompilationComponents
@@ -31,6 +35,7 @@ import org.jetbrains.kotlin.util.PerformanceCounter
 import org.jetbrains.kotlin.utils.PathUtil
 import org.slf4j.Logger
 import org.slf4j.Marker
+import wemi.boot.WemiBuildFileExtensions
 import wemi.compile.*
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
 import wemi.util.LocatedFile
@@ -262,7 +267,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
     /**
      * @param sources java and kotlin source files (or source roots)
      */
-    private fun setupSources(configuration: CompilerConfiguration, sources: List<LocatedFile>) {
+    private fun setupSources(configuration: CompilerConfiguration, flags: CompilerFlags, sources: List<LocatedFile>, messageCollector: MessageCollector) {
         for (source in sources) {
             val file = source.file
             when {
@@ -275,6 +280,13 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
                 }
                 file.hasExtension(JavaSourceFileExtensions) -> {
                     configuration.addJavaSourceRoot(file, source.packageName)
+                }
+                flags.useDefault(KotlinJVMCompilerFlags.compilingWemiBuildFiles, false)
+                        && file.hasExtension(WemiBuildFileExtensions) -> {
+                    configuration.addKotlinSourceRoot(file.absolutePath)
+                }
+                else -> {
+                    messageCollector.report(WARNING, "Unrecognized source file, ignoring: "+file.absolutePath)
                 }
             }
         }
@@ -326,9 +338,24 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
                 setupLanguageVersionSettings(configuration, flags, messageCollector)
                 setupCommonConfiguration(configuration, flags, messageCollector).let { if (it != OK) return it }
                 setupJVMConfiguration(configuration, flags, services, messageCollector)
-                setupSources(configuration, sources)
+                setupSources(configuration, flags, sources, messageCollector)
                 setupClasspath(configuration, flags, classpath)
                 setupDestination(configuration, destination)
+
+                if (flags.useDefault(KotlinJVMCompilerFlags.compilingWemiBuildFiles, false)) {
+                    // Hack to recognize .wemi files as kotlin files
+                    // This has to be done as a "plugin" because that seems to be the only way to get hold of
+                    // the file type registry before it is too late. By masquerading as a plugin, we get to
+                    // execute arbitrary code when the FileTypeRegistry global is properly initialized,
+                    // so we can register our type.
+                    configuration.add(ComponentRegistrar.PLUGIN_COMPONENT_REGISTRARS, object:ComponentRegistrar {
+                        override fun registerProjectComponents(project: MockProject, configuration: CompilerConfiguration) {
+                            val registry = FileTypeRegistry.getInstance() as CoreFileTypeRegistry
+                            // This registers the KotlinFileType multiple times, but the official code does that as well
+                            registry.registerFileType(KotlinFileType.INSTANCE, WemiBuildFileExtensions.joinToString(";"))
+                        }
+                    })
+                }
 
                 val code = doCompile(configuration, rootDisposable, flags, messageCollector)
                 exitStatus = if (messageCollector.hasErrors()) COMPILATION_ERROR else code

@@ -136,4 +136,7 @@ object KotlinJVMCompilerFlags {
 
     //TODO What?
     val friendPaths = CompilerFlag<Array<String>>("friendPaths", "Paths to output directories for friend modules.")
+
+    /** Used to allow compiling of .wemi files by Kotlin compiler */
+    internal val compilingWemiBuildFiles = CompilerFlag<Boolean>("compilingWemiBuildFiles", "Internal flag")
 }

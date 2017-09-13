@@ -134,7 +134,9 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
         }
         classpath.addAll(artifacts)
 
-        val status = kotlinCompiler(WemiKotlinVersion).compile(listOf(LocatedFile(buildFile)), classpath, resultJar, CompilerFlags(), LoggerFactory.getLogger("BuildScriptCompilation"), null)
+        val flags = CompilerFlags()
+        flags[KotlinJVMCompilerFlags.compilingWemiBuildFiles] = true
+        val status = kotlinCompiler(WemiKotlinVersion).compile(listOf(LocatedFile(buildFile)), classpath, resultJar, flags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
         if (status != KotlinCompiler.CompileExitStatus.OK) {
             return null
         }
