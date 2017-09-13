@@ -1,5 +1,7 @@
 package wemi.util
 
+import java.io.File
+
 /**
  *
  */
@@ -62,3 +64,15 @@ fun formatTimeDuration(ms:Long):CharSequence {
     return result
 }
 
+fun File.hasExtension(extensions:Collection<String>):Boolean {
+    val name = this.name
+    val length = name.length
+    for (extension in extensions) {
+        if (length >= extension.length + 1
+                && name.endsWith(extension, ignoreCase = true)
+                && name[length - extension.length - 1] == '.') {
+            return true
+        }
+    }
+    return false
+}

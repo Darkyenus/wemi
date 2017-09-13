@@ -31,12 +31,10 @@ import org.jetbrains.kotlin.util.PerformanceCounter
 import org.jetbrains.kotlin.utils.PathUtil
 import org.slf4j.Logger
 import org.slf4j.Marker
-import wemi.compile.CompilerFlags
-import wemi.compile.KotlinCompiler
+import wemi.compile.*
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
-import wemi.compile.KotlinCompilerFlags
-import wemi.compile.KotlinJVMCompilerFlags
 import wemi.util.LocatedFile
+import wemi.util.hasExtension
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
@@ -261,15 +259,22 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         return reportPerf
     }
 
+    /**
+     * @param sources java and kotlin source files (or source roots)
+     */
     private fun setupSources(configuration: CompilerConfiguration, sources: List<LocatedFile>) {
-        //TODO this is fishy
         for (source in sources) {
-            if (source.file.extension == "java") {
-                configuration.addJavaSourceRoot(source.file)
-            } else {
-                configuration.addKotlinSourceRoot(source.file.absolutePath)
-                if (source.file.isDirectory) {
-                    configuration.addJavaSourceRoot(source.file)
+            val file = source.file
+            when {
+                file.isDirectory -> {
+                    configuration.addKotlinSourceRoot(file.absolutePath)
+                    configuration.addJavaSourceRoot(file)
+                }
+                file.hasExtension(KotlinSourceFileExtensions) -> {
+                    configuration.addKotlinSourceRoot(file.absolutePath)
+                }
+                file.hasExtension(JavaSourceFileExtensions) -> {
+                    configuration.addJavaSourceRoot(file, source.packageName)
                 }
             }
         }

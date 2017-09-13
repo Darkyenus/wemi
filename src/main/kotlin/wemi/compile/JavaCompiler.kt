@@ -1,5 +1,7 @@
 package wemi.compile
 
+val JavaSourceFileExtensions = listOf("java")
+
 /**
  *
  */

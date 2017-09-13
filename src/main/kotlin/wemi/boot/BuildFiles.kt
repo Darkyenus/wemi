@@ -7,12 +7,15 @@ import wemi.compile.*
 import wemi.dependency.*
 import wemi.util.LocatedFile
 import wemi.util.WemiClasspathFile
+import wemi.util.hasExtension
 import java.io.File
 import java.net.URL
 
 private val LOG = LoggerFactory.getLogger("BuildFiles")
 
 val BuildFileStdLib = ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-stdlib", WemiKotlinVersion.string))
+
+val WemiBuildFileExtensions = listOf("wemi", "wemi.kt")
 
 /**
  * Build file is a file with .wemi extension, anywhere in current or parent directory.
@@ -25,7 +28,7 @@ fun findBuildFile(from: File): List<File> {
         val files = currentDirectory.listFiles()
         if (files != null) {
             for (file in files) {
-                if (file.isFile && !file.isHidden && (file.name.endsWith(".wemi", ignoreCase = true) || file.name.endsWith(".wemi.kt", ignoreCase = true))) {
+                if (file.isFile && !file.isHidden && file.hasExtension(WemiBuildFileExtensions)) {
                     if (result == null) {
                         result = ArrayList()
                     }

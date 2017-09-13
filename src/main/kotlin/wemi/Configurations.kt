@@ -25,14 +25,14 @@ object Configurations {
 
     val compilingJava by configuration("Configuration used when compiling Java sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
-        Keys.sourceExtensions set { KeyDefaults.SourceExtensionsJavaList }
+        Keys.sourceExtensions set { JavaSourceFileExtensions }
         Keys.javaCompiler set { ToolProvider.getSystemJavaCompiler() }
         Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
     }
 
     val compilingKotlin by configuration("Configuration used when compiling Kotlin sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
-        Keys.sourceExtensions set { KeyDefaults.SourceExtensionsKotlinList }
+        Keys.sourceExtensions set { KotlinSourceFileExtensions }
         Keys.kotlinCompiler set { kotlinCompiler(WemiKotlinVersion) }
     }
 }

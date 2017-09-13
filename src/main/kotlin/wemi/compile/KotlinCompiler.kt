@@ -66,6 +66,8 @@ fun kotlinCompiler(forVersion:KotlinCompilerVersion):KotlinCompiler {
     }
 }
 
+val KotlinSourceFileExtensions = listOf("kt", "kts")
+
 object KotlinCompilerFlags {
     /* Descriptions and most names taken from the Kotlin at https://github.com/JetBrains/kotlin under Apache 2 license */
 

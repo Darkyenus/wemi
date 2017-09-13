@@ -14,6 +14,7 @@ import wemi.dependency.*
 import wemi.util.LocatedFile
 import wemi.util.constructLocatedFiles
 import wemi.util.div
+import wemi.util.hasExtension
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -40,19 +41,13 @@ object KeyDefaults {
         listOf(base / "resources")
     }
 
-    val SourceExtensionsJavaList = listOf("java")
-    val SourceExtensionsKotlinList = listOf("kt", "kts")
-
     val SourceFiles: BoundKeyValue<Collection<LocatedFile>> = {
         val roots = Keys.sourceRoots.get()
         val extensions = Keys.sourceExtensions.get()
         val result = ArrayList<LocatedFile>()
 
         for (root in roots) {
-            constructLocatedFiles(root, result) { file ->
-                val ext = file.extension
-                extensions.any { it.equals(ext, ignoreCase = true) }
-            }
+            constructLocatedFiles(root, result) { it.hasExtension(extensions) }
         }
 
         result
