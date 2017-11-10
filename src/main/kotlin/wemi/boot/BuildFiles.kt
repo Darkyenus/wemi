@@ -2,12 +2,11 @@ package wemi.boot
 
 import org.slf4j.LoggerFactory
 import wemi.WemiKotlinVersion
-import wemi.compile.KotlinCompiler
 import wemi.compile.*
 import wemi.dependency.*
 import wemi.util.LocatedFile
-import wemi.util.WemiClasspathFile
 import wemi.util.hasExtension
+import wemi.util.wemiLauncherFileWithJarExtension
 import java.io.File
 import java.net.URL
 
@@ -76,7 +75,7 @@ private val M2RepositoryRegex = "///\\s*m2-repository\\s+(\\w+)\\s+at\\s+(\\w+:\
 private val LibraryRegex = "///\\s*build-library\\s+(\\w+)\\s*:\\s*(\\w+)\\s*:\\s*(\\w+)\\s*".toRegex()
 
 fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
-    val buildFolder = prepareBuildFileCacheFolder(buildFile)
+    val buildFolder = prepareBuildFileCacheFolder(buildFile) ?: return null
     val resultJar = File(buildFolder, buildFile.name + "-cache.jar")
     val classpathFile = File(buildFolder, buildFile.name + ".classpath")
     val resultClasspath = mutableListOf<File>()
@@ -99,6 +98,14 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
             }
         }
     }
+
+    val buildFlags = CompilerFlags()
+    buildFlags[KotlinJVMCompilerFlags.compilingWemiBuildFiles] = true
+    buildFlags[KotlinJVMCompilerFlags.moduleName] = buildFile.nameWithoutExtension
+    // Wemi launcher has kotlin runtime bundled, which is fine
+    buildFlags[KotlinJVMCompilerFlags.skipRuntimeVersionCheck] = true
+
+    val sources = listOf(LocatedFile(buildFile))
 
     if (recompile) {
         // Recompile
@@ -126,27 +133,28 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
 
         val repositoryChain = createRepositoryChain(repositories)
 
-        classpath.add(WemiClasspathFile)
+        val wemiLauncherJar = wemiLauncherFileWithJarExtension(buildFolder)
+        classpath.add(wemiLauncherJar)
         val artifacts = DependencyResolver.resolveArtifacts(buildDependencyLibraries, repositoryChain)
         if (artifacts == null) {
-            LOG.warn("Failed to retrieve all build file dependencies")
+            LOG.warn("Failed to retrieve all build file dependencies for {}", buildFile)
             return null
         }
         classpath.addAll(artifacts)
 
-        val flags = CompilerFlags()
-        flags[KotlinJVMCompilerFlags.compilingWemiBuildFiles] = true
-        val status = kotlinCompiler(WemiKotlinVersion).compile(listOf(LocatedFile(buildFile)), classpath, resultJar, flags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
+        val status = kotlinCompiler(WemiKotlinVersion).compile(sources, classpath, resultJar, buildFlags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
         if (status != KotlinCompiler.CompileExitStatus.OK) {
+            LOG.warn("Compilation failed for {}: {}", buildFile, status)
             return null
         }
 
+        resultClasspath.add(wemiLauncherJar)
         resultClasspath.addAll(artifacts)
         classpathFile.writeText(artifacts.joinToString(separator = "\n") { file -> file.absolutePath })
     }
 
     // Figure out the init class
-    return BuildFile(resultJar, resultClasspath, transformFileNameToKotlinClassName(buildFile.nameWithoutExtension))
+    return BuildFile(resultJar, resultClasspath, transformFileNameToKotlinClassName(buildFile.nameWithoutExtension), sources, buildFlags)
 }
 
 private fun transformFileNameToKotlinClassName(fileNameWithoutExtension:String):String {
@@ -172,6 +180,10 @@ private fun transformFileNameToKotlinClassName(fileNameWithoutExtension:String):
     return sb.toString()
 }
 
-data class BuildFile(val scriptJar:File, val extraClasspath:List<File>, val initClass:String)
-
-
+/**
+ * @property scriptJar jar to which the build script has been compiled
+ * @property classpath used to compile and to run the scriptJar
+ * @property initClass main class of the [scriptJar]
+ */
+data class BuildFile(val scriptJar:File, val classpath:List<File>, val initClass:String,
+                     val sources:List<LocatedFile>, val buildFlags: CompilerFlags)

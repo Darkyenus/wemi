@@ -95,7 +95,8 @@ configuration is derived from (or *extends* if you will) the `compiling` configu
 Configuration however does not have to be derived and in most cases won't be.
 
 It is a soft convention to name configurations with the description of the activity in which the configuration will be used,
-with the verb in *present participle*, that is, ending with *-ing*.
+with the verb in *present participle*, that is, ending with *-ing*. If the configuration is not used for an activity,
+any descriptive name is fine.
 
 Standard configurations are defined in `wemi.Configurations` object.
 
@@ -210,3 +211,11 @@ This is not the same as library dependencies of the compiled project, see `libra
 WEMI features a simple interactive user interface, which is launched by default.
 It accepts key queries, which are then evaluated, and a few commands. Refer to the `help` command.
 To exit, use the `exit` command, or simply EOF (Ctrl-D).
+
+## Distribution and installation
+WEMI is distributed as a runnable .jar file called `wemi`, which is also a valid `.sh` file.
+This file should be as small as possible, as it will be checked into the version control system of the project,
+like wrappers of other build systems. This should ensure that building and updating of the build system and its
+files will be as painless as possible.
+
+The prepended `.sh` file conforms to the standard `sh` shell, for maximum compatibility.

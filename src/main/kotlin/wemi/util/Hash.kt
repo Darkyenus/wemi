@@ -1,5 +1,8 @@
 package wemi.util
 
+import java.io.File
+import java.security.DigestInputStream
+import java.security.MessageDigest
 import java.util.*
 
 /**
@@ -47,3 +50,14 @@ fun fromHexString(data: CharSequence): ByteArray? {
         return Arrays.copyOf(bytes, byteI)
     }
 }
+
+fun File.hash(algorithm:String = "MD5"):ByteArray {
+    val md = MessageDigest.getInstance(algorithm)
+    DigestInputStream(inputStream(), md).use {
+        val buf = ByteArray(1024)
+        while (it.read(buf) != -1) {}
+        it.close()
+    }
+    return md.digest()
+}
+

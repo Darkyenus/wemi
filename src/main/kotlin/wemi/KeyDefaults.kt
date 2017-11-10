@@ -8,13 +8,11 @@ import wemi.assembly.AssemblySource
 import wemi.assembly.FileRecognition
 import wemi.assembly.MergeStrategy
 import wemi.compile.CompilerFlags
-import wemi.compile.KotlinCompiler
 import wemi.compile.JavaCompilerFlags
+import wemi.compile.JavaVersion
+import wemi.compile.KotlinCompiler
 import wemi.dependency.*
-import wemi.util.LocatedFile
-import wemi.util.constructLocatedFiles
-import wemi.util.div
-import wemi.util.hasExtension
+import wemi.util.*
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -70,11 +68,25 @@ object KeyDefaults {
     val LibraryDependencies: BoundKeyValue<Collection<ProjectDependency>> = {
         listOf(KotlinStdlib)
     }
-    val ExternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
+    val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<ProjectId, ResolvedProject>>> = {
         val repositories = createRepositoryChain(Keys.repositories.get())
-        val artifacts = DependencyResolver.resolveArtifacts(Keys.libraryDependencies.get(), repositories)
-                ?: throw WemiException("Failed to resolve all artifacts")
-        artifacts.map { LocatedFile(it) }
+        val resolved = mutableMapOf<ProjectId, ResolvedProject>()
+        val complete = DependencyResolver.resolve(resolved, Keys.libraryDependencies.get(), repositories, Keys.libraryDependencyProjectMapper.get())
+        Partial(resolved, complete)
+    }
+    val ExternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
+        val resolved = Keys.resolvedLibraryDependencies.get()
+        if (!resolved.complete) {
+            throw WemiException("Failed to resolve all artifacts")
+        }
+        val unmanaged = Keys.unmanagedDependencies.get()
+
+        val result = mutableListOf<LocatedFile>()
+        result.addAll(unmanaged)
+        for (entry in resolved.value) {
+            result.add(LocatedFile(entry.value.artifact ?: continue))
+        }
+        result
     }
     val InternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
         val compiled = Keys.compile.get()
@@ -172,6 +184,14 @@ object KeyDefaults {
                 val compilerOptions = ArrayList<String>()
                 compilerFlags.use(JavaCompilerFlags.customFlags) {
                     compilerOptions.addAll(it)
+                }
+                compilerFlags.use(JavaCompilerFlags.sourceVersion) {
+                    compilerOptions.add("-source")
+                    compilerOptions.add(it.version)
+                }
+                compilerFlags.use(JavaCompilerFlags.targetVersion) {
+                    compilerOptions.add("-target")
+                    compilerOptions.add(it.version)
                 }
                 compilerOptions.add("-classpath")
                 val classpathString = externalClasspath.joinToString(pathSeparator) { it.file.absolutePath }
@@ -517,6 +537,8 @@ object KeyDefaults {
 
         Keys.repositories set Repositories
         Keys.libraryDependencies set LibraryDependencies
+        Keys.resolvedLibraryDependencies set ResolvedLibraryDependencies
+        Keys.unmanagedDependencies set { emptyList() }
         Keys.internalClasspath set InternalClasspath
         Keys.externalClasspath set ExternalClasspath
         Keys.classpath set Classpath
@@ -529,6 +551,10 @@ object KeyDefaults {
         Keys.outputSourcesDirectory set OutputSourcesDirectory
         Keys.outputHeadersDirectory set OutputHeadersDirectory
         Keys.compilerOptions set { CompilerFlags() }
+        with(Configurations.compilingJava) {
+            Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
+            Keys.compilerOptions[JavaCompilerFlags.targetVersion] = JavaVersion.V1_8
+        }
         Keys.compile set Compile
 
         //Keys.mainClass TODO Detect main class?

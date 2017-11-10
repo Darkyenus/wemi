@@ -4,6 +4,7 @@ package wemi
 
 import org.slf4j.LoggerFactory
 import wemi.KeyDefaults.applyDefaults
+import wemi.boot.BuildFileIntrospection.initializeBuildScriptInfo
 import java.io.File
 import java.util.*
 import kotlin.properties.ReadOnlyProperty
@@ -43,6 +44,7 @@ class ProjectDelegate internal constructor(
             Keys.projectRoot set { project.projectRoot }
         }
         this.project.applyDefaults()
+        this.project.initializeBuildScriptInfo()
         this.project.initializer()
         this.project.locked = true
         return this
@@ -101,7 +103,7 @@ class ConfigurationDelegate internal constructor(
 }
 
 open class ScopeCache internal constructor(internal val bindingHolder: BindingHolder,
-                  internal val parentScope:Scope?) {
+                                                                   internal val parentScope:Scope?) {
 
     private val scopes:MutableMap<Configuration, ConfigurationScope> by lazy(LazyThreadSafetyMode.PUBLICATION) {
         mutableMapOf<Configuration, ConfigurationScope>()
@@ -113,7 +115,8 @@ open class ScopeCache internal constructor(internal val bindingHolder: BindingHo
         val scopes = scopes
         synchronized(scopes) {
             return scopes.getOrPut(configuration) {
-                ConfigurationScope(configuration, me)
+                val realHolder = bindingHolder.configurationExtensions[configuration] ?: configuration
+                ConfigurationScope(configuration, realHolder, me)
             }
         }
     }
@@ -151,13 +154,12 @@ open class ScopeCache internal constructor(internal val bindingHolder: BindingHo
 }
 
 private class ConfigurationScope(
-        bindingHolder: Configuration,
+        val configuration: Configuration,
+        bindingHolder: BindingHolder,
         parentScope:Scope) : ScopeCache(bindingHolder, parentScope), Scope {
-
-    override fun previous(): Scope = parentScope!!
 
     override val scopeCache: ScopeCache
         get() = this
 
-    override fun scopeToString(): String = parentScope!!.scopeToString() + bindingHolder.name + ":"
+    override fun scopeToString(): String = parentScope!!.scopeToString() + configuration.name + ":"
 }

@@ -6,8 +6,11 @@ import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.ProjectDependency
+import wemi.dependency.ProjectId
 import wemi.dependency.Repository
+import wemi.dependency.ResolvedProject
 import wemi.util.LocatedFile
+import wemi.util.Partial
 import java.io.File
 import javax.tools.JavaCompiler
 
@@ -35,6 +38,9 @@ object Keys {
 
     val repositories by key<Collection<Repository>>("Repositories to be used when resolving dependencies")
     val libraryDependencies by key<Collection<ProjectDependency>>("Libraries that the project depends on")
+    val libraryDependencyProjectMapper by key<(ProjectDependency) -> ProjectDependency>("Function applied to ProjectDependencies encountered while resolving. Used for example when retrieving sources.", defaultValue = {it})
+    val resolvedLibraryDependencies by key<Partial<Map<ProjectId, ResolvedProject>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.")
+    val unmanagedDependencies by key<Collection<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers")
     val externalClasspath by key<Collection<LocatedFile>>("External classpath of the project, usually dependencies", cached = true)
     val internalClasspath by key<Collection<LocatedFile>>("Internal classpath of the project, usually compiled sources and resources")
     val classpath by key<Collection<LocatedFile>>("Full classpath of the project, combined external and internal classpath")

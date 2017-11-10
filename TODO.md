@@ -19,5 +19,17 @@ Pushing into the override could be using a new method `withOverride`. Questions:
 	at the project level, which will activate when the overridden key is requested at the correct scope.
 	Should there be "override priority levels" to determine which override should be used?
 
+**Above has been implemented, document `extend` mechanism!!!**
+
 1. Allow projects to inherit from parent project configuration/config set
 	- Maybe simple "setup function" would be enough...
+
+1. IDE (IntelliJ, other Jetbrains later) integrations
+
+1. Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
+
+1. Self hosting
+
+1. Trace debug mode
+
+1. Allow projects to depend on other projects and implement this in IDE plugin

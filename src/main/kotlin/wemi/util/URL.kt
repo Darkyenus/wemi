@@ -2,6 +2,7 @@ package wemi.util
 
 import java.io.File
 import java.net.URL
+import java.net.URLDecoder
 
 /**
  * Custom URL implementation
@@ -28,26 +29,23 @@ operator fun CharSequence.div(path: CharSequence): StringBuilder {
 }
 
 fun URL.toFile(): File? {
-    when (protocol) {
-        "file" -> {
-            if (host.isNullOrBlank() || host == "localhost") {
-                return File(path)
-            } else {
-                return null
-            }
-        }
-        "jar" -> {
-            if (path.startsWith("file:")) {
-                val begin = path.indexOf(':')
-                val end = path.lastIndexOf('!')
-                return File(path.substring(begin, if (end == -1) path.length else end))
-            } else {
-                return null
-            }
-        }
-        else -> {
-            return null
-        }
+    if (host != null
+            && !host.isBlank()
+            && !host.equals("localhost", ignoreCase = true)
+            && !host.equals("127.0.0.1", ignoreCase = true)) {
+        return null
+    }
+
+    var url = this
+
+    if (url.protocol == "jar") {
+        url = URL(url.file.substring(0, url.file.lastIndexOf("!/")))
+    }
+
+    if (url.protocol == "file") {
+        return File(URLDecoder.decode(url.file, Charsets.UTF_8.name()))
+    } else {
+        return null
     }
 }
 

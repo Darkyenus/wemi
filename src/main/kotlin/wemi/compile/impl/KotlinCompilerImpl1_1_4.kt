@@ -328,7 +328,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
 
             val rootDisposable = Disposer.newDisposable()
             try {
-                setIdeaIoUseFallback()
+                setIdeaIoUseFallback() // No idea what this does, remove?
 
                 val configuration = CompilerConfiguration()
                 configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)

@@ -1,5 +1,7 @@
 package wemi.util
 
+import com.esotericsoftware.jsonbeans.Json
+import wemi.boot.MachineWritable
 import java.io.File
 
 @Suppress("NOTHING_TO_INLINE")
@@ -14,7 +16,8 @@ import java.io.File
  * @property root to which [path] is relative to
  * @property simple is true if the (File) constructor has been used and the file is not really "located"
  */
-class LocatedFile private constructor(val file: File, val root:File, val path: String, val simple:Boolean) {
+class LocatedFile private constructor(val file: File, val root:File, val path: String, val simple:Boolean)
+    : MachineWritable {
 
     constructor(file:File) : this(file, file.parentFile, file.name, true)
     constructor(file:File, location: String, root:File) : this(file, root, location, false)
@@ -48,6 +51,15 @@ class LocatedFile private constructor(val file: File, val root:File, val path: S
 
     override fun toString(): String {
         return root.absolutePath+"//"+path
+    }
+
+    override fun writeMachine(json: Json) {
+        json.writeObjectStart()
+        json.writeValue("file", file, File::class.java)
+        json.writeValue("root", root, File::class.java)
+        json.writeValue("path", path, String::class.java)
+        json.writeValue("simple", simple, Boolean::class.java)
+        json.writeObjectEnd()
     }
 }
 

@@ -29,47 +29,49 @@ object DependencyResolver {
             }
         }
         // Fail
-        LOG.warn("Failed to resolve {}", projectDependency.project)
+        LOG.warn("Failed to resolve {}", projectDependency.project)//TODO make this debug and report elsewhere
         return ResolvedProject(projectDependency.project, null, emptyList(), true)
     }
 
-    private fun doResolveArtifacts(artifacts: MutableList<File>, resolved: MutableSet<ProjectId>,
-                                   dependency: ProjectDependency, repositories: RepositoryChain): Boolean {
+    private fun doResolveArtifacts(resolved: MutableMap<ProjectId, ResolvedProject>,
+                                   dependency: ProjectDependency, repositories: RepositoryChain,
+                                   mapper:(ProjectDependency) -> ProjectDependency): Boolean {
         if (resolved.contains(dependency.project)) {
             return true
         }
 
-        val resolvedProject = resolveProject(dependency, repositories)
+        val resolvedProject = resolveProject(mapper(dependency), repositories)
         if (resolvedProject.hasError) {
             return false
         }
-        resolved.add(resolvedProject.id)
-        if (resolvedProject.artifact != null) {
-            artifacts.add(resolvedProject.artifact)
-        }
+        resolved.put(dependency.project, resolvedProject)
 
         var ok = true
         for (transitiveDependency in resolvedProject.dependencies) {
-            ok = ok and doResolveArtifacts(artifacts, resolved, transitiveDependency, repositories)
+            ok = ok and doResolveArtifacts(resolved, transitiveDependency, repositories, mapper)
         }
         return ok
     }
 
     fun resolveArtifacts(projects: Collection<ProjectDependency>, repositories: RepositoryChain): List<File>? {
-        val artifacts = mutableListOf<File>()
-        val resolved = mutableSetOf<ProjectId>()
-
-        var ok = true
-
-        for (project in projects) {
-            ok = ok and doResolveArtifacts(artifacts, resolved, project, repositories)
-        }
+        val resolved = mutableMapOf<ProjectId, ResolvedProject>()
+        val ok = resolve(resolved, projects, repositories, {it})
 
         if (!ok) {
             return null
         }
 
-        return artifacts
+        return resolved.mapNotNull { it.value.artifact }
+    }
+
+    fun resolve(resolved:MutableMap<ProjectId, ResolvedProject>, projects: Collection<ProjectDependency>, repositories: RepositoryChain, mapper:((ProjectDependency) -> ProjectDependency)): Boolean {
+        var ok = true
+
+        for (project in projects) {
+            ok = ok and doResolveArtifacts(resolved, project, repositories, mapper)
+        }
+
+        return ok
     }
 
     private fun resolveInRepository(projectDependency: ProjectDependency, repository: Repository): ResolvedProject {

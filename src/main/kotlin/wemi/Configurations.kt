@@ -1,9 +1,14 @@
+@file:Suppress("unused")
+
 package wemi
 
 import configuration
-import wemi.KeyDefaults.SourceBaseScopeTest
-import wemi.KeyDefaults.SourceRootsJavaKotlin
-import wemi.compile.*
+import wemi.compile.JavaCompilerFlags
+import wemi.compile.JavaSourceFileExtensions
+import wemi.compile.KotlinSourceFileExtensions
+import wemi.compile.kotlinCompiler
+import wemi.dependency.ProjectDependency
+import wemi.dependency.Repository.M2.Companion.M2ClassifierAttribute
 import javax.tools.ToolProvider
 
 /**
@@ -18,8 +23,28 @@ object Configurations {
     //endregion
 
     //region Testing configuration
-    val testing by configuration("Used when testing") {
+    val test by configuration("Used when testing") {
         Keys.sourceBase set KeyDefaults.SourceBaseScopeTest
+    }
+    //endregion
+
+    //region IDE configurations
+    val retrievingSources by configuration("Used to retrieve sources") {
+        Keys.libraryDependencyProjectMapper set {
+            {(projectId, exclusions):ProjectDependency ->
+                val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (M2ClassifierAttribute to "sources"))
+                ProjectDependency(sourcesProjectId, exclusions)
+            }
+        }
+    }
+
+    val retrievingDocs by configuration("Used to retrieve docs") {
+        Keys.libraryDependencyProjectMapper set {
+            {(projectId, exclusions):ProjectDependency ->
+                val javadocProjectId = projectId.copy(attributes = projectId.attributes + (M2ClassifierAttribute to "javadoc"))
+                ProjectDependency(javadocProjectId, exclusions)
+            }
+        }
     }
     //endregion
 

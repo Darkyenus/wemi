@@ -1,0 +1,77 @@
+<idea-plugin>
+    <id>com.darkyen.wemi.intellij</id>
+    <name>WEMI</name>
+    <version>0.0</version>
+    <vendor email="darkyenus@gmail.com" url="http://darkyenus.github.io">Jan Polák</vendor>
+
+    <description><![CDATA[
+      Allows to use WEMI build system from the IDE.<br>
+
+      <b>Features:</b>
+      <ul>
+        <li>Import the project structure to the IDE</li>
+        <li>Compile and run using WEMI</li>
+        <li>Code completion and syntax highlighting inside build files</li>
+      </ul>
+    ]]></description>
+
+    <change-notes><![CDATA[
+      0.0
+      <ul>
+        <li>Development</li>
+      </ul>
+    ]]>
+    </change-notes>
+
+    <!-- http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html -->
+    <idea-version since-build="171"/>
+
+    <!--  http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.java</depends>
+    <depends>org.jetbrains.kotlin</depends>
+
+    <actions>
+        <action id="com.darkyen.wemi.intellij.importing.ImportProjectAction"
+                class="com.darkyen.wemi.intellij.importing.ImportProjectAction"
+                text="Import Wemi Project"
+                description="Import an unlinked Wemi project in the project's root into the IDE"
+                icon="WemiIcons.WEMI">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Import -->
+        <postStartupActivity implementation="com.darkyen.wemi.intellij.importing.OfferImportStartupActivity"/>
+        <projectImportProvider implementation="com.darkyen.wemi.intellij.importing.WemiProjectImportProvider"/>
+        <projectImportBuilder implementation="com.darkyen.wemi.intellij.importing.ImportFromWemiControlBuilder"/>
+
+        <!-- Settings -->
+        <projectService serviceImplementation="com.darkyen.wemi.intellij.settings.WemiSystemSettings"/>
+        <projectService serviceImplementation="com.darkyen.wemi.intellij.settings.WemiLocalSettings"/>
+
+        <projectConfigurable groupId="build.tools" id="com.darkyen.wemi.configurable-settings"
+                             instance="com.darkyen.wemi.intellij.settings.WemiConfigurable"/>
+
+        <!-- Execution -->
+        <configurationType implementation="com.darkyen.wemi.intellij.execution.WemiTaskConfigurationType"/>
+        <externalSystemExecutionConsoleManager
+                implementation="com.darkyen.wemi.intellij.execution.WemiExecutionConsoleManager" order="last"/>
+        <stepsBeforeRunProvider implementation="com.darkyen.wemi.intellij.execution.WemiBeforeRunTaskProvider"/>
+        <runConfigurationProducer implementation="com.darkyen.wemi.intellij.execution.WemiRunConfigurationProducer"/>
+
+
+        <!-- Manager -->
+        <externalSystemManager implementation="com.darkyen.wemi.intellij.manager.WemiManager"/>
+
+        <!-- Tasks -->
+        <externalSystemTaskNotificationListener
+                implementation="com.darkyen.wemi.intellij.importing.WemiProjectResolutionListener"/>
+
+        <!-- Misc -->
+        <fileTypeFactory implementation="com.darkyen.wemi.intellij.WemiFileTypeFactory"/>
+    </extensions>
+
+</idea-plugin>

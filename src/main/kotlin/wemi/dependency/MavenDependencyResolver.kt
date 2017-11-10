@@ -48,6 +48,7 @@ internal object MavenDependencyResolver {
             "pom" -> null
             "jar" -> {
                 val jarPath = project.artifactPath("jar")
+                //TODO When we are only resolving the presence of the file - do we need to read the data?
                 val (data, file) = retrieveFile(jarPath, repository)
                 if (file == null) {
                     error = true

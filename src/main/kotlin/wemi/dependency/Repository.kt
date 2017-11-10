@@ -1,12 +1,14 @@
 package wemi.dependency
 
+import com.esotericsoftware.jsonbeans.Json
+import wemi.boot.MachineWritable
 import java.net.URL
 import java.security.MessageDigest
 
 /**
  * Represents preferredRepository from which artifacts may be retrieved
  */
-sealed class Repository(val name: String) {
+sealed class Repository(val name: String) : MachineWritable {
 
     /** Local repositories are preferred, because retrieving from them is faster. */
     abstract val local: Boolean
@@ -48,6 +50,16 @@ sealed class Repository(val name: String) {
                 sb.append(" (cached by ").append(cache.name).append(')')
             }
             return sb.toString()
+        }
+
+        override fun writeMachine(json: Json) {
+            json.writeObjectStart()
+            json.writeValue("type", "M2", String::class.java)
+            json.writeValue("url", url.toExternalForm(), String::class.java)
+            json.writeValue("local", local, Boolean::class.java)
+            json.writeValue("cache", cache, M2::class.java)
+            json.writeValue("checksum", checksum, M2.Checksum::class.java)
+            json.writeObjectEnd()
         }
     }
 

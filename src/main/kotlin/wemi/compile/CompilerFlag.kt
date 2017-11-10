@@ -1,6 +1,8 @@
 package wemi.compile
 
+import com.esotericsoftware.jsonbeans.Json
 import org.slf4j.LoggerFactory
+import wemi.boot.MachineWritable
 
 /**
  * Key for compiler flags. Each compiler may have different flags and may need different code to apply them.
@@ -8,11 +10,16 @@ import org.slf4j.LoggerFactory
  *
  * @see CompilerFlags
  */
-class CompilerFlag<Type>(val name:String, val description:String)
+@Suppress("unused")
+class CompilerFlag<Type>(val name:String, val description:String) : MachineWritable {
+    override fun writeMachine(json: Json) {
+        json.writeValue(name as Any, String::class.java)
+    }
+}
 
 private val LOG = LoggerFactory.getLogger("CompilerFlag")
 
-class CompilerFlags {
+class CompilerFlags : MachineWritable {
     private val map = HashMap<CompilerFlag<*>, Any?>()
     private val used = HashSet<CompilerFlag<*>>()
 
@@ -79,5 +86,9 @@ class CompilerFlags {
     fun clear() {
         map.clear()
         used.clear()
+    }
+
+    override fun writeMachine(json: Json) {
+        json.writeValue(map)
     }
 }
