@@ -160,7 +160,7 @@ class WemiManager : ExternalSystemUiAware,
             val start = changedFileOrDirPath.lastIndexOf('/')
             // Ignore hidden files
             if (start != -1 && changedFileOrDirPath[start+1] != '.') {
-                return changedFileOrDirPath
+                return changedFileOrDirPath.substring(0, start)
             }
         }
         return null

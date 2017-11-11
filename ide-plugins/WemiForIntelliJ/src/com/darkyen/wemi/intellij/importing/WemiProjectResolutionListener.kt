@@ -20,8 +20,6 @@ import java.util.regex.Pattern
 
 /**
  * Gets notified when the project import fails for Wemi project and shows a helpful notification
- *
- * TODO Our failure messages are currently not properly reported through [WemiProjectResolver]
  */
 class WemiProjectResolutionListener : ExternalSystemTaskNotificationListenerAdapter() {
 
@@ -30,13 +28,14 @@ class WemiProjectResolutionListener : ExternalSystemTaskNotificationListenerAdap
             return
         }
 
-        //TODO Doesn't show anything
         ExternalSystemNotificationManager.getInstance(taskId.findProject() ?: return)
                 .showNotification(taskId.projectSystemId,
                         NotificationData("Wemi Success",
                                 "Project imported successfully",
                                 NotificationCategory.INFO,
-                                NotificationSource.PROJECT_SYNC))
+                                NotificationSource.PROJECT_SYNC, null, -1, -1, true).apply {
+                            balloonGroup = WemiNotificationGroup.displayId
+                        })
     }
 
     private fun unwrapException(e:Exception):String? {
