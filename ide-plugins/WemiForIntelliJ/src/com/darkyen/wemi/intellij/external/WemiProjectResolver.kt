@@ -67,13 +67,18 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Creating session"))
             val launcher = (settings ?: return null).launcher
 
-            session = if (settings.javaVmExecutable.isBlank()) {
-                launcher.createMachineReadableSession(settings.env, settings.isPassParentEnvs, settings.prefixConfigurationsArray())
-            } else {
-                launcher.createMachineReadableSession(settings.javaVmExecutable, settings.vmOptions, settings.env, settings.isPassParentEnvs, settings.prefixConfigurationsArray())
+            var prefixConfigurations = settings.prefixConfigurationsArray()
+            if (isPreviewMode) {
+                prefixConfigurations += "offline"
             }
 
-            return resolveProjectInfo(id, session, projectPath, isPreviewMode, settings, listener)
+            session = if (settings.javaVmExecutable.isBlank()) {
+                launcher.createMachineReadableSession(settings.env, settings.isPassParentEnvs, prefixConfigurations)
+            } else {
+                launcher.createMachineReadableSession(settings.javaVmExecutable, settings.vmOptions, settings.env, settings.isPassParentEnvs, prefixConfigurations)
+            }
+
+            return resolveProjectInfo(id, session, projectPath, settings, listener)
         } catch (se:WemiSessionException) {
             LOG.warn("WemiSessionException encountered while resolving", se)
             val sw = StringWriter()
@@ -124,7 +129,6 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
     private fun resolveProjectInfo(id: ExternalSystemTaskId,
                                    session: WemiLauncherSession,
                                    projectPath: String,
-                                   isPreviewMode: Boolean,//TODO Implement previewMode with offline resolution
                                    settings: WemiExecutionSettings,
                                    listener: ExternalSystemTaskNotificationListener): DataNode<ProjectData> {
         listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving project list"))
@@ -259,25 +263,29 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             dependencies.getOrPut(id) { mutableListOf() }.add(dep)
         }
 
-        session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies").get("value").forEach {
-            val projectId = it.get("key")
-            val artifact = it.get("value").get("artifact").asString() ?: return@forEach
+        try {
+            session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies").get("value").forEach {
+                val projectId = it.get("key")
+                val artifact = it.get("value").get("artifact").asString() ?: return@forEach
 
-            val group = projectId.getString("group")
-            val name = projectId.getString("name")
-            val version = projectId.getString("version")
-            val classifier = projectId.get("attributes").find { it.getString("key") == "m2-classifier" }?.getString("value") ?: ""
+                val group = projectId.getString("group")
+                val name = projectId.getString("name")
+                val version = projectId.getString("version")
+                val classifier = projectId.get("attributes").find { it.getString("key") == "m2-classifier" }?.getString("value") ?: ""
 
-            add("$group:$name:$version",
-                    WemiLibraryDependency(
-                    "$group:$name:$version${if(classifier.isBlank()) "" else "-$classifier"}",
-                            File(artifact).absoluteFile))
-        }
+                add("$group:$name:$version",
+                        WemiLibraryDependency(
+                                "$group:$name:$version${if (classifier.isBlank()) "" else "-$classifier"}",
+                                File(artifact).absoluteFile))
+            }
 
-        session.jsonArray(projectName, *config, task = "unmanagedDependencies").forEach {
-            val file = File(it.getString(if (it.getBoolean("simple")) "file" else "root")).absoluteFile
+            session.jsonArray(projectName, *config, task = "unmanagedDependencies").forEach {
+                val file = File(it.getString(if (it.getBoolean("simple")) "file" else "root")).absoluteFile
 
-            add(file.absolutePath, WemiLibraryDependency(file.name, file))
+                add(file.absolutePath, WemiLibraryDependency(file.name, file))
+            }
+        } catch (e:WemiSessionException) {
+            LOG.warn("Failed to resolve dependencies for "+config.joinToString(""){it+":"}+projectName, e)
         }
 
         return dependencies
