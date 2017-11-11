@@ -10,11 +10,17 @@ import wemi.boot.MachineWritable
  *
  * @see CompilerFlags
  */
-@Suppress("unused")
+@Suppress("unused")//Type is technically unused, but helps when compile-time type-checking
 class CompilerFlag<Type>(val name:String, val description:String) : MachineWritable {
     override fun writeMachine(json: Json) {
         json.writeValue(name as Any, String::class.java)
     }
+
+    override fun toString(): String {
+        return "$name - $description"
+    }
+
+
 }
 
 private val LOG = LoggerFactory.getLogger("CompilerFlag")
@@ -61,7 +67,7 @@ class CompilerFlags : MachineWritable {
     }
 
     /** Iterate through all set but unused keys (used flag is set when querying with [use] method). */
-    fun forEachUnused(action:(CompilerFlag<*>) -> Unit) {
+    private fun forEachUnused(action:(CompilerFlag<*>) -> Unit) {
         for ((key, _) in map) {
             if (!used.contains(key)) {
                 action(key)
@@ -82,10 +88,22 @@ class CompilerFlags : MachineWritable {
         }
     }
 
-    /** Clear all bindings and all used flags. */
-    fun clear() {
-        map.clear()
-        used.clear()
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.append("{")
+        var first = true
+        for ((k, v) in map) {
+            sb.append(k.name)
+            sb.append(" -> ")
+            sb.append(v)
+            if (first) {
+                first = false
+            } else {
+                sb.append(", ")
+            }
+        }
+        sb.append("}")
+        return sb.toString()
     }
 
     override fun writeMachine(json: Json) {
