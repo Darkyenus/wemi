@@ -5,10 +5,7 @@ import wemi.assembly.MergeStrategy
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion
-import wemi.dependency.ProjectDependency
-import wemi.dependency.ProjectId
-import wemi.dependency.Repository
-import wemi.dependency.ResolvedProject
+import wemi.dependency.*
 import wemi.util.LocatedFile
 import wemi.util.Partial
 import java.io.File
@@ -37,6 +34,7 @@ object Keys {
     val resourceFiles by key<Collection<LocatedFile>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files")
 
     val repositories by key<Collection<Repository>>("Repositories to be used when resolving dependencies")
+    val repositoryChain by key<RepositoryChain>("ADVANCED - Resolved repository chain from 'repositories'")
     val libraryDependencies by key<Collection<ProjectDependency>>("Libraries that the project depends on")
     val libraryDependencyProjectMapper by key<(ProjectDependency) -> ProjectDependency>("Function applied to ProjectDependencies encountered while resolving. Used for example when retrieving sources.", defaultValue = {it})
     val resolvedLibraryDependencies by key<Partial<Map<ProjectId, ResolvedProject>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.")

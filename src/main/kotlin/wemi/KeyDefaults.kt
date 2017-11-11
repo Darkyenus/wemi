@@ -69,7 +69,7 @@ object KeyDefaults {
         listOf(KotlinStdlib)
     }
     val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<ProjectId, ResolvedProject>>> = {
-        val repositories = createRepositoryChain(Keys.repositories.get())
+        val repositories = Keys.repositoryChain.get()
         val resolved = mutableMapOf<ProjectId, ResolvedProject>()
         val complete = DependencyResolver.resolve(resolved, Keys.libraryDependencies.get(), repositories, Keys.libraryDependencyProjectMapper.get())
         Partial(resolved, complete)
@@ -536,6 +536,9 @@ object KeyDefaults {
         Keys.resourceFiles set ResourceFiles
 
         Keys.repositories set Repositories
+        Keys.repositoryChain set {
+            createRepositoryChain(Keys.repositories.get())
+        }
         Keys.libraryDependencies set LibraryDependencies
         Keys.resolvedLibraryDependencies set ResolvedLibraryDependencies
         Keys.unmanagedDependencies set { emptyList() }

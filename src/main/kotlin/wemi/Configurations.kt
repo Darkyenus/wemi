@@ -48,6 +48,12 @@ object Configurations {
     }
     //endregion
 
+    val offline by configuration("Disables non-local repositories from the repository chain for offline use") {
+        Keys.repositoryChain modify { oldChain ->
+            oldChain.filter { it.local }
+        }
+    }
+
     val compilingJava by configuration("Configuration used when compiling Java sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { JavaSourceFileExtensions }
