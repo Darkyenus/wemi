@@ -47,8 +47,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
      * @return object-level representation of the target external system project;
      * {@code null} if it's not possible to resolve the project due to the objective reasons
      * @throws ExternalSystemException  in case when unexpected exception occurs during project info construction
-     * @throws IllegalArgumentException if given path is invalid
-     * @throws IllegalStateException    if it's not possible to resolve target project info
+     * @throws java.lang.IllegalArgumentException if given path is invalid
+     * @throws java.lang.IllegalStateException    if it's not possible to resolve target project info
      */
     @Throws(ExternalSystemException::class, IllegalArgumentException::class, IllegalStateException::class)
     override fun resolveProjectInfo(id: ExternalSystemTaskId,
@@ -328,6 +328,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 update(docArtifacts) { update(it) }
             }
         }
+
+        override fun toString(): String = name
     }
 
     private class WemiLibraryDependencyBank {
@@ -348,17 +350,17 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             val scope:DependencyScope
             if (inCompile && inRuntime) {
                 if (!inTest) {
-                    //TODO Warn
+                    LOG.warn("Dependency $library will be included in test configurations, but shouldn't be")
                 }
                 scope = DependencyScope.COMPILE
             } else if (inCompile && !inRuntime) {
                 if (!inTest) {
-                    //TODO Warn
+                    LOG.warn("Dependency $library will be included in test configurations, but shouldn't be")
                 }
                 scope = DependencyScope.PROVIDED
             } else if (!inCompile && inRuntime) {
                 if (!inTest) {
-                    //TODO Warn
+                    LOG.warn("Dependency $library will be included in test configurations, but shouldn't be")
                 }
                 scope = DependencyScope.RUNTIME
             } else {
