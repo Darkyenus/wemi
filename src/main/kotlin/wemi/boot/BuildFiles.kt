@@ -80,10 +80,19 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
     val classpathFile = File(buildFolder, buildFile.name + ".classpath")
     val resultClasspath = mutableListOf<File>()
 
-    var recompile = forceCompile || !resultJar.exists() || resultJar.isDirectory || resultJar.lastModified() < buildFile.lastModified()
-    recompile = recompile || !classpathFile.exists() || classpathFile.isDirectory
-
-    if (!recompile) {
+    val recompile = if (forceCompile) {
+        LOG.debug("Rebuilding build scripts: Requested")
+        true
+    } else if (!resultJar.exists() || resultJar.isDirectory) {
+        LOG.debug("Rebuilding build scripts: No cache at {}", resultJar)
+        true
+    } else if (resultJar.lastModified() < buildFile.lastModified()) {
+        LOG.debug("Rebuilding build scripts: Old cache")
+        true
+    } else if (!classpathFile.exists() || classpathFile.isDirectory) {
+        LOG.debug("Rebuilding build scripts: No classpath cache")
+        true
+    } else recompile@{
         // All seems good, try to load the result classpath
         classpathFile.forEachLine { line ->
             if (line.isNotBlank()) {
@@ -92,11 +101,12 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
         }
         for (file in resultClasspath) {
             if (!file.exists()) {
-                recompile = true
+                LOG.debug("Rebuilding build scripts: Classpath cache corrupted ({} does not exist)", file)
                 resultClasspath.clear()
-                break
+                return@recompile true
             }
         }
+        false
     }
 
     val buildFlags = CompilerFlags()
@@ -109,6 +119,7 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
 
     if (recompile) {
         // Recompile
+        resultJar.deleteRecursively()
         val classpath = ArrayList<File>()
 
         val repositories = mutableListOf<Repository>()

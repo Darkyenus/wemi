@@ -303,7 +303,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
     }
 
     private fun setupDestination(configuration: CompilerConfiguration, destination: File) {
-        if (destination.endsWith(".jar")) {
+        if (destination.name.endsWith(".jar", ignoreCase = true)) {
             configuration.put(JVMConfigurationKeys.OUTPUT_JAR, destination)
         } else {
             configuration.put(JVMConfigurationKeys.OUTPUT_DIRECTORY, destination)
