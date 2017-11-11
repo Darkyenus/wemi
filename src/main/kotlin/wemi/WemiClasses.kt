@@ -74,8 +74,7 @@ class Configuration internal constructor(val name: String,
 class ConfigurationExtension internal constructor(extending: Configuration) : BindingHolder(extending)
 
 class Project internal constructor(val name: String, val projectRoot: File)
-    : BindingHolder(null), WithDescriptiveString, Scope, MachineWritable {
-    override fun scopeToString(): String = name + "/"
+    : BindingHolder(null), WithDescriptiveString, MachineWritable {
 
     override fun toString(): String = name
 
@@ -85,7 +84,13 @@ class Project internal constructor(val name: String, val projectRoot: File)
         json.writeValue(name as Any, String::class.java)
     }
 
-    override val scopeCache: ScopeCache = ScopeCache(this, null)
+    private val scopeCache: ScopeCache = ScopeCache(this, null)
+
+    val projectScope:Scope = object:Scope {
+        override fun scopeToString(): String = name + "/"
+
+        override val scopeCache: ScopeCache = this@Project.scopeCache
+    }
 }
 
 interface Scope {

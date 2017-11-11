@@ -116,7 +116,7 @@ object KeyDefaults {
         }
 
         for ((_, project) in AllProjects) {
-            clearedCount += project.scopeCache.cleanCache()
+            clearedCount += project.projectScope.scopeCache.cleanCache()
         }
 
         clearedCount
@@ -551,7 +551,7 @@ object KeyDefaults {
         Keys.outputSourcesDirectory set OutputSourcesDirectory
         Keys.outputHeadersDirectory set OutputHeadersDirectory
         Keys.compilerOptions set { CompilerFlags() }
-        with(Configurations.compilingJava) {
+        Configurations.compilingJava extend {
             Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
             Keys.compilerOptions[JavaCompilerFlags.targetVersion] = JavaVersion.V1_8
         }

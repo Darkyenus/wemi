@@ -93,14 +93,14 @@ class CompilerFlags : MachineWritable {
         sb.append("{")
         var first = true
         for ((k, v) in map) {
-            sb.append(k.name)
-            sb.append(" -> ")
-            sb.append(v)
             if (first) {
                 first = false
             } else {
                 sb.append(", ")
             }
+            sb.append(k.name)
+            sb.append(" -> ")
+            sb.append(v)
         }
         sb.append("}")
         return sb.toString()

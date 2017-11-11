@@ -17,9 +17,8 @@ import java.io.File
 import java.io.IOException
 
 /**
- *
+ * Handles user interaction in standard (possibly interactive) mode
  */
-
 object CLI {
 
     private val LOG = LoggerFactory.getLogger(javaClass)
@@ -77,15 +76,15 @@ object CLI {
 
     private val ColorSupported: Boolean = TerminalColor.COLOR_SUPPORTED
 
-    fun formatLabel(text: CharSequence): CharSequence {
+    private fun formatLabel(text: CharSequence): CharSequence {
         return format(text, foreground = Color.Green, format = Format.Bold)
     }
 
-    fun formatValue(text: CharSequence): CharSequence {
+    private fun formatValue(text: CharSequence): CharSequence {
         return format(text, foreground = Color.Blue)
     }
 
-    fun formatInput(text: CharSequence): CharSequence {
+    private fun formatInput(text: CharSequence): CharSequence {
         return format(text, format = Format.Underline)
     }
 
@@ -112,11 +111,11 @@ object CLI {
     }
 
 
-    internal fun printWarning(text: CharSequence) {
+    private fun printWarning(text: CharSequence) {
         println(format(text, foreground = Color.Red))
     }
 
-    internal fun printWarning(text: CharSequence, input:String, possibilities:Collection<String>) {
+    private fun printWarning(text: CharSequence, input:String, possibilities:Collection<String>) {
         println(format(text, foreground = Color.Red))
 
         val matchResult = MatchUtils.match(possibilities.toTypedArray(), { it.toLowerCase() }, input.toLowerCase())
@@ -175,7 +174,11 @@ object CLI {
             }
             CLI.KeyEvaluationStatus.NoKey -> {
                 val keyString = data as String
-                printWarning("Can't evaluate $text - no key named '$keyString' found", keyString, AllKeys.keys)
+                if (keyString == text) {
+                    printWarning("Can't evaluate $text - no key or command named '$keyString' found", keyString, AllKeys.keys + commands.keys)
+                } else {
+                    printWarning("Can't evaluate $text - no key named '$keyString' found", keyString, AllKeys.keys)
+                }
             }
             CLI.KeyEvaluationStatus.NotAssigned -> {
                 val error = data as WemiException.KeyNotAssignedException
@@ -263,7 +266,7 @@ object CLI {
         val key = AllKeys.findCaseInsensitive(keyString) ?: return KeyEvaluationResult(keyString, KeyEvaluationStatus.NoKey)
 
         return try {
-            KeyEvaluationResult(project.run {
+            KeyEvaluationResult(project.projectScope.run {
                 evaluateInNestedScope(key, configurations, 0)
             }, KeyEvaluationStatus.Success)
         } catch (e: WemiException.KeyNotAssignedException) {
@@ -284,25 +287,21 @@ object CLI {
         }
     }
 
-    fun evaluateCommand(command:String) {
-        if (command.isBlank()) {
-            return
-        }
-
-        when (command.toLowerCase()) {
-            "exit" ->
-                    throw EndOfFileException()
-            "projects" -> {
+    private val commands = mapOf(
+            "exit" to {
+                throw EndOfFileException()
+            },
+            "projects" to {
                 printLabeled("project", AllProjects)
-            }
-            "configurations" -> {
+            },
+            "configurations" to {
                 printLabeled("configuration", AllConfigurations)
-            }
-            "keys" -> {
+            },
+            "keys" to {
                 printLabeled("key", AllKeys)
-            }
-            "help" -> {
-                println(formatLabel("Wemi ${WemiVersion} (Kotlin ${WemiKotlinVersion})"))
+            },
+            "help" to {
+                println(formatLabel("Wemi $WemiVersion (Kotlin $WemiKotlinVersion)"))
                 print(formatLabel("Commands: "))
                 println("exit, projects, configurations, keys, help")
                 print(formatLabel("Keys: "))
@@ -310,14 +309,22 @@ object CLI {
                         "the project in 'projectVersion' key or complex operation, like compiling and running in 'run' key.\n" +
                         "To evaluate the key, simply type its name. If you want to run the key in a different project or\n" +
                         "in a configuration, prefix it with its name and slash, for example: desktop/run")
-                return
             }
-            else -> {
-                try {
-                    evaluateKeyAndPrint(command)
-                } catch (we: WemiException) {
+    )
 
-                }
+    private fun evaluateCommand(command:String) {
+        if (command.isBlank()) {
+            return
+        }
+
+        val commandFunction = commands[command.toLowerCase()]
+        if (commandFunction != null) {
+            commandFunction()
+        } else {
+            try {
+                evaluateKeyAndPrint(command)
+            } catch (we: WemiException) {
+
             }
         }
     }
