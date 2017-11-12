@@ -191,7 +191,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving build script modules"))
         for (buildScript in session.jsonArray(project = null, task = "#buildScripts", includeUserConfigurations = false)) {
             // Retrieve info
-            val name = buildScript.get("projects").asStringArray().joinToString("-", postfix = "-build")
+            val projectsUnderBuildScript = buildScript.get("projects").asStringArray()
+            val name = projectsUnderBuildScript.joinToString("-", postfix = "-build")
             val classpath = buildScript.get("classpath").asStringArray().map { File(it) }
             val scriptJar = buildScript.getString("scriptJar")
             val sources = buildScript.get("sources").map { it.getString("file") }
@@ -210,11 +211,25 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             }
             moduleNode.createChild(ProjectKeys.CONTENT_ROOT, contentRoot)
 
-            // Dependencies (TODO: Sources & Javadoc)
+            // Dependencies
             val unresolved = classpath.any { !it.exists() }
             val libraryData = LibraryData(WemiProjectSystemId, name+" Classpath", unresolved)
             for (artifact in classpath) {
                 libraryData.addPath(LibraryPathType.BINARY, artifact.path)
+            }
+            if (settings.downloadSources) {
+                for ((_, dependencies) in createWemiProjectDependencies(session, projectsUnderBuildScript[0], "wemiBuildScript", "retrievingSources")) {
+                    for (dependency in dependencies) {
+                        libraryData.addPath(LibraryPathType.SOURCE, dependency.artifact.path)
+                    }
+                }
+            }
+            if (settings.downloadDocs) {
+                for ((_, dependencies) in createWemiProjectDependencies(session, projectsUnderBuildScript[0], "wemiBuildScript", "retrievingDocs")) {
+                    for (dependency in dependencies) {
+                        libraryData.addPath(LibraryPathType.DOC, dependency.artifact.path)
+                    }
+                }
             }
             moduleNode.createChild(ProjectKeys.LIBRARY, libraryData)
 

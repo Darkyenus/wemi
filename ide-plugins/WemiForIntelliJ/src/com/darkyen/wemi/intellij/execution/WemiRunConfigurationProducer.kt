@@ -10,7 +10,7 @@ import com.intellij.psi.PsiElement
  * Provides ability to right-click a file/main method/something (?) and have "run" configuration automatically
  * generated.
  *
- * TODO This is currently not implemented.
+ * TODO This is currently not implemented. We need "runMain-like" task first.
  */
 class WemiRunConfigurationProducer(type: WemiTaskConfigurationType)
     : AbstractExternalSystemRunConfigurationProducer(type) {

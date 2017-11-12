@@ -5,6 +5,7 @@ import wemi.WemiKotlinVersion
 import wemi.compile.*
 import wemi.dependency.*
 import wemi.util.LocatedFile
+import wemi.util.WemiLauncherFile
 import wemi.util.hasExtension
 import wemi.util.wemiLauncherFileWithJarExtension
 import java.io.File
@@ -70,10 +71,6 @@ fun prepareBuildFileCacheFolder(buildFile: File): File? {
     return folder
 }
 
-private val M2RepositoryRegex = "///\\s*m2-repository\\s+(\\w+)\\s+at\\s+(\\w+:\\w+)\\s*".toRegex()
-
-private val LibraryRegex = "///\\s*build-library\\s+(\\w+)\\s*:\\s*(\\w+)\\s*:\\s*(\\w+)\\s*".toRegex()
-
 fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
     val buildFolder = prepareBuildFileCacheFolder(buildFile) ?: return null
     val resultJar = File(buildFolder, buildFile.name + "-cache.jar")
@@ -91,6 +88,9 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
         true
     } else if (!classpathFile.exists() || classpathFile.isDirectory) {
         LOG.debug("Rebuilding build scripts: No classpath cache")
+        true
+    } else if (WemiLauncherFile.lastModified() > resultJar.lastModified()) {
+        LOG.debug("Rebuilding build scripts: Launcher updated ({})", WemiLauncherFile)
         true
     } else recompile@{
         // All seems good, try to load the result classpath
@@ -117,36 +117,17 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
 
     val sources = listOf(LocatedFile(buildFile))
 
+    val classpathConfiguration = BuildFileClasspathConfiguration(buildFile)
+
     if (recompile) {
         // Recompile
         resultJar.deleteRecursively()
-        val classpath = ArrayList<File>()
-
-        val repositories = mutableListOf<Repository>()
-        repositories.addAll(DefaultRepositories)
-        val buildDependencyLibraries = mutableListOf(BuildFileStdLib)
-
-        buildFile.forEachLine { line ->
-            val m2resolver = M2RepositoryRegex.matchEntire(line)
-            if (m2resolver != null) {
-                val (name, url) = m2resolver.destructured
-                repositories.add(Repository.M2(name, URL(url), LocalM2Repository))
-                return@forEachLine
-            }
-
-            val buildLibrary = LibraryRegex.matchEntire(line)
-            if (buildLibrary != null) {
-                val (group, name, version) = buildLibrary.destructured
-                buildDependencyLibraries.add(ProjectDependency(ProjectId(group, name, version)))
-                return@forEachLine
-            }
-        }
-
-        val repositoryChain = createRepositoryChain(repositories)
 
         val wemiLauncherJar = wemiLauncherFileWithJarExtension(buildFolder)
+
+        val classpath = ArrayList<File>()
         classpath.add(wemiLauncherJar)
-        val artifacts = DependencyResolver.resolveArtifacts(buildDependencyLibraries, repositoryChain)
+        val artifacts = DependencyResolver.resolveArtifacts(classpathConfiguration.dependencies, classpathConfiguration.repositoryChain)
         if (artifacts == null) {
             LOG.warn("Failed to retrieve all build file dependencies for {}", buildFile)
             return null
@@ -165,7 +146,7 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
     }
 
     // Figure out the init class
-    return BuildFile(resultJar, resultClasspath, transformFileNameToKotlinClassName(buildFile.nameWithoutExtension), sources, buildFlags)
+    return BuildFile(resultJar, resultClasspath, transformFileNameToKotlinClassName(buildFile.nameWithoutExtension), classpathConfiguration, sources, buildFlags)
 }
 
 private fun transformFileNameToKotlinClassName(fileNameWithoutExtension:String):String {
@@ -191,10 +172,89 @@ private fun transformFileNameToKotlinClassName(fileNameWithoutExtension:String):
     return sb.toString()
 }
 
+private val DirectiveRegex = "///\\s*([a-zA-Z0-9\\-]+)\\s+(.*?)\\s*".toRegex()
+
+private val M2RepositoryDirectiveRegex = "(\\S+)\\s+at\\s+(\\S+:\\S+)".toRegex()
+
+private val LibraryDirectiveRegex = "(\\S+)\\s*:\\s*(\\S+)\\s*:\\s*(\\S+)".toRegex()
+
+class BuildFileClasspathConfiguration(private val buildFile:File) {
+    private var _repositories : List<Repository>? = null
+    private var _repositoryChain : RepositoryChain? = null
+    private var _dependencies : List<ProjectDependency>? = null
+
+    private fun resolve() {
+        val repositories = mutableListOf<Repository>()
+        repositories.addAll(DefaultRepositories)
+        val buildDependencyLibraries = mutableListOf(BuildFileStdLib)
+
+        var lineNumber = 0
+        buildFile.forEachLine { line ->
+            lineNumber++
+            val directiveMatch = DirectiveRegex.matchEntire(line) ?: return@forEachLine
+            val directive = (directiveMatch.groups[1]?.value ?: "").toLowerCase()
+            val value = directiveMatch.groups[2]?.value ?: ""
+
+            when (directive) {
+                "dependency" -> {
+                    val match = LibraryDirectiveRegex.matchEntire(value)
+                    if (match == null) {
+                        LOG.warn("{}:{} Invalid dependency directive \"{}\". (Example: 'com.example:my-project:1.0')", buildFile, lineNumber, value)
+                    } else {
+                        val (group, name, version) = match.destructured
+                        buildDependencyLibraries.add(ProjectDependency(ProjectId(group, name, version)))
+                    }
+                }
+                "repository" -> {
+                    val match = M2RepositoryDirectiveRegex.matchEntire(value)
+                    if (match == null) {
+                        LOG.warn("{}:{} Invalid repository directive \"{}\". (Example: 'my-repo at https://example.com')", buildFile, lineNumber, value)
+                    } else {
+                        val (name, url) = match.destructured
+                        repositories.add(Repository.M2(name, URL(url), LocalM2Repository))
+                    }
+                }
+                else -> {
+                    LOG.warn("{}:{} Invalid directive \"{}\". Supported directives are 'dependency' and 'repository'.", buildFile, lineNumber, directive)
+                }
+            }
+        }
+
+        _repositories = repositories
+        _repositoryChain = createRepositoryChain(repositories)
+        _dependencies = buildDependencyLibraries
+    }
+
+    val repositories : List<Repository>
+        get() {
+            if (_repositories == null) {
+                resolve()
+            }
+            return _repositories!!
+        }
+
+    val repositoryChain : RepositoryChain
+        get() {
+            if (_repositoryChain == null) {
+                resolve()
+            }
+            return _repositoryChain!!
+        }
+
+    val dependencies : List<ProjectDependency>
+        get() {
+            if (_dependencies == null) {
+                resolve()
+            }
+            return _dependencies!!
+        }
+}
+
 /**
  * @property scriptJar jar to which the build script has been compiled
  * @property classpath used to compile and to run the scriptJar
  * @property initClass main class of the [scriptJar]
  */
 data class BuildFile(val scriptJar:File, val classpath:List<File>, val initClass:String,
+                     val buildFileClasspathConfiguration: BuildFileClasspathConfiguration,
                      val sources:List<LocatedFile>, val buildFlags: CompilerFlags)

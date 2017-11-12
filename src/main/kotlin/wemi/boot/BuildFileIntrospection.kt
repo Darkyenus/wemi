@@ -44,6 +44,9 @@ object BuildFileIntrospection {
             _buildFileProjects.getValue(buildFile).add(this)
 
             wemiBuildScript extend {
+                Keys.repositories set { buildFile.buildFileClasspathConfiguration.repositories }
+                Keys.repositoryChain set { buildFile.buildFileClasspathConfiguration.repositoryChain }
+                Keys.libraryDependencies set { buildFile.buildFileClasspathConfiguration.dependencies }
                 Keys.classpath set { buildFile.classpath.map { LocatedFile(it) } }
                 Keys.mainClass set { buildFile.initClass }
                 Keys.compilerOptions set { buildFile.buildFlags }

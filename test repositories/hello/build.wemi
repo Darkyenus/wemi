@@ -1,7 +1,6 @@
 
-///include something
-///library com.esotericsoftware:jsonbeans:0.7
-///resolver something@something.com
+///repository jitpack at https://jitpack.io
+///dependency com.github.esotericsoftware:jsonbeans:0.9
 
 val hello by project {
 
