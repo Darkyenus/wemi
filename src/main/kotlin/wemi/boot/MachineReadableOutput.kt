@@ -54,6 +54,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task:String) {
                     for ((buildFile, projects) in BuildFileIntrospection.buildFileProjects) {
                         json.writeObjectStart()
 
+                        json.writeValue("buildFolder", buildFile.buildFolder)
                         json.writeValue("sources", buildFile.sources)
                         json.writeValue("scriptJar", buildFile.scriptJar)
                         json.writeValue("classpath", buildFile.classpath)

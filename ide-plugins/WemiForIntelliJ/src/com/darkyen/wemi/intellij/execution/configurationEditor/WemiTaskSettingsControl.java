@@ -17,6 +17,7 @@
 package com.darkyen.wemi.intellij.execution.configurationEditor;
 
 import com.darkyen.wemi.intellij.WemiKt;
+import com.darkyen.wemi.intellij.execution.WemiRunConfiguration;
 import com.darkyen.wemi.intellij.manager.WemiManager;
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.execution.configuration.EnvironmentVariablesData;
@@ -32,6 +33,7 @@ import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.RawCommandLineEditor;
+import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.GridBag;
@@ -45,7 +47,8 @@ import static com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil.nor
 /** Controls editing of standard ExternalSystemTaskExecutionSettings but in a way that makes sense for Wemi.
  *
  * Modifications:
- * - Arguments are not used */
+ * - Arguments are not used, instead checkbox to set WemiRunConfiguration.WEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG
+ * */
 public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<ExternalSystemTaskExecutionSettings> {
 
 	@NotNull private final Project myProject;
@@ -53,12 +56,17 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 	@SuppressWarnings("FieldCanBeLocal")// Used via reflection at showUi() and disposeResources()
 	private JBLabel myProjectPathLabel;
 	private ExternalProjectPathField myProjectPathField;
+
 	@SuppressWarnings("FieldCanBeLocal")// Used via reflection at showUi() and disposeResources()
 	private JBLabel myTasksLabel;
 	private EditorTextField myTasksTextField;
+
 	@SuppressWarnings("FieldCanBeLocal")// Used via reflection at showUi() and disposeResources()
 	private JBLabel myVmOptionsLabel;
 	private RawCommandLineEditor myVmOptionsEditor;
+
+	private JBCheckBox suppressDebug;
+
 	private EnvironmentVariablesComponent myEnvVariablesComponent;
 
 	@Nullable private ExternalSystemTaskExecutionSettings myOriginalSettings;
@@ -106,6 +114,10 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 		myVmOptionsEditor.setDialogCaption(ExternalSystemBundle.message("run.configuration.settings.label.vmoptions"));
 		canvas.add(myVmOptionsLabel, ExternalSystemUiUtil.getLabelConstraints(0));
 		canvas.add(myVmOptionsEditor, ExternalSystemUiUtil.getFillLineConstraints(0));
+
+		suppressDebug = new JBCheckBox("Suppress Wemi launcher debugging to debug launched project");
+		canvas.add(suppressDebug, ExternalSystemUiUtil.getFillLineConstraints(0));
+
 		myEnvVariablesComponent = new EnvironmentVariablesComponent();
 		JBLabel myEnvVariablesComponentLabel = myEnvVariablesComponent.getLabel();
 		myEnvVariablesComponentLabel.remove(myEnvVariablesComponentLabel);
@@ -118,6 +130,7 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 		myProjectPathField.setText("");
 		myTasksTextField.setText("");
 		myVmOptionsEditor.setText("");
+		suppressDebug.setSelected(false);
 		myEnvVariablesComponent.setEnvData(EnvironmentVariablesData.DEFAULT);
 		showUi(true);
 
@@ -132,6 +145,7 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 		myProjectPathField.setText(path);
 		myTasksTextField.setText(StringUtil.join(myOriginalSettings.getTaskNames(), " "));
 		myVmOptionsEditor.setText(myOriginalSettings.getVmOptions());
+		suppressDebug.setSelected(isSuppressDebug(myOriginalSettings));
 		myEnvVariablesComponent.setEnvData(EnvironmentVariablesData.create(myOriginalSettings.getEnv(),
 			myOriginalSettings.isPassParentEnvs()));
 	}
@@ -148,6 +162,7 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 			|| !Comparing.equal(normalizePath(myTasksTextField.getText()),
 				normalizePath(StringUtil.join(myOriginalSettings.getTaskNames(), " ")))
 			|| !Comparing.equal(normalizePath(myVmOptionsEditor.getText()), normalizePath(myOriginalSettings.getVmOptions()))
+			|| isSuppressDebug(myOriginalSettings) != suppressDebug.isSelected()
 			|| myEnvVariablesComponent.isPassParentEnvs() != myOriginalSettings.isPassParentEnvs()
 			|| !myEnvVariablesComponent.getEnvs().equals(myOriginalSettings.getEnv());
 
@@ -159,8 +174,17 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 		settings.setExternalProjectPath(projectPath);
 		settings.setTaskNames(StringUtil.split(myTasksTextField.getText(), " "));
 		settings.setVmOptions(myVmOptionsEditor.getText());
+		setSuppressDebug(settings, suppressDebug.isSelected());
 		settings.setPassParentEnvs(myEnvVariablesComponent.isPassParentEnvs());
 		settings.setEnv(ContainerUtil.newHashMap(myEnvVariablesComponent.getEnvs()));
+	}
+
+	private static boolean isSuppressDebug(ExternalSystemTaskExecutionSettings settings) {
+		return WemiRunConfiguration.Companion.getWEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG().equals(settings.getScriptParameters());
+	}
+
+	private static void setSuppressDebug(ExternalSystemTaskExecutionSettings settings, boolean suppressDebug) {
+		settings.setScriptParameters(suppressDebug ? WemiRunConfiguration.Companion.getWEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG() : "");
 	}
 
 	@Override

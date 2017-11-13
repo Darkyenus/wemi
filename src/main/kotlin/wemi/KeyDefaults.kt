@@ -235,8 +235,15 @@ object KeyDefaults {
         }
     }
     val RunDirectory: BoundKeyValue<File> = { Keys.projectRoot.get() }
-    val RunOptionsList = listOf("-ea", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005")
-    val RunOptions: BoundKeyValue<Collection<String>> = { RunOptionsList }
+    val RunOptions: BoundKeyValue<Collection<String>> = {
+        val options = mutableListOf<String>()
+        options.add("-ea")
+        val debugPort = System.getenv("WEMI_RUN_DEBUG_PORT")?.toIntOrNull()
+        if (debugPort != null) {
+            options.add("-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=$debugPort")
+        }
+        options
+    }
     val RunArguments: BoundKeyValue<Collection<String>> = { emptyList() }
     val Run: BoundKeyValue<Int> = {
         with (Configurations.running) {

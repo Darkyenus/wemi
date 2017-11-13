@@ -26,6 +26,7 @@ import com.intellij.util.Function
 import com.intellij.util.PathUtil
 import com.intellij.util.containers.ContainerUtilRt
 import icons.WemiIcons
+import java.io.File
 import java.net.URL
 
 /**
@@ -117,6 +118,8 @@ class WemiManager : ExternalSystemUiAware,
      * Called when:
      */
     override fun enhanceLocalProcessing(urls: MutableList<URL>) {
+        urls.add(File(PathUtil.getJarPathForClass(Unit::class.java)).toURI().toURL())
+        urls.add(File(PathUtil.getJarPathForClass(JsonReader::class.java)).toURI().toURL())
     }
 
     /**

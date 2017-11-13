@@ -115,6 +115,7 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
     // Wemi launcher has kotlin runtime bundled, which is fine
     buildFlags[KotlinJVMCompilerFlags.skipRuntimeVersionCheck] = true
 
+    //TODO Refactor so that sources are all .wemi files in the folder, do not separate them
     val sources = listOf(LocatedFile(buildFile))
 
     val classpathConfiguration = BuildFileClasspathConfiguration(buildFile)
@@ -146,7 +147,9 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
     }
 
     // Figure out the init class
-    return BuildFile(resultJar, resultClasspath, transformFileNameToKotlinClassName(buildFile.nameWithoutExtension), classpathConfiguration, sources, buildFlags)
+    return BuildFile(resultJar, buildFolder,
+            resultClasspath, transformFileNameToKotlinClassName(buildFile.nameWithoutExtension),
+            classpathConfiguration, sources, buildFlags)
 }
 
 private fun transformFileNameToKotlinClassName(fileNameWithoutExtension:String):String {
@@ -255,6 +258,7 @@ class BuildFileClasspathConfiguration(private val buildFile:File) {
  * @property classpath used to compile and to run the scriptJar
  * @property initClass main class of the [scriptJar]
  */
-data class BuildFile(val scriptJar:File, val classpath:List<File>, val initClass:String,
+data class BuildFile(val scriptJar:File, val buildFolder:File,
+                     val classpath:List<File>, val initClass:String,
                      val buildFileClasspathConfiguration: BuildFileClasspathConfiguration,
                      val sources:List<LocatedFile>, val buildFlags: CompilerFlags)

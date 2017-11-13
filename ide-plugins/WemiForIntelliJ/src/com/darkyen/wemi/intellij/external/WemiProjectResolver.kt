@@ -191,25 +191,19 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving build script modules"))
         for (buildScript in session.jsonArray(project = null, task = "#buildScripts", includeUserConfigurations = false)) {
             // Retrieve info
+            val buildFolder = buildScript.getString("buildFolder")
             val projectsUnderBuildScript = buildScript.get("projects").asStringArray()
             val name = projectsUnderBuildScript.joinToString("-", postfix = "-build")
             val classpath = buildScript.get("classpath").asStringArray().map { File(it) }
             val scriptJar = buildScript.getString("scriptJar")
-            val sources = buildScript.get("sources").map { it.getString("file") }
-            val rootPath = File(sources.first()).parent
 
             // Module Data
-            val moduleData = ModuleData(name, WemiProjectSystemId, StdModuleTypes.JAVA.id, name, rootPath, projectPath)
+            val moduleData = ModuleData(name, WemiProjectSystemId, StdModuleTypes.JAVA.id, name, buildFolder, projectPath)
             moduleData.isInheritProjectCompileOutputPath = false
             moduleData.setCompileOutputPath(ExternalSystemSourceType.SOURCE, File(scriptJar).parent)
 
             // Module Node
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, moduleData)
-            val contentRoot = ContentRootData(WemiProjectSystemId, rootPath)
-            for (source in sources) {
-                contentRoot.storePath(ExternalSystemSourceType.SOURCE, source)
-            }
-            moduleNode.createChild(ProjectKeys.CONTENT_ROOT, contentRoot)
 
             // Dependencies
             val unresolved = classpath.any { !it.exists() }
@@ -217,17 +211,19 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             for (artifact in classpath) {
                 libraryData.addPath(LibraryPathType.BINARY, artifact.path)
             }
-            if (settings.downloadSources) {
-                for ((_, dependencies) in createWemiProjectDependencies(session, projectsUnderBuildScript[0], "wemiBuildScript", "retrievingSources")) {
-                    for (dependency in dependencies) {
-                        libraryData.addPath(LibraryPathType.SOURCE, dependency.artifact.path)
+            if (projectsUnderBuildScript.isNotEmpty()) {
+                if (settings.downloadSources) {
+                    for ((_, dependencies) in createWemiProjectDependencies(session, projectsUnderBuildScript[0], "wemiBuildScript", "retrievingSources")) {
+                        for (dependency in dependencies) {
+                            libraryData.addPath(LibraryPathType.SOURCE, dependency.artifact.path)
+                        }
                     }
                 }
-            }
-            if (settings.downloadDocs) {
-                for ((_, dependencies) in createWemiProjectDependencies(session, projectsUnderBuildScript[0], "wemiBuildScript", "retrievingDocs")) {
-                    for (dependency in dependencies) {
-                        libraryData.addPath(LibraryPathType.DOC, dependency.artifact.path)
+                if (settings.downloadDocs) {
+                    for ((_, dependencies) in createWemiProjectDependencies(session, projectsUnderBuildScript[0], "wemiBuildScript", "retrievingDocs")) {
+                        for (dependency in dependencies) {
+                            libraryData.addPath(LibraryPathType.DOC, dependency.artifact.path)
+                        }
                     }
                 }
             }

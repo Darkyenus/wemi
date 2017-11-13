@@ -1,8 +1,7 @@
-package com.darkyen.wemi.intellij
+package com.darkyen.wemi.intellij.file
 
 import com.intellij.openapi.fileTypes.FileTypeConsumer
 import com.intellij.openapi.fileTypes.FileTypeFactory
-import org.jetbrains.kotlin.idea.KotlinFileType
 
 /**
  * Register .wemi files as kotlin files
@@ -10,7 +9,7 @@ import org.jetbrains.kotlin.idea.KotlinFileType
 class WemiFileTypeFactory : FileTypeFactory() {
 
     override fun createFileTypes(consumer: FileTypeConsumer) {
-        consumer.consume(KotlinFileType.INSTANCE, WemiBuildFileExtensions.joinToString(FileTypeConsumer.EXTENSION_DELIMITER))
+        consumer.consume(WemiFileType)
     }
 
 }

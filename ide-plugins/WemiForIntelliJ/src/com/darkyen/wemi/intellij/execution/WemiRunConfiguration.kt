@@ -73,12 +73,21 @@ class WemiRunConfiguration(project: Project,
         override fun execute(executor: Executor, runner: ProgramRunner<*>): ExecutionResult? {
             if (myProject.isDisposed) return null
 
-            if (mySettings.taskNames.isEmpty()) {
+            var settings = mySettings
+            if (settings.taskNames.isEmpty()) {
                 throw ExecutionException(ExternalSystemBundle.message("run.error.undefined.task"))
             }
+
             var jvmAgentSetup: String? = null
             if (debugPort > 0) {
-                jvmAgentSetup = "-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=" + debugPort
+                if (settings.scriptParameters == WEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG) {
+                    settings = settings.clone()
+                    val newEnv = settings.env.toMutableMap()
+                    newEnv[WEMI_SUPPRESS_DEBUG_ENVIRONMENT_VARIABLE_NAME] = debugPort.toString()
+                    settings.env = newEnv
+                } else {
+                    jvmAgentSetup = "-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=" + debugPort
+                }
             } else {
                 val parametersList = myEnv.getUserData(ExternalSystemTaskExecutionSettings.JVM_AGENT_SETUP_KEY)
                 if (parametersList != null) {
@@ -95,7 +104,7 @@ class WemiRunConfiguration(project: Project,
             ApplicationManager.getApplication().assertIsDispatchThread()
             FileDocumentManager.getInstance().saveAllDocuments()
 
-            val task = ExternalSystemExecuteTaskTask(myProject, mySettings, jvmAgentSetup)
+            val task = ExternalSystemExecuteTaskTask(myProject, settings, jvmAgentSetup)
             copyUserDataTo(task)
 
             val processHandler = WemiProcessHandler(task)
@@ -108,10 +117,12 @@ class WemiRunConfiguration(project: Project,
 
             ApplicationManager.getApplication().executeOnPooledThread {
                 val startDateTime = DateFormatUtil.formatTimeWithSeconds(System.currentTimeMillis())
-                val greeting: String = if (mySettings.taskNames.size > 1) {
-                    ExternalSystemBundle.message("run.text.starting.multiple.task", startDateTime, mySettings.toString())
+                val taskName = settings.taskNames?.joinToString(" ")?:"" + settings.vmOptions?:""
+
+                val greeting: String = if (settings.taskNames.size > 1) {
+                    ExternalSystemBundle.message("run.text.starting.multiple.task", startDateTime, taskName)
                 } else {
-                    ExternalSystemBundle.message("run.text.starting.single.task", startDateTime, mySettings.toString())
+                    ExternalSystemBundle.message("run.text.starting.single.task", startDateTime, taskName)
                 }
                 processHandler.notifyTextAvailable(greeting, ProcessOutputTypes.SYSTEM)
                 val taskListener = object : ExternalSystemTaskNotificationListenerAdapter() {
@@ -137,10 +148,10 @@ class WemiRunConfiguration(project: Project,
                     override fun onEnd(id: ExternalSystemTaskId) {
                         val endDateTime = DateFormatUtil.formatTimeWithSeconds(System.currentTimeMillis())
                         val farewell: String
-                        if (mySettings.taskNames.size > 1) {
-                            farewell = ExternalSystemBundle.message("run.text.ended.multiple.task", endDateTime, mySettings.toString())
+                        if (settings.taskNames.size > 1) {
+                            farewell = ExternalSystemBundle.message("run.text.ended.multiple.task", endDateTime, taskName)
                         } else {
-                            farewell = ExternalSystemBundle.message("run.text.ended.single.task", endDateTime, mySettings.toString())
+                            farewell = ExternalSystemBundle.message("run.text.ended.single.task", endDateTime, taskName)
                         }
                         processHandler.notifyTextAvailable(farewell, ProcessOutputTypes.SYSTEM)
                         processHandler.notifyProcessTerminated(0)
@@ -209,5 +220,19 @@ class WemiRunConfiguration(project: Project,
 
     companion object {
         private val LOG = Logger.getInstance(WemiRunConfiguration::class.java)
+
+        /**
+         * Value to which [ExternalSystemTaskExecutionSettings.getScriptParameters] is set,
+         * if debug agent should not be applied to the Wemi launcher directly.
+         *
+         * Then, if, for example, 'run' task is executed with the debugger enabled, IDE will connect to the project
+         * that is being run, not to the Wemi launcher which runs it.
+         *
+         * In that case, IDE will launch Wemi with environment variable [WEMI_SUPPRESS_DEBUG_ENVIRONMENT_VARIABLE_NAME]
+         * (= "WEMI_RUN_DEBUG_PORT") so that the project can be run with the debugger on the correct port.
+         */
+        val WEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG = "wemi.suppress-debug"
+
+        val WEMI_SUPPRESS_DEBUG_ENVIRONMENT_VARIABLE_NAME = "WEMI_RUN_DEBUG_PORT"
     }
 }

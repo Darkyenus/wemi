@@ -70,8 +70,9 @@
         <externalSystemTaskNotificationListener
                 implementation="com.darkyen.wemi.intellij.importing.WemiProjectResolutionListener"/>
 
-        <!-- Misc -->
-        <fileTypeFactory implementation="com.darkyen.wemi.intellij.WemiFileTypeFactory"/>
+        <!-- File -->
+        <fileTypeFactory implementation="com.darkyen.wemi.intellij.file.WemiFileTypeFactory"/>
+        <resolveScopeProvider implementation="com.darkyen.wemi.intellij.file.WemiResolveScopeProvider"/>
     </extensions>
 
 </idea-plugin>
