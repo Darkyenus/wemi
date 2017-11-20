@@ -136,14 +136,14 @@ object KeyDefaults {
 
     private val CompileLOG = LoggerFactory.getLogger("Compile")
     val Compile: BoundKeyValue<File> = {
-        with (Configurations.compiling) {
+        using(Configurations.compiling) {
             val output = Keys.outputClassesDirectory.get()
-            val javaSources = with (compilingJava) { Keys.sourceFiles.get() }
+            val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
             val javaSourceRoots = mutableSetOf<File>()
             for ((file, _, root) in javaSources) {
                 javaSourceRoots.add((root ?: file).absoluteFile)
             }
-            val kotlinSources = with (compilingKotlin) { Keys.sourceFiles.get() }
+            val kotlinSources = using(compilingKotlin) { Keys.sourceFiles.get() }
 
             val externalClasspath = Keys.externalClasspath.get()
 
@@ -155,8 +155,8 @@ object KeyDefaults {
                 }
                 sources.addAll(javaSourceRoots)
 
-                val compiler = with (compilingKotlin) { Keys.kotlinCompiler.get() }
-                val compilerFlags = with (compilingKotlin) { Keys.compilerOptions.get() }
+                val compiler = using(compilingKotlin) { Keys.kotlinCompiler.get() }
+                val compilerFlags = using(compilingKotlin) { Keys.compilerOptions.get() }
 
                 val compileResult = compiler.compile(javaSources + kotlinSources, externalClasspath.map { it.file }.toList(), output, compilerFlags, LoggerFactory.getLogger("ProjectCompilation"), null)
                 if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
@@ -168,16 +168,16 @@ object KeyDefaults {
 
             // Compile Java
             if (javaSources.isNotEmpty()) {
-                val compiler = with(compilingJava) { Keys.javaCompiler.get() }
+                val compiler = using(compilingJava) { Keys.javaCompiler.get() }
                 val fileManager = compiler.getStandardFileManager(null, Locale.getDefault(), StandardCharsets.UTF_8)
                 val writerSb = StringBuilder()
                 val writer = StringBuilderWriter(writerSb)
-                val compilerFlags = with (compilingJava) { Keys.compilerOptions.get() }
+                val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
 
                 output.mkdirs()
-                val sourcesOut = with (compilingJava) { Keys.outputSourcesDirectory.get() }
+                val sourcesOut = using(compilingJava) { Keys.outputSourcesDirectory.get() }
                 sourcesOut.mkdirs()
-                val headersOut = with (compilingJava) { Keys.outputHeadersDirectory.get() }
+                val headersOut = using(compilingJava) { Keys.outputHeadersDirectory.get() }
                 headersOut.mkdirs()
 
                 val pathSeparator = System.getProperty("path.separator", ":")
@@ -246,7 +246,7 @@ object KeyDefaults {
     }
     val RunArguments: BoundKeyValue<Collection<String>> = { emptyList() }
     val Run: BoundKeyValue<Int> = {
-        with (Configurations.running) {
+        using(Configurations.running) {
             val javaExecutable = Keys.javaExecutable.get()
             val classpath = Keys.classpath.get()
             val directory = Keys.runDirectory.get()
@@ -561,7 +561,7 @@ object KeyDefaults {
         Keys.outputSourcesDirectory set OutputSourcesDirectory
         Keys.outputHeadersDirectory set OutputHeadersDirectory
         Keys.compilerOptions set { CompilerFlags() }
-        Configurations.compilingJava extend {
+        extend (Configurations.compilingJava) {
             Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
             Keys.compilerOptions[JavaCompilerFlags.targetVersion] = JavaVersion.V1_8
         }

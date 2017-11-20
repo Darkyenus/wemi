@@ -97,7 +97,7 @@ interface Scope {
 
     val scopeCache:ScopeCache
 
-    fun <Result> with(configuration: Configuration, action: Scope.() -> Result):Result {
+    fun <Result> using(configuration: Configuration, action: Scope.() -> Result):Result {
         val scope = scopeCache.scope(this, configuration)
         return scope.action()
     }
@@ -226,16 +226,16 @@ sealed class BindingHolder(val parent: BindingHolder?) {
         modifiers.add(lazyValueModifier)
     }
 
-    infix fun Configuration.extend(initializer:ConfigurationExtension.() -> Unit) {
+    fun extend(configuration: Configuration, initializer:ConfigurationExtension.() -> Unit) {
         ensureUnlocked()
         val extensions = this@BindingHolder.configurationExtensions
         if (extensions.containsKey(this)) {
-            throw IllegalStateException("Configuration $this already extended in ${this@BindingHolder}")
+            throw IllegalStateException("Configuration $configuration already extended in ${this@BindingHolder}")
         }
-        val extension = ConfigurationExtension(this)
+        val extension = ConfigurationExtension(configuration)
         extension.initializer()
         extension.locked = true
-        extensions[this] = extension
+        extensions[configuration] = extension
     }
 
     //region Modify utility methods

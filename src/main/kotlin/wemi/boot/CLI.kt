@@ -281,7 +281,7 @@ object CLI {
         return if (index == all.size) {
             key.get()
         } else {
-            with (all[index]) {
+            using(all[index]) {
                 evaluateInNestedScope(key, all, index + 1)
             }
         }

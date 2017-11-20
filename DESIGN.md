@@ -86,13 +86,16 @@ more on that in the section about *scopes*.
 Configuration definition may look like this:
 ```kotlin
 val compilingJava by configuration("Configuration used when compiling Java sources", compiling) {
-	Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
+	sourceRoots set { 
+		val base = sourceBase.get()
+		listOf(base / "kotlin", base / "java")
+	}
 }
 ```
 As you can see, it is very similar to the project definition, and the similarity is internal as well.
 Configuration however also holds mandatory reference description, like keys, and this example `compilingJava`
 configuration is derived from (or *extends* if you will) the `compiling` configuration, which it references as a variable.
-Configuration however does not have to be derived and in most cases won't be.
+Configuration, however, does not have to be derived and in most cases won't be.
 
 It is a soft convention to name configurations with the description of the activity in which the configuration will be used,
 with the verb in *present participle*, that is, ending with *-ing*. If the configuration is not used for an activity,
@@ -103,7 +106,7 @@ Standard configurations are defined in `wemi.Configurations` object.
 ### Scopes
 Scopes are the heart of the *value querying* mechanism. They are not declared, but created at runtime, on demand.
 Scopes also manage the key caching system, but that is not their primary role.
-They are **composed** out of one *project* and zero or more *configurations* in set order.
+They are **composed** out of one *project* and zero or more *configurations* in some order.
 
 This reflects in the key invocation syntax, which is used in the user interface to query/invoke key values.
 (Querying and invocation is the same operation, but it makes more sense to talk about querying for keys that bind settings
@@ -114,9 +117,49 @@ The syntax is as follows:
 ```
 Where `<project>` is a name of some defined project, `<config>` is a name of some defined configuration and `<key>`
 is a name of some defined key. For example `calculator/compiling:clean` would be a query to value bound to key `clean`,
-in one configuration `compiling` and in the project `calculator`. (There is probably not a practical reason to use this command,
-but it uses previously shown elements.) While the project part is defined in the syntax as optional, each scope **must**
+in one configuration `compiling` and in the project `calculator`. While the project part is defined in the syntax as optional, each scope **must**
 always have a project. When the project part is missing, the default project of the user interface is automatically used.
+
+A key binding defined in code, i.e. `sourceRoots set { /* this */ }`, is always executed in some implicit scope, only
+through which it is possible to query values of other keys - in that same scope. It is impossible (well, at least not advisable) to escape that scope.
+For example, when the key binding is being evaluated in scope `myProject/testing:compiling:` it can't drop the `compiling:`
+nor any other part of the scope stack. However, it can add more configurations on top of it, by wrapping the key evaluation in
+`using (configuration) {}` clause. For example, given following key binding:
+```kotlin
+compile set {
+	val comp = using (compilingJava) { compiler.get() }
+	val compOptions = compileOptions.get()
+	comp.compileWithOptions(compOptions)
+}
+```
+evaluating `myProject/foo:compile` will then evaluate, in order tasks `myProject/foo:compilingJava:compiler` and
+`myProject/foo:compileOptions`. `using` clauses can be freely nested.
+
+Note that you can push only a configuration on the stack, it is not possible to change the project with it.
+To see how to evaluate the key in an arbitrary configuration, you can check [how it is implemented in CLI](src/main/kotlin/wemi/boot/CLI.kt).
+
+### Configuration extensions
+While the scope system outlined above is powerful, some things are still not possible to do easily in it.
+For example, the `compile` key depends on two keys: `compiler` and `compileOptions`.
+`compileOptions` is queried directly, but `compiler` is queried through `compilingJava`.
+It is possible to override used `compileOptions` by overriding it in the project (when no other configuration is used).
+But to override `compiler` one would have to put the override in the definition of `compilingJava` configuration, but that is not possible,
+because configuration definitions are immutable. This is where configuration extensions come in to play.
+
+To fix this, you can use `extend (configuration) {}` clause, when defining key bindings. For example, when overriding
+`compilingJava:compiler` as seen in previous example, one would type:
+```kotlin
+compile set { /* see previous section */ }
+
+extend (compilingJava) {
+	MyJavaCompiler()
+}
+```
+This will change the querying order when evaluating `compilingJava:compiler` to first check the new extension configuration
+and only then, if the key is not bound, check the original configuration. In fact, configurations defined with the
+`extend` clause, are implemented by creating a new, anonymous configuration, that extends the original configuration,
+and is silently used when accessing the extended configuration in the scope in which the extension is defined.
+`extend`s, like `using`s, can be freely nested for even more specific overrides.
 
 #### Querying order
 When key in scope is queried, configurations and project in the scope is searched for the value binding in a specified order.

@@ -43,7 +43,7 @@ object BuildFileIntrospection {
         } else {
             _buildFileProjects.getValue(buildFile).add(this)
 
-            wemiBuildScript extend {
+            extend (wemiBuildScript) {
                 Keys.repositories set { buildFile.buildFileClasspathConfiguration.repositories }
                 Keys.repositoryChain set { buildFile.buildFileClasspathConfiguration.repositoryChain }
                 Keys.libraryDependencies set { buildFile.buildFileClasspathConfiguration.dependencies }
