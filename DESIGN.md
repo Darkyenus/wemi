@@ -7,6 +7,39 @@
 - Do not introduce dependencies unless necessary, prefer to (down)load them at runtime, when needed
 - Do not be afraid of breaking changes of code, at least during development
 
+## Directory layout
+Project backed by Wemi will usually have following directory structure:
+```
+/wemi                   <- Wemi executable
+/src/main/kotlin/
+/src/main/resources/
+/src/test/java/         <- Production/Test Java/Kotlin sources (Maven convention)
+/build/build.wemi       <- Build script file (All files named *.wemi in this folder will be used)
+/build/logs/            <- Folder with logs of Wemi runs
+/build/cache/           <- Folder with internal Wemi cache and compiled classes of source files
+/build/artifacts/       <- Folder with assembled artifacts, such as fat-jars, or anything else that you wish to produce
+```
+Wemi executable is stored directly in the project's root and should be included in version control.
+It is deliberately kept as small as possible, for this purpose. Doing it this way has multiple advantages:
+builds are reliably kept identical, even after a long time, no complicated installation, simple troubleshooting, etc.
+
+Sources are kept in a Maven-like structure: `/src/<build-type>/<kind>/`. It is possible to fully reconfigure it, if needed.
+By default, Wemi is configured to use `test` and `main` build type and looks for sources in `kotlin` and `java` folders.
+(Note that you can freely put Kotlin sources in `java` folder and vice-versa, as usual.)
+Resources are looked for in `resources`-kind folder.
+
+The `build` folder is where all Wemi-related things are stored. Build script files, that is any files directly under
+`build/` with `.wemi` extension (and not beginning with a `.`), are automatically detected as such and compiled together.
+Compiled scripts are kept, along with other internal cache items in the `cache` directory. This is also where Wemi
+stores what compilers produce for the main sources, as configured by the `outputClassesDirectory` key.
+When the Wemi is run, all of its output is kept in the `logs` directory (this is usually, but not always, very similar
+to what you see in the command line user interface). And in `artifacts`, final products of the project are stored
+- if there are any to store.
+
+This all is true for a typical, single-project layout. It is possible to have multiple projects in a single Wemi directory
+(or just one with a different root). In that case, all except `src/` would be in the same place. `src/` is, by default,
+in the project's root.
+
 ## Internal architecture
 At the core of WEMI are four intertwined concepts.
 - Key

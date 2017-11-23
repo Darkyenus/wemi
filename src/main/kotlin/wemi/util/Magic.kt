@@ -31,8 +31,8 @@ internal val WemiLauncherFile: File = __ResourceHook.javaClass.getResource("Magi
 
 private val WemiLauncherFileWithJarExtensionCache = mutableMapOf<File, File>()
 
-internal fun wemiLauncherFileWithJarExtension(buildFolder:File):File {
-    return WemiLauncherFileWithJarExtensionCache.getOrPut(buildFolder) lazy@{
+internal fun wemiLauncherFileWithJarExtension(cacheFolder:File):File {
+    return WemiLauncherFileWithJarExtensionCache.getOrPut(cacheFolder) lazy@{
         val wemiLauncherFile = WemiLauncherFile
         if (wemiLauncherFile.name.endsWith(".jar", ignoreCase = true) || wemiLauncherFile.isDirectory) {
             LOG.debug("WemiLauncherFileWithJar is unchanged {}", wemiLauncherFile)
@@ -52,7 +52,7 @@ internal fun wemiLauncherFileWithJarExtension(buildFolder:File):File {
             "wemi-$WemiVersion.jar"
         }
 
-        val wemiLauncherLinksDirectory = buildFolder / "wemi-launcher-links"
+        val wemiLauncherLinksDirectory = cacheFolder / "wemi-launcher-links"
         wemiLauncherLinksDirectory.mkdirs()
         val linked = wemiLauncherLinksDirectory / name
 

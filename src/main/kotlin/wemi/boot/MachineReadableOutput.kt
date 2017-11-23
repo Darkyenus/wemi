@@ -51,7 +51,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task:String) {
             machineReadablePrint(out, object : MachineWritable {
                 override fun writeMachine(json: Json) {
                     json.writeArrayStart()
-                    for ((buildFile, projects) in BuildFileIntrospection.buildFileProjects) {
+                    for ((buildFile, projects) in BuildScriptIntrospection.buildScriptProjects) {
                         json.writeObjectStart()
 
                         json.writeValue("buildFolder", buildFile.buildFolder)

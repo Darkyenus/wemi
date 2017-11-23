@@ -4,10 +4,7 @@ import org.slf4j.LoggerFactory
 import wemi.WemiKotlinVersion
 import wemi.compile.*
 import wemi.dependency.*
-import wemi.util.LocatedFile
-import wemi.util.WemiLauncherFile
-import wemi.util.hasExtension
-import wemi.util.wemiLauncherFileWithJarExtension
+import wemi.util.*
 import java.io.File
 import java.net.URL
 
@@ -20,49 +17,30 @@ val WemiBuildFileExtensions = listOf("wemi", "wemi.kt")
 /**
  * Build file is a file with .wemi extension, anywhere in current or parent directory.
  */
-fun findBuildFile(from: File): List<File> {
-    var currentDirectory: File = from
+fun findBuildScriptSources(buildFolder: File): List<File> {
     var result: MutableList<File>? = null
 
-    while (true) {
-        val files = currentDirectory.listFiles()
-        if (files != null) {
-            for (file in files) {
-                if (file.isFile && !file.isHidden && file.hasExtension(WemiBuildFileExtensions)) {
-                    if (result == null) {
-                        result = ArrayList()
-                    }
-                    result.add(file)
-                }
-            }
+    val files = buildFolder.listFiles() ?: return emptyList()
 
-            if (result != null) {
-                return result
+    for (file in files) {
+        if (file.isFile && !file.isHidden && !file.name.startsWith('.') && file.nameHasExtension(WemiBuildFileExtensions)) {
+            if (result == null) {
+                result = ArrayList()
             }
+            result.add(file)
         }
-
-        val parent = currentDirectory.parentFile
-        if (parent == null || parent == currentDirectory) {
-            break
-        }
-        currentDirectory = parent
     }
 
-    return emptyList()
+    return result ?: emptyList()
 }
 
-fun prepareBuildFileCacheFolder(buildFile: File): File? {
-    val parentFile = buildFile.parentFile
-    if (parentFile == null) {
-        LOG.error("Failed to retrieve parent file of {}", buildFile)
-        return null
-    }
-    val folder = File(parentFile, "build")
+private fun prepareBuildFileCacheFolder(buildFolder: File): File? {
+    val folder = File(buildFolder, "cache")
     if (folder.exists() && !folder.isDirectory) {
         LOG.error("Build directory {} exists and is not a directory", folder)
         return null
     } else if (!folder.exists()) {
-        if (!folder.mkdirs()) {
+        if (!folder.mkdirs() && !folder.isDirectory) {
             LOG.error("Could not create build directory {}", folder)
             return null
         }
@@ -71,38 +49,48 @@ fun prepareBuildFileCacheFolder(buildFile: File): File? {
     return folder
 }
 
-fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
-    val buildFolder = prepareBuildFileCacheFolder(buildFile) ?: return null
-    val resultJar = File(buildFolder, buildFile.name + "-cache.jar")
-    val classpathFile = File(buildFolder, buildFile.name + ".classpath")
-    val resultClasspath = mutableListOf<File>()
+fun getCompiledBuildScript(buildFolder: File, buildScriptSources:List<File>, forceCompile: Boolean): BuildScript? {
+    val cacheFolder = prepareBuildFileCacheFolder(buildFolder) ?: return null
+    val combinedBuildFileName = buildScriptSources.joinToString("-") { it.nameWithoutExtension }
+
+    val resultJar = File(cacheFolder, combinedBuildFileName + "-cache.jar")
+    val classpathFile = File(cacheFolder, combinedBuildFileName + ".classpath")
+    val classpath = mutableListOf<File>()
+
+    var recompileReason = ""
 
     val recompile = if (forceCompile) {
+        recompileReason = "Requested"
         LOG.debug("Rebuilding build scripts: Requested")
         true
     } else if (!resultJar.exists() || resultJar.isDirectory) {
+        recompileReason = "No cache"
         LOG.debug("Rebuilding build scripts: No cache at {}", resultJar)
         true
-    } else if (resultJar.lastModified() < buildFile.lastModified()) {
+    } else if (resultJar.lastModified().let { jarLastModified -> buildScriptSources.any { source -> jarLastModified < source.lastModified()} }) {
+        recompileReason = "Script changed"
         LOG.debug("Rebuilding build scripts: Old cache")
         true
     } else if (!classpathFile.exists() || classpathFile.isDirectory) {
+        recompileReason = "Missing cache metadata"
         LOG.debug("Rebuilding build scripts: No classpath cache")
         true
     } else if (WemiLauncherFile.lastModified() > resultJar.lastModified()) {
+        recompileReason = "Updated launcher"
         LOG.debug("Rebuilding build scripts: Launcher updated ({})", WemiLauncherFile)
         true
     } else recompile@{
         // All seems good, try to load the result classpath
         classpathFile.forEachLine { line ->
             if (line.isNotBlank()) {
-                resultClasspath.add(File(line))
+                classpath.add(File(line))
             }
         }
-        for (file in resultClasspath) {
+        for (file in classpath) {
             if (!file.exists()) {
+                recompileReason = "Corrupted cache metadata"
                 LOG.debug("Rebuilding build scripts: Classpath cache corrupted ({} does not exist)", file)
-                resultClasspath.clear()
+                classpath.clear()
                 return@recompile true
             }
         }
@@ -111,44 +99,43 @@ fun getCompiledBuildFile(buildFile: File, forceCompile: Boolean): BuildFile? {
 
     val buildFlags = CompilerFlags()
     buildFlags[KotlinJVMCompilerFlags.compilingWemiBuildFiles] = true
-    buildFlags[KotlinJVMCompilerFlags.moduleName] = buildFile.nameWithoutExtension
+    buildFlags[KotlinJVMCompilerFlags.moduleName] = combinedBuildFileName
     // Wemi launcher has kotlin runtime bundled, which is fine
     buildFlags[KotlinJVMCompilerFlags.skipRuntimeVersionCheck] = true
 
-    //TODO Refactor so that sources are all .wemi files in the folder, do not separate them
-    val sources = listOf(LocatedFile(buildFile))
+    val sources = buildScriptSources.map { LocatedFile(it) }
 
-    val classpathConfiguration = BuildFileClasspathConfiguration(buildFile)
+    val classpathConfiguration = BuildScriptClasspathConfiguration(buildScriptSources)
 
     if (recompile) {
         // Recompile
+        LOG.info("Compiling build script: {}", recompileReason)
         resultJar.deleteRecursively()
 
-        val wemiLauncherJar = wemiLauncherFileWithJarExtension(buildFolder)
+        val wemiLauncherJar = wemiLauncherFileWithJarExtension(cacheFolder)
 
-        val classpath = ArrayList<File>()
         classpath.add(wemiLauncherJar)
         val artifacts = DependencyResolver.resolveArtifacts(classpathConfiguration.dependencies, classpathConfiguration.repositoryChain)
         if (artifacts == null) {
-            LOG.warn("Failed to retrieve all build file dependencies for {}", buildFile)
+            LOG.warn("Failed to retrieve all build file dependencies for {}", buildScriptSources)
             return null
         }
         classpath.addAll(artifacts)
 
+        LOG.debug("Compiling sources: {} classpath: {} resultJar: {} buildFlags: {}", sources, classpath, resultJar, buildFlags)
+
         val status = kotlinCompiler(WemiKotlinVersion).compile(sources, classpath, resultJar, buildFlags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
         if (status != KotlinCompiler.CompileExitStatus.OK) {
-            LOG.warn("Compilation failed for {}: {}", buildFile, status)
+            LOG.warn("Compilation failed for {}: {}", buildScriptSources, status)
             return null
         }
 
-        resultClasspath.add(wemiLauncherJar)
-        resultClasspath.addAll(artifacts)
-        classpathFile.writeText(artifacts.joinToString(separator = "\n") { file -> file.absolutePath })
+        classpathFile.writeText(classpath.joinToString(separator = "\n") { file -> file.absolutePath })
     }
 
     // Figure out the init class
-    return BuildFile(resultJar, buildFolder,
-            resultClasspath, transformFileNameToKotlinClassName(buildFile.nameWithoutExtension),
+    return BuildScript(resultJar, buildFolder,
+            classpath, buildScriptSources.map { transformFileNameToKotlinClassName(it.nameWithoutExtension) },
             classpathConfiguration, sources, buildFlags)
 }
 
@@ -181,7 +168,7 @@ private val M2RepositoryDirectiveRegex = "(\\S+)\\s+at\\s+(\\S+:\\S+)".toRegex()
 
 private val LibraryDirectiveRegex = "(\\S+)\\s*:\\s*(\\S+)\\s*:\\s*(\\S+)".toRegex()
 
-class BuildFileClasspathConfiguration(private val buildFile:File) {
+class BuildScriptClasspathConfiguration(private val buildScriptSources:List<File>) {
     private var _repositories : List<Repository>? = null
     private var _repositoryChain : RepositoryChain? = null
     private var _dependencies : List<ProjectDependency>? = null
@@ -191,34 +178,36 @@ class BuildFileClasspathConfiguration(private val buildFile:File) {
         repositories.addAll(DefaultRepositories)
         val buildDependencyLibraries = mutableListOf(BuildFileStdLib)
 
-        var lineNumber = 0
-        buildFile.forEachLine { line ->
-            lineNumber++
-            val directiveMatch = DirectiveRegex.matchEntire(line) ?: return@forEachLine
-            val directive = (directiveMatch.groups[1]?.value ?: "").toLowerCase()
-            val value = directiveMatch.groups[2]?.value ?: ""
+        for (source in buildScriptSources) {
+            var lineNumber = 0
+            source.forEachLine { line ->
+                lineNumber++
+                val directiveMatch = DirectiveRegex.matchEntire(line) ?: return@forEachLine
+                val directive = (directiveMatch.groups[1]?.value ?: "").toLowerCase()
+                val value = directiveMatch.groups[2]?.value ?: ""
 
-            when (directive) {
-                "dependency" -> {
-                    val match = LibraryDirectiveRegex.matchEntire(value)
-                    if (match == null) {
-                        LOG.warn("{}:{} Invalid dependency directive \"{}\". (Example: 'com.example:my-project:1.0')", buildFile, lineNumber, value)
-                    } else {
-                        val (group, name, version) = match.destructured
-                        buildDependencyLibraries.add(ProjectDependency(ProjectId(group, name, version)))
+                when (directive) {
+                    "dependency" -> {
+                        val match = LibraryDirectiveRegex.matchEntire(value)
+                        if (match == null) {
+                            LOG.warn("{}:{} Invalid dependency directive \"{}\". (Example: 'com.example:my-project:1.0')", buildScriptSources, lineNumber, value)
+                        } else {
+                            val (group, name, version) = match.destructured
+                            buildDependencyLibraries.add(ProjectDependency(ProjectId(group, name, version)))
+                        }
                     }
-                }
-                "repository" -> {
-                    val match = M2RepositoryDirectiveRegex.matchEntire(value)
-                    if (match == null) {
-                        LOG.warn("{}:{} Invalid repository directive \"{}\". (Example: 'my-repo at https://example.com')", buildFile, lineNumber, value)
-                    } else {
-                        val (name, url) = match.destructured
-                        repositories.add(Repository.M2(name, URL(url), LocalM2Repository))
+                    "repository" -> {
+                        val match = M2RepositoryDirectiveRegex.matchEntire(value)
+                        if (match == null) {
+                            LOG.warn("{}:{} Invalid repository directive \"{}\". (Example: 'my-repo at https://example.com')", buildScriptSources, lineNumber, value)
+                        } else {
+                            val (name, url) = match.destructured
+                            repositories.add(Repository.M2(name, URL(url), LocalM2Repository))
+                        }
                     }
-                }
-                else -> {
-                    LOG.warn("{}:{} Invalid directive \"{}\". Supported directives are 'dependency' and 'repository'.", buildFile, lineNumber, directive)
+                    else -> {
+                        LOG.warn("{}:{} Invalid directive \"{}\". Supported directives are 'dependency' and 'repository'.", buildScriptSources, lineNumber, directive)
+                    }
                 }
             }
         }
@@ -256,9 +245,9 @@ class BuildFileClasspathConfiguration(private val buildFile:File) {
 /**
  * @property scriptJar jar to which the build script has been compiled
  * @property classpath used to compile and to run the scriptJar
- * @property initClass main class of the [scriptJar]
+ * @property initClasses main classes of the [scriptJar]
  */
-data class BuildFile(val scriptJar:File, val buildFolder:File,
-                     val classpath:List<File>, val initClass:String,
-                     val buildFileClasspathConfiguration: BuildFileClasspathConfiguration,
-                     val sources:List<LocatedFile>, val buildFlags: CompilerFlags)
+data class BuildScript(val scriptJar:File, val buildFolder:File,
+                       val classpath:List<File>, val initClasses:List<String>,
+                       val buildScriptClasspathConfiguration: BuildScriptClasspathConfiguration,
+                       val sources:List<LocatedFile>, val buildFlags: CompilerFlags)

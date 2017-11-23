@@ -4,7 +4,7 @@ package wemi
 
 import org.slf4j.LoggerFactory
 import wemi.KeyDefaults.applyDefaults
-import wemi.boot.BuildFileIntrospection.initializeBuildScriptInfo
+import wemi.boot.BuildScriptIntrospection.initializeBuildScriptInfo
 import java.io.File
 import java.util.*
 import kotlin.properties.ReadOnlyProperty

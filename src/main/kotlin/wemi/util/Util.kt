@@ -64,7 +64,7 @@ fun formatTimeDuration(ms:Long):CharSequence {
     return result
 }
 
-fun File.hasExtension(extensions:Collection<String>):Boolean {
+fun File.nameHasExtension(extensions:Collection<String>):Boolean {
     val name = this.name
     val length = name.length
     for (extension in extensions) {
@@ -75,4 +75,53 @@ fun File.hasExtension(extensions:Collection<String>):Boolean {
         }
     }
     return false
+}
+
+inline fun String.forCodePoints(action:(Int) -> Unit) {
+    val length = this.length
+    var i = 0
+
+    while (i < length) {
+        val c1 = get(i++)
+        if (!Character.isHighSurrogate(c1) || i >= length) {
+            action(c1.toInt())
+        } else {
+            val c2 = get(i)
+            if (Character.isLowSurrogate(c2)) {
+                i++
+                action(Character.toCodePoint(c1, c2))
+            } else {
+                action(c1.toInt())
+            }
+        }
+    }
+}
+
+fun Int.isCodePointSafeInFileName():Boolean = when {
+    !Character.isValidCodePoint(this) -> false
+    this < ' '.toInt() -> false
+    this == '/'.toInt() || this == '\\'.toInt() -> false
+    this == '*'.toInt() || this == '%'.toInt() || this == '?'.toInt() -> false
+    this == ':'.toInt() || this == '|'.toInt() || this == '"'.toInt() -> false
+    else -> true
+}
+
+fun String.toSafeFileName(replacement:Char = '_'):String {
+    val sb = StringBuilder(length)
+    var anyReplacements = false
+
+    forCodePoints { cp ->
+        if (cp.isCodePointSafeInFileName()) {
+            sb.appendCodePoint(cp)
+        } else {
+            sb.append(replacement)
+            anyReplacements = true
+        }
+    }
+
+    return if (anyReplacements) {
+        sb.toString()
+    } else {
+        this
+    }
 }

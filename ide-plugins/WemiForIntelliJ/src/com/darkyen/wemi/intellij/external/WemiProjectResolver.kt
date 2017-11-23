@@ -205,6 +205,13 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             // Module Node
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, moduleData)
 
+            val contentRoot = ContentRootData(WemiProjectSystemId, buildFolder)
+            contentRoot.storePath(ExternalSystemSourceType.SOURCE, buildFolder)
+            contentRoot.storePath(ExternalSystemSourceType.EXCLUDED, "$buildFolder/cache")
+            contentRoot.storePath(ExternalSystemSourceType.EXCLUDED, "$buildFolder/logs")
+            contentRoot.storePath(ExternalSystemSourceType.EXCLUDED, "$buildFolder/artifacts")
+            moduleNode.createChild(ProjectKeys.CONTENT_ROOT, contentRoot)
+
             // Dependencies
             val unresolved = classpath.any { !it.exists() }
             val libraryData = LibraryData(WemiProjectSystemId, name+" Classpath", unresolved)

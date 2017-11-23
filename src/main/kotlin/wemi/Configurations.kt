@@ -25,6 +25,9 @@ object Configurations {
     //region Testing configuration
     val test by configuration("Used when testing") {
         Keys.sourceBase set KeyDefaults.SourceBaseScopeTest
+        Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
+        Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
+        Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
     }
     //endregion
 

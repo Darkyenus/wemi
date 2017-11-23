@@ -39,7 +39,7 @@ import wemi.boot.WemiBuildFileExtensions
 import wemi.compile.*
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
 import wemi.util.LocatedFile
-import wemi.util.hasExtension
+import wemi.util.nameHasExtension
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
@@ -275,14 +275,14 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
                     configuration.addKotlinSourceRoot(file.absolutePath)
                     configuration.addJavaSourceRoot(file)
                 }
-                file.hasExtension(KotlinSourceFileExtensions) -> {
+                file.nameHasExtension(KotlinSourceFileExtensions) -> {
                     configuration.addKotlinSourceRoot(file.absolutePath)
                 }
-                file.hasExtension(JavaSourceFileExtensions) -> {
+                file.nameHasExtension(JavaSourceFileExtensions) -> {
                     configuration.addJavaSourceRoot(file, source.packageName)
                 }
                 flags.useDefault(KotlinJVMCompilerFlags.compilingWemiBuildFiles, false)
-                        && file.hasExtension(WemiBuildFileExtensions) -> {
+                        && file.nameHasExtension(WemiBuildFileExtensions) -> {
                     configuration.addKotlinSourceRoot(file.absolutePath)
                 }
                 else -> {

@@ -158,12 +158,12 @@ class WemiManager : ExternalSystemUiAware,
      * @param changedFileOrDirPath path to the changed file, sometimes relative, sometimes absolute
      */
     override fun getAffectedExternalProjectPath(changedFileOrDirPath: String, project: Project): String? {
-        // TODO Consider the project?
         if (changedFileOrDirPath.endsWith(".wemi", ignoreCase = true)) {
             val start = changedFileOrDirPath.lastIndexOf('/')
             // Ignore hidden files
-            if (start != -1 && changedFileOrDirPath[start+1] != '.') {
-                return changedFileOrDirPath.substring(0, start)
+            if (start != -1 && start + 1 != changedFileOrDirPath.length
+                    && changedFileOrDirPath[start+1] != '.') {
+                return project.basePath
             }
         }
         return null

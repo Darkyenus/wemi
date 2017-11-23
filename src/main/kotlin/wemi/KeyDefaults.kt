@@ -1,3 +1,5 @@
+@file:Suppress("MemberVisibilityCanPrivate")
+
 package wemi
 
 import com.darkyen.tproll.util.StringBuilderWriter
@@ -45,7 +47,7 @@ object KeyDefaults {
         val result = ArrayList<LocatedFile>()
 
         for (root in roots) {
-            constructLocatedFiles(root, result) { it.hasExtension(extensions) }
+            constructLocatedFiles(root, result) { it.nameHasExtension(extensions) }
         }
 
         result
@@ -124,14 +126,8 @@ object KeyDefaults {
     val JavaHome: BoundKeyValue<File> = {wemi.run.JavaHome}
     val JavaExecutable: BoundKeyValue<File> = {wemi.run.javaExecutable(Keys.javaHome.get())}
 
-    val OutputClassesDirectory: BoundKeyValue<File> = {
-        Keys.buildDirectory.get() / "classes"
-    }
-    val OutputSourcesDirectory: BoundKeyValue<File> = {
-        Keys.buildDirectory.get() / "sources"
-    }
-    val OutputHeadersDirectory: BoundKeyValue<File> = {
-        Keys.buildDirectory.get() / "headers"
+    fun outputClassesDirectory(tag:String): BoundKeyValue<File> = {
+        Keys.buildDirectory.get() / "cache/$tag-${Keys.projectName.get().toSafeFileName()}"
     }
 
     private val CompileLOG = LoggerFactory.getLogger("Compile")
@@ -557,9 +553,9 @@ object KeyDefaults {
 
         Keys.javaHome set JavaHome
         Keys.javaExecutable set JavaExecutable
-        Keys.outputClassesDirectory set OutputClassesDirectory
-        Keys.outputSourcesDirectory set OutputSourcesDirectory
-        Keys.outputHeadersDirectory set OutputHeadersDirectory
+        Keys.outputClassesDirectory set outputClassesDirectory("classes")
+        Keys.outputSourcesDirectory set outputClassesDirectory("sources")
+        Keys.outputHeadersDirectory set outputClassesDirectory("headers")
         Keys.compilerOptions set { CompilerFlags() }
         extend (Configurations.compilingJava) {
             Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8

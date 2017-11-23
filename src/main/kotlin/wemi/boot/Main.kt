@@ -72,7 +72,7 @@ fun main(args: Array<String>) {
                 } else if (arg == "-allowBrokenBuildScripts") {
                     allowBrokenBuildScripts = true
                 } else if (arg == "-v" || arg == "-version") {
-                    println("WEMI ${WemiVersion} with Kotlin $KotlinVersion")
+                    println("WEMI $WemiVersion with Kotlin $KotlinVersion")
                 } else if (arg == "-?" || arg == "-h" || arg == "-help") {
                     println("WEMI")
                     println("  -clean")
@@ -100,7 +100,7 @@ fun main(args: Array<String>) {
         }
     }
 
-    val machineOutput:PrintStream?
+    val machineOutput: PrintStream?
 
     if (machineReadableOutput) {
         // Redirect logging to err
@@ -121,43 +121,33 @@ fun main(args: Array<String>) {
 
     // Find root
     val root = File(".").absoluteFile
-    val buildFiles = findBuildFile(root)
+
+    val buildFolder = root / "build"
+    val buildScriptSources = findBuildScriptSources(buildFolder)
 
     val consoleLogger = ConsoleLogFunction(null, null)
-    if (buildFiles.isEmpty()) {
+    if (buildScriptSources.isEmpty()) {
         LOG.warn("No build files found")
 
         TPLogger.setLogFunction(consoleLogger)
     } else {
-        LOG.debug("{} build file(s) found", buildFiles.size)
+        LOG.debug("{} build file(s) found", buildScriptSources.size)
 
         TPLogger.setLogFunction(LogFunctionMultiplexer(
-                FileLogFunction(prepareBuildFileCacheFolder(buildFiles.first())!! / "logs"),
+                FileLogFunction(buildFolder / "logs"),
                 consoleLogger
         ))
     }
 
-    val compiledBuildFiles = mutableListOf<BuildFile>()
+    val buildFile = getCompiledBuildScript(buildFolder, buildScriptSources, cleanBuild)
 
-    for (buildFile in buildFiles) {
-        val compiled = getCompiledBuildFile(buildFile, cleanBuild)
-        if (compiled == null) {
-            errors++
-        } else {
-            compiledBuildFiles.add(compiled)
-        }
-    }
-
-    if (!allowBrokenBuildScripts && errors > 0) {
-        LOG.warn("{} build script(s) failed to compile", errors)
+    if (!allowBrokenBuildScripts && buildFile == null) {
+        LOG.warn("Build script failed to compile")
         exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
-    } else {
-        @Suppress("UNUSED_VALUE")
-        errors = 0
     }
 
     // Load build files now
-    for (buildFile in compiledBuildFiles) {
+    if (buildFile != null) {
         val urls = arrayOfNulls<URL>(2 + buildFile.classpath.size)
         urls[0] = buildFile.scriptJar.toURI().toURL()
         var i = 1
@@ -166,13 +156,15 @@ fun main(args: Array<String>) {
         }
         val loader = URLClassLoader(urls, WemiDefaultClassLoader)
         LOG.debug("Loading build file {}", buildFile)
-        BuildFileIntrospection.currentlyInitializedBuildFile = buildFile
-        try {
-            Class.forName(buildFile.initClass, true, loader)
-        } catch (e:Exception) {
-            LOG.warn("Failed to load build file class {} from {}", buildFile.initClass, urls, e)
+        BuildScriptIntrospection.currentlyInitializedBuildScript = buildFile
+        for (initClass in buildFile.initClasses) {
+            try {
+                Class.forName(initClass, true, loader)
+            } catch (e: Exception) {
+                LOG.warn("Failed to load build file class {} from {}", initClass, urls, e)
+            }
         }
-        BuildFileIntrospection.currentlyInitializedBuildFile = null
+        BuildScriptIntrospection.currentlyInitializedBuildScript = null
         LOG.debug("Build file loaded")
     }
 
