@@ -4,13 +4,9 @@ import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.execution.configurationEditor.WemiRunConfigurationEditor
 import com.intellij.diagnostic.logging.LogConfigurationPanel
 import com.intellij.execution.*
-import com.intellij.execution.configurations.ConfigurationFactory
-import com.intellij.execution.configurations.RunConfiguration
-import com.intellij.execution.configurations.RunProfileState
+import com.intellij.execution.configurations.*
 import com.intellij.execution.executors.DefaultDebugExecutor
-import com.intellij.execution.process.AnsiEscapeDecoder
-import com.intellij.execution.process.ProcessHandler
-import com.intellij.execution.process.ProcessOutputTypes
+import com.intellij.execution.process.*
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ProgramRunner
 import com.intellij.execution.ui.ExecutionConsole
@@ -39,8 +35,6 @@ import java.io.*
 
 /**
  * Used when creating Wemi task run to run as IDE Configuration
- *
- * TODO Input piping to the task does not seem to work
  */
 class WemiRunConfiguration(project: Project,
                                    factory: ConfigurationFactory) : ExternalSystemRunConfiguration(WemiProjectSystemId, project, factory, "") {
@@ -168,17 +162,17 @@ class WemiRunConfiguration(project: Project,
     /** Based on [ExternalSystemRunConfiguration.MyProcessHandler] of 172.4343 */
     private class WemiProcessHandler(private val myTask: ExternalSystemExecuteTaskTask) : ProcessHandler(), AnsiEscapeDecoder.ColoredTextAcceptor {
         private val myAnsiEscapeDecoder = AnsiEscapeDecoder()
-        private var myProcessInput: OutputStream? = null
-
-        init {
-            try {
-                val inputStream = PipedInputStream()
-                myProcessInput = PipedOutputStream(inputStream)
-                myTask.putUserData<InputStream>(ExternalSystemRunConfiguration.RUN_INPUT_KEY, inputStream)
-            } catch (e: IOException) {
-                LOG.warn("Unable to setup process input", e)
-            }
-
+        /**
+         * This stream receives user input
+         */
+        private var userInput: OutputStream? = try {
+            val inputStream = PipedInputStream()
+            val userInput = PipedOutputStream(inputStream)
+            myTask.putUserData<InputStream>(ExternalSystemRunConfiguration.RUN_INPUT_KEY, inputStream)
+            userInput
+        } catch (e: IOException) {
+            LOG.warn("Unable to setup process input", e)
+            null
         }
 
         override fun notifyTextAvailable(text: String, outputType: Key<*>) {
@@ -195,13 +189,17 @@ class WemiRunConfiguration(project: Project,
             closeInput()
         }
 
-        override fun detachIsDefault(): Boolean {
-            return false
-        }
+        override fun detachIsDefault(): Boolean = false
 
-        override fun getProcessInput(): OutputStream? {
-            return myProcessInput
-        }
+        //TODO Input piping to the task does not work, waiting for https://intellij-support.jetbrains.com/hc/en-us/community/posts/115000708024-How-to-implement-user-input-in-the-ExternalSystem-API-
+        override fun getProcessInput(): OutputStream? = //userInput
+                object : OutputStream() {
+                    override fun write(b: Int) {}
+
+                    override fun flush() {
+                        notifyTextAvailable("<User input through plugin not supported yet>\n", ProcessOutputTypes.SYSTEM)
+                    }
+                }
 
         public override fun notifyProcessTerminated(exitCode: Int) {
             super.notifyProcessTerminated(exitCode)
@@ -213,8 +211,8 @@ class WemiRunConfiguration(project: Project,
         }
 
         private fun closeInput() {
-            StreamUtil.closeStream(myProcessInput)
-            myProcessInput = null
+            StreamUtil.closeStream(userInput)
+            userInput = null
         }
     }
 

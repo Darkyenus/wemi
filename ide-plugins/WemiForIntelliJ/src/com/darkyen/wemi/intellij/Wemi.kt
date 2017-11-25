@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
 
 val WemiBuildFileExtensions = arrayOf("wemi")
 
-val WemiProjectSystemId = ProjectSystemId("WEMI", "WEMI")
+val WemiProjectSystemId = ProjectSystemId("WEMI", "Wemi")
 
 val WemiLauncherFileName = "wemi"
 

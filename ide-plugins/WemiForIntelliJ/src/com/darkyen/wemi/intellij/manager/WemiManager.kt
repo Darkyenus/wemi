@@ -137,8 +137,8 @@ class WemiManager : ExternalSystemUiAware,
         parameters.vmParametersList.addProperty("file.encoding", CharsetToolkit.UTF8)
         parameters.vmParametersList.addProperty(ExternalSystemConstants.EXTERNAL_SYSTEM_ID_KEY, WemiProjectSystemId.id)
 
-        /* To debug the retrieval of dependencies, uncomment this and launch a remote debugging configuration. */
-        //parameters.vmParametersList.addParametersString("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5009")
+        // To debug the retrieval of dependencies, add param:
+        // -Dexternal.system.remote.communication.manager.debug.port=5009
     }
 
     //region ExternalSystemConfigurableAware
