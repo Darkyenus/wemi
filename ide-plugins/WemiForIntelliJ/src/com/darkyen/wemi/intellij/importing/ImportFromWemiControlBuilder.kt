@@ -12,6 +12,7 @@ import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.*
 import com.intellij.openapi.roots.LanguageLevelProjectExtension
+import com.intellij.openapi.roots.ProjectRootManager
 import icons.WemiIcons
 import java.io.File
 
@@ -25,23 +26,31 @@ class ImportFromWemiControlBuilder(dataManager: ProjectDataManager, val launcher
 
     override fun getIcon() = WemiIcons.WEMI
 
-    override fun getName() = "WEMI"
+    override fun getName() = "Wemi"
 
+    /**
+     * Called before "Import module from Wemi" wizard window is shown
+     */
     override fun doPrepare(context: WizardContext) {
-        ""
+
     }
 
     /**
      * Called after the (preview?) sync is done and project will be updated with data from [com.darkyen.wemi.intellij.external.WemiProjectResolver]
      *
      * @param dataNode from project resolver
-     * @param project that is being created (TODO: VERIFY!)
+     * @param project that is being created
      */
     override fun beforeCommit(dataNode: DataNode<ProjectData>, project: Project) {
         // Setup language level to what is reported by the resolved data
-        val javaProjectNode = ExternalSystemApiUtil.find(dataNode, JavaProjectData.KEY) ?: return
+        val javaProjectData = ExternalSystemApiUtil.find(dataNode, JavaProjectData.KEY)?.data ?: return
         val languageLevelExtension = LanguageLevelProjectExtension.getInstance(project)
-        languageLevelExtension.languageLevel = javaProjectNode.data.languageLevel
+        languageLevelExtension.languageLevel = javaProjectData.languageLevel
+
+        val projectRootManager = ProjectRootManager.getInstance(project)
+        ExternalSystemApiUtil.doWriteAction {
+            projectRootManager.projectSdk = findJdk(javaProjectData.jdkVersion)
+        }
     }
 
     override fun applyExtraSettings(context: WizardContext) {
@@ -84,6 +93,8 @@ class ImportFromWemiControlBuilder(dataManager: ProjectDataManager, val launcher
         return candidate
     }
 
-    override fun isSuitableSdkType(sdkType: SdkTypeId?) = sdkType === JavaSdk.getInstance()
+    override fun isSuitableSdkType(sdkType: SdkTypeId?): Boolean {
+        return sdkType == JavaSdk.getInstance()
+    }
 
 }

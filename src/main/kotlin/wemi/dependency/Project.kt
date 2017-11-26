@@ -5,27 +5,27 @@ import wemi.boot.MachineWritable
 import java.io.File
 
 /**
- * Unique identifier for wemi.project/module to be resolved.
+ * Unique identifier for project/module to be resolved.
  * May have dependencies on other projects and may have artifacts.
  *
- * @param group of wemi.project (aka organisation)
- * @param name of wemi.project
- * @param version of wemi.project (aka revision)
+ * @param group of project (aka organisation)
+ * @param name of project
+ * @param version of project (aka revision)
  *
- * @param preferredRepository preferredRepository in which to search for this wemi.project first
+ * @param preferredRepository preferredRepository in which to search for this project first
  */
-data class ProjectId(val group: String,
-                val name: String,
-                val version: String,
+data class DependencyId(val group: String,
+                        val name: String,
+                        val version: String,
 
-                val preferredRepository: Repository? = null,
-                val attributes: Map<ProjectAttribute, String> = emptyMap()) : MachineWritable {
+                        val preferredRepository: Repository? = null,
+                        val attributes: Map<ProjectAttribute, String> = emptyMap()) : MachineWritable {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other?.javaClass != javaClass) return false
 
-        other as ProjectId
+        other as DependencyId
 
         if (group != other.group) return false
         if (name != other.name) return false
@@ -95,11 +95,11 @@ data class ProjectExclusion(val group: String, val name: String, val version: St
         return (pattern == "*" && value != null) || pattern == value
     }
 
-    fun excludes(projectId: ProjectId): Boolean {
-        return matches(group, projectId.group)
-                && matches(name, projectId.name)
-                && matches(version, projectId.version)
-                && attributes.all { (key, value) -> matches(value, projectId.attributes[key]) }
+    fun excludes(dependencyId: DependencyId): Boolean {
+        return matches(group, dependencyId.group)
+                && matches(name, dependencyId.name)
+                && matches(version, dependencyId.version)
+                && attributes.all { (key, value) -> matches(value, dependencyId.attributes[key]) }
     }
 
     override fun toString(): String {
@@ -132,17 +132,17 @@ val DefaultExclusions = listOf(
         ))
 )
 
-/** Represents dependency on a [project], with transitive dependencies, which may be excluded by [exclusions]. */
-data class ProjectDependency(val project: ProjectId, val exclusions: List<ProjectExclusion> = DefaultExclusions) : MachineWritable {
+/** Represents dependency on a [dependencyId], with transitive dependencies, which may be excluded by [exclusions]. */
+data class Dependency(val dependencyId: DependencyId, val exclusions: List<ProjectExclusion> = DefaultExclusions) : MachineWritable {
     override fun writeMachine(json: Json) {
         json.writeObjectStart()
-        json.writeValue("project", project, ProjectId::class.java)
+        json.writeValue("id", dependencyId, DependencyId::class.java)
         json.writeValue("exclusions", exclusions, List::class.java)
         json.writeObjectEnd()
     }
 }
 
 /**
- * Data retrieved by resolving a wemi.project
+ * Data retrieved by resolving a dependency
  */
-data class ResolvedProject(val id: ProjectId, val artifact: File?, val dependencies: List<ProjectDependency>, val hasError: Boolean)
+data class ResolvedDependency(val id: DependencyId, val artifact: File?, val dependencies: List<Dependency>, val hasError: Boolean)

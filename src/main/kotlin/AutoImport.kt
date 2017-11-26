@@ -14,8 +14,8 @@ typealias Configuration = wemi.Configuration
 typealias Project = wemi.Project
 typealias Scope = wemi.Scope
 typealias Repository = wemi.dependency.Repository
-typealias ProjectId = wemi.dependency.ProjectId
-typealias ProjectDependency = wemi.dependency.ProjectDependency
+typealias ProjectId = wemi.dependency.DependencyId
+typealias ProjectDependency = wemi.dependency.Dependency
 typealias ProjectExclusion = wemi.dependency.ProjectExclusion
 
 typealias File = java.io.File

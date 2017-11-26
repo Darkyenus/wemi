@@ -46,15 +46,15 @@ fun configuration(description: String, parent: Configuration?, initializer: Conf
     return ConfigurationDelegate(description, parent, initializer)
 }
 
-/** Convenience ProjectDependency creator. */
-fun dependency(group: String, name: String, version: String, preferredRepository: Repository?, vararg attributes: Pair<ProjectAttribute, String>): ProjectDependency {
-    return ProjectDependency(ProjectId(group, name, version, preferredRepository, attributes = mapOf(*attributes)))
+/** Convenience Dependency creator. */
+fun dependency(group: String, name: String, version: String, preferredRepository: Repository?, vararg attributes: Pair<ProjectAttribute, String>): Dependency {
+    return Dependency(DependencyId(group, name, version, preferredRepository, attributes = mapOf(*attributes)))
 }
 
-/** Convenience ProjectDependency creator.
+/** Convenience Dependency creator.
  * @param groupNameVersion Gradle-like semicolon separated group, name and version of the dependency.
  *          If the amount of ':'s isn't exactly 2, or one of the triplet is empty, runtime exception is thrown. */
-fun dependency(groupNameVersion: String, preferredRepository: Repository?, vararg attributes: Pair<ProjectAttribute, String>): ProjectDependency {
+fun dependency(groupNameVersion: String, preferredRepository: Repository?, vararg attributes: Pair<ProjectAttribute, String>): Dependency {
     val first = groupNameVersion.indexOf(':')
     val second = groupNameVersion.indexOf(':', startIndex = maxOf(first + 1, 0))
     val third = groupNameVersion.indexOf(':', startIndex = maxOf(second + 1, 0))
@@ -72,14 +72,14 @@ fun dependency(groupNameVersion: String, preferredRepository: Repository?, varar
     return dependency(group, name, version, preferredRepository, *attributes)
 }
 
-fun Scope.kotlinDependency(name: String): ProjectDependency {
-    return ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-" + name, Keys.kotlinVersion.get().string))
+fun Scope.kotlinDependency(name: String): Dependency {
+    return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-" + name, Keys.kotlinVersion.get().string))
 }
 
-val Scope.KotlinStdlib: ProjectDependency
+val Scope.KotlinStdlib: Dependency
     get() = kotlinDependency("stdlib")
 
-val Scope.KotlinReflect: ProjectDependency
+val Scope.KotlinReflect: Dependency
     get() = kotlinDependency("reflect")
 
 fun repository(name: String, url: String, checksum: Repository.M2.Checksum): Repository.M2 {

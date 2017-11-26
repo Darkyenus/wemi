@@ -24,20 +24,20 @@ private val LOG = LoggerFactory.getLogger("MavenDependencyResolver")
  */
 internal object MavenDependencyResolver {
 
-    fun resolveInM2Repository(projectDependency: ProjectDependency, repository: Repository.M2): ResolvedProject {
-        val (project, exclusions) = projectDependency
-        val pom = retrievePom(project, repository) ?: return ResolvedProject(project, null, emptyList(), true)
+    fun resolveInM2Repository(dependency: Dependency, repository: Repository.M2): ResolvedDependency {
+        val (project, exclusions) = dependency
+        val pom = retrievePom(project, repository) ?: return ResolvedDependency(project, null, emptyList(), true)
 
-        val dependencies = pom.dependencies.mapNotNull { (dependency, dependencyExclusions) ->
+        val dependencies = pom.dependencies.mapNotNull { (dependencyId, dependencyExclusions) ->
             if (exclusions.any { rule ->
-                if (rule.excludes(dependency)) {
-                    LOG.debug("Excluded {} with rule {} (dependency of {})", dependency, rule, projectDependency.project)
+                if (rule.excludes(dependencyId)) {
+                    LOG.debug("Excluded {} with rule {} (dependency of {})", dependencyId, rule, dependency.dependencyId)
                     true
                 } else false
             }) {
                 return@mapNotNull null
             } else {
-                return@mapNotNull ProjectDependency(dependency, dependencyExclusions + exclusions)
+                return@mapNotNull Dependency(dependencyId, dependencyExclusions + exclusions)
             }
         }
 
@@ -70,7 +70,7 @@ internal object MavenDependencyResolver {
             }
         }
 
-        return ResolvedProject(project, artifact, dependencies, error)
+        return ResolvedDependency(project, artifact, dependencies, error)
     }
 
     private data class Pom(
@@ -80,7 +80,7 @@ internal object MavenDependencyResolver {
             var packaging: String = "jar"
     ) {
 
-        val dependencies = mutableListOf<ProjectDependency>()
+        val dependencies = mutableListOf<Dependency>()
 
         fun assignParent(pom: Pom) {
             if (groupId == null) {
@@ -214,14 +214,14 @@ internal object MavenDependencyResolver {
         return Pair(response.body, retrievedFile)
     }
 
-    private fun retrievePom(project: ProjectId, repository: Repository.M2): Pom? {
-        return retrievePom(project.pomPath(), project, repository)
+    private fun retrievePom(dependencyId: DependencyId, repository: Repository.M2): Pom? {
+        return retrievePom(dependencyId.pomPath(), dependencyId, repository)
     }
 
-    private fun retrievePom(pomPath: String, project: ProjectId?, repository: Repository.M2): Pom? {
+    private fun retrievePom(pomPath: String, dependencyId: DependencyId?, repository: Repository.M2): Pom? {
         // Create path to pom
         val pomUrl = repository.url / pomPath
-        LOG.debug("Retrieving pom at '{}' in {} for {}", pomPath, repository, project ?: "parent wemi.project")
+        LOG.debug("Retrieving pom at '{}' in {} for {}", pomPath, repository, dependencyId ?: "parent project")
         val pomData = retrieveFile(pomPath, repository)
         if (pomData.first == null) {
             return null
@@ -248,7 +248,7 @@ internal object MavenDependencyResolver {
                 parent = retrievePom(parentPomPath, null, repository)
             }
             if (parent == null) {
-                val parentProjectId = ProjectId(pomBuilder.parentGroupId, pomBuilder.parentArtifactId, pomBuilder.parentVersion)
+                val parentProjectId = DependencyId(pomBuilder.parentGroupId, pomBuilder.parentArtifactId, pomBuilder.parentVersion)
                 LOG.debug("Retrieving parent pom of '{}' by coordinates '{}'", pomPath, parentProjectId)
                 parent = retrievePom(parentProjectId, repository)
             }
@@ -356,13 +356,13 @@ internal object MavenDependencyResolver {
             } else if (atElement(DependencyType)) {
                 lastDependencyAttributes[Repository.M2.M2TypeAttribute] = characters()
             } else if (atElement(Dependency)) {
-                val projectId = ProjectId(lastDependencyGroupId, lastDependencyArtifactId, lastDependencyVersion, attributes = lastDependencyAttributes)
+                val projectId = DependencyId(lastDependencyGroupId, lastDependencyArtifactId, lastDependencyVersion, attributes = lastDependencyAttributes)
                 lastDependencyGroupId = ""
                 lastDependencyArtifactId = ""
                 lastDependencyVersion = ""
                 lastDependencyAttributes = mutableMapOf<ProjectAttribute, String>()
 
-                val pomDependency = ProjectDependency(projectId, lastDependencyExclusions)
+                val pomDependency = Dependency(projectId, lastDependencyExclusions)
                 lastDependencyExclusions = mutableListOf()
 
                 pom.dependencies.add(pomDependency)
@@ -419,51 +419,51 @@ internal object MavenDependencyResolver {
         }
 
         companion object {
-            val ModelVersion = arrayOf("wemi.project", "modelVersion")
+            val ModelVersion = arrayOf("project", "modelVersion")
             val SupportedModelVersion = "4.0.0"
 
-            val GroupId = arrayOf("wemi.project", "groupId")
-            val ArtifactId = arrayOf("wemi.project", "artifactId")
-            val Version = arrayOf("wemi.project", "version")
-            val Packaging = arrayOf("wemi.project", "packaging")
+            val GroupId = arrayOf("project", "groupId")
+            val ArtifactId = arrayOf("project", "artifactId")
+            val Version = arrayOf("project", "version")
+            val Packaging = arrayOf("project", "packaging")
 
-            val Parent = arrayOf("wemi.project", "parent")
-            val ParentGroupId = arrayOf("wemi.project", "parent", "groupId")
-            val ParentArtifactId = arrayOf("wemi.project", "parent", "artifactId")
-            val ParentVersion = arrayOf("wemi.project", "parent", "version")
-            val ParentRelativePath = arrayOf("wemi.project", "parent", "relativePath")
+            val Parent = arrayOf("project", "parent")
+            val ParentGroupId = arrayOf("project", "parent", "groupId")
+            val ParentArtifactId = arrayOf("project", "parent", "artifactId")
+            val ParentVersion = arrayOf("project", "parent", "version")
+            val ParentRelativePath = arrayOf("project", "parent", "relativePath")
 
-            val Dependency = arrayOf("wemi.project", "dependencies", "dependency")
-            val DependencyGroupId = arrayOf("wemi.project", "dependencies", "dependency", "groupId")
-            val DependencyArtifactId = arrayOf("wemi.project", "dependencies", "dependency", "artifactId")
-            val DependencyVersion = arrayOf("wemi.project", "dependencies", "dependency", "version")
-            val DependencyClassifier = arrayOf("wemi.project", "dependencies", "dependency", "classifier")
-            val DependencyOptional = arrayOf("wemi.project", "dependencies", "dependency", "optional")
-            val DependencyScope = arrayOf("wemi.project", "dependencies", "dependency", "scope")
-            val DependencyType = arrayOf("wemi.project", "dependencies", "dependency", "type")
+            val Dependency = arrayOf("project", "dependencies", "dependency")
+            val DependencyGroupId = arrayOf("project", "dependencies", "dependency", "groupId")
+            val DependencyArtifactId = arrayOf("project", "dependencies", "dependency", "artifactId")
+            val DependencyVersion = arrayOf("project", "dependencies", "dependency", "version")
+            val DependencyClassifier = arrayOf("project", "dependencies", "dependency", "classifier")
+            val DependencyOptional = arrayOf("project", "dependencies", "dependency", "optional")
+            val DependencyScope = arrayOf("project", "dependencies", "dependency", "scope")
+            val DependencyType = arrayOf("project", "dependencies", "dependency", "type")
 
-            val DependencyExclusion = arrayOf("wemi.project", "dependencies", "dependency", "exclusions", "exclusion")
-            val DependencyExclusionGroupId = arrayOf("wemi.project", "dependencies", "dependency", "exclusions", "exclusion", "groupId")
-            val DependencyExclusionArtifactId = arrayOf("wemi.project", "dependencies", "dependency", "exclusions", "exclusion", "artifactId")
-            val DependencyExclusionVersion = arrayOf("wemi.project", "dependencies", "dependency", "exclusions", "exclusion", "version")
+            val DependencyExclusion = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion")
+            val DependencyExclusionGroupId = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion", "groupId")
+            val DependencyExclusionArtifactId = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion", "artifactId")
+            val DependencyExclusionVersion = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion", "version")
 
-            val Repo = arrayOf("wemi.project", "repositories", "repository")
-            val RepoReleases = arrayOf("wemi.project", "repositories", "repository", "releases")
-            val RepoSnapshots = arrayOf("wemi.project", "repositories", "repository", "snapshots")
-            val RepoId = arrayOf("wemi.project", "repositories", "repository", "id")
-            val RepoName = arrayOf("wemi.project", "repositories", "repository", "name")
-            val RepoUrl = arrayOf("wemi.project", "repositories", "repository", "url")
-            val RepoLayout = arrayOf("wemi.project", "repositories", "repository", "layout")
+            val Repo = arrayOf("project", "repositories", "repository")
+            val RepoReleases = arrayOf("project", "repositories", "repository", "releases")
+            val RepoSnapshots = arrayOf("project", "repositories", "repository", "snapshots")
+            val RepoId = arrayOf("project", "repositories", "repository", "id")
+            val RepoName = arrayOf("project", "repositories", "repository", "name")
+            val RepoUrl = arrayOf("project", "repositories", "repository", "url")
+            val RepoLayout = arrayOf("project", "repositories", "repository", "layout")
         }
     }
 
-    private fun ProjectId.pomPath(): String {
+    private fun DependencyId.pomPath(): String {
         val sb = group.replace('.', '/') / name / version
         sb.append('/').append(name).append('-').append(version).append(".pom")
         return sb.toString()
     }
 
-    private fun ProjectId.artifactPath(extension: String): String {
+    private fun DependencyId.artifactPath(extension: String): String {
         val fileName = StringBuilder()
         fileName.append(name).append('-').append(version)
         val classifier = attributes[Repository.M2.M2ClassifierAttribute]

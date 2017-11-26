@@ -10,11 +10,11 @@ object DependencyResolver {
 
     private val LOG = LoggerFactory.getLogger(DependencyResolver.javaClass)
 
-    fun resolveProject(projectDependency: ProjectDependency, repositories: RepositoryChain): ResolvedProject {
-        LOG.debug("Resolving {}", projectDependency)
+    fun resolveSingleDependency(dependency: Dependency, repositories: RepositoryChain): ResolvedDependency {
+        LOG.debug("Resolving {}", dependency)
         // Try preferred repository first
-        if (projectDependency.project.preferredRepository != null) {
-            val resolved = resolveInRepository(projectDependency, projectDependency.project.preferredRepository)
+        if (dependency.dependencyId.preferredRepository != null) {
+            val resolved = resolveInRepository(dependency, dependency.dependencyId.preferredRepository)
             if (!resolved.hasError) {
                 LOG.debug("Resolution success {}", resolved)
                 return resolved
@@ -22,29 +22,29 @@ object DependencyResolver {
         }
         // Try ordered repositories
         for (repository in repositories) {
-            val resolved = resolveInRepository(projectDependency, repository)
+            val resolved = resolveInRepository(dependency, repository)
             if (!resolved.hasError) {
                 LOG.debug("Resolution success {}", resolved)
                 return resolved
             }
         }
         // Fail
-        LOG.warn("Failed to resolve {}", projectDependency.project)//TODO make this debug and report elsewhere
-        return ResolvedProject(projectDependency.project, null, emptyList(), true)
+        LOG.warn("Failed to resolve {}", dependency.dependencyId)//TODO make this debug and report elsewhere
+        return ResolvedDependency(dependency.dependencyId, null, emptyList(), true)
     }
 
-    private fun doResolveArtifacts(resolved: MutableMap<ProjectId, ResolvedProject>,
-                                   dependency: ProjectDependency, repositories: RepositoryChain,
-                                   mapper:(ProjectDependency) -> ProjectDependency): Boolean {
-        if (resolved.contains(dependency.project)) {
+    private fun doResolveArtifacts(resolved: MutableMap<DependencyId, ResolvedDependency>,
+                                   dependency: Dependency, repositories: RepositoryChain,
+                                   mapper:(Dependency) -> Dependency): Boolean {
+        if (resolved.contains(dependency.dependencyId)) {
             return true
         }
 
-        val resolvedProject = resolveProject(mapper(dependency), repositories)
+        val resolvedProject = resolveSingleDependency(mapper(dependency), repositories)
         if (resolvedProject.hasError) {
             return false
         }
-        resolved.put(dependency.project, resolvedProject)
+        resolved.put(dependency.dependencyId, resolvedProject)
 
         var ok = true
         for (transitiveDependency in resolvedProject.dependencies) {
@@ -53,8 +53,8 @@ object DependencyResolver {
         return ok
     }
 
-    fun resolveArtifacts(projects: Collection<ProjectDependency>, repositories: RepositoryChain): List<File>? {
-        val resolved = mutableMapOf<ProjectId, ResolvedProject>()
+    fun resolveArtifacts(projects: Collection<Dependency>, repositories: RepositoryChain): List<File>? {
+        val resolved = mutableMapOf<DependencyId, ResolvedDependency>()
         val ok = resolve(resolved, projects, repositories, {it})
 
         if (!ok) {
@@ -64,7 +64,7 @@ object DependencyResolver {
         return resolved.mapNotNull { it.value.artifact }
     }
 
-    fun resolve(resolved:MutableMap<ProjectId, ResolvedProject>, projects: Collection<ProjectDependency>, repositories: RepositoryChain, mapper:((ProjectDependency) -> ProjectDependency)): Boolean {
+    fun resolve(resolved:MutableMap<DependencyId, ResolvedDependency>, projects: Collection<Dependency>, repositories: RepositoryChain, mapper:((Dependency) -> Dependency)): Boolean {
         var ok = true
 
         for (project in projects) {
@@ -74,12 +74,12 @@ object DependencyResolver {
         return ok
     }
 
-    private fun resolveInRepository(projectDependency: ProjectDependency, repository: Repository): ResolvedProject {
+    private fun resolveInRepository(dependency: Dependency, repository: Repository): ResolvedDependency {
         LOG.debug("Trying in {}", repository)
 
         return when (repository) {
             is Repository.M2 -> {
-                MavenDependencyResolver.resolveInM2Repository(projectDependency, repository)
+                MavenDependencyResolver.resolveInM2Repository(dependency, repository)
             }
         }
     }

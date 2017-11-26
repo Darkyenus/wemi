@@ -201,6 +201,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             val moduleData = ModuleData(name, WemiProjectSystemId, StdModuleTypes.JAVA.id, name, buildFolder, projectPath)
             moduleData.isInheritProjectCompileOutputPath = false
             moduleData.setCompileOutputPath(ExternalSystemSourceType.SOURCE, File(scriptJar).parent)
+            moduleData.targetCompatibility = "1.8" // Using kotlin, but just for some sensible defaults
+            moduleData.sourceCompatibility = "1.8" // Using kotlin, but just for some sensible defaults
 
             // Module Node
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, moduleData)
@@ -251,9 +253,12 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
     }
 
     private fun createWemiProjectData(session: WemiLauncherSession, projectName:String):WemiProjectData {
-        val compilerOptions = session.jsonArray(projectName, task = "compilerOptions")
+        val compilerOptions = session.jsonArray(projectName, task = "compilerOptions", configurations = "compilingJava")
         return WemiProjectData(
                 projectName,
+                session.string(projectName, task = "projectName"),
+                session.string(projectName, task = "projectGroup"),
+                session.string(projectName, task = "projectVersion"),
                 session.string(projectName, task = "projectRoot"),
                 compilerOptions.let {
                     it.mapGet("sourceVersion")?.asString() ?: ""
@@ -419,6 +424,9 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
     private class WemiProjectData(
             val name:String,
+            val artifactName:String,
+            val artifactGroup:String,
+            val artifactVersion:String,
             val rootPath:String,
             val javaSourceVersion:String,
             val javaTargetVersion:String,
@@ -443,6 +451,9 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             data.setCompileOutputPath(ExternalSystemSourceType.TEST, classOutputTesting)
             data.sourceCompatibility = javaSourceVersion
             data.targetCompatibility = javaTargetVersion
+            data.externalName = artifactName
+            data.group = artifactGroup
+            data.version = artifactVersion
             return data
         }
 

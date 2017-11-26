@@ -31,10 +31,10 @@ class ProjectDelegate internal constructor(
         synchronized(BuildScriptData.AllProjects) {
             for ((_, project) in BuildScriptData.AllProjects) {
                 if (project.name == this.project.name) {
-                    throw WemiException("wemi.Project named '${this.project.name}' already exists (at ${project.projectRoot})")
+                    throw WemiException("Project named '${this.project.name}' already exists (at ${project.projectRoot})")
                 }
                 if (project.projectRoot == this.project.projectRoot) {
-                    LOG.warn("wemi.Project ${this.project.name} is at the same location as wemi.project ${project.name}")
+                    LOG.warn("Project ${this.project.name} is at the same location as project ${project.name}")
                 }
             }
             BuildScriptData.AllProjects.put(project.name, project)
@@ -105,9 +105,7 @@ class ConfigurationDelegate internal constructor(
 open class ScopeCache internal constructor(internal val bindingHolder: BindingHolder,
                                                                    internal val parentScope:Scope?) {
 
-    private val scopes:MutableMap<Configuration, ConfigurationScope> by lazy(LazyThreadSafetyMode.PUBLICATION) {
-        mutableMapOf<Configuration, ConfigurationScope>()
-    }
+    private val scopes:MutableMap<Configuration, ConfigurationScope> = mutableMapOf()
 
     private var valueCache:MutableMap<Key<*>, Any?>? = null
 
@@ -115,7 +113,24 @@ open class ScopeCache internal constructor(internal val bindingHolder: BindingHo
         val scopes = scopes
         synchronized(scopes) {
             return scopes.getOrPut(configuration) {
-                val realHolder = bindingHolder.configurationExtensions[configuration] ?: configuration
+                // Resolve configuration extension, checking even parent scopes
+                val realHolder:BindingHolder
+
+                var scope:ScopeCache = this
+                while (true) {
+                    val extension = scope.bindingHolder.configurationExtensions[configuration]
+                    if (extension != null) {
+                        realHolder = extension
+                        break
+                    }
+                    val parentScope = scope.parentScope
+                    if (parentScope == null) {
+                        realHolder = configuration
+                        break
+                    }
+                    scope = parentScope.scopeCache
+                }
+
                 ConfigurationScope(configuration, realHolder, me)
             }
         }

@@ -10,7 +10,7 @@ import java.net.URL
 
 private val LOG = LoggerFactory.getLogger("BuildFiles")
 
-val BuildFileStdLib = ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-stdlib", WemiKotlinVersion.string))
+val BuildFileStdLib = Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-stdlib", WemiKotlinVersion.string))
 
 val WemiBuildFileExtensions = listOf("wemi", "wemi.kt")
 
@@ -171,7 +171,7 @@ private val LibraryDirectiveRegex = "(\\S+)\\s*:\\s*(\\S+)\\s*:\\s*(\\S+)".toReg
 class BuildScriptClasspathConfiguration(private val buildScriptSources:List<File>) {
     private var _repositories : List<Repository>? = null
     private var _repositoryChain : RepositoryChain? = null
-    private var _dependencies : List<ProjectDependency>? = null
+    private var _dependencies : List<Dependency>? = null
 
     private fun resolve() {
         val repositories = mutableListOf<Repository>()
@@ -193,7 +193,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources:List<File
                             LOG.warn("{}:{} Invalid dependency directive \"{}\". (Example: 'com.example:my-project:1.0')", buildScriptSources, lineNumber, value)
                         } else {
                             val (group, name, version) = match.destructured
-                            buildDependencyLibraries.add(ProjectDependency(ProjectId(group, name, version)))
+                            buildDependencyLibraries.add(Dependency(DependencyId(group, name, version)))
                         }
                     }
                     "repository" -> {
@@ -233,7 +233,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources:List<File
             return _repositoryChain!!
         }
 
-    val dependencies : List<ProjectDependency>
+    val dependencies : List<Dependency>
         get() {
             if (_dependencies == null) {
                 resolve()

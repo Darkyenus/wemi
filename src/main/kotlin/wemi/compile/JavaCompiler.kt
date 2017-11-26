@@ -25,4 +25,6 @@ enum class JavaVersion(val version:String) : MachineWritable {
     override fun writeMachine(json: Json) {
         json.writeValue(version as Any, String::class.java)
     }
+
+    override fun toString(): String = version
 }

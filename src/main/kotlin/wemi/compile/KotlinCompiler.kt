@@ -37,9 +37,9 @@ enum class KotlinCompilerVersion(val string:String, internal val implementationC
     override fun toString(): String = string
 }
 
-private val KotlinCompilerImplementationDependenciesByVersion:Map<KotlinCompilerVersion, Collection<ProjectDependency>> = mapOf(
+private val KotlinCompilerImplementationDependenciesByVersion:Map<KotlinCompilerVersion, Collection<Dependency>> = mapOf(
         KotlinCompilerVersion.Version1_1_4 to listOf(
-                ProjectDependency(ProjectId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4"))
+                Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4"))
         )
 )
 

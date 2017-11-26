@@ -1,5 +1,9 @@
 # Things to do next
 
+1. Import WEMI project directly
+
+1. New project wizard
+
 1. Allow projects to inherit from parent project configuration/config set
 	- Maybe simple "setup function" would be enough...
 

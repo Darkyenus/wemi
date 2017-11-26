@@ -148,7 +148,7 @@ fun main(args: Array<String>) {
 
     // Load build files now
     if (buildFile != null) {
-        val urls = arrayOfNulls<URL>(2 + buildFile.classpath.size)
+        val urls = arrayOfNulls<URL>(1 + buildFile.classpath.size)
         urls[0] = buildFile.scriptJar.toURI().toURL()
         var i = 1
         for (file in buildFile.classpath) {

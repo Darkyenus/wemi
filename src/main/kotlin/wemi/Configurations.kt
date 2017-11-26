@@ -7,7 +7,7 @@ import wemi.compile.JavaCompilerFlags
 import wemi.compile.JavaSourceFileExtensions
 import wemi.compile.KotlinSourceFileExtensions
 import wemi.compile.kotlinCompiler
-import wemi.dependency.ProjectDependency
+import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.M2ClassifierAttribute
 import javax.tools.ToolProvider
 
@@ -34,18 +34,18 @@ object Configurations {
     //region IDE configurations
     val retrievingSources by configuration("Used to retrieve sources") {
         Keys.libraryDependencyProjectMapper set {
-            {(projectId, exclusions):ProjectDependency ->
+            {(projectId, exclusions): Dependency ->
                 val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (M2ClassifierAttribute to "sources"))
-                ProjectDependency(sourcesProjectId, exclusions)
+                Dependency(sourcesProjectId, exclusions)
             }
         }
     }
 
     val retrievingDocs by configuration("Used to retrieve docs") {
         Keys.libraryDependencyProjectMapper set {
-            {(projectId, exclusions):ProjectDependency ->
+            {(projectId, exclusions): Dependency ->
                 val javadocProjectId = projectId.copy(attributes = projectId.attributes + (M2ClassifierAttribute to "javadoc"))
-                ProjectDependency(javadocProjectId, exclusions)
+                Dependency(javadocProjectId, exclusions)
             }
         }
     }

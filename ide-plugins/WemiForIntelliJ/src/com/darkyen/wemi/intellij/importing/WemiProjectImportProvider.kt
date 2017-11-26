@@ -12,13 +12,19 @@ import com.intellij.openapi.vfs.VirtualFile
  */
 class WemiProjectImportProvider(builder: ImportFromWemiControlBuilder) : AbstractExternalProjectImportProvider(builder, WemiProjectSystemId) {
 
-    override fun canCreateNewProject(): Boolean = true
+    override fun canCreateNewProject(): Boolean {
+        return true
+    }
 
-    override fun canImportModule(): Boolean = false
+    override fun canImportModule(): Boolean {
+        return true
+    }
 
     override fun canImport(fileOrDirectory: VirtualFile, project: Project?): Boolean {
         return super.canImport(fileOrDirectory, project)
     }
 
-    override fun getFileSample() = "<b>WEMI</b> build script (build.wemi)"
+    override fun getFileSample(): String {
+        return "<b>WEMI</b> build script (build.wemi)"
+    }
 }

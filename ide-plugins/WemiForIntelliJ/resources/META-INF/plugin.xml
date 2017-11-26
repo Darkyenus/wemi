@@ -54,6 +54,7 @@
 
         <projectConfigurable groupId="build.tools" id="com.darkyen.wemi.configurable-settings"
                              instance="com.darkyen.wemi.intellij.settings.WemiConfigurable"/>
+        <externalSystemConfigLocator implementation="com.darkyen.wemi.intellij.manager.WemiConfigLocator"/>
 
         <!-- Execution -->
         <configurationType implementation="com.darkyen.wemi.intellij.execution.WemiTaskConfigurationType"/>
