@@ -57,12 +57,13 @@ class KeyDelegate<Value> internal constructor(
         private val description:String,
         private val hasDefaultValue:Boolean,
         private val defaultValue:Value?,
-        private val cached:Boolean) : ReadOnlyProperty<Any?, Key<Value>> {
+        private val cached:Boolean,
+        private val prettyPrinter:((Value) -> CharSequence)?) : ReadOnlyProperty<Any?, Key<Value>> {
 
     private lateinit var key: Key<Value>
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): KeyDelegate<Value> {
-        this.key = Key(property.name, description, hasDefaultValue, defaultValue, cached)
+        this.key = Key(property.name, description, hasDefaultValue, defaultValue, cached, prettyPrinter)
         @Suppress("UNCHECKED_CAST")
         synchronized(BuildScriptData.AllKeys) {
             val existing = BuildScriptData.AllKeys[this.key.name]

@@ -2,9 +2,8 @@ package wemi.boot
 
 import com.darkyen.tproll.TPLogger
 import com.darkyen.tproll.integration.JavaLoggingIntegration
-import com.darkyen.tproll.logfunctions.ConsoleLogFunction
-import com.darkyen.tproll.logfunctions.FileLogFunction
-import com.darkyen.tproll.logfunctions.LogFunctionMultiplexer
+import com.darkyen.tproll.logfunctions.*
+import com.darkyen.tproll.util.TimeFormatter
 import org.slf4j.LoggerFactory
 import wemi.Configurations
 import wemi.WemiVersion
@@ -13,6 +12,7 @@ import wemi.util.div
 import java.io.*
 import java.net.URL
 import java.net.URLClassLoader
+import java.time.Duration
 import kotlin.system.exitProcess
 
 private val LOG = LoggerFactory.getLogger("Main")
@@ -125,6 +125,7 @@ fun main(args: Array<String>) {
     val buildFolder = root / "build"
     val buildScriptSources = findBuildScriptSources(buildFolder)
 
+    // Setup logging
     val consoleLogger = ConsoleLogFunction(null, null)
     if (buildScriptSources.isEmpty()) {
         LOG.warn("No build files found")
@@ -134,7 +135,17 @@ fun main(args: Array<String>) {
         LOG.debug("{} build file(s) found", buildScriptSources.size)
 
         TPLogger.setLogFunction(LogFunctionMultiplexer(
-                FileLogFunction(buildFolder / "logs"),
+                FileLogFunction(TimeFormatter.AbsoluteTimeFormatter(),
+                        LogFileHandler(
+                                buildFolder / "logs",
+                                DateTimeFileCreationStrategy(
+                                        DateTimeFileCreationStrategy.DEFAULT_DATE_TIME_FILE_NAME_FORMATTER,
+                                        false,
+                                        DateTimeFileCreationStrategy.DEFAULT_LOG_FILE_EXTENSION,
+                                        1024L,
+                                        Duration.ofDays(60)),
+                                false),
+                        true),
                 consoleLogger
         ))
     }

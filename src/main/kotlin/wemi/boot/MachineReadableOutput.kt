@@ -78,7 +78,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task:String) {
     }
 
     try {
-        val (data, status) = CLI.evaluateKey(task)
+        val (_, data, status) = CLI.evaluateKey(task)
         when (status) {
             CLI.KeyEvaluationStatus.Success -> {
                 machineReadablePrint(out, data)

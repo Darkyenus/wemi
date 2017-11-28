@@ -11,14 +11,15 @@ import wemi.util.WithDescriptiveString
 import java.io.File
 
 /** wemi.Key which can have value of type [Value] assigned, through [Project] or [Configuration]. */
-class Key<out Value> internal constructor(val name:String,
+class Key<Value> internal constructor(val name:String,
                                           val description:String,
                                           /** True if defaultValue is set, false if not.
                                            * Needed, because we don't know whether or not is [Value] nullable
                                            * or not, so we need to know if we should return null or not. */
                                           internal val hasDefaultValue:Boolean,
                                           internal val defaultValue:Value?,
-                                          internal val cached:Boolean) : WithDescriptiveString, MachineWritable {
+                                          internal val cached:Boolean,
+                                          internal val prettyPrinter:((Value) -> CharSequence)?) : WithDescriptiveString, MachineWritable {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

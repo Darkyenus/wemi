@@ -29,6 +29,12 @@ libraryDependencies += "org.jetbrains.kotlin" % "kotlin-compiler" % "1.1.4" % Pr
 
 libraryDependencies += "org.jline" % "jline" % "3.3.0"
 
+libraryDependencies += "junit" % "junit" % "4.12" % Test
+
+libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % Test
+
+testOptions in Test := Seq(Tests.Argument(TestFrameworks.JUnit, "-a"))
+
 assemblyMergeStrategy in assembly := {stuff => if (stuff.endsWith(".kotlin_module")) {
   MergeStrategy.deduplicate
 } else if (stuff.equals("META-INF/MANIFEST.MF")) {

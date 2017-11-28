@@ -79,14 +79,14 @@ object KeyDefaults {
     val ExternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
         val resolved = Keys.resolvedLibraryDependencies.get()
         if (!resolved.complete) {
-            throw WemiException("Failed to resolve all artifacts")
+            throw WemiException("Failed to resolve all artifacts\n${resolved.value.prettyPrint(emptyList<DependencyId>())}")
         }
         val unmanaged = Keys.unmanagedDependencies.get()
 
         val result = mutableListOf<LocatedFile>()
         result.addAll(unmanaged)
-        for (entry in resolved.value) {
-            result.add(LocatedFile(entry.value.artifact ?: continue))
+        for ((_, resolvedDependency) in resolved.value) {
+            result.add(LocatedFile(resolvedDependency.artifact ?: continue))
         }
         result
     }
@@ -271,9 +271,9 @@ object KeyDefaults {
             }
         }
     }
-    val AssemblyRenameFunction: BoundKeyValue<(File, String) -> String?> = {
+    val AssemblyRenameFunction: BoundKeyValue<(AssemblySource, String) -> String?> = {
         { root, name ->
-            val injectedName = root.nameWithoutExtension
+            val injectedName = root.name
             val extensionSeparator = name.lastIndexOf('.')
             if (extensionSeparator == -1) {
                 name + '_' + injectedName

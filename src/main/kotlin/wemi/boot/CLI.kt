@@ -137,27 +137,45 @@ object CLI {
 
     fun evaluateKeyAndPrint(text: String) {
         val beginTime = System.currentTimeMillis()
-        val (data, status) = evaluateKey(text)
+        val (key, data, status) = evaluateKey(text)
         val duration = System.currentTimeMillis() - beginTime
 
-        when (status) {
+        base@when (status) {
             CLI.KeyEvaluationStatus.Success -> {
                 print(formatLabel("Done "))
                 print(formatInput(text))
-                @Suppress("CascadeIf")
-                if (data == null) {
-                    println()
-                    // Done
-                } else if (data is Collection<*>){
-                    print(formatLabel(" ("))
-                    print(data.size)
-                    println(formatLabel("): "))
-                    for (item:Any? in data) {
-                        println("  "+ formatValue(item.toString()))
+                @Suppress("UNCHECKED_CAST")
+                val prettyPrinter:((Any?) -> CharSequence)? = key?.prettyPrinter as ((Any?) -> CharSequence)?
+
+                if (prettyPrinter != null) {
+                    val printed: CharSequence? =
+                        try {
+                            prettyPrinter(data)
+                        } catch (e:Exception) {
+                            null
+                        }
+
+                    if (printed != null) {
+                        println(formatLabel(": "))
+                        println(printed)
+                        return@base
                     }
-                } else {
-                    print(formatLabel(": "))
-                    println(formatValue(data.toString()))
+                }
+
+                when (data) {
+                    null -> println()
+                    is Collection<*> -> {
+                        print(formatLabel(" ("))
+                        print(data.size)
+                        println(formatLabel("): "))
+                        for (item:Any? in data) {
+                            println("  "+ formatValue(item.toString()))
+                        }
+                    }
+                    else -> {
+                        print(formatLabel(": "))
+                        println(formatValue(data.toString()))
+                    }
                 }
             }
             CLI.KeyEvaluationStatus.NoProject -> {
@@ -219,7 +237,7 @@ object CLI {
         Exception
     }
 
-    data class KeyEvaluationResult(val data:Any?, val status: KeyEvaluationStatus)
+    data class KeyEvaluationResult(val key:Key<*>?, val data:Any?, val status: KeyEvaluationStatus)
 
     /**
      * Evaluates given command. Syntax is:
@@ -241,11 +259,11 @@ object CLI {
             val projectString = text.substring(offset, projectSlashIndex)
             project = AllProjects.findCaseInsensitive(projectString)
             if (project == null) {
-                return KeyEvaluationResult(projectString, KeyEvaluationStatus.NoProject)
+                return KeyEvaluationResult(null, projectString, KeyEvaluationStatus.NoProject)
             }
             offset = projectSlashIndex + 1
         } else if (project == null) {
-            return KeyEvaluationResult(null, KeyEvaluationStatus.NoProject)
+            return KeyEvaluationResult(null,null, KeyEvaluationStatus.NoProject)
         }
 
         // Parse Configurations
@@ -256,23 +274,23 @@ object CLI {
             }
 
             val configString = text.substring(offset, nextConfigEnd)
-            val config = AllConfigurations.findCaseInsensitive(configString) ?: return KeyEvaluationResult(configString, KeyEvaluationStatus.NoConfiguration)
+            val config = AllConfigurations.findCaseInsensitive(configString) ?: return KeyEvaluationResult(null, configString, KeyEvaluationStatus.NoConfiguration)
             configurations.add(config)
             offset = nextConfigEnd + 1
         }
 
         // Parse Key
         val keyString = text.substring(offset)
-        val key = AllKeys.findCaseInsensitive(keyString) ?: return KeyEvaluationResult(keyString, KeyEvaluationStatus.NoKey)
+        val key = AllKeys.findCaseInsensitive(keyString) ?: return KeyEvaluationResult(null, keyString, KeyEvaluationStatus.NoKey)
 
         return try {
-            KeyEvaluationResult(project.projectScope.run {
+            KeyEvaluationResult(key, project.projectScope.run {
                 evaluateInNestedScope(key, configurations, 0)
             }, KeyEvaluationStatus.Success)
         } catch (e: WemiException.KeyNotAssignedException) {
-            KeyEvaluationResult(e, KeyEvaluationStatus.NotAssigned)
+            KeyEvaluationResult(key, e, KeyEvaluationStatus.NotAssigned)
         } catch (e: WemiException) {
-            KeyEvaluationResult(e, KeyEvaluationStatus.Exception)
+            KeyEvaluationResult(key, e, KeyEvaluationStatus.Exception)
         }
     }
 
@@ -415,5 +433,4 @@ object CLI {
         print(ByeBodies.random())
         println(ByeSuffixes.random())
     }
-
 }

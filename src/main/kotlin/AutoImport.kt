@@ -1,6 +1,6 @@
 @file:Suppress("NOTHING_TO_INLINE", "unused")
 
-import wemi.dependency.ProjectAttribute
+import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository
 import wemi.kotlinDependency as _kotlinDependency
 
@@ -16,7 +16,7 @@ typealias Scope = wemi.Scope
 typealias Repository = wemi.dependency.Repository
 typealias ProjectId = wemi.dependency.DependencyId
 typealias ProjectDependency = wemi.dependency.Dependency
-typealias ProjectExclusion = wemi.dependency.ProjectExclusion
+typealias ProjectExclusion = wemi.dependency.DependencyExclusion
 
 typealias File = java.io.File
 
@@ -26,8 +26,8 @@ inline fun project(projectRoot: File = File("."), noinline initializer: Project.
 inline fun <Value> key(description: String, defaultValue: Value, cached: Boolean = false) = wemi.key(description, defaultValue, cached)
 inline fun <Value> key(description: String, cached: Boolean = false) = wemi.key<Value>(description, cached)
 inline fun configuration(description: String, parent: Configuration? = null, noinline initializer: Configuration.() -> Unit) = wemi.configuration(description, parent, initializer)
-inline fun dependency(group: String, name: String, version: String, preferredRepository: Repository? = null, vararg attributes: Pair<ProjectAttribute, String>) = wemi.dependency(group, name, version, preferredRepository, *attributes)
-inline fun dependency(groupNameVersion: String, preferredRepository: Repository? = null, vararg attributes: Pair<ProjectAttribute, String>) = wemi.dependency(groupNameVersion, preferredRepository, *attributes)
+inline fun dependency(group: String, name: String, version: String, preferredRepository: Repository? = null, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(group, name, version, preferredRepository, *attributes)
+inline fun dependency(groupNameVersion: String, preferredRepository: Repository? = null, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(groupNameVersion, preferredRepository, *attributes)
 inline fun Scope.kotlinDependency(name: String) = _kotlinDependency(name)
 inline fun repository(name: String, url: String, checksum: Repository.M2.Checksum = Repository.M2.Checksum.SHA1) = wemi.repository(name, url, checksum)
 

@@ -37,7 +37,9 @@ object Keys {
     val repositoryChain by key<RepositoryChain>("ADVANCED - Resolved repository chain from 'repositories'")
     val libraryDependencies by key<Collection<Dependency>>("Libraries that the project depends on")
     val libraryDependencyProjectMapper by key<(Dependency) -> Dependency>("Function applied to ProjectDependencies encountered while resolving. Used for example when retrieving sources.", defaultValue = {it})
-    val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.")
+    val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved ->
+        resolved.value.prettyPrint(emptyList<DependencyId>())
+    })
     val unmanagedDependencies by key<Collection<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers")
     val externalClasspath by key<Collection<LocatedFile>>("External classpath of the project, usually dependencies", cached = true)
     val internalClasspath by key<Collection<LocatedFile>>("Internal classpath of the project, usually compiled sources and resources")

@@ -34,12 +34,12 @@ fun project(projectRoot: java.io.File, initializer: Project.() -> Unit): Project
     return ProjectDelegate(projectRoot, initializer)
 }
 
-fun <Value> key(description: String, defaultValue: Value, cached: Boolean = false): KeyDelegate<Value> {
-    return KeyDelegate(description, true, defaultValue, cached)
+fun <Value> key(description: String, defaultValue: Value, cached: Boolean = false, prettyPrinter:((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+    return KeyDelegate(description, true, defaultValue, cached, prettyPrinter)
 }
 
-fun <Value> key(description: String, cached: Boolean = false): KeyDelegate<Value> {
-    return KeyDelegate(description, false, null, cached)
+fun <Value> key(description: String, cached: Boolean = false, prettyPrinter:((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+    return KeyDelegate(description, false, null, cached, prettyPrinter)
 }
 
 fun configuration(description: String, parent: Configuration?, initializer: Configuration.() -> Unit): ConfigurationDelegate {
@@ -47,14 +47,14 @@ fun configuration(description: String, parent: Configuration?, initializer: Conf
 }
 
 /** Convenience Dependency creator. */
-fun dependency(group: String, name: String, version: String, preferredRepository: Repository?, vararg attributes: Pair<ProjectAttribute, String>): Dependency {
+fun dependency(group: String, name: String, version: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>): Dependency {
     return Dependency(DependencyId(group, name, version, preferredRepository, attributes = mapOf(*attributes)))
 }
 
 /** Convenience Dependency creator.
  * @param groupNameVersion Gradle-like semicolon separated group, name and version of the dependency.
  *          If the amount of ':'s isn't exactly 2, or one of the triplet is empty, runtime exception is thrown. */
-fun dependency(groupNameVersion: String, preferredRepository: Repository?, vararg attributes: Pair<ProjectAttribute, String>): Dependency {
+fun dependency(groupNameVersion: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>): Dependency {
     val first = groupNameVersion.indexOf(':')
     val second = groupNameVersion.indexOf(':', startIndex = maxOf(first + 1, 0))
     val third = groupNameVersion.indexOf(':', startIndex = maxOf(second + 1, 0))

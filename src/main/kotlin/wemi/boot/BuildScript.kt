@@ -4,6 +4,7 @@ import org.slf4j.LoggerFactory
 import wemi.WemiKotlinVersion
 import wemi.compile.*
 import wemi.dependency.*
+import wemi.dependency.DependencyResolver.artifacts
 import wemi.util.*
 import java.io.File
 import java.net.URL
@@ -115,12 +116,13 @@ fun getCompiledBuildScript(buildFolder: File, buildScriptSources:List<File>, for
         val wemiLauncherJar = wemiLauncherFileWithJarExtension(cacheFolder)
 
         classpath.add(wemiLauncherJar)
-        val artifacts = DependencyResolver.resolveArtifacts(classpathConfiguration.dependencies, classpathConfiguration.repositoryChain)
-        if (artifacts == null) {
-            LOG.warn("Failed to retrieve all build file dependencies for {}", buildScriptSources)
+        val resolved = HashMap<DependencyId, ResolvedDependency>()
+        val resolutionOk = DependencyResolver.resolve(resolved, classpathConfiguration.dependencies, classpathConfiguration.repositoryChain)
+        if (!resolutionOk) {
+            LOG.warn("Failed to retrieve all build file dependencies for {}:\n{}", buildScriptSources, resolved.prettyPrint(classpathConfiguration.dependencies))
             return null
         }
-        classpath.addAll(artifacts)
+        classpath.addAll(resolved.artifacts())
 
         LOG.debug("Compiling sources: {} classpath: {} resultJar: {} buildFlags: {}", sources, classpath, resultJar, buildFlags)
 

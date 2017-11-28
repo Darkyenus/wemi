@@ -10,27 +10,57 @@ object DependencyResolver {
 
     private val LOG = LoggerFactory.getLogger(DependencyResolver.javaClass)
 
+    @Suppress("NOTHING_TO_INLINE")
+    private inline fun StringBuilder?.tried(repo:Repository):StringBuilder {
+        val sb = this?: StringBuilder()
+
+        if (sb.isEmpty()) {
+            sb.append("tried: ").append(repo.name)
+        } else {
+            sb.append(", ").append(repo.name)
+        }
+
+        return sb
+    }
+
     fun resolveSingleDependency(dependency: Dependency, repositories: RepositoryChain): ResolvedDependency {
+        var log:StringBuilder? = null
+
         LOG.debug("Resolving {}", dependency)
         // Try preferred repository first
         if (dependency.dependencyId.preferredRepository != null) {
-            val resolved = resolveInRepository(dependency, dependency.dependencyId.preferredRepository)
+            LOG.debug("Trying in {}", dependency.dependencyId.preferredRepository)
+            val resolved = when (dependency.dependencyId.preferredRepository) {
+                is Repository.M2 -> {
+                    MavenDependencyResolver.resolveInM2Repository(dependency, dependency.dependencyId.preferredRepository, repositories)
+                }
+            }
             if (!resolved.hasError) {
                 LOG.debug("Resolution success {}", resolved)
                 return resolved
+            } else {
+                log = log.tried(dependency.dependencyId.preferredRepository)
             }
         }
         // Try ordered repositories
         for (repository in repositories) {
-            val resolved = resolveInRepository(dependency, repository)
+            LOG.debug("Trying in {}", repository)
+            val resolved = when (repository) {
+                is Repository.M2 -> {
+                    MavenDependencyResolver.resolveInM2Repository(dependency, repository, repositories)
+                }
+            }
             if (!resolved.hasError) {
                 LOG.debug("Resolution success {}", resolved)
                 return resolved
+            } else {
+                log = log.tried(repository)
             }
         }
+
         // Fail
-        LOG.warn("Failed to resolve {}", dependency.dependencyId)//TODO make this debug and report elsewhere
-        return ResolvedDependency(dependency.dependencyId, null, emptyList(), true)
+        LOG.debug("Failed to resolve {}", dependency.dependencyId)
+        return ResolvedDependency(dependency.dependencyId, emptyList(), null, true, log?:"no repositories to search in")
     }
 
     private fun doResolveArtifacts(resolved: MutableMap<DependencyId, ResolvedDependency>,
@@ -55,16 +85,20 @@ object DependencyResolver {
 
     fun resolveArtifacts(projects: Collection<Dependency>, repositories: RepositoryChain): List<File>? {
         val resolved = mutableMapOf<DependencyId, ResolvedDependency>()
-        val ok = resolve(resolved, projects, repositories, {it})
+        val ok = resolve(resolved, projects, repositories)
 
         if (!ok) {
             return null
         }
 
-        return resolved.mapNotNull { it.value.artifact }
+        return resolved.artifacts()
     }
 
-    fun resolve(resolved:MutableMap<DependencyId, ResolvedDependency>, projects: Collection<Dependency>, repositories: RepositoryChain, mapper:((Dependency) -> Dependency)): Boolean {
+    fun Map<DependencyId, ResolvedDependency>.artifacts():List<File> {
+        return mapNotNull { it.value.artifact }
+    }
+
+    fun resolve(resolved:MutableMap<DependencyId, ResolvedDependency>, projects: Collection<Dependency>, repositories: RepositoryChain, mapper:((Dependency) -> Dependency) = {it}): Boolean {
         var ok = true
 
         for (project in projects) {
@@ -74,13 +108,4 @@ object DependencyResolver {
         return ok
     }
 
-    private fun resolveInRepository(dependency: Dependency, repository: Repository): ResolvedDependency {
-        LOG.debug("Trying in {}", repository)
-
-        return when (repository) {
-            is Repository.M2 -> {
-                MavenDependencyResolver.resolveInM2Repository(dependency, repository)
-            }
-        }
-    }
 }
