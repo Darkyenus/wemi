@@ -238,7 +238,9 @@ internal object MavenDependencyResolver {
 
             try {
                 // Retrieve checksum
-                val expectedChecksumString = webb.get((repository.url / (path + checksum.suffix)).toExternalForm()).executeString().body
+                val expectedChecksumData = webb.get((repository.url / (path + checksum.suffix)).toExternalForm()).executeString().body
+                // Checksum files sometimes also contain filename after hash, separated by whitespace
+                val expectedChecksumString = expectedChecksumData.takeWhile { !it.isWhitespace() }
                 val expectedChecksum = fromHexString(expectedChecksumString)
 
                 if (expectedChecksum == null) {
@@ -545,7 +547,7 @@ internal object MavenDependencyResolver {
             } else if (atElement(RepoLayout)) {
 
             } else if (atElement(Repo)) {
-                LOG.warn("Pom at {} uses custom repositories, which are not supported yet", pomUrl)
+                LOG.debug("Pom at {} uses custom repositories, which are not supported yet", pomUrl)
             }
 
             elementStack.removeAt(elementStack.size - 1)
