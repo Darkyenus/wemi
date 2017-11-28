@@ -36,32 +36,29 @@ object CLI {
 
     internal fun findDefaultProject(root: File):Project? {
         val allProjects = AllProjects
-        if (allProjects.isEmpty()) {
-            return null
-        } else if (allProjects.size == 1) {
-            return allProjects.values.first()
-        } else {
-            var closest: Project? = null
-            for (project in allProjects.values) {
-                if (project.projectRoot == root) {
-                    defaultProject = project
-                    break
-                } else if (closest == null) {
-                    closest = project
-                } else {
-                    // Compare how close they are!
-                    try {
-                        val projectDist = project.projectRoot.toRelativeString(root).count { it == File.pathSeparatorChar }
-                        val closestDist = closest.projectRoot.toRelativeString(root).count { it == File.pathSeparatorChar }
-                        if (projectDist < closestDist) {
-                            closest = project
-                        }
-                    } catch (_: IllegalArgumentException) {
-                        //May happen if projects are on different roots, but lets not deal with that.
+        when {
+            allProjects.isEmpty() -> return null
+            allProjects.size == 1 -> return allProjects.values.first()
+            else -> {
+                var closest: Project? = null
+                for (project in allProjects.values) {
+                    when {
+                        project.projectRoot == root -> return project
+                        closest == null -> closest = project
+                        else -> // Compare how close they are!
+                            try {
+                                val projectDist = project.projectRoot.toRelativeString(root).count { it == File.pathSeparatorChar }
+                                val closestDist = closest.projectRoot.toRelativeString(root).count { it == File.pathSeparatorChar }
+                                if (projectDist < closestDist) {
+                                    closest = project
+                                }
+                            } catch (_: IllegalArgumentException) {
+                                //May happen if projects are on different roots, but lets not deal with that.
+                            }
                     }
                 }
+                return closest
             }
-            return closest
         }
     }
 
