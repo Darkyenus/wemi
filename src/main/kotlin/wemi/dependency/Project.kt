@@ -23,6 +23,10 @@ data class DependencyId(val group: String,
                         val preferredRepository: Repository? = null,
                         val attributes: Map<DependencyAttribute, String> = emptyMap()) : MachineWritable {
 
+    fun attribute(attribute: DependencyAttribute):String? {
+        return attributes[attribute] ?: attribute.defaultValue
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other?.javaClass != javaClass) return false
@@ -33,10 +37,10 @@ data class DependencyId(val group: String,
         if (name != other.name) return false
         if (version != other.version) return false
         for ((key, value) in attributes) {
-            if (key.makesUnique && other.attributes[key] != value) return false
+            if (key.makesUnique && other.attribute(key) != value) return false
         }
         for ((key, value) in other.attributes) {
-            if (key.makesUnique && attributes[key] != value) return false
+            if (key.makesUnique && attribute(key) != value) return false
         }
         if (attributes != other.attributes) return false
 
@@ -80,7 +84,7 @@ data class DependencyId(val group: String,
     }
 }
 
-data class DependencyAttribute(val name: String, val makesUnique: Boolean) : MachineWritable {
+data class DependencyAttribute(val name: String, val makesUnique: Boolean, val defaultValue:String? = null) : MachineWritable {
     override fun toString(): String = name
 
     override fun writeMachine(json: Json) {

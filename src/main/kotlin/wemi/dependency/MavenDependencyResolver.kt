@@ -35,7 +35,7 @@ internal object MavenDependencyResolver {
         val (dependencyId, exclusions) = dependency
 
         // Just retrieving raw pom file
-        if (dependency.dependencyId.attributes[Repository.M2.M2TypeAttribute] == "pom") {
+        if (dependency.dependencyId.attribute(Repository.M2.M2TypeAttribute) == "pom") {
             return retrievePom(dependencyId, repository, chain)
         }
 
@@ -61,7 +61,7 @@ internal object MavenDependencyResolver {
             }
         }
 
-        val packaging = dependencyId.attributes[Repository.M2.M2TypeAttribute] ?: pom.packaging
+        val packaging = dependencyId.attribute(Repository.M2.M2TypeAttribute) ?: pom.packaging
 
         when (packaging) {
             "pom" -> {
@@ -500,7 +500,7 @@ internal object MavenDependencyResolver {
                 lastDependencyGroupId = ""
                 lastDependencyArtifactId = ""
                 lastDependencyVersion = ""
-                lastDependencyAttributes = mutableMapOf<DependencyAttribute, String>()
+                lastDependencyAttributes = mutableMapOf()
 
                 val pomDependency = Dependency(projectId, lastDependencyExclusions)
                 lastDependencyExclusions = mutableListOf()
@@ -616,7 +616,7 @@ internal object MavenDependencyResolver {
     private fun DependencyId.artifactPath(extension: String): String {
         val fileName = StringBuilder()
         fileName.append(name).append('-').append(version)
-        val classifier = attributes[Repository.M2.M2ClassifierAttribute]
+        val classifier = attribute(Repository.M2.M2ClassifierAttribute)
         if (classifier != null) {
             fileName.append('-').append(classifier)
         }

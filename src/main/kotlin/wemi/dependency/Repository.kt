@@ -45,9 +45,17 @@ sealed class Repository(val name: String) : MachineWritable {
              *
              * Examples: jar (default), pom (returns pom.xml, used internally)
              */
-            val M2TypeAttribute = DependencyAttribute("m2-type", true)
-            val M2ScopeAttribute = DependencyAttribute("m2-scope", false)
-            val M2OptionalAttribute = DependencyAttribute("m2-optional", false)
+            val M2TypeAttribute = DependencyAttribute("m2-type", true, "jar")
+            /**
+             * Scope of the dependency.
+             *
+             * Examples: compile, provided, test
+             * See https://maven.apache.org/pom.html#Dependencies
+             *
+             * In Wemi used only when filtering.
+             */
+            val M2ScopeAttribute = DependencyAttribute("m2-scope", false, "compile")
+            val M2OptionalAttribute = DependencyAttribute("m2-optional", false, "false")
         }
 
         enum class Checksum(val suffix: String, val algo: String) {
