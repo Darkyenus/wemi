@@ -163,7 +163,7 @@ object CLI {
                 }
 
                 when (data) {
-                    null -> println()
+                    null, is Unit -> println()
                     is Collection<*> -> {
                         print(formatLabel(" ("))
                         print(data.size)
