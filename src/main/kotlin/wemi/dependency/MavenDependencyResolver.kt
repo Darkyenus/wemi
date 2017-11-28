@@ -108,7 +108,7 @@ internal object MavenDependencyResolver {
             val key = substring(2, length - 1)
             val explicitKey = properties[key]
             if (explicitKey != null) {
-                LOG.warn("Unreliable Pom resolution: property '{}' resolved through explicit properties to '{}'", key, explicitKey)
+                LOG.debug("Unreliable Pom resolution: property '{}' resolved through explicit properties to '{}'", key, explicitKey)
                 return explicitKey
             }
 
@@ -136,7 +136,7 @@ internal object MavenDependencyResolver {
                         return this
                     }
                 }
-                LOG.warn("Unreliable Pom resolution: property '{}' resolved through project properties to '{}'", key, project)
+                LOG.debug("Unreliable Pom resolution: property '{}' resolved through project properties to '{}'", key, project)
                 return project
             }
 
