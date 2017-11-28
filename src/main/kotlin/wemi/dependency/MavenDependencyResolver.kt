@@ -26,6 +26,8 @@ private val LOG = LoggerFactory.getLogger("MavenDependencyResolver")
  */
 internal object MavenDependencyResolver {
 
+    private val PomFile = ArtifactKey<File>("pomFile", true)
+    private val PomData = ArtifactKey<ByteArray>("pomData", false)
     private val PomKey = ArtifactKey<Pom>("pom", false)
     private val PomUrlKey = ArtifactKey<URL>("pomUrl", true)
 
@@ -339,7 +341,7 @@ internal object MavenDependencyResolver {
         if (pomData == null) {
             return ResolvedDependency(dependencyId, emptyList(), repository, true).apply {
                 if (pomFile != null) {
-                    putKey(ArtifactKey.File, pomFile)
+                    putKey(PomFile, pomFile)
                 }
                 putKey(PomUrlKey, pomUrl)
             }
@@ -356,9 +358,9 @@ internal object MavenDependencyResolver {
             LOG.warn("fatal error during parsing {}", pomUrl, se)
             return ResolvedDependency(dependencyId, emptyList(), repository, true, "Malformed xml").apply {
                 if (pomFile != null) {
-                    putKey(ArtifactKey.File, pomFile)
+                    putKey(PomFile, pomFile)
                 }
-                putKey(ArtifactKey.Data, pomData)
+                putKey(PomData, pomData)
                 putKey(PomUrlKey, pomUrl)
             }
         }
@@ -396,9 +398,9 @@ internal object MavenDependencyResolver {
 
         return ResolvedDependency(dependencyId, emptyList(), repository, false).apply {
             if (pomFile != null) {
-                putKey(ArtifactKey.File, pomFile)
+                putKey(PomFile, pomFile)
             }
-            putKey(ArtifactKey.Data, pomData)
+            putKey(PomData, pomData)
             putKey(PomUrlKey, pomUrl)
             putKey(PomKey, pom)
         }

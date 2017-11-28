@@ -30,11 +30,7 @@ object DependencyResolver {
         // Try preferred repository first
         if (dependency.dependencyId.preferredRepository != null) {
             LOG.debug("Trying in {}", dependency.dependencyId.preferredRepository)
-            val resolved = when (dependency.dependencyId.preferredRepository) {
-                is Repository.M2 -> {
-                    MavenDependencyResolver.resolveInM2Repository(dependency, dependency.dependencyId.preferredRepository, repositories)
-                }
-            }
+            val resolved = dependency.dependencyId.preferredRepository.resolveInRepository(dependency, repositories)
             if (!resolved.hasError) {
                 LOG.debug("Resolution success {}", resolved)
                 return resolved
@@ -45,11 +41,7 @@ object DependencyResolver {
         // Try ordered repositories
         for (repository in repositories) {
             LOG.debug("Trying in {}", repository)
-            val resolved = when (repository) {
-                is Repository.M2 -> {
-                    MavenDependencyResolver.resolveInM2Repository(dependency, repository, repositories)
-                }
-            }
+            val resolved = repository.resolveInRepository(dependency, repositories)
             if (!resolved.hasError) {
                 LOG.debug("Resolution success {}", resolved)
                 return resolved

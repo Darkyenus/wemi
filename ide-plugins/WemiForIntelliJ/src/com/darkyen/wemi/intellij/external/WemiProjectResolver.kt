@@ -289,7 +289,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         try {
             session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies").get("value").forEach {
                 val projectId = it.get("key")
-                val artifact = it.get("value")?.get("data")?.find { it.getString("name") == "file" }?.getString("value") ?: return@forEach
+                val artifact = it.get("value")?.get("data")?.find { it.getString("name") == "artifactFile" }?.getString("value") ?: return@forEach
 
                 val group = projectId.getString("group")
                 val name = projectId.getString("name")

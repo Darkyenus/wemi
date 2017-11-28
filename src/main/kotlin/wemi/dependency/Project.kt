@@ -150,8 +150,8 @@ data class Dependency(val dependencyId: DependencyId, val exclusions: List<Depen
 @Suppress("unused")// T is used only in syntax
 class ArtifactKey<T>(val name: String, val printOut:Boolean) {
     companion object {
-        val File = ArtifactKey<File>("file", true)
-        val Data = ArtifactKey<ByteArray>("data", false)
+        val ArtifactFile = ArtifactKey<File>("artifactFile", true)
+        val ArtifactData = ArtifactKey<ByteArray>("artifactData", false)
     }
 
     override fun toString(): String = name
@@ -188,18 +188,18 @@ data class ResolvedDependency(val id: DependencyId,
     }
 
     var artifact: File?
-        get() = this.getKey(ArtifactKey.File)
+        get() = this.getKey(ArtifactKey.ArtifactFile)
         set(value) {
             if (value == null) {
-                this.removeKey(wemi.dependency.ArtifactKey.File)
+                this.removeKey(wemi.dependency.ArtifactKey.ArtifactFile)
             } else {
-                this.putKey(wemi.dependency.ArtifactKey.File, value)
+                this.putKey(wemi.dependency.ArtifactKey.ArtifactFile, value)
             }
         }
 
     var artifactData: ByteArray?
         get() {
-            val data = this.getKey(wemi.dependency.ArtifactKey.Data)
+            val data = this.getKey(wemi.dependency.ArtifactKey.ArtifactData)
             if (data != null) {
                 return data
             }
@@ -208,7 +208,7 @@ data class ResolvedDependency(val id: DependencyId,
             if (artifact != null) {
                 try {
                     val bytes = artifact.readBytes()
-                    this.putKey(wemi.dependency.ArtifactKey.Data, bytes)
+                    this.putKey(wemi.dependency.ArtifactKey.ArtifactData, bytes)
                     return bytes
                 } catch (e:Exception) {
                     LOG.warn("Failed to load artifactData of {}", this, e)
@@ -219,9 +219,9 @@ data class ResolvedDependency(val id: DependencyId,
         }
         set(value) {
             if (value == null) {
-                this.removeKey(wemi.dependency.ArtifactKey.Data)
+                this.removeKey(wemi.dependency.ArtifactKey.ArtifactData)
             } else {
-                this.putKey(wemi.dependency.ArtifactKey.Data, value)
+                this.putKey(wemi.dependency.ArtifactKey.ArtifactData, value)
             }
         }
 
