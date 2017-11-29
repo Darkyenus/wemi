@@ -87,15 +87,19 @@ fun getCompiledBuildScript(buildFolder: File, buildScriptSources:List<File>, for
                 classpath.add(File(line))
             }
         }
+        // Compiler bug workaround
+        var result = false
         for (file in classpath) {
             if (!file.exists()) {
                 recompileReason = "Corrupted cache metadata"
                 LOG.debug("Rebuilding build scripts: Classpath cache corrupted ({} does not exist)", file)
                 classpath.clear()
-                return@recompile true
+                result = true
+                break
+                //return@recompile true
             }
         }
-        false
+        result
     }
 
     val buildFlags = CompilerFlags()
