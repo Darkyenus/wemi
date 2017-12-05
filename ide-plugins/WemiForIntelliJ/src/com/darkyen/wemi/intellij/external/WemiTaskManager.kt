@@ -63,7 +63,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                 var javaVmExecutable = settings.javaVmExecutable
                 if (javaVmExecutable.isBlank()) {
                     javaVmExecutable = "java"
-                    listener.onTaskOutput(id, "Using implicit java executable from PATH", false)
+                    listener.onTaskOutput(id, "Using implicit java executable from PATH\n", false)
                 }
 
                 launcher.createTaskSession(javaVmExecutable, vmOptions, settings.env, settings.isPassParentEnvs, tasks)
