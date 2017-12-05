@@ -1,0 +1,20 @@
+///repository jitpack at https://jitpack.io
+///dependency com.github.esotericsoftware:jsonbeans:0.9
+
+val hello by project {
+
+    projectGroup set { "com.darkyen" }
+    projectName set { "hello" }
+    projectVersion set { "1.0-SNAPSHOT" }
+
+    startYear set { 2017 }
+
+    repositories add { repository("jitpack", "https://jitpack.io") }
+
+    libraryDependencies add { dependency("org.slf4j:slf4j-api:1.7.22") }
+    libraryDependencies add { dependency("com.github.Darkyenus:tproll:v1.2.4") }
+    libraryDependencies add { dependency("com.h2database:h2:1.4.196") }
+
+    mainClass set { "com.hello.HelloWemiKt" }
+
+}

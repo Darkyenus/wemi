@@ -1,0 +1,39 @@
+
+import wemi.Keys.runOptions
+import wemi.dependency.DefaultRepositories
+import wemi.dependency.Repository
+import wemi.util.div
+import java.net.URL
+
+val gdxVersion = "1.9.7"
+
+val lwjgl3 by project(File("lwjgl3")) {
+
+    projectName set {"LibGDX Demo"}
+    projectGroup set {"wemi"}
+    projectVersion set {"1.0"}
+
+    libraryDependencies add { dependency("com.badlogicgames.gdx:gdx:$gdxVersion") }
+    libraryDependencies add { dependency("com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion") }
+    libraryDependencies add { dependency("com.badlogicgames.gdx:gdx-platform:$gdxVersion", attributes = Repository.M2.M2ClassifierAttribute to "natives-desktop") }
+
+    runOptions add {"-XstartOnFirstThread"}
+    mainClass set {"game.Main"}
+}
+
+val lwjgl2 by project(File("./lwjgl2/")) {
+    projectName set {"LibGDX Demo"}
+    projectGroup set {"wemi"}
+    projectVersion set {"1.0"}
+
+    //val LocalM2Repository = Repository.M2("local", URL("file", "localhost", (projectRoot / "m2/").absolutePath + "/"), null)
+    //val CentralM2Repository = Repository.M2("central", URL("https://repo1.maven.org/maven2/"), LocalM2Repository)
+
+    //repositories set { listOf(CentralM2Repository, LocalM2Repository) }
+
+    libraryDependencies add { dependency("com.badlogicgames.gdx:gdx:$gdxVersion") }
+    libraryDependencies add { dependency("com.badlogicgames.gdx:gdx-backend-lwjgl:$gdxVersion") }
+    libraryDependencies add { dependency("com.badlogicgames.gdx:gdx-platform:$gdxVersion", attributes = Repository.M2.M2ClassifierAttribute to "natives-desktop") }
+
+    mainClass set {"game.Main"}
+}
