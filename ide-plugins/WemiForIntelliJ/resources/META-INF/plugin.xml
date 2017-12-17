@@ -40,6 +40,14 @@
                 icon="WemiIcons.WEMI">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
+
+        <action id="com.darkyen.wemi.intellij.importing.ReloadProjectAction"
+                class="com.darkyen.wemi.intellij.importing.ReloadProjectAction"
+                text="Reload Wemi Project"
+                description="Re-import Wemi project in the project's root into the IDE"
+                icon="WemiIcons.WEMI">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
     </actions>
 
     <extensions defaultExtensionNs="com.intellij">

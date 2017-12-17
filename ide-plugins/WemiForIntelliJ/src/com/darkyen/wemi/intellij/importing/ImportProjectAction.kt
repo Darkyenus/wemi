@@ -43,6 +43,9 @@ class ImportProjectAction : AnAction("Import Wemi Project", "Import an unlinked 
     companion object {
 
         fun canOfferImportOfUnlinkedProject(project: Project):Boolean {
+            if (project.isDefault) {
+                return false
+            }
             if (!WemiSystemSettings.getInstance(project).linkedProjectsSettings.isEmpty() || project.baseDir == null) {
                 return false
             }
