@@ -29,7 +29,7 @@ fun readFully(into: OutputStream, stream: InputStream, buffer:ByteArray = ByteAr
     return read
 }
 
-class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private val onLineRead:(CharSequence) -> Unit) : OutputStream() {
+open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private val onLineRead:(CharSequence) -> Unit) : OutputStream() {
 
     private val decoder: CharsetDecoder = charset.newDecoder()
             .onMalformedInput(CodingErrorAction.REPLACE)

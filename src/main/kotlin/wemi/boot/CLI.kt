@@ -1,20 +1,20 @@
 package wemi.boot
 
+import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TerminalColor
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
 import org.jline.reader.impl.DefaultParser
+import org.jline.reader.impl.LineReaderImpl
 import org.jline.terminal.Terminal
 import org.jline.terminal.TerminalBuilder
 import org.slf4j.LoggerFactory
 import wemi.*
-import wemi.util.MatchUtils
-import wemi.util.WithDescriptiveString
-import wemi.util.findCaseInsensitive
-import wemi.util.formatTimeDuration
+import wemi.util.*
 import java.io.File
 import java.io.IOException
+import java.io.PrintStream
 
 /**
  * Handles user interaction in standard (possibly interactive) mode
@@ -24,6 +24,17 @@ object CLI {
     private val LOG = LoggerFactory.getLogger(javaClass)
 
     private val Terminal: Terminal by lazy { TerminalBuilder.terminal() }
+
+    private val LineReader: LineReaderImpl by lazy {
+        LineReaderBuilder.builder()
+                .appName("Wemi")
+                .terminal(Terminal)
+                .parser(DefaultParser().apply {
+                    isEofOnEscapedNewLine = false
+                    isEofOnUnclosedQuote = false
+                })
+                .build() as LineReaderImpl
+    }
 
     private var defaultProject: Project? = null
         set(value) {
@@ -69,6 +80,14 @@ object CLI {
         } else {
             defaultProject = shouldBeDefault
         }
+
+        val out = Terminal.writer()
+        System.setOut(PrintStream(object : LineReadingOutputStream(onLineRead = {line -> out.append(line)}){
+            override fun flush() {
+                super.flush()
+                out.flush()
+            }
+        }, true))
     }
 
     private val ColorSupported: Boolean = TerminalColor.COLOR_SUPPORTED
@@ -133,6 +152,10 @@ object CLI {
     }
 
     fun evaluateKeyAndPrint(text: String) {
+        // TODO Ideally, this would get rewritten with Done message if nothing was written between them
+        print(formatLabel("→ "))
+        println(formatInput(text))
+
         val beginTime = System.currentTimeMillis()
         val (key, data, status) = evaluateKey(text)
         val duration = System.currentTimeMillis() - beginTime
@@ -165,13 +188,14 @@ object CLI {
                         print(formatLabel(" ("))
                         print(data.size)
                         println(formatLabel("): "))
+
                         for (item:Any? in data) {
-                            println("  "+ formatValue(item.toString()))
+                            println("  "+ formatValue(PrettyPrinter.toString(item)))
                         }
                     }
                     else -> {
                         print(formatLabel(": "))
-                        println(formatValue(data.toString()))
+                        println(formatValue(PrettyPrinter.toString(data)))
                     }
                 }
             }
@@ -345,14 +369,7 @@ object CLI {
     }
 
     internal fun beginInteractive() {
-        val lineReader = LineReaderBuilder.builder()
-                .appName("Wemi")
-                .terminal(Terminal)
-                .parser(DefaultParser().apply {
-                    isEofOnEscapedNewLine = false
-                    isEofOnUnclosedQuote = false
-                })
-                .build()
+        val lineReader = LineReader
 
         val prompt = format("> ", format = Format.Bold).toString()
 
