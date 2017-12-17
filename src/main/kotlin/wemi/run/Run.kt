@@ -1,9 +1,12 @@
 package wemi.run
 
 import org.jline.utils.OSUtils
+import org.slf4j.LoggerFactory
 import wemi.WemiException
 import wemi.util.div
 import java.io.File
+
+private val LOG = LoggerFactory.getLogger("Run")
 
 /**
  *
@@ -35,7 +38,8 @@ fun javaExecutable(javaHome:File):File = run {
     }
 }
 
-fun runJava(javaExecutable:File, workingDirectory:File, classpath:Collection<File>, mainClass:String, javaOptions:Collection<String>, args:Collection<String>):Process {
+fun prepareJavaProcess(javaExecutable:File, workingDirectory:File, classpath:Collection<File>,
+                       mainClass:String, javaOptions:Collection<String>, args:Collection<String>):ProcessBuilder {
     val command = mutableListOf<String>()
     command.add(javaExecutable.absolutePath)
     command.add("-cp")
@@ -43,8 +47,9 @@ fun runJava(javaExecutable:File, workingDirectory:File, classpath:Collection<Fil
     command.addAll(javaOptions)
     command.add(mainClass)
     command.addAll(args)
+
+    LOG.debug("Starting command {} in {}", command, workingDirectory)
     return ProcessBuilder(command)
             .directory(workingDirectory)
             .inheritIO()
-            .start()
 }

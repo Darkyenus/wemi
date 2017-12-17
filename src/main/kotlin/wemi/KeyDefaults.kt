@@ -154,7 +154,7 @@ object KeyDefaults {
                 val compiler = using(compilingKotlin) { Keys.kotlinCompiler.get() }
                 val compilerFlags = using(compilingKotlin) { Keys.compilerOptions.get() }
 
-                val compileResult = compiler.compile(javaSources + kotlinSources, externalClasspath.map { it.file }.toList(), output, compilerFlags, LoggerFactory.getLogger("ProjectCompilation"), null)
+                val compileResult = compiler.compile(javaSources + kotlinSources, externalClasspath.map { it.file }.toList(), output, compilerFlags, CompileLOG, null)
                 if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
                     throw WemiException("Kotlin compilation failed: "+compileResult, showStacktrace = false)
                 }
@@ -217,7 +217,12 @@ object KeyDefaults {
                 ).call()
 
                 if (!writerSb.isBlank()) {
-                    CompileLOG.info("{}", writerSb)
+                    val format = if (writerSb.contains('\n')) "\n{}" else "{}"
+                    if (success) {
+                        CompileLOG.info(format, writerSb)
+                    } else {
+                        CompileLOG.warn(format, writerSb)
+                    }
                 }
 
                 if (!success) {
@@ -252,8 +257,16 @@ object KeyDefaults {
 
             val modifiedClasspath = classpath.map { it.classpathEntry }.distinct()
 
-            val process = wemi.run.runJava(javaExecutable, directory, modifiedClasspath, mainClass, options, arguments)
-            process.waitFor()
+            val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, modifiedClasspath,
+                    mainClass, options, arguments)
+
+            // Separate process output from Wemi output
+            println()
+            val process = processBuilder.start()
+            val result = process.waitFor()
+            println()
+
+            result
         }
     }
 

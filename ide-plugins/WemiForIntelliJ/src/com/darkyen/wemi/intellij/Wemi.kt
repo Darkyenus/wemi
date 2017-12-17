@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij
 
+import com.darkyen.wemi.intellij.util.readFully
 import com.esotericsoftware.jsonbeans.JsonReader
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.execution.configurations.GeneralCommandLine
@@ -156,27 +157,10 @@ class WemiLauncherSession(private val commandLine: GeneralCommandLine, private v
                 return field
             }
 
-        private fun readFully(into:OutputStream, stream:InputStream):Int {
-            var read = 0
-            while (true) {
-                val available = stream.available()
-                if (available <= 0) {
-                    break
-                }
-                val size = stream.read(buffer, 0, minOf(buffer.size, available))
-                if (size == -1) {
-                    break
-                }
-                read += size
-                into.write(buffer, 0, size)
-            }
-            return read
-        }
-
         fun emptyBuffers(occasion:String) {
             try {
                 extraDataStreamCache.apply {
-                    readFully(this, inputStream)
+                    readFully(this, inputStream, buffer)
                     if (this.size() > 0) {
                         WemiLauncherSession.LOG.warn("Extra data found $occasion: ${contentToString()}")
                     }
@@ -308,6 +292,9 @@ class WemiLauncherSession(private val commandLine: GeneralCommandLine, private v
                 if (out == 0 && err == 0 && !process.isAlive) {
                     break
                 }
+
+                //TODO Solve this busy-loop
+                Thread.sleep(1)
             }
         }
     }

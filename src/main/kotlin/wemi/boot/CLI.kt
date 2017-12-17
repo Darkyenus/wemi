@@ -377,7 +377,6 @@ object CLI {
             }
         }
 
-        printBye()
         System.out.flush()
         System.err.flush()
     }
@@ -405,29 +404,5 @@ object CLI {
             print("   ")
             println(value.toDescriptiveAnsiString())
         }
-    }
-
-    private val Random = java.util.Random()
-
-    private fun <T> Array<T>.random():T {
-        return get(Random.nextInt(size))
-    }
-
-    private fun printBye() {
-        val ByeBodies = arrayOf(
-                format("Bye! ", Color.Red),
-                format("Bye! ", Color.Cyan),
-                format("Bye! ", Color.Green),
-                format("Bye! ", Color.Blue),
-                format("Bye! ", Color.Yellow),
-                format("Bye! ", Color.Magenta),
-                "" + format("B", Color.Red) + format("y", Color.Green) + format("e", Color.Yellow) + format("!", Color.Blue) + " ",
-                "" + format("B", Color.Green) + format("y", Color.Red) + format("e", Color.White) + format("!", Color.Green) + " ",
-                "" + format("B", Color.Cyan) + format("y", Color.Magenta) + format("e", Color.Yellow) + format("!", Color.Black) + " "
-        )
-        val ByeSuffixes = arrayOf("😀", "😃", "😄", "😊", "🙂", "🙃", "😋", "🤓", "😎", "👽", "😺", "😸", "👋", "👍", "👊", "🤘", "🖖", "🐶", "🐻", "🐼", "🐨", "🐒", "🐸", "🐙", "🐺", "🐲", "🏂", "🏄", "👾", "💎", "🎈", "🎉")
-
-        print(ByeBodies.random())
-        println(ByeSuffixes.random())
     }
 }

@@ -2,15 +2,11 @@ package com.darkyen.wemi.intellij.external
 
 import com.darkyen.wemi.intellij.WemiLauncherSession
 import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
+import com.darkyen.wemi.intellij.util.LineReadingOutputStream
 import com.intellij.openapi.externalSystem.model.ExternalSystemException
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
 import com.intellij.openapi.externalSystem.task.ExternalSystemTaskManager
-import java.io.OutputStream
-import java.nio.ByteBuffer
-import java.nio.CharBuffer
-import java.nio.charset.CharsetDecoder
-import java.nio.charset.CodingErrorAction
 
 /**
  * May be run in a different process from the rest of the IDE
@@ -69,11 +65,16 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                 launcher.createTaskSession(javaVmExecutable, vmOptions, settings.env, settings.isPassParentEnvs, tasks)
             }
 
+            val stdout = LineReadingOutputStream { line -> listener.onTaskOutput(id, line.toString(), true) }
+            val stderr = LineReadingOutputStream { line -> listener.onTaskOutput(id, line.toString(), false) }
             session.readOutputInteractive(
-                    StreamToListener(id, listener, true),
-                    StreamToListener(id, listener, false),
+                    stdout,
+                    stderr,
                     System.`in`
             )
+            stdout.close()
+            stderr.close()
+
         } catch (e:ThreadDeath) {
             return
         } catch (e:Throwable) {
@@ -86,68 +87,6 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                 session?.done()
             } catch (e:Throwable) {
                 beingThrown?.addSuppressed(e)
-            }
-        }
-    }
-
-    private class StreamToListener(val id:ExternalSystemTaskId, val listener: ExternalSystemTaskNotificationListener, val stdout:Boolean) : OutputStream() {
-
-        val decoder: CharsetDecoder = Charsets.UTF_8.newDecoder()
-                .onMalformedInput(CodingErrorAction.REPLACE)
-                .onUnmappableCharacter(CodingErrorAction.REPLACE)
-
-        val inputBuffer: ByteBuffer = ByteBuffer.allocate(1024)
-        val outputBuffer: CharBuffer = CharBuffer.allocate(1024)
-        val outputSB = StringBuilder()
-
-        init {
-            inputBuffer.clear()
-            outputBuffer.clear()
-        }
-
-        private fun decode() {
-            inputBuffer.flip()
-            while (true) {
-                val result = decoder.decode(inputBuffer, outputBuffer, false)
-                outputBuffer.flip()
-                for (i in 0 until outputBuffer.limit()) {
-                    val c = outputBuffer[i]
-                    outputSB.append(c)
-
-                    if (c == '\n') {
-                        // Flush outputSB!
-                        listener.onTaskOutput(id, outputSB.toString(), stdout)
-                        outputSB.setLength(0)
-                    }
-                }
-
-                if (!result.isOverflow) {
-                    break
-                }
-            }
-
-            inputBuffer.compact()
-        }
-
-        override fun write(b: Int) {
-            inputBuffer.put(b.toByte())
-            decode()
-        }
-
-        override fun write(b: ByteArray) {
-            write(b, 0, b.size)
-        }
-
-        override fun write(b: ByteArray, off: Int, len: Int) {
-            var offset = off
-            var remaining = len
-
-            while (remaining > 0) {
-                val toConsume = minOf(remaining, inputBuffer.remaining())
-                inputBuffer.put(b, offset, toConsume)
-                offset += toConsume
-                remaining -= toConsume
-                decode()
             }
         }
     }
