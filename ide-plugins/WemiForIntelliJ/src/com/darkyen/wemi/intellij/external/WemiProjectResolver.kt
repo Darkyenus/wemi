@@ -78,6 +78,12 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 launcher.createMachineReadableSession(settings.javaVmExecutable, settings.vmOptions, settings.env, settings.isPassParentEnvs, prefixConfigurations)
             }
 
+            // First request on session will be probably waiting for build scripts to compile
+            listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Loading Wemi build scripts"))
+            val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
+            LOG.info("Wemi version is "+wemiVersion)
+            //TODO Version check, disallow too old versions
+
             return resolveProjectInfo(id, session, projectPath, settings, listener)
         } catch (se:WemiSessionException) {
             LOG.warn("WemiSessionException encountered while resolving", se)

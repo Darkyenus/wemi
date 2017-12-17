@@ -19,7 +19,7 @@ libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.25"
 
 resolvers += "jitpack" at "https://jitpack.io"
 
-libraryDependencies += "com.github.Darkyenus" % "tproll" % "v1.2.4"
+libraryDependencies += "com.github.Darkyenus" % "tproll" % "v1.2.5"
 
 libraryDependencies += "com.github.Darkyenus" % "DaveWebb" % "v1.2"
 

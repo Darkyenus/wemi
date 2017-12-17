@@ -2,10 +2,7 @@ package wemi.boot
 
 import com.esotericsoftware.jsonbeans.*
 import org.slf4j.LoggerFactory
-import wemi.AllConfigurations
-import wemi.AllKeys
-import wemi.AllProjects
-import wemi.WemiException
+import wemi.*
 import java.io.File
 import java.io.IOException
 import java.io.OutputStreamWriter
@@ -19,62 +16,71 @@ import kotlin.system.exitProcess
 private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
 
 fun machineReadableEvaluateAndPrint(out: PrintStream, task:String) {
-    when (task) {
-        "#projects" -> {
-            machineReadablePrint(out, AllProjects.values)
-            return
-        }
-        "#configurations" -> {
-            machineReadablePrint(out, AllConfigurations.values)
-            return
-        }
-        "#keys" -> {
-            machineReadablePrint(out, AllKeys.values)
-            return
-        }
-        "#keysWithDescription" -> {
-            machineReadablePrint(out, object : MachineWritable {
-                override fun writeMachine(json: Json) {
-                    json.writeArrayStart()
-                    for (key in AllKeys.values) {
-                        json.writeObjectStart()
-                        json.writeValue("name", key.name, String::class.java)
-                        json.writeValue("description", key.description, String::class.java)
-                        json.writeObjectEnd()
-                    }
-                    json.writeArrayEnd()
-                }
-            })
-            return
-        }
-        "#buildScripts" -> {
-            machineReadablePrint(out, object : MachineWritable {
-                override fun writeMachine(json: Json) {
-                    json.writeArrayStart()
-                    for ((buildFile, projects) in BuildScriptIntrospection.buildScriptProjects) {
-                        json.writeObjectStart()
-
-                        json.writeValue("buildFolder", buildFile.buildFolder)
-                        json.writeValue("sources", buildFile.sources)
-                        json.writeValue("scriptJar", buildFile.scriptJar)
-                        json.writeValue("classpath", buildFile.classpath)
-                        json.writeArrayStart("projects")
-                        for (project in projects) {
-                            json.writeValue(project.name)
+    if (task.startsWith('#')) {
+        when (task) {
+            "#version" -> {
+                machineReadablePrint(out, WemiVersion)
+                return
+            }
+            "#projects" -> {
+                machineReadablePrint(out, AllProjects.values)
+                return
+            }
+            "#configurations" -> {
+                machineReadablePrint(out, AllConfigurations.values)
+                return
+            }
+            "#keys" -> {
+                machineReadablePrint(out, AllKeys.values)
+                return
+            }
+            "#keysWithDescription" -> {
+                machineReadablePrint(out, object : MachineWritable {
+                    override fun writeMachine(json: Json) {
+                        json.writeArrayStart()
+                        for (key in AllKeys.values) {
+                            json.writeObjectStart()
+                            json.writeValue("name", key.name, String::class.java)
+                            json.writeValue("description", key.description, String::class.java)
+                            json.writeObjectEnd()
                         }
                         json.writeArrayEnd()
-
-                        json.writeObjectEnd()
                     }
-                    json.writeArrayEnd()
-                }
-            })
-            return
+                })
+                return
+            }
+            "#buildScripts" -> {
+                machineReadablePrint(out, object : MachineWritable {
+                    override fun writeMachine(json: Json) {
+                        json.writeArrayStart()
+                        for ((buildFile, projects) in BuildScriptIntrospection.buildScriptProjects) {
+                            json.writeObjectStart()
+
+                            json.writeValue("buildFolder", buildFile.buildFolder)
+                            json.writeValue("sources", buildFile.sources)
+                            json.writeValue("scriptJar", buildFile.scriptJar)
+                            json.writeValue("classpath", buildFile.classpath)
+                            json.writeArrayStart("projects")
+                            for (project in projects) {
+                                json.writeValue(project.name)
+                            }
+                            json.writeArrayEnd()
+
+                            json.writeObjectEnd()
+                        }
+                        json.writeArrayEnd()
+                    }
+                })
+                return
+            }
+            "#defaultProject" -> {
+                machineReadablePrint(out, CLI.findDefaultProject(File("."))?.name)
+                return
+            }
         }
-        "#defaultProject" -> {
-            machineReadablePrint(out, CLI.findDefaultProject(File("."))?.name)
-            return
-        }
+
+        LOG.error("Can't evaluate {} - unknown command", task)
+        return
     }
 
     try {

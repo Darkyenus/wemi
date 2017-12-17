@@ -3,6 +3,7 @@ package wemi.boot
 import com.darkyen.tproll.TPLogger
 import com.darkyen.tproll.integration.JavaLoggingIntegration
 import com.darkyen.tproll.logfunctions.*
+import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TimeFormatter
 import org.slf4j.LoggerFactory
 import wemi.Configurations
@@ -159,6 +160,8 @@ fun main(args: Array<String>) {
 
     // Load build files now
     if (buildScript != null) {
+        PrettyPrinter.setApplicationRootDirectory(buildScript.wemiRoot)
+
         val urls = arrayOfNulls<URL>(1 + buildScript.classpath.size)
         urls[0] = buildScript.scriptJar.toURI().toURL()
         var i = 1
