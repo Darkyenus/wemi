@@ -29,17 +29,18 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.RawCommandLineEditor;
-import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.GridBag;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import javax.swing.DefaultComboBoxModel;
 import java.awt.*;
 
 import static com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil.normalizePath;
@@ -65,7 +66,7 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 	private JBLabel myVmOptionsLabel;
 	private RawCommandLineEditor myVmOptionsEditor;
 
-	private JBCheckBox suppressDebug;
+	private ComboBox<DebugMode> debugMode;
 
 	private EnvironmentVariablesComponent myEnvVariablesComponent;
 
@@ -115,8 +116,8 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 		canvas.add(myVmOptionsLabel, ExternalSystemUiUtil.getLabelConstraints(0));
 		canvas.add(myVmOptionsEditor, ExternalSystemUiUtil.getFillLineConstraints(0));
 
-		suppressDebug = new JBCheckBox("Suppress Wemi launcher debugging to debug launched project");
-		canvas.add(suppressDebug, ExternalSystemUiUtil.getFillLineConstraints(0));
+		debugMode = new ComboBox<>(new DefaultComboBoxModel<>(DebugMode.values()));
+		canvas.add(debugMode, ExternalSystemUiUtil.getFillLineConstraints(0));
 
 		myEnvVariablesComponent = new EnvironmentVariablesComponent();
 		JBLabel myEnvVariablesComponentLabel = myEnvVariablesComponent.getLabel();
@@ -130,7 +131,7 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 		myProjectPathField.setText("");
 		myTasksTextField.setText("");
 		myVmOptionsEditor.setText("");
-		suppressDebug.setSelected(false);
+		debugMode.setSelectedItem(DebugMode.DEBUG_FORKED_PROGRAM);
 		myEnvVariablesComponent.setEnvData(EnvironmentVariablesData.DEFAULT);
 		showUi(true);
 
@@ -145,7 +146,7 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 		myProjectPathField.setText(path);
 		myTasksTextField.setText(StringUtil.join(myOriginalSettings.getTaskNames(), " "));
 		myVmOptionsEditor.setText(myOriginalSettings.getVmOptions());
-		suppressDebug.setSelected(isSuppressDebug(myOriginalSettings));
+		debugMode.setSelectedItem(DebugMode.find(myOriginalSettings.getScriptParameters()));
 		myEnvVariablesComponent.setEnvData(EnvironmentVariablesData.create(myOriginalSettings.getEnv(),
 			myOriginalSettings.isPassParentEnvs()));
 	}
@@ -162,7 +163,7 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 			|| !Comparing.equal(normalizePath(myTasksTextField.getText()),
 				normalizePath(StringUtil.join(myOriginalSettings.getTaskNames(), " ")))
 			|| !Comparing.equal(normalizePath(myVmOptionsEditor.getText()), normalizePath(myOriginalSettings.getVmOptions()))
-			|| isSuppressDebug(myOriginalSettings) != suppressDebug.isSelected()
+			|| DebugMode.find(myOriginalSettings.getScriptParameters()) != debugMode.getSelectedItem()
 			|| myEnvVariablesComponent.isPassParentEnvs() != myOriginalSettings.isPassParentEnvs()
 			|| !myEnvVariablesComponent.getEnvs().equals(myOriginalSettings.getEnv());
 
@@ -174,17 +175,10 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 		settings.setExternalProjectPath(projectPath);
 		settings.setTaskNames(StringUtil.split(myTasksTextField.getText(), " "));
 		settings.setVmOptions(myVmOptionsEditor.getText());
-		setSuppressDebug(settings, suppressDebug.isSelected());
+		final DebugMode debugMode = (DebugMode) this.debugMode.getSelectedItem();
+		settings.setScriptParameters(debugMode != null ? debugMode.scriptParameters : DebugMode.DEBUG_FORKED_PROGRAM.scriptParameters);
 		settings.setPassParentEnvs(myEnvVariablesComponent.isPassParentEnvs());
 		settings.setEnv(ContainerUtil.newHashMap(myEnvVariablesComponent.getEnvs()));
-	}
-
-	private static boolean isSuppressDebug(ExternalSystemTaskExecutionSettings settings) {
-		return WemiRunConfiguration.Companion.getWEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG().equals(settings.getScriptParameters());
-	}
-
-	private static void setSuppressDebug(ExternalSystemTaskExecutionSettings settings, boolean suppressDebug) {
-		settings.setScriptParameters(suppressDebug ? WemiRunConfiguration.Companion.getWEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG() : "");
 	}
 
 	@Override
@@ -208,5 +202,33 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 	@Override
 	public void showUi (boolean show) {
 		ExternalSystemUiUtil.showUi(this, show);
+	}
+
+	private enum DebugMode {
+		DEBUG_BUILD_SCRIPT("Debug build scripts", ""),
+		DEBUG_FORKED_PROGRAM("Debug forked process (e.g. by run task)", WemiRunConfiguration.Companion.getWEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG());
+
+		private final String description, scriptParameters;
+
+		DebugMode(String description, String scriptParameters) {
+			this.description = description;
+			this.scriptParameters = scriptParameters;
+		}
+
+		public static DebugMode find(String scriptParameters) {
+			for (DebugMode value : VALUES) {
+				if (value.scriptParameters.equals(scriptParameters)) {
+					return value;
+				}
+			}
+			return DEBUG_FORKED_PROGRAM;
+		}
+
+		@Override
+		public String toString() {
+			return description;
+		}
+
+		public static final DebugMode[] VALUES = values();
 	}
 }
