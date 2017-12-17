@@ -2,6 +2,7 @@ package wemi
 
 import wemi.assembly.AssemblySource
 import wemi.assembly.MergeStrategy
+import wemi.boot.BuildScript
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion
@@ -25,6 +26,7 @@ object Keys {
 
     val projectRoot by key<File>("Root directory of the project")
     val buildDirectory by key<File>("Directory in which Wemi stores cache and processed data")
+    val buildScript by key<BuildScript>("Build script used to load this project")
 
     val sourceBase by key<File>("Directory in which all source directories can be found (example: '/src/main')")
     val sourceRoots by key<Collection<File>>("Directories which are source roots for the project (example: '/src/main/java')")

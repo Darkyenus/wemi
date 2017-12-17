@@ -150,32 +150,32 @@ fun main(args: Array<String>) {
         ))
     }
 
-    val buildFile = getCompiledBuildScript(buildFolder, buildScriptSources, cleanBuild)
+    val buildScript = getCompiledBuildScript(root, buildFolder, buildScriptSources, cleanBuild)
 
-    if (!allowBrokenBuildScripts && buildFile == null) {
+    if (!allowBrokenBuildScripts && buildScript == null) {
         LOG.warn("Build script failed to compile")
         exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
     }
 
     // Load build files now
-    if (buildFile != null) {
-        val urls = arrayOfNulls<URL>(1 + buildFile.classpath.size)
-        urls[0] = buildFile.scriptJar.toURI().toURL()
+    if (buildScript != null) {
+        val urls = arrayOfNulls<URL>(1 + buildScript.classpath.size)
+        urls[0] = buildScript.scriptJar.toURI().toURL()
         var i = 1
-        for (file in buildFile.classpath) {
+        for (file in buildScript.classpath) {
             urls[i++] = file.toURI().toURL()
         }
         val loader = URLClassLoader(urls, WemiDefaultClassLoader)
-        LOG.debug("Loading build file {}", buildFile)
-        BuildScriptIntrospection.currentlyInitializedBuildScript = buildFile
-        for (initClass in buildFile.initClasses) {
-            try {
-                Class.forName(initClass, true, loader)
-            } catch (e: Exception) {
-                LOG.warn("Failed to load build file class {} from {}", initClass, urls, e)
+        LOG.debug("Loading build file {}", buildScript)
+        BuildScriptIntrospection.initializingBuildScript(buildScript) {
+            for (initClass in buildScript.initClasses) {
+                try {
+                    Class.forName(initClass, true, loader)
+                } catch (e: Exception) {
+                    LOG.warn("Failed to load build file class {} from {}", initClass, urls, e)
+                }
             }
         }
-        BuildScriptIntrospection.currentlyInitializedBuildScript = null
         LOG.debug("Build file loaded")
     }
 

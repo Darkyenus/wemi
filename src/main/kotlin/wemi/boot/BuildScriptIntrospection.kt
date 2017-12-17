@@ -18,7 +18,8 @@ object BuildScriptIntrospection {
     val buildScriptProjects: Map<BuildScript, List<Project>>
         get() = _buildFileProjects
 
-    internal var currentlyInitializedBuildScript: BuildScript? = null
+    private val CURRENTLY_INITIALIZED_BUILD_SCRIPT_LOCK = Object()
+    private var currentlyInitializedBuildScript: BuildScript? = null
         set(value) {
             if (value != null) {
                 _buildFileProjects.getOrPut(value){ mutableListOf() }
@@ -26,35 +27,33 @@ object BuildScriptIntrospection {
             field = value
         }
 
-    private fun throwIntrospectionInfoNotAvailable():Nothing {
-        throw IllegalStateException("Introspection info not available")
-    }
+    internal inline fun <T>initializingBuildScript(buildScript: BuildScript, action:()->T):T =
+            synchronized(CURRENTLY_INITIALIZED_BUILD_SCRIPT_LOCK) {
+                currentlyInitializedBuildScript = buildScript
+                val result = action()
+                currentlyInitializedBuildScript = null
+                result
+            }
 
-    @Suppress("MemberVisibilityCanPrivate")
+    @Suppress("unused")
     val wemiBuildScript by configuration("Setup with information about the build script " +
             "(but not actually used for building the build script)") {
-        Keys.classpath set { throwIntrospectionInfoNotAvailable() }
-        Keys.compilerOptions set { throwIntrospectionInfoNotAvailable() }
-        Keys.compile set { throwIntrospectionInfoNotAvailable() }
-        Keys.sourceFiles set { throwIntrospectionInfoNotAvailable() }
+        Keys.repositories set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositories }
+        Keys.repositoryChain set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositoryChain }
+        Keys.libraryDependencies set { Keys.buildScript.get().buildScriptClasspathConfiguration.dependencies }
+        Keys.classpath set { Keys.buildScript.get().classpath.map { LocatedFile(it) } }
+        Keys.compilerOptions set { Keys.buildScript.get().buildFlags }
+        Keys.compile set { Keys.buildScript.get().scriptJar }
+        Keys.sourceFiles set { Keys.buildScript.get().sources }
     }
 
     internal fun Project.initializeBuildScriptInfo() {
-        val buildFile = currentlyInitializedBuildScript
-        if (buildFile == null) {
+        val buildScript = currentlyInitializedBuildScript
+        if (buildScript == null) {
             LOG.debug("Project {} is being initialized at unexpected time, introspection will not be available", this)
         } else {
-            _buildFileProjects.getValue(buildFile).add(this)
-
-            extend (wemiBuildScript) {
-                Keys.repositories set { buildFile.buildScriptClasspathConfiguration.repositories }
-                Keys.repositoryChain set { buildFile.buildScriptClasspathConfiguration.repositoryChain }
-                Keys.libraryDependencies set { buildFile.buildScriptClasspathConfiguration.dependencies }
-                Keys.classpath set { buildFile.classpath.map { LocatedFile(it) } }
-                Keys.compilerOptions set { buildFile.buildFlags }
-                Keys.compile set { buildFile.scriptJar }
-                Keys.sourceFiles set { buildFile.sources }
-            }
+            _buildFileProjects.getValue(buildScript).add(this)
+            Keys.buildScript set { buildScript }
         }
 
     }

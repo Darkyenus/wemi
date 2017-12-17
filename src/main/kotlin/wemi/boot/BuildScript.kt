@@ -50,7 +50,7 @@ private fun prepareBuildFileCacheFolder(buildFolder: File): File? {
     return folder
 }
 
-fun getCompiledBuildScript(buildFolder: File, buildScriptSources:List<File>, forceCompile: Boolean): BuildScript? {
+fun getCompiledBuildScript(rootFolder:File, buildFolder: File, buildScriptSources:List<File>, forceCompile: Boolean): BuildScript? {
     val cacheFolder = prepareBuildFileCacheFolder(buildFolder) ?: return null
     val combinedBuildFileName = buildScriptSources.joinToString("-") { it.nameWithoutExtension }
 
@@ -140,7 +140,7 @@ fun getCompiledBuildScript(buildFolder: File, buildScriptSources:List<File>, for
     }
 
     // Figure out the init class
-    return BuildScript(resultJar, buildFolder,
+    return BuildScript(rootFolder, resultJar, buildFolder,
             classpath, buildScriptSources.map { transformFileNameToKotlinClassName(it.nameWithoutExtension) },
             classpathConfiguration, sources, buildFlags)
 }
@@ -249,11 +249,13 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources:List<File
 }
 
 /**
+ * @property wemiRoot directory in which wemi executable is
  * @property scriptJar jar to which the build script has been compiled
  * @property classpath used to compile and to run the scriptJar
  * @property initClasses main classes of the [scriptJar]
  */
-data class BuildScript(val scriptJar:File, val buildFolder:File,
+data class BuildScript(val wemiRoot:File,
+                       val scriptJar:File, val buildFolder:File,
                        val classpath:List<File>, val initClasses:List<String>,
                        val buildScriptClasspathConfiguration: BuildScriptClasspathConfiguration,
                        val sources:List<LocatedFile>, val buildFlags: CompilerFlags)

@@ -253,7 +253,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
     }
 
     private fun createWemiProjectData(session: WemiLauncherSession, projectName:String):WemiProjectData {
-        val compilerOptions = session.jsonArray(projectName, task = "compilerOptions", configurations = "compilingJava")
+        val compilerOptions = session.jsonArray(projectName, task = "compilerOptions", configurations = *arrayOf("compilingJava"))
         return WemiProjectData(
                 projectName,
                 session.string(projectName, task = "projectName"),
@@ -267,9 +267,9 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     it.mapGet("targetVersion")?.asString() ?: ""
                 },
                 session.string(projectName, task = "outputClassesDirectory"),
-                session.string(projectName, configurations = "test", task = "outputClassesDirectory"),
-                session.stringArray(projectName, configurations = "compilingJava", task = "sourceRoots")
-                        .union(session.stringArray(projectName, configurations = "compilingKotlin", task = "sourceRoots").asIterable())
+                session.string(projectName, configurations = *arrayOf("test"), task = "outputClassesDirectory"),
+                session.stringArray(projectName, configurations = *arrayOf("compilingJava"), task = "sourceRoots")
+                        .union(session.stringArray(projectName, configurations = *arrayOf("compilingKotlin"), task = "sourceRoots").asIterable())
                         .toTypedArray(),
                 session.stringArray(projectName, task = "resourceRoots"),
                 session.stringArray(projectName, "test", "compilingJava", task = "sourceRoots")
