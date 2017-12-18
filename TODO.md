@@ -2,8 +2,6 @@
 
 1. New project wizard
 
-1. (Re)import build script by right-clicking it in the project view
-
 1. Allow projects to inherit from parent project configuration/config set
 	- Maybe simple "setup function" would be enough...
 

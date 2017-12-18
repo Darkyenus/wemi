@@ -47,6 +47,7 @@
                 description="Re-import Wemi project in the project's root into the IDE"
                 icon="WemiIcons.WEMI">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenuRunGroup" anchor="last"/>
         </action>
     </actions>
 
