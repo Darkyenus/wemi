@@ -137,6 +137,28 @@ open class ScopeCache internal constructor(internal val bindingHolder: BindingHo
         }
     }
 
+    internal fun scope(me:Scope, anonymousConfiguration: AnonymousConfiguration):Scope {
+        // Resolve configuration extension, checking even parent scopes
+        val realHolder:BindingHolder
+
+        var scope:ScopeCache = this
+        while (true) {
+            val extension = scope.bindingHolder.configurationExtensions[anonymousConfiguration.parent as? Configuration]
+            if (extension != null) {
+                realHolder = extension
+                break
+            }
+            val parentScope = scope.parentScope
+            if (parentScope == null) {
+                realHolder = anonymousConfiguration
+                break
+            }
+            scope = parentScope.scopeCache
+        }
+
+        return AnonymousConfigurationScope(anonymousConfiguration, realHolder, me)
+    }
+
     internal fun <Value>getCached(key:Key<Value>):Value? {
         synchronized(this) {
             val valueCache = this.valueCache ?: return null
@@ -178,4 +200,15 @@ private class ConfigurationScope(
         get() = this
 
     override fun scopeToString(): String = parentScope!!.scopeToString() + configuration.name + ":"
+}
+
+private class AnonymousConfigurationScope (
+        val anonymousConfiguration: AnonymousConfiguration,
+        bindingHolder: BindingHolder,
+        parentScope: Scope) : ScopeCache(bindingHolder, parentScope), Scope {
+
+    override val scopeCache: ScopeCache
+        get() = this
+
+    override fun scopeToString(): String = parentScope!!.scopeToString() + "<anonymous>:"
 }
