@@ -30,6 +30,9 @@ val EXIT_CODE_MACHINE_OUTPUT_NO_CONFIGURATION_ERROR = 6
 val EXIT_CODE_MACHINE_OUTPUT_NO_KEY_ERROR = 7
 val EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR = 8
 
+internal var WemiRunningInInteractiveMode = false
+    private set
+
 /**
  * Entry point for the WEMI build tool
  */
@@ -119,6 +122,8 @@ fun main(args: Array<String>) {
     if (errors > 0) {
         exitProcess(EXIT_CODE_ARGUMENT_ERROR)
     }
+
+    WemiRunningInInteractiveMode = interactive
 
     // Find root
     val root = File(".").absoluteFile

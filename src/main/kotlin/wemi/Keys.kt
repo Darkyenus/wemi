@@ -28,6 +28,8 @@ object Keys {
     val buildDirectory by key<File>("Directory in which Wemi stores cache and processed data")
     val buildScript by key<BuildScript>("Build script used to load this project")
 
+    val input by key<Input>("Provides access to user input, that can be programmatically pre-set")
+
     val sourceBase by key<File>("Directory in which all source directories can be found (example: '/src/main')")
     val sourceRoots by key<Collection<File>>("Directories which are source roots for the project (example: '/src/main/java')")
     val sourceExtensions by key<Collection<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)")

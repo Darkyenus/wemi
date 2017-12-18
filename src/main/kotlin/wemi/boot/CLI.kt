@@ -25,7 +25,7 @@ object CLI {
 
     private val Terminal: Terminal by lazy { TerminalBuilder.terminal() }
 
-    private val LineReader: LineReaderImpl by lazy {
+    internal val LineReader: LineReaderImpl by lazy {
         LineReaderBuilder.builder()
                 .appName("Wemi")
                 .terminal(Terminal)

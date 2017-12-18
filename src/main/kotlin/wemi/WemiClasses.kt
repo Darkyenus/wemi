@@ -74,7 +74,7 @@ class Configuration internal constructor(val name: String,
 
 private val AnonymousConfigurationDescriptiveAnsiString = CLI.format("<anonymous>", format = CLI.Format.Bold).toString()
 
-class AnonymousConfiguration internal constructor(parent: Configuration?) : BindingHolder(parent), WithDescriptiveString {
+class AnonymousConfiguration @PublishedApi internal constructor(parent: Configuration?) : BindingHolder(parent), WithDescriptiveString {
     override fun toDescriptiveAnsiString(): String = AnonymousConfigurationDescriptiveAnsiString
 }
 
@@ -100,22 +100,22 @@ class Project internal constructor(val name: String, val projectRoot: File)
     }
 }
 
+inline fun <Result> Scope.using(configuration: Configuration, action: Scope.() -> Result):Result {
+    val scope = scopeCache.scope(this, configuration)
+    return scope.action()
+}
+
+inline fun <Result> Scope.using(anonInitializer:AnonymousConfiguration.()->Unit,
+                   parent: Configuration? = null, action:Scope.() -> Result):Result {
+    val anonConfig = AnonymousConfiguration(parent)
+    anonConfig.anonInitializer()
+    val scope = scopeCache.scope(this, anonConfig)
+    return scope.action()
+}
+
 interface Scope {
 
     val scopeCache:ScopeCache
-
-    fun <Result> using(configuration: Configuration, action: Scope.() -> Result):Result {
-        val scope = scopeCache.scope(this, configuration)
-        return scope.action()
-    }
-
-    fun <Result> using(anonInitializer:AnonymousConfiguration.()->Unit,
-                       parent: Configuration? = null, action:Scope.() -> Result):Result {
-        val anonConfig = AnonymousConfiguration(parent)
-        anonConfig.anonInitializer()
-        val scope = scopeCache.scope(this, anonConfig)
-        return scope.action()
-    }
 
     private inline fun <Value>unpack(scope: Scope, key: Key<Value>, binding: BoundKeyValue<Value>, reverseModifiers:ArrayList<BoundKeyValueModifier<Value>>?):Value {
         var result = this.binding()
@@ -254,14 +254,14 @@ sealed class BindingHolder(val parent: BindingHolder?) {
     }
 
     //region Modify utility methods
-    infix fun <Value> Key<Collection<Value>>.add(lazyValueModifier: BoundKeyValue<Value>) {
+    infix inline fun <Value> Key<Collection<Value>>.add(crossinline lazyValueModifier: BoundKeyValue<Value>) {
         this.modify { collection:Collection<Value> ->
             //TODO Optimize?
             collection + lazyValueModifier()
         }
     }
 
-    infix fun <Value> Key<Collection<Value>>.remove(lazyValueModifier: BoundKeyValue<Value>) {
+    infix inline fun <Value> Key<Collection<Value>>.remove(crossinline lazyValueModifier: BoundKeyValue<Value>) {
         this.modify { collection:Collection<Value> ->
             collection - lazyValueModifier()
         }

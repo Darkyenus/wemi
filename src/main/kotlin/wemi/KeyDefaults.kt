@@ -9,6 +9,7 @@ import wemi.Configurations.compilingKotlin
 import wemi.assembly.AssemblySource
 import wemi.assembly.FileRecognition
 import wemi.assembly.MergeStrategy
+import wemi.boot.WemiRunningInInteractiveMode
 import wemi.compile.CompilerFlags
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.JavaVersion
@@ -545,6 +546,8 @@ object KeyDefaults {
     }
 
     fun Project.applyDefaults() {
+        Keys.input set { InputBase(WemiRunningInInteractiveMode) }
+
         Keys.buildDirectory set BuildDirectory
         Keys.sourceBase set SourceBaseScopeMain
         Keys.sourceFiles set SourceFiles

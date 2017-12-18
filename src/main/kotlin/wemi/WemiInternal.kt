@@ -110,6 +110,7 @@ open class ScopeCache internal constructor(internal val bindingHolder: BindingHo
 
     private var valueCache:MutableMap<Key<*>, Any?>? = null
 
+    @PublishedApi
     internal fun scope(me:Scope, configuration:Configuration):Scope {
         val scopes = scopes
         synchronized(scopes) {
@@ -137,26 +138,10 @@ open class ScopeCache internal constructor(internal val bindingHolder: BindingHo
         }
     }
 
+    @PublishedApi
     internal fun scope(me:Scope, anonymousConfiguration: AnonymousConfiguration):Scope {
-        // Resolve configuration extension, checking even parent scopes
-        val realHolder:BindingHolder
-
-        var scope:ScopeCache = this
-        while (true) {
-            val extension = scope.bindingHolder.configurationExtensions[anonymousConfiguration.parent as? Configuration]
-            if (extension != null) {
-                realHolder = extension
-                break
-            }
-            val parentScope = scope.parentScope
-            if (parentScope == null) {
-                realHolder = anonymousConfiguration
-                break
-            }
-            scope = parentScope.scopeCache
-        }
-
-        return AnonymousConfigurationScope(anonymousConfiguration, realHolder, me)
+        // Cannot be extended
+        return AnonymousConfigurationScope(anonymousConfiguration, me)
     }
 
     internal fun <Value>getCached(key:Key<Value>):Value? {
@@ -203,9 +188,8 @@ private class ConfigurationScope(
 }
 
 private class AnonymousConfigurationScope (
-        val anonymousConfiguration: AnonymousConfiguration,
-        bindingHolder: BindingHolder,
-        parentScope: Scope) : ScopeCache(bindingHolder, parentScope), Scope {
+        anonymousConfiguration: AnonymousConfiguration,
+        parentScope: Scope) : ScopeCache(anonymousConfiguration, parentScope), Scope {
 
     override val scopeCache: ScopeCache
         get() = this
