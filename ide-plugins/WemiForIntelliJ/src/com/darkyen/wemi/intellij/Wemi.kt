@@ -21,11 +21,13 @@ val WemiLauncherFileName = "wemi"
  *
  * This is not a "fast" operation.
  */
-fun findWemiLauncher(project:Project):WemiLauncher? {
-    val wemiJar = project.baseDir.findChild(WemiLauncherFileName)?: return null
-    if (!wemiJar.isValid || wemiJar.isDirectory) return null
+fun findWemiLauncher(project:Project, wemiRootPath:String? = null):WemiLauncher? {
+    val baseFile = File(project.basePath ?: wemiRootPath ?: return null)
+    val wemiJar = File(baseFile, WemiLauncherFileName)
 
-    return WemiLauncher(wemiJar.path)
+    if (!wemiJar.isFile) return null
+
+    return WemiLauncher(wemiJar.absolutePath)
 }
 
 class WemiLauncher internal constructor(val file: String) {

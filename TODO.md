@@ -1,7 +1,5 @@
 # Things to do next
 
-1. Import WEMI project directly
-
 1. New project wizard
 
 1. (Re)import build script by right-clicking it in the project view

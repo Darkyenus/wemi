@@ -7,7 +7,6 @@ import com.intellij.ide.actions.ImportModuleAction
 import com.intellij.ide.util.newProjectWizard.AddModuleWizard
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.externalSystem.service.project.ProjectDataManager
 import com.intellij.openapi.project.Project
 import icons.WemiIcons
 import java.io.File
@@ -53,7 +52,7 @@ class ImportProjectAction : AnAction("Import Wemi Project", "Import an unlinked 
         }
 
         fun importUnlinkedProject(project: Project, launcher: WemiLauncher) {
-            val importBuilder = ImportFromWemiControlBuilder(ProjectDataManager.getInstance(), launcher)
+            val importBuilder = ImportFromWemiControlBuilder()
 
             val projectDirectory = File(launcher.file).parentFile
             val wizard = AddModuleWizard(project, projectDirectory.absolutePath, WemiProjectImportProvider(importBuilder))

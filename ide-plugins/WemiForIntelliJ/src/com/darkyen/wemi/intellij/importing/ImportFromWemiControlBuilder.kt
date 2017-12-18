@@ -1,6 +1,5 @@
 package com.darkyen.wemi.intellij.importing
 
-import com.darkyen.wemi.intellij.WemiLauncher
 import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.intellij.externalSystem.JavaProjectData
 import com.intellij.ide.util.projectWizard.WizardContext
@@ -17,12 +16,10 @@ import icons.WemiIcons
 import java.io.File
 
 /**
- * Used when importing unlinked project.
- *
- * TODO Check if it does what it should
+ * Used when importing (unlinked?) project.
  */
-class ImportFromWemiControlBuilder(dataManager: ProjectDataManager, val launcher: WemiLauncher)
-    : AbstractExternalProjectImportBuilder<ImportFromWemiControl>(dataManager, ImportFromWemiControl(), WemiProjectSystemId) {
+class ImportFromWemiControlBuilder
+    : AbstractExternalProjectImportBuilder<ImportFromWemiControl>(ProjectDataManager.getInstance(), ImportFromWemiControl(), WemiProjectSystemId) {
 
     override fun getIcon() = WemiIcons.WEMI
 

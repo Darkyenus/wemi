@@ -63,6 +63,7 @@ class WemiManager : ExternalSystemUiAware,
 
     override fun getExecutionSettingsProvider(): Function<Pair<Project, String/*linked project path*/>, WemiExecutionSettings> {
         return Function { pair ->
+            // Project may be template project!
             val project = pair.first
 
             val systemSettings = WemiSystemSettings.getInstance(project)
@@ -84,7 +85,7 @@ class WemiManager : ExternalSystemUiAware,
 
 
             WemiExecutionSettings(
-                    findWemiLauncher(project) ?: throw RuntimeException("Project $project does not have wemi launcher!"),
+                    findWemiLauncher(project, pair.second) ?: throw RuntimeException("Project $project does not have wemi launcher!"),
                     javaVmExecutablePath,
                     projectSettings?.downloadDocs ?: true,
                     projectSettings?.downloadSources ?: true,
