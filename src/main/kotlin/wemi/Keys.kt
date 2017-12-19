@@ -67,6 +67,7 @@ object Keys {
     val runOptions by key<Collection<String>>("Options given to 'java' when running the project")
     val runArguments by key<Collection<String>>("Options given to the application when running the project")
     val run by key<Int>("Compile and run the project, return exit code")
+    val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code")
 
     val assemblyMergeStrategy by key<(String) -> MergeStrategy>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
     val assemblyRenameFunction by key<(AssemblySource, String) -> String?>("Function for renaming assembled duplicate files for which merge strategy is Rename. First argument is the source of the data, second is the path inside the root. Returns new path or null to discard. Paths after rename must not conflict, rules are not recursive.")

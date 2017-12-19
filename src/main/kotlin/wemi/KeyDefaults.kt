@@ -271,6 +271,32 @@ object KeyDefaults {
         }
     }
 
+    val RunMain: BoundKeyValue<Int> = {
+        val mainClass = Keys.input.get().read("main", "Main class to start", ClassNameValidator)
+                ?: throw WemiException("Main class not specified", showStacktrace = false)
+
+        using(Configurations.running) {
+            val javaExecutable = Keys.javaExecutable.get()
+            val classpath = Keys.classpath.get()
+            val directory = Keys.runDirectory.get()
+            val options = Keys.runOptions.get()
+            val arguments = Keys.runArguments.get()
+
+            val modifiedClasspath = classpath.map { it.classpathEntry }.distinct()
+
+            val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, modifiedClasspath,
+                    mainClass, options, arguments)
+
+            // Separate process output from Wemi output
+            println()
+            val process = processBuilder.start()
+            val result = process.waitFor()
+            println()
+
+            result
+        }
+    }
+
     val AssemblyMergeStrategy: BoundKeyValue<(String) -> MergeStrategy> = {
         { name ->
             // Based on https://github.com/sbt/sbt-assembly logic
@@ -584,6 +610,7 @@ object KeyDefaults {
         Keys.runOptions set RunOptions
         Keys.runArguments set RunArguments
         Keys.run set Run
+        Keys.runMain set RunMain
 
         Keys.assemblyMergeStrategy set AssemblyMergeStrategy
         Keys.assemblyRenameFunction set AssemblyRenameFunction

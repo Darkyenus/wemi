@@ -33,6 +33,9 @@ val EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR = 8
 internal var WemiRunningInInteractiveMode = false
     private set
 
+internal var WemiBuildScript:BuildScript? = null
+    private set
+
 /**
  * Entry point for the WEMI build tool
  */
@@ -165,6 +168,7 @@ fun main(args: Array<String>) {
 
     // Load build files now
     if (buildScript != null) {
+        WemiBuildScript = buildScript
         PrettyPrinter.setApplicationRootDirectory(buildScript.wemiRoot)
 
         val urls = arrayOfNulls<URL>(1 + buildScript.classpath.size)

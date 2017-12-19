@@ -2,9 +2,7 @@ package wemi.boot
 
 import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TerminalColor
-import org.jline.reader.EndOfFileException
-import org.jline.reader.LineReaderBuilder
-import org.jline.reader.UserInterruptException
+import org.jline.reader.*
 import org.jline.reader.impl.DefaultParser
 import org.jline.reader.impl.LineReaderImpl
 import org.jline.terminal.Terminal
@@ -15,6 +13,9 @@ import wemi.util.*
 import java.io.File
 import java.io.IOException
 import java.io.PrintStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.time.Instant
 
 /**
  * Handles user interaction in standard (possibly interactive) mode
@@ -25,7 +26,7 @@ object CLI {
 
     private val Terminal: Terminal by lazy { TerminalBuilder.terminal() }
 
-    internal val LineReader: LineReaderImpl by lazy {
+    private val LineReader: LineReaderImpl by lazy {
         LineReaderBuilder.builder()
                 .appName("Wemi")
                 .terminal(Terminal)
@@ -33,6 +34,19 @@ object CLI {
                     isEofOnEscapedNewLine = false
                     isEofOnUnclosedQuote = false
                 })
+                .history(getHistory("repl"))
+                .build() as LineReaderImpl
+    }
+
+    internal val InputLineReader: LineReaderImpl by lazy {
+        LineReaderBuilder.builder()
+                .appName("Wemi")
+                .terminal(Terminal)
+                .parser(DefaultParser().apply {
+                    isEofOnEscapedNewLine = false
+                    isEofOnUnclosedQuote = false
+                })
+                .history(NoHistory)
                 .build() as LineReaderImpl
     }
 
@@ -410,9 +424,9 @@ object CLI {
     }
 
     enum class Format(internal val number: Int) {
-        Bold(1),
+        Bold(1), // Label or Prompt
         Italic(3),
-        Underline(4),
+        Underline(4), // Input
     }
 
     private fun printLabeled(label:String, items:Map<String, WithDescriptiveString>) {
@@ -421,5 +435,270 @@ object CLI {
             print("   ")
             println(value.toDescriptiveAnsiString())
         }
+    }
+
+    private val histories = HashMap<String, SimpleHistory>()
+
+    fun getHistory(name:String):History {
+        return histories.getOrPut(name) {
+            val buildScript = WemiBuildScript
+            if (buildScript == null) {
+                SimpleHistory(null)
+            } else {
+                val historiesFolder = buildScript.buildFolder.toPath().resolve("cache/history/")
+                Files.createDirectories(historiesFolder)
+                val fileName = StringBuilder()
+                for (c in name) {
+                    if (c.isLetterOrDigit() || c.isWhitespace() || c == '.' || c == '_' || c == '-') {
+                        fileName.append(c)
+                    } else {
+                        fileName.append(c.toInt())
+                    }
+                }
+
+                SimpleHistory(historiesFolder.resolve(fileName.toString()))
+            }
+        }
+    }
+
+    init {
+        Runtime.getRuntime().addShutdownHook(Thread({
+            for (value in histories.values) {
+                value.save()
+            }
+            HISTORY_LOG.debug("Histories saved")
+        }, "HistorySaver"))
+    }
+
+    private val NoHistory = SimpleHistory(null)
+
+    private val HISTORY_LOG = LoggerFactory.getLogger(SimpleHistory::class.java)
+
+    private class SimpleHistory(private val path:Path?) : History {
+
+        val DEFAULT_HISTORY_SIZE = 50
+
+        private val items = ArrayList<String>()
+        private var index = 0
+        private var changed = false
+
+        init {
+            load()
+        }
+
+        override fun attach(reader: LineReader) {
+            // Do nothing, we don't care about what LineReader thinks
+        }
+
+        override fun load() {
+            if (path == null || !Files.exists(path)) {
+                return
+            }
+            val lines = try {
+                Files.readAllLines(path, Charsets.UTF_8)
+            } catch (e:Exception) {
+                HISTORY_LOG.warn("Failed to load from path {}", path, e)
+                return
+            }
+            clear()
+            items.addAll(lines)
+            changed = false
+            index = size()
+        }
+
+        override fun save() {
+            if (!changed || path == null) {
+                return
+            }
+
+            try {
+                Files.newBufferedWriter(path, Charsets.UTF_8).use { writer ->
+                    for (line in items) {
+                        writer.write(line)
+                        writer.append('\n')
+                    }
+                }
+            } catch (e:Exception) {
+                HISTORY_LOG.warn("Failed to write to path {}", path, e)
+                return
+            }
+
+            changed = false
+        }
+
+        private fun clear() {
+            items.clear()
+            index = 0
+            changed = true
+        }
+
+        override fun purge() {
+            clear()
+            if (path != null) {
+                HISTORY_LOG.trace("Purging history from {}", path)
+                Files.deleteIfExists(path)
+            }
+            changed = false
+        }
+
+        override fun size(): Int {
+            return items.size
+        }
+
+        override fun isEmpty(): Boolean {
+            return items.isEmpty()
+        }
+
+        override fun index(): Int = index
+
+        override fun first(): Int = 0
+
+        override fun last(): Int = items.size - 1
+
+        override fun get(index: Int): String {
+            return items[index]
+        }
+
+        override fun add(line: String) {
+            items.remove(line)
+            items.add(line)
+            changed = true
+            while (size() > DEFAULT_HISTORY_SIZE) {
+                items.removeAt(0)
+            }
+            index = size()
+        }
+
+        override fun add(time: Instant, line: String) {
+            add(line)
+        }
+
+        // This is used when navigating the history
+        override fun iterator(index: Int): ListIterator<History.Entry> {
+            val iterator = items.listIterator(index)
+            return object : ListIterator<History.Entry> {
+                override fun hasNext(): Boolean = iterator.hasNext()
+
+                override fun hasPrevious(): Boolean = iterator.hasPrevious()
+
+                override fun nextIndex(): Int = iterator.nextIndex()
+
+                override fun previousIndex(): Int = iterator.previousIndex()
+
+                private fun map(index:Int, line:String):History.Entry {
+                    return object : History.Entry {
+                        override fun index(): Int = index
+
+                        override fun time(): Instant = Instant.EPOCH
+
+                        override fun line(): String = line
+                    }
+                }
+
+                override fun next(): History.Entry = map(iterator.nextIndex(), iterator.next())
+
+                override fun previous(): History.Entry = map(iterator.previousIndex(), iterator.previous())
+            }
+        }
+
+        //
+        // Navigation
+        //
+
+        /**
+         * This moves the history to the last entry. This entry is one position
+         * before the moveToEnd() position.
+         *
+         * @return Returns false if there were no history iterator or the history
+         * index was already at the last entry.
+         */
+        override fun moveToLast(): Boolean {
+            val lastEntry = size() - 1
+            if (lastEntry >= 0 && lastEntry != index) {
+                index = size() - 1
+                return true
+            }
+
+            return false
+        }
+
+        /**
+         * Move to the specified index in the history
+         */
+        override fun moveTo(index: Int): Boolean {
+            if (index >= 0 && index < size()) {
+                this.index = index
+                return true
+            }
+            return false
+        }
+
+        /**
+         * Moves the history index to the first entry.
+         *
+         * @return Return false if there are no iterator in the history or if the
+         * history is already at the beginning.
+         */
+        override fun moveToFirst(): Boolean {
+            if (size() > 0 && index != 0) {
+                index = 0
+                return true
+            }
+            return false
+        }
+
+        /**
+         * Move to the end of the history buffer. This will be a blank entry, after
+         * all of the other iterator.
+         */
+        override fun moveToEnd() {
+            index = size()
+        }
+
+        /**
+         * Return the content of the current buffer.
+         */
+        override fun current(): String {
+            return if (index < 0 || index >= size()) {
+                ""
+            } else {
+                items[index]
+            }
+        }
+
+        /**
+         * Move the pointer to the previous element in the buffer.
+         *
+         * @return true if we successfully went to the previous element
+         */
+        override fun previous(): Boolean {
+            if (index <= 0) {
+                return false
+            }
+            index--
+            return true
+        }
+
+        /**
+         * Move the pointer to the next element in the buffer.
+         *
+         * @return true if we successfully went to the next element
+         */
+        override fun next(): Boolean {
+            if (index >= size()) {
+                return false
+            }
+            index++
+            return true
+        }
+
+        override fun toString(): String {
+            val sb = StringBuilder()
+            for (e in this) {
+                sb.append(e.toString()).append("\n")
+            }
+            return sb.toString()
+        }
+
     }
 }

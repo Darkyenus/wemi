@@ -1,6 +1,7 @@
 package wemi
 
 import org.jline.reader.EndOfFileException
+import org.jline.reader.History
 import org.jline.reader.UserInterruptException
 import wemi.boot.CLI
 import wemi.util.Failable
@@ -19,13 +20,21 @@ internal class InputBase (private val interactive:Boolean) : Input() {
         }
         try {
             while (true) {
-                val line = CLI.LineReader.readLine(description)
+                val line = CLI.InputLineReader.run {
+                    val previousHistory = history
+                    try {
+                        history = getHistory(key)
+                        readLine("${CLI.format(description, format = CLI.Format.Bold)}: ")
+                    } finally {
+                        history = previousHistory
+                    }
+                }
                 val value = validator(line)
                 value.use ({
                     return it
                 }, {
-                    print("Invalid input: ")
-                    println(it)
+                    print(CLI.format("Invalid input: ", format = CLI.Format.Bold))
+                    println(CLI.format(it, foreground = CLI.Color.Red))
                 })
             }
         } catch (e:UserInterruptException) {
@@ -35,6 +44,10 @@ internal class InputBase (private val interactive:Boolean) : Input() {
         }
     }
 
+}
+
+private fun getHistory(key:String):History {
+    return CLI.getHistory("input.$key")
 }
 
 /**
@@ -62,6 +75,7 @@ private class InputExtensionBinding(val previous:Input, val extension: InputExte
 
             if (preparedValue != null) {
                 validator(preparedValue).success {
+                    getHistory(key).add(preparedValue)
                     return it
                 }
             }
@@ -78,8 +92,10 @@ private class InputExtensionBinding(val previous:Input, val extension: InputExte
         extension.apply {
             if (freeInput != null) {
                 if (nextFreeInput < freeInput.size) {
-                    validator(freeInput[nextFreeInput]).success {
+                    val freeInput = freeInput[nextFreeInput]
+                    validator(freeInput).success {
                         // We will use this free input
+                        getHistory(key).add(freeInput)
                         nextFreeInput++
                         return it
                     }
@@ -118,6 +134,36 @@ val BooleanValidator:Validator<Boolean> = {
         else ->
             Failable.failure("Boolean expected")
     }
+}
+/**
+ * String validator, succeeds only if string is a valid class name with package.
+ * (For example "wemi.Input")
+ */
+val ClassNameValidator:Validator<String> = validator@{
+    val className = it.trim()
+
+    var firstLetter = true
+    for (c in className) {
+        if (firstLetter) {
+            if (!c.isJavaIdentifierStart()) {
+                return@validator Failable.failure("Invalid character '$c' - class name expected")
+            }
+            firstLetter = false
+        } else {
+            if (!c.isJavaIdentifierPart()) {
+                if (c == '.') {
+                    firstLetter = true
+                } else {
+                    return@validator Failable.failure("Invalid character '$c' - class name expected")
+                }
+            }
+        }
+    }
+    if (firstLetter) {
+        return@validator Failable.failure("Class name is incomplete")
+    }
+
+    Failable.success(className)
 }
 
 /**
