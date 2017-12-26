@@ -8,6 +8,7 @@ import com.darkyen.tproll.util.TimeFormatter
 import org.slf4j.LoggerFactory
 import wemi.Configurations
 import wemi.WemiVersion
+import wemi.util.Tokens
 import wemi.util.WemiDefaultClassLoader
 import wemi.util.div
 import java.io.*
@@ -19,9 +20,7 @@ import kotlin.system.exitProcess
 private val LOG = LoggerFactory.getLogger("Main")
 
 val EXIT_CODE_SUCCESS = 0
-@Suppress("unused")
-@Deprecated("Consider adding separate error code")
-val EXIT_CODE_UNKNOWN_ERROR = 1
+//val EXIT_CODE_UNKNOWN_ERROR = 1 // Do not use
 val EXIT_CODE_ARGUMENT_ERROR = 2
 val EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR = 3
 val EXIT_CODE_MACHINE_OUTPUT_THROWN_EXCEPTION_ERROR = 4
@@ -29,6 +28,7 @@ val EXIT_CODE_MACHINE_OUTPUT_NO_PROJECT_ERROR = 5
 val EXIT_CODE_MACHINE_OUTPUT_NO_CONFIGURATION_ERROR = 6
 val EXIT_CODE_MACHINE_OUTPUT_NO_KEY_ERROR = 7
 val EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR = 8
+val EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND = 9
 
 internal var WemiRunningInInteractiveMode = false
     private set
@@ -47,7 +47,7 @@ fun main(args: Array<String>) {
 
     var errors = 0
 
-    val tasks = ArrayList<String>()
+    val taskArguments = ArrayList<String>()
     var interactive = false
     var machineReadableOutput = false
     var allowBrokenBuildScripts = false
@@ -99,11 +99,11 @@ fun main(args: Array<String>) {
                     errors++
                 }
             } else {
-                tasks.add(arg)
+                taskArguments.add(arg)
                 parsingOptions = false
             }
         } else {
-            tasks.add(arg)
+            taskArguments.add(arg)
         }
     }
 
@@ -116,7 +116,7 @@ fun main(args: Array<String>) {
     } else {
         machineOutput = null
 
-        if (tasks.isEmpty()) {
+        if (taskArguments.isEmpty()) {
             interactive = true
         }
     }
@@ -195,7 +195,12 @@ fun main(args: Array<String>) {
     Configurations
     // ------------------------------------
 
+    val taskTokens = TaskParser.createTokens(TaskParser.parseTokens(taskArguments))
+    val tasks = TaskParser.parseTasks(taskTokens)
+
     if (machineReadableOutput) {
+        taskTokens.machineReadableCheckErrors()
+
         val out = machineOutput!!
         for (task in tasks) {
             machineReadableEvaluateAndPrint(out, task)
@@ -205,11 +210,28 @@ fun main(args: Array<String>) {
             val reader = BufferedReader(InputStreamReader(System.`in`))
             while (true) {
                 val line = reader.readLine() ?: break
-                machineReadableEvaluateAndPrint(out, line)
+
+                val parsedTokens = TaskParser.parseTokens(line, 0)
+                val lineTaskTokens = TaskParser.createTokens(parsedTokens.tokens)
+                val lineTasks = TaskParser.parseTasks(lineTaskTokens)
+
+                lineTaskTokens.machineReadableCheckErrors()
+
+                for (task in lineTasks) {
+                    machineReadableEvaluateAndPrint(out, task)
+                }
             }
         }
     } else {
         CLI.init(root)
+
+        val formattedErrors = taskTokens.formattedErrors(true)
+        if (formattedErrors.hasNext()) {
+            println(CLI.format("Errors in task input:", CLI.Color.Red))
+            do {
+                println(formattedErrors.next())
+            } while (formattedErrors.hasNext())
+        }
 
         for (task in tasks) {
             CLI.evaluateKeyAndPrint(task)
@@ -221,4 +243,20 @@ fun main(args: Array<String>) {
     }
 
     exitProcess(EXIT_CODE_SUCCESS)
+}
+
+/**
+ * Checks if [Tokens] contain errors after parsing.
+ * If there are any, print them and exit process.
+ */
+private fun Tokens<String, TaskParser.TokenType>.machineReadableCheckErrors() {
+    val formattedErrors = formattedErrors(false)
+    if (formattedErrors.hasNext()) {
+        LOG.error("Errors in task input:")
+        do {
+            LOG.error("{}", formattedErrors.next())
+        } while (formattedErrors.hasNext())
+
+        exitProcess(EXIT_CODE_ARGUMENT_ERROR)
+    }
 }

@@ -15,9 +15,9 @@ import kotlin.system.exitProcess
 
 private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
 
-fun machineReadableEvaluateAndPrint(out: PrintStream, task:String) {
-    if (task.startsWith('#')) {
-        when (task) {
+fun machineReadableEvaluateAndPrint(out: PrintStream, task:Task) {
+    if (task.key.startsWith('#') && task.couldBeCommand) {
+        when (task.key) {
             "#version" -> {
                 machineReadablePrint(out, WemiVersion)
                 return
@@ -80,7 +80,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task:String) {
         }
 
         LOG.error("Can't evaluate {} - unknown command", task)
-        return
+        exitProcess(EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND)
     }
 
     try {

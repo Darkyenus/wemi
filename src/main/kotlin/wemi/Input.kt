@@ -24,7 +24,7 @@ internal class InputBase (private val interactive:Boolean) : Input() {
                     val previousHistory = history
                     try {
                         history = getHistory(key)
-                        readLine("${CLI.format(description, format = CLI.Format.Bold)}: ")
+                        readLine("${CLI.format(description, format = CLI.Format.Bold)} (${CLI.format(key, format = CLI.Format.Italic)}): ")
                     } finally {
                         history = previousHistory
                     }
@@ -228,4 +228,24 @@ fun <Result> Scope.withInput(vararg freeInput:String, action:Scope.()->Result):R
             }
         }, parent = null, action = action)
 }
+
+/**
+ * Add given inputs pairs to the scope through an anonymous configuration and run the [action] with that
+ * configuration in [Scope] stack.
+ *
+ * This can specify free and non-free inputs at the same time.
+ * Those input pairs with null keys are treated as free input.
+ *
+ * @see [using]
+ * @see [withInput]
+ */
+fun <Result> Scope.withMixedInput(freeInput: Array<out String>, boundInput:Map<String, String>, action:Scope.()->Result):Result {
+    val inputExtension = InputExtension(freeInput, boundInput)
+    return using(anonInitializer = {
+        Keys.input.modify { old ->
+            InputExtensionBinding(old, inputExtension)
+        }
+    }, parent = null, action = action)
+}
+
 

@@ -1,6 +1,8 @@
 package wemi.util
 
+import wemi.boot.CLI
 import java.io.File
+import java.util.*
 
 /**
  *
@@ -77,23 +79,32 @@ fun File.nameHasExtension(extensions:Collection<String>):Boolean {
     return false
 }
 
-inline fun String.forCodePoints(action:(Int) -> Unit) {
+typealias Index = Int
+typealias CodePoint = Int
+
+inline fun String.forCodePointsIndexed(action:(Index, CodePoint) -> Unit) {
     val length = this.length
     var i = 0
 
     while (i < length) {
         val c1 = get(i++)
         if (!Character.isHighSurrogate(c1) || i >= length) {
-            action(c1.toInt())
+            action(i, c1.toInt())
         } else {
             val c2 = get(i)
             if (Character.isLowSurrogate(c2)) {
                 i++
-                action(Character.toCodePoint(c1, c2))
+                action(i, Character.toCodePoint(c1, c2))
             } else {
-                action(c1.toInt())
+                action(i, c1.toInt())
             }
         }
+    }
+}
+
+inline fun String.forCodePoints(action:(CodePoint) -> Unit) {
+    forCodePointsIndexed { _, cp ->
+        action(cp)
     }
 }
 
@@ -123,5 +134,178 @@ fun String.toSafeFileName(replacement:Char = '_'):String {
         sb.toString()
     } else {
         this
+    }
+}
+
+/**
+ * @return true if the string is a valid identifier, using Java identifier rules
+ */
+fun String.isValidIdentifier():Boolean {
+    if (isEmpty()) {
+        return false
+    }
+    if (!this[0].isJavaIdentifierStart()) {
+        return false
+    }
+    for (i in 1..lastIndex) {
+        if (!this[i].isJavaIdentifierPart()) {
+            return false
+        }
+    }
+    return true
+}
+
+@Suppress("UNCHECKED_CAST")
+fun <T> arrayFilledWith(size:Int, with:T): Array<T> {
+    val memoArray:Array<T> = java.lang.reflect.Array.newInstance((with as Any)::class.java, size) as Array<T>
+    Arrays.fill(memoArray, with)
+    return memoArray
+}
+
+typealias Mark = Int
+
+class Tokens<T, Memo>(val data:List<T>, private val limit:Int = data.size, defaultMemo:Memo? = null) {
+
+    @Suppress("UNCHECKED_CAST")
+    val memos:Array<Memo>? = if (defaultMemo == null) { null } else { arrayFilledWith(data.size, defaultMemo) }
+
+    private var next = 0
+    private var lazyErrors:ArrayList<Pair<Int, String>>? = null
+
+    val errors:List<Pair<Int, String>>
+        get() = lazyErrors ?: emptyList()
+
+    fun formattedErrors(colored:Boolean):Iterator<String> = object : Iterator<String> {
+            val parent = errors.iterator()
+
+            override fun hasNext(): Boolean {
+                return parent.hasNext()
+            }
+
+            override fun next(): String {
+                val (word, message) = parent.next()
+
+                val sb = StringBuilder()
+                if (word - 3 in data.indices) {
+                    sb.append("... ")
+                }
+                if (word - 2 in data.indices) {
+                    sb.append(data[word-2]).append(' ')
+                }
+                if (word - 1 in data.indices) {
+                    sb.append(data[word-1]).append(' ')
+                }
+                if (word in data.indices) {
+                    sb.append('>')
+                    if (colored) {
+                        sb.append(CLI.format(data[word].toString(), format = CLI.Format.Underline))
+                    } else {
+                        sb.append(data[word])
+                    }
+                    sb.append('<')
+
+                    sb.append(' ')
+                }
+                if (word + 1 in data.indices) {
+                    sb.append(data[word + 1]).append(' ')
+                }
+                if (word + 2 in data.indices) {
+                    sb.append(data[word + 2]).append(' ')
+                }
+                if (word + 3 in data.indices) {
+                    sb.append("... ")
+                }
+
+                if (sb.isEmpty()) {
+                    sb.append("(At word ").append(word).append('/').append(data.size).append(")")
+                } else {
+                    // Strip leading space
+                    sb.setLength(sb.length-1)
+                }
+                sb.append('\n').append('⤷').append(' ')
+                if (colored) {
+                    sb.append(CLI.format(message, CLI.Color.Red))
+                } else {
+                    sb.append(message)
+                }
+
+                return sb.toString()
+            }
+        }
+
+    fun mark():Mark = next
+
+    fun Mark.rollback() {
+        next = this
+    }
+
+    fun Mark.errorAndRollback(error:String) {
+        error(error)
+        next = this
+    }
+
+    fun error(message:String) {
+        if (lazyErrors == null) {
+            lazyErrors = ArrayList()
+        }
+        lazyErrors!!.add(next to message)
+    }
+
+    fun hasNext(memo: Memo? = null):Boolean {
+        if (next < data.size && memos != null && memo != null) {
+            memos[next] = memo
+        }
+
+        return next < limit
+    }
+
+    fun next(memo: Memo? = null):T? {
+        if (next < data.size && memos != null && memo != null) {
+            memos[next] = memo
+        }
+
+        return if (next < limit) {
+            data[next++]
+        } else {
+            null
+        }
+    }
+
+    fun peek(skip:Int = 0):T? {
+        return data.getOrNull(next + skip)
+    }
+
+    fun match(memo: Memo? = null, matcher:(T)->Boolean):Boolean {
+        return if (next < limit && matcher(data[next])) {
+            if (memos != null && memo != null) {
+                memos[next] = memo
+            }
+            next++
+            true
+        } else {
+            false
+        }
+    }
+
+    fun matches(skip:Int = 0, matcher:(T)->Boolean):Boolean {
+        val index = next + skip
+        return index in (0 until limit) && matcher(data[index])
+    }
+
+    fun match(value:T, memo: Memo? = null):Boolean {
+        return if (next < limit && value == data[next]) {
+            if (memos != null && memo != null) {
+                memos[next] = memo
+            }
+            next++
+            true
+        } else {
+            false
+        }
+    }
+
+    fun matches(skip:Int = 0, value:T):Boolean {
+        val index = next + skip
+        return index in (0 until limit) && value == data[index]
     }
 }

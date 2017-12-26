@@ -26,16 +26,17 @@ object CLI {
 
     private val Terminal: Terminal by lazy { TerminalBuilder.terminal() }
 
-    private val LineReader: LineReaderImpl by lazy {
-        LineReaderBuilder.builder()
+    private val TaskLineReader: LineReaderImpl by lazy {
+        (LineReaderBuilder.builder()
                 .appName("Wemi")
                 .terminal(Terminal)
-                .parser(DefaultParser().apply {
-                    isEofOnEscapedNewLine = false
-                    isEofOnUnclosedQuote = false
-                })
+                .parser(TaskParser)
+                .completer(TaskCompleter)
                 .history(getHistory("repl"))
-                .build() as LineReaderImpl
+                .build() as LineReaderImpl).apply {
+            unsetOpt(LineReader.Option.INSERT_TAB)
+            unsetOpt(LineReader.Option.MENU_COMPLETE)
+        }
     }
 
     internal val InputLineReader: LineReaderImpl by lazy {
@@ -165,19 +166,19 @@ object CLI {
         }
     }
 
-    fun evaluateKeyAndPrint(text: String) {
+    fun evaluateKeyAndPrint(task: Task) {
         // TODO Ideally, this would get rewritten with Done message if nothing was written between them
         print(formatLabel("→ "))
-        println(formatInput(text))
+        println(formatInput(task.key))
 
         val beginTime = System.currentTimeMillis()
-        val (key, data, status) = evaluateKey(text)
+        val (key, data, status) = evaluateKey(task)
         val duration = System.currentTimeMillis() - beginTime
 
         base@when (status) {
             CLI.KeyEvaluationStatus.Success -> {
                 print(formatLabel("Done "))
-                print(formatInput(text))
+                print(formatInput(task.key))
                 @Suppress("UNCHECKED_CAST")
                 val prettyPrinter:((Any?) -> CharSequence)? = key?.prettyPrinter as ((Any?) -> CharSequence)?
 
@@ -216,21 +217,21 @@ object CLI {
             CLI.KeyEvaluationStatus.NoProject -> {
                 val projectString = data as String?
                 if (projectString != null) {
-                    printWarning("Can't evaluate $text - no project named '$projectString' found", projectString, AllProjects.keys)
+                    printWarning("Can't evaluate $task - no project named '$projectString' found", projectString, AllProjects.keys)
                 } else {
-                    printWarning("Can't evaluate $text - no project specified")
+                    printWarning("Can't evaluate $task - no project specified")
                 }
             }
             CLI.KeyEvaluationStatus.NoConfiguration -> {
                 val configString = data as String
-                printWarning("Can't evaluate $text - no configuration named '$configString' found", configString, AllConfigurations.keys)
+                printWarning("Can't evaluate $task - no configuration named '$configString' found", configString, AllConfigurations.keys)
             }
             CLI.KeyEvaluationStatus.NoKey -> {
                 val keyString = data as String
-                if (keyString == text) {
-                    printWarning("Can't evaluate $text - no key or command named '$keyString' found", keyString, AllKeys.keys + commands.keys)
+                if (task.couldBeCommand) {
+                    printWarning("Can't evaluate $task - no key or command named '$keyString' found", keyString, AllKeys.keys + commands.keys)
                 } else {
-                    printWarning("Can't evaluate $text - no key named '$keyString' found", keyString, AllKeys.keys)
+                    printWarning("Can't evaluate $task - no key named '$keyString' found", keyString, AllKeys.keys)
                 }
             }
             CLI.KeyEvaluationStatus.NotAssigned -> {
@@ -244,10 +245,10 @@ object CLI {
 
                 val message = we.message
                 if (we.showStacktrace || message == null || message.isBlank()) {
-                    LOG.error("Error while evaluating $text", we)
+                    LOG.error("Error while evaluating $task", we)
                 } else {
                     printWarning(message)
-                    LOG.debug("Error while evaluating $text", we)
+                    LOG.debug("Error while evaluating $task", we)
                 }
             }
         }
@@ -282,45 +283,53 @@ object CLI {
      *
      * (default project will be then used)
      */
-    fun evaluateKey(text: String): KeyEvaluationResult {
+    fun evaluateKey(task: Task): KeyEvaluationResult {
         var project: Project? = defaultProject
         val configurations = mutableListOf<Configuration>()
 
-        var offset = 0
-
         // Parse Project
-        val projectSlashIndex = text.indexOf('/')
-        if (projectSlashIndex != -1) {
-            val projectString = text.substring(offset, projectSlashIndex)
-            project = AllProjects.findCaseInsensitive(projectString)
+        if (task.project != null) {
+            project = AllProjects.findCaseInsensitive(task.project)
             if (project == null) {
-                return KeyEvaluationResult(null, projectString, KeyEvaluationStatus.NoProject)
+                return KeyEvaluationResult(null, task.project, KeyEvaluationStatus.NoProject)
             }
-            offset = projectSlashIndex + 1
         } else if (project == null) {
             return KeyEvaluationResult(null,null, KeyEvaluationStatus.NoProject)
         }
 
         // Parse Configurations
-        while (true) {
-            val nextConfigEnd = text.indexOf(':', offset)
-            if (nextConfigEnd == -1) {
-                break
-            }
-
-            val configString = text.substring(offset, nextConfigEnd)
-            val config = AllConfigurations.findCaseInsensitive(configString) ?: return KeyEvaluationResult(null, configString, KeyEvaluationStatus.NoConfiguration)
+        for (configString in task.configurations) {
+            val config = AllConfigurations.findCaseInsensitive(configString)
+                    ?: return KeyEvaluationResult(null, configString, KeyEvaluationStatus.NoConfiguration)
             configurations.add(config)
-            offset = nextConfigEnd + 1
         }
 
         // Parse Key
-        val keyString = text.substring(offset)
-        val key = AllKeys.findCaseInsensitive(keyString) ?: return KeyEvaluationResult(null, keyString, KeyEvaluationStatus.NoKey)
+        val key = AllKeys.findCaseInsensitive(task.key)
+                ?: return KeyEvaluationResult(null, task.key, KeyEvaluationStatus.NoKey)
 
         return try {
             KeyEvaluationResult(key, project.projectScope.run {
-                evaluateInNestedScope(key, configurations, 0)
+                // Attach input, if any
+                if (task.input.isEmpty()) {
+                    evaluateInNestedScope(key, configurations, 0)
+                } else {
+                    val freeInput = ArrayList<String>()
+                    val boundInput = HashMap<String, String>()
+
+                    for ((k, v) in task.input) {
+                        if (k == null) {
+                            freeInput.add(v)
+                        } else {
+                            boundInput.put(k, v)
+                        }
+                    }
+
+                    withMixedInput(freeInput.toTypedArray(), boundInput) {
+                        evaluateInNestedScope(key, configurations, 0)
+                    }
+                }
+
             }, KeyEvaluationStatus.Success)
         } catch (e: WemiException.KeyNotAssignedException) {
             KeyEvaluationResult(key, e, KeyEvaluationStatus.NotAssigned)
@@ -365,25 +374,41 @@ object CLI {
             }
     )
 
+    /**
+     * Evaluate command from the REPL
+     */
     private fun evaluateCommand(command:String) {
         if (command.isBlank()) {
             return
         }
 
-        val commandFunction = commands[command.toLowerCase()]
-        if (commandFunction != null) {
-            commandFunction()
-        } else {
-            try {
-                evaluateKeyAndPrint(command)
-            } catch (we: WemiException) {
+        val parsedTokens = TaskParser.parseTokens(command, 0)
+        val tokens = TaskParser.createTokens(parsedTokens.tokens)
+        val tasks = TaskParser.parseTasks(tokens)
 
+        val errors = tokens.formattedErrors(true)
+        if (errors.hasNext()) {
+            do {
+                println(errors.next())
+            } while (errors.hasNext())
+            return
+        }
+
+        for (task in tasks) {
+            if (task.couldBeCommand) {
+                val commandFunction = commands[task.key]
+                if (commandFunction != null) {
+                    commandFunction()
+                    continue
+                }
             }
+
+            evaluateKeyAndPrint(task)
         }
     }
 
     internal fun beginInteractive() {
-        val lineReader = LineReader
+        val lineReader = TaskLineReader
 
         val prompt = format("> ", format = Format.Bold).toString()
 
@@ -393,9 +418,8 @@ object CLI {
                 if (line.isNullOrBlank()) {
                     continue
                 }
-                for (word in lineReader.parser.parse(line, line.length).words()) {
-                    evaluateCommand(word)
-                }
+
+                evaluateCommand(line)
             } catch (interrupt: UserInterruptException) {
                 // User wants to delete written line or exit
                 if (interrupt.partialLine.isNullOrEmpty()) {
@@ -405,6 +429,8 @@ object CLI {
                 break
             } catch (_: IOException) {
                 break
+            } catch (e:Exception) {
+                LOG.error("Error in interactive loop", e)
             }
         }
 
@@ -439,26 +465,45 @@ object CLI {
 
     private val histories = HashMap<String, SimpleHistory>()
 
-    fun getHistory(name:String):History {
-        return histories.getOrPut(name) {
-            val buildScript = WemiBuildScript
-            if (buildScript == null) {
-                SimpleHistory(null)
+    private fun getHistoryFile(name:String):Path? {
+        val buildScript = WemiBuildScript ?: return null
+        val historiesFolder = buildScript.buildFolder.toPath().resolve("cache/history/")
+        Files.createDirectories(historiesFolder)
+        val fileName = StringBuilder()
+        for (c in name) {
+            if (c.isLetterOrDigit() || c.isWhitespace() || c == '.' || c == '_' || c == '-') {
+                fileName.append(c)
             } else {
-                val historiesFolder = buildScript.buildFolder.toPath().resolve("cache/history/")
-                Files.createDirectories(historiesFolder)
-                val fileName = StringBuilder()
-                for (c in name) {
-                    if (c.isLetterOrDigit() || c.isWhitespace() || c == '.' || c == '_' || c == '-') {
-                        fileName.append(c)
-                    } else {
-                        fileName.append(c.toInt())
-                    }
-                }
-
-                SimpleHistory(historiesFolder.resolve(fileName.toString()))
+                fileName.append(c.toInt())
             }
         }
+
+        return historiesFolder.resolve(fileName.toString())
+    }
+
+    internal fun getHistory(name:String):SimpleHistory {
+        return histories.getOrPut(name) {
+            SimpleHistory(getHistoryFile(name))
+        }
+    }
+
+    /**
+     * Retrieves the history, but only if it exists, either in cache or in filesystem.
+     */
+    internal fun getExistingHistory(name:String):SimpleHistory? {
+        val existing = histories[name]
+        if (existing != null) {
+            return existing
+        }
+
+        val historyFile = getHistoryFile(name)
+        if (historyFile == null || !Files.exists(historyFile)) {
+            return null
+        }
+
+        val history = SimpleHistory(historyFile)
+        histories.put(name, history)
+        return history
     }
 
     init {
@@ -474,11 +519,11 @@ object CLI {
 
     private val HISTORY_LOG = LoggerFactory.getLogger(SimpleHistory::class.java)
 
-    private class SimpleHistory(private val path:Path?) : History {
+    internal class SimpleHistory(private val path:Path?) : History {
 
-        val DEFAULT_HISTORY_SIZE = 50
+        private val DEFAULT_HISTORY_SIZE = 50
 
-        private val items = ArrayList<String>()
+        internal val items = ArrayList<String>()
         private var index = 0
         private var changed = false
 
@@ -512,10 +557,14 @@ object CLI {
             }
 
             try {
-                Files.newBufferedWriter(path, Charsets.UTF_8).use { writer ->
-                    for (line in items) {
-                        writer.write(line)
-                        writer.append('\n')
+                if (items.isEmpty()) {
+                    Files.deleteIfExists(path)
+                } else {
+                    Files.newBufferedWriter(path, Charsets.UTF_8).use { writer ->
+                        for (line in items) {
+                            writer.write(line)
+                            writer.append('\n')
+                        }
                     }
                 }
             } catch (e:Exception) {
