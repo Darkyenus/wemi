@@ -144,12 +144,13 @@ They are **composed** out of one *project* and zero or more *configurations* in 
 This reflects in the key invocation syntax, which is used in the user interface to query/invoke key values.
 (Querying and invocation is the same operation, but it makes more sense to talk about querying for keys that bind settings
 and about invocation for keys that bind tasks, but this is just a convention and there is no real distinction between the two.)
-The syntax is as follows:
+The basic syntax is as follows:
 ```regexp
 (<project>"/")?(<config>":")*<key>
 ```
 Where `<project>` is a name of some defined project, `<config>` is a name of some defined configuration and `<key>`
-is a name of some defined key. For example `calculator/compiling:clean` would be a query to value bound to key `clean`,
+is a name of some defined key. For more information, see section `Query language` below.
+For example `calculator/compiling:clean` would be a query to value bound to key `clean`,
 in one configuration `compiling` and in the project `calculator`. While the project part is defined in the syntax as optional, each scope **must**
 always have a project. When the project part is missing, the default project of the user interface is automatically used.
 
@@ -283,10 +284,139 @@ Add library as a dependency for this build script. The library is directly avail
 Library is searched for in the repositories specified by *repository directive*.
 This is not the same as library dependencies of the compiled project, see `libraryDependencies` key for that.
 
+## Input system
+A small but important part of the Wemi's functionality is its input system. Most keys take their inputs by evaluating
+other keys, but sometimes it is more beneficial to ask the user. For example the `runMain` key can be used
+to execute arbitrary main class from the project's classpath, interactively, without having to change the `mainClass`
+key.
+
+The input is provided through the object held in the `input` key. It can be asked to provide arbitrary, textual or other,
+value for given input query. Input query consists of three parts:
+1. *Input key* - is any simple string, which specifies what is the query about.
+    For example `main` when asking about main class. The string should be a valid Java identifier.
+2. *Prompt* - arbitrary human readable string that will be shown to the user when asked to provide the input text.
+    It should explain the purpose and form of the collected input text. 
+3. *Validator* - a function that converts the string given by the user (or stored in `input`, more on that later)
+    and returns either arbitrary object to be used as the user's response, or an error message to be shown to
+    the user.
+
+Sometimes, it is more beneficial to supply the answer to a prompt even before the question is asked.
+The *input key* is used to specify what question is being answered in advance.
+For example, to start the project's `foo.bar.Main` class from the shell, use `$ ./wemi runMain main=foo.bar.Main`.
+(More on this syntax in the section **Query language**.)
+
+However, often it is known beforehand that the key will ask only a single question. For example, the default
+implementation of `runMain` key will only ever ask about `main` input key. So it is possible to omit the `main=`
+part of the query and use simply `runMain foo.bar.Main`.
+
+To specify the inputs from code, wrap your key invocation in `withInput(){}` call. For example:
+```kotlin
+{
+    // With free input
+    withInput("foo.bar.Main") {
+        runMain.get()
+    }
+    
+    // With named input
+    withInput("main" to "foo.bar.Main") {
+        runMain.get()
+    }
+}
+```
+
+When there is multiple stored inputs, first the named ones are tried, then the free ones, then the user is asked.
+If named input does not satisfy the validator, it is skipped and the user is notified.
+Free inputs added together are considered only after the one before them is consumed.
+Consumed *free* inputs are never considered again. However it is not advised to use more than one free input.
+
+For example:
+```kotlin
+
+withInput("main" to "foo.Main1") {
+    withInput("foo.Main2") {
+        // Both runMain queries won't ask for input and will always execute the class foo.Main1,
+        // because named input is used before the free "foo.Main2"
+        runMain.get()
+        runMain.get()
+    }
+}
+
+// Query: myRun foo.MainQ
+myRun set {
+    withInput("foo.Main2") {
+        withInput("foo.Main1") {
+            runMain.get() // Will execute foo.Main1
+            runMain.get() // Will execute foo.Main2
+            runMain.get() // Will execute foo.MainQ from the query
+        }
+    }
+}
+
+// Query: myRun foo.MainQ
+myRun set {
+    withInput("foo.Main2", "foo.Main3") {
+        withInput("foo.Main1") {
+            runMain.get() // Will execute foo.Main1
+            runMain.get() // Will execute foo.Main2
+            runMain.get() // Will execute foo.Main3
+            runMain.get() // Will execute foo.MainQ from the query
+        }
+    }
+}
+
+```
+
 ## Command line user interface
-WEMI features a simple interactive user interface, which is launched by default.
+WEMI features a simple interactive user interface in a form of Read-Evaluate-Print-Loop, which is launched by default.
 It accepts key queries, which are then evaluated, and a few commands. Refer to the `help` command.
 To exit, use the `exit` command, or simply EOF (Ctrl-D).
+
+REPL launches by default only when there is no query string present. To request interactivity with initial query,
+use the `-i` (`-interactive`) flag, e.g. `$ ./wemi -i run`.
+
+### Query language
+Queries form the main entry point to any Wemi functionality invocation and basic examples of this simple language
+can be seen throughout this document. A single query fits on a line, with following grammar:
+```
+<query> := <command>
+        | <query> ';' <command>
+
+<command> := <scoped-task> <input>*
+
+<scoped-task> := (<project> '/')? (<configuration> ':')* <task>
+
+<input> := <named-input> | <free-input>
+<named-input> := <input-key> '=' <input-text>
+<free-input> := <input-text>
+
+<project>, <configuration>, <task>, <input-key> := Valid Java identifier
+<input-text> := Arbitrary text
+```
+(See [TaskParser](src/main/kotlin/wemi/boot/TaskParser.kt) for more information about the grammar.)
+
+Project, configuration and task items were explained in the section `Scope`.
+Named input and free input items allow to specify input text to use when the evaluated keys require input.
+For more information about input, see section `Input` above.
+
+Examples of valid queries (one per line):
+```
+run
+test:run
+game/run
+application/test:run
+runMain com.example.Main
+runMain main=com.example.Main
+packResources; run
+```
+Separators (i.e. `/`, `:`, `=`, `;`, and whitespace, though technically any character) may be escaped with
+backslash (`\`) to treat them as a regular letter character. Note that this is useful only for input text,
+as other parts of the query do not support these characters anyway.
+
+When in REPL, it is also possible to quote text with double quotes (`"quoted"`) to automatically escape every control
+character, except for `\` and `"` itself, so it is still possible to use escapes and escape `"` to include it in the input text.
+
+Initial query passed to Wemi through process arguments is parsed very similarly, but whitespace is not treated as
+a separator and argument boundaries are used instead. That way it is possible to leverage shell's own quoting rules.
 
 ## Distribution and installation
 WEMI is distributed as a runnable .jar file called `wemi`, which is also a valid `.sh` file.

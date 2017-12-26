@@ -240,6 +240,8 @@ object TaskParser : Parser {
                     escapeNext = false
                     current.appendCodePoint(cp)
                 }
+                cp == '\\'.toInt() -> // Escape next character
+                    escapeNext = true
                 currentQuoted -> {
                     if (cp == '"'.toInt()) {
                         currentQuoted = false
@@ -248,8 +250,6 @@ object TaskParser : Parser {
                         current.appendCodePoint(cp)
                     }
                 }
-                cp == '\\'.toInt() -> // Escape next character
-                    escapeNext = true
                 cp == '"'.toInt() -> // Start quotes
                     currentQuoted = true
                 Character.isWhitespace(cp) -> // Word end

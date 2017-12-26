@@ -3,8 +3,11 @@ package wemi
 import org.jline.reader.EndOfFileException
 import org.jline.reader.History
 import org.jline.reader.UserInterruptException
+import org.slf4j.LoggerFactory
 import wemi.boot.CLI
 import wemi.util.Failable
+
+private val LOG = LoggerFactory.getLogger("Input")
 
 /**
  * Base for input. Does not store any prepared values, but reads from the user, if interactive.
@@ -74,10 +77,12 @@ private class InputExtensionBinding(val previous:Input, val extension: InputExte
             val preparedValue = extension.inputPairs[key]
 
             if (preparedValue != null) {
-                validator(preparedValue).success {
+                validator(preparedValue).use<Unit>({
                     getHistory(key).add(preparedValue)
                     return it
-                }
+                }, {
+                    LOG.info("Can't use '{}' for input key '{}': {}", preparedValue, key, it)
+                })
             }
         }
         return previous.getPrepared(key, validator)
