@@ -25,15 +25,22 @@ libraryDependencies += "com.github.Darkyenus" % "DaveWebb" % "v1.2"
 
 libraryDependencies += "com.github.EsotericSoftware" % "jsonbeans" % "cb0f3406fc"
 
-libraryDependencies += "org.jetbrains.kotlin" % "kotlin-compiler" % "1.1.4" % Provided
-
 libraryDependencies += "org.jline" % "jline" % "3.3.0"
 
-libraryDependencies += "junit" % "junit" % "4.12" % Test
+//region Provided
+/* Used ONLY in wemi.compile.impl.KotlinCompilerImpl1_1_4 */
+libraryDependencies += "org.jetbrains.kotlin" % "kotlin-compiler" % "1.1.4" % Provided
 
-libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % Test
+/* Used ONLY in wemi.test.forked.TestLauncher */
+libraryDependencies += "org.junit.platform" % "junit-platform-launcher" % "1.0.2" % Provided
+//endregion
 
-testOptions in Test := Seq(Tests.Argument(TestFrameworks.JUnit, "-a"))
+// For tests
+libraryDependencies += "org.junit.jupiter" % "junit-jupiter-api" % "5.0.2" % Test
+
+//region Remove me
+libraryDependencies += "org.junit.platform" % "junit-platform-console" % "1.0.2" % Test
+//endregion
 
 assemblyMergeStrategy in assembly := {stuff => if (stuff.endsWith(".kotlin_module")) {
   MergeStrategy.deduplicate

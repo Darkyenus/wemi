@@ -164,7 +164,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             // Collect dependencies
             val compileDependencies = createWemiProjectCombinedDependencies(session, project.name, "compiling", settings.downloadDocs, settings.downloadSources)
             val runtimeDependencies = createWemiProjectCombinedDependencies(session, project.name, "running", settings.downloadDocs, settings.downloadSources)
-            val testDependencies = createWemiProjectCombinedDependencies(session, project.name, "test", settings.downloadDocs, settings.downloadSources)
+            val testDependencies = createWemiProjectCombinedDependencies(session, project.name, "testing", settings.downloadDocs, settings.downloadSources)
 
             for ((hash, dep) in compileDependencies) {
                 val inRuntime = runtimeDependencies.remove(hash) != null
@@ -273,15 +273,15 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     it.mapGet("targetVersion")?.asString() ?: ""
                 },
                 session.string(projectName, task = "outputClassesDirectory"),
-                session.string(projectName, configurations = *arrayOf("test"), task = "outputClassesDirectory"),
+                session.string(projectName, configurations = *arrayOf("testing"), task = "outputClassesDirectory"),
                 session.stringArray(projectName, configurations = *arrayOf("compilingJava"), task = "sourceRoots")
                         .union(session.stringArray(projectName, configurations = *arrayOf("compilingKotlin"), task = "sourceRoots").asIterable())
                         .toTypedArray(),
                 session.stringArray(projectName, task = "resourceRoots"),
-                session.stringArray(projectName, "test", "compilingJava", task = "sourceRoots")
-                        .union(session.stringArray(projectName, "test", "compilingKotlin", task = "sourceRoots").asIterable())
+                session.stringArray(projectName, "testing", "compilingJava", task = "sourceRoots")
+                        .union(session.stringArray(projectName, "testing", "compilingKotlin", task = "sourceRoots").asIterable())
                         .toTypedArray(),
-                session.stringArray(projectName, "test", task = "resourceRoots")
+                session.stringArray(projectName, "testing", task = "resourceRoots")
                 )
     }
 

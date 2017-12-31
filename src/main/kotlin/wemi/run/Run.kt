@@ -28,7 +28,11 @@ fun javaExecutable(javaHome:File):File = run {
     } else if (!winExists && unixExists) {
         unixFile
     } else if (!winExists && !unixExists) {
-        throw WemiException("Java executables should be at $windowsFile or $unixFile, but neither exists")
+        if (OSUtils.IS_WINDOWS) {
+            throw WemiException("Java executable should be at $windowsFile, but it does not exist")
+        } else {
+            throw WemiException("Java executable should be at $unixFile, but it does not exist")
+        }
     } else {
         if (OSUtils.IS_WINDOWS) {
             windowsFile

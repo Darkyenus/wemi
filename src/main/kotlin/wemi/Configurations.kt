@@ -3,12 +3,11 @@
 package wemi
 
 import configuration
-import wemi.compile.JavaCompilerFlags
-import wemi.compile.JavaSourceFileExtensions
-import wemi.compile.KotlinSourceFileExtensions
-import wemi.compile.kotlinCompiler
+import wemi.compile.*
 import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.M2ClassifierAttribute
+import wemi.test.JUnitPlatformLauncher
+import wemi.util.div
 import javax.tools.ToolProvider
 
 /**
@@ -23,11 +22,13 @@ object Configurations {
     //endregion
 
     //region Testing configuration
-    val test by configuration("Used when testing") {
-        Keys.sourceBase set KeyDefaults.SourceBaseScopeTest
+    val testing by configuration("Used when testing") {
+        Keys.sourceBases add { Keys.projectRoot.get() / "src/test" }
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
         Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
+
+        Keys.libraryDependencies add { Dependency(JUnitPlatformLauncher) }
     }
     //endregion
 
@@ -62,6 +63,8 @@ object Configurations {
         Keys.sourceExtensions set { JavaSourceFileExtensions }
         Keys.javaCompiler set { ToolProvider.getSystemJavaCompiler() }
         Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
+        Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
+        Keys.compilerOptions[JavaCompilerFlags.targetVersion] = JavaVersion.V1_8
     }
 
     val compilingKotlin by configuration("Configuration used when compiling Kotlin sources", compiling) {

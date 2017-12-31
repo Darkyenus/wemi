@@ -7,6 +7,8 @@ import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
+import wemi.test.TestParameters
+import wemi.test.TestReport
 import wemi.util.LocatedFile
 import wemi.util.Partial
 import java.io.File
@@ -30,7 +32,7 @@ object Keys {
 
     val input by key<Input>("Provides access to user input, that can be programmatically pre-set")
 
-    val sourceBase by key<File>("Directory in which all source directories can be found (example: '/src/main')")
+    val sourceBases by key<Collection<File>>("Directory in which all source directories can be found (example: '/src/main')")
     val sourceRoots by key<Collection<File>>("Directories which are source roots for the project (example: '/src/main/java')")
     val sourceExtensions by key<Collection<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)")
     val sourceFiles by key<Collection<LocatedFile>>("Files to be compiled. Usually derived from sourceRoots and sourceFilter. Maps source root -> source files")
@@ -68,6 +70,9 @@ object Keys {
     val runArguments by key<Collection<String>>("Options given to the application when running the project")
     val run by key<Int>("Compile and run the project, return exit code")
     val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code")
+
+    val testParameters by key<TestParameters>("Parameters for the test key. By default discovers all tests in the test sources.")
+    val test by key<TestReport>("Run the tests (through the JUnit Platform by default)")
 
     val assemblyMergeStrategy by key<(String) -> MergeStrategy>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
     val assemblyRenameFunction by key<(AssemblySource, String) -> String?>("Function for renaming assembled duplicate files for which merge strategy is Rename. First argument is the source of the data, second is the path inside the root. Returns new path or null to discard. Paths after rename must not conflict, rules are not recursive.")

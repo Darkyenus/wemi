@@ -44,10 +44,15 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
         outputBuffer.clear()
     }
 
-    private fun decode() {
+    private fun flushLine() {
+        onLineRead(outputSB)
+        outputSB.setLength(0)
+    }
+
+    private fun decode(endOfInput:Boolean) {
         inputBuffer.flip()
         while (true) {
-            val result = decoder.decode(inputBuffer, outputBuffer, false)
+            val result = decoder.decode(inputBuffer, outputBuffer, endOfInput)
             outputBuffer.flip()
             for (i in 0 until outputBuffer.limit()) {
                 val c = outputBuffer[i]
@@ -55,12 +60,11 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
 
                 if (c == '\n') {
                     // Flush outputSB!
-                    onLineRead(outputSB)
-                    outputSB.setLength(0)
+                    flushLine()
                 }
             }
 
-            if (!result.isOverflow) {
+            if (result.isUnderflow) {
                 break
             }
         }
@@ -70,7 +74,7 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
 
     override fun write(b: Int) {
         inputBuffer.put(b.toByte())
-        decode()
+        decode(false)
     }
 
     override fun write(b: ByteArray) {
@@ -86,7 +90,16 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
             inputBuffer.put(b, offset, toConsume)
             offset += toConsume
             remaining -= toConsume
-            decode()
+            decode(false)
         }
+    }
+
+    /**
+     * Flushes the pending, unfinished line.
+     * Writing further bytes into the stream after closing it leads to an undefined behavior.
+     */
+    override fun close() {
+        decode(true)
+        flushLine()
     }
 }

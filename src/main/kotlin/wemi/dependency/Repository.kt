@@ -139,9 +139,13 @@ fun createRepositoryChain(repositories: Collection<Repository>): RepositoryChain
 
 // Default repositories
 val LocalM2Repository = Repository.M2("local", URL("file", "localhost", System.getProperty("user.home") + "/.m2/repository/"), null)
-val CentralM2Repository = Repository.M2("central", URL("https://repo1.maven.org/maven2/"), LocalM2Repository)
+val MavenCentral = Repository.M2("central", URL("https://repo1.maven.org/maven2/"), LocalM2Repository)
+
+// TODO Remove by 2018-02-01
+@Deprecated("Renamed", replaceWith = ReplaceWith("MavenCentral", "wemi.dependency.MavenCentral"))
+val CentralM2Repository = MavenCentral
 
 val DefaultRepositories: List<Repository> = listOf(
         LocalM2Repository,
-        CentralM2Repository
+        MavenCentral
 )

@@ -1,7 +1,7 @@
 package wemi.boot
 
-import org.junit.Assert
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 
 /**
  *
@@ -13,7 +13,7 @@ class TaskParserTests {
         val tokens = TaskParser.createTokens(lines.tokens)
         val parsedTasks = TaskParser.parseTasks(tokens).toTypedArray()
 
-        Assert.assertArrayEquals(tasks, parsedTasks)
+        assertArrayEquals(tasks, parsedTasks)
     }
 
     private fun assertEqualsMulti(line: String, vararg tasks: Task) {

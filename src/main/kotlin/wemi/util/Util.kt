@@ -1,5 +1,7 @@
 package wemi.util
 
+import com.esotericsoftware.jsonbeans.Json
+import com.esotericsoftware.jsonbeans.JsonValue
 import wemi.boot.CLI
 import java.io.File
 import java.util.*
@@ -307,5 +309,21 @@ class Tokens<T, Memo>(val data:List<T>, private val limit:Int = data.size, defau
     fun matches(skip:Int = 0, value:T):Boolean {
         val index = next + skip
         return index in (0 until limit) && value == data[index]
+    }
+}
+
+fun JsonValue?.putArrayStrings(into:MutableCollection<String>) {
+    this?.forEach {
+        into.add(it.asString())
+    }
+}
+
+fun Json.writeStringArray(from:Collection<String>, name:String, skipEmpty:Boolean = false) {
+    if (from.isNotEmpty() || !skipEmpty) {
+        writeArrayStart(name)
+        for (s in from) {
+            writeValue(s as Any, String::class.java)
+        }
+        writeArrayEnd()
     }
 }

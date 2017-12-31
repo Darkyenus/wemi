@@ -9,12 +9,16 @@ import wemi.Configurations.compilingKotlin
 import wemi.assembly.AssemblySource
 import wemi.assembly.FileRecognition
 import wemi.assembly.MergeStrategy
+import wemi.boot.WemiBuildScript
 import wemi.boot.WemiRunningInInteractiveMode
 import wemi.compile.CompilerFlags
 import wemi.compile.JavaCompilerFlags
-import wemi.compile.JavaVersion
 import wemi.compile.KotlinCompiler
 import wemi.dependency.*
+import wemi.test.TEST_LAUNCHER_MAIN_CLASS
+import wemi.test.TestParameters
+import wemi.test.TestReport
+import wemi.test.handleProcessForTesting
 import wemi.util.*
 import java.io.BufferedOutputStream
 import java.io.File
@@ -30,16 +34,26 @@ object KeyDefaults {
 
     val BuildDirectory: BoundKeyValue<File> = { Keys.projectRoot.get() / "build" }
 
-    val SourceBaseScopeMain: BoundKeyValue<File> = { Keys.projectRoot.get() / "src/main" }
-    val SourceBaseScopeTest: BoundKeyValue<File> = { Keys.projectRoot.get() / "src/test" }
+    val SourceBase: BoundKeyValue<Collection<File>> = {
+        listOf(Keys.projectRoot.get() / "src/main")
+    }
 
     val SourceRootsJavaKotlin: BoundKeyValue<Collection<File>> = {
-        val base = Keys.sourceBase.get()
-        listOf(base / "kotlin", base / "java")
+        val bases = Keys.sourceBases.get()
+        val roots = ArrayList<File>()
+        for (base in bases) {
+            roots.add(base / "kotlin")
+            roots.add(base / "java")
+        }
+        roots
     }
     val ResourceRoots: BoundKeyValue<Collection<File>> = {
-        val base = Keys.sourceBase.get()
-        listOf(base / "resources")
+        val bases = Keys.sourceBases.get()
+        val roots = ArrayList<File>()
+        for (base in bases) {
+            roots.add(base / "resources")
+        }
+        roots
     }
 
     val SourceFiles: BoundKeyValue<Collection<LocatedFile>> = {
@@ -256,9 +270,9 @@ object KeyDefaults {
             val options = Keys.runOptions.get()
             val arguments = Keys.runArguments.get()
 
-            val modifiedClasspath = classpath.map { it.classpathEntry }.distinct()
+            val classpathEntries = classpath.map { it.classpathEntry }.distinct()
 
-            val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, modifiedClasspath,
+            val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, classpathEntries,
                     mainClass, options, arguments)
 
             // Separate process output from Wemi output
@@ -275,27 +289,48 @@ object KeyDefaults {
         val mainClass = Keys.input.get().read("main", "Main class to start", ClassNameValidator)
                 ?: throw WemiException("Main class not specified", showStacktrace = false)
 
-        using(Configurations.running) {
-            val javaExecutable = Keys.javaExecutable.get()
-            val classpath = Keys.classpath.get()
-            val directory = Keys.runDirectory.get()
-            val options = Keys.runOptions.get()
-            val arguments = Keys.runArguments.get()
-
-            val modifiedClasspath = classpath.map { it.classpathEntry }.distinct()
-
-            val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, modifiedClasspath,
-                    mainClass, options, arguments)
-
-            // Separate process output from Wemi output
-            println()
-            val process = processBuilder.start()
-            val result = process.waitFor()
-            println()
-
-            result
+        using({
+            Keys.mainClass.set { mainClass }
+        }) {
+            Keys.run.get()
         }
     }
+
+    val TestParameters:BoundKeyValue<TestParameters> = {
+        val testParameters = wemi.test.TestParameters()
+        testParameters.filter.classNamePatterns.include("^.*Tests?$")
+        testParameters.select.classpathRoots.add(Keys.outputClassesDirectory.get().absolutePath)
+        testParameters
+    }
+
+    val Test:BoundKeyValue<TestReport> = {
+        using(Configurations.testing) {
+            val javaExecutable = Keys.javaExecutable.get()
+            val directory = Keys.runDirectory.get()
+            val options = Keys.runOptions.get()
+
+            val externalClasspath = Keys.externalClasspath.get().map { it.classpathEntry }.distinct()
+            val internalClasspath = Keys.internalClasspath.get().map { it.classpathEntry }.distinct()
+            val wemiClasspathEntry = wemiLauncherFileWithJarExtension(WemiBuildScript!!.cacheFolder)
+
+            val classpathEntries = ArrayList<File>(internalClasspath.size + externalClasspath.size + 1)
+            classpathEntries.addAll(internalClasspath)
+            classpathEntries.addAll(externalClasspath)
+            classpathEntries.add(wemiClasspathEntry)
+
+            val processBuilder = wemi.run.prepareJavaProcess(
+                    javaExecutable, directory, classpathEntries,
+                    TEST_LAUNCHER_MAIN_CLASS, options, emptyList())
+
+            val testParameters = Keys.testParameters.get()
+
+            val report = handleProcessForTesting(processBuilder, testParameters)
+                    ?: throw WemiException("Test execution failed, see logs for more information", showStacktrace = false)
+
+            report
+        }
+    }
+
 
     val AssemblyMergeStrategy: BoundKeyValue<(String) -> MergeStrategy> = {
         { name ->
@@ -304,6 +339,8 @@ object KeyDefaults {
                 MergeStrategy.Rename
             } else if (FileRecognition.isSystemJunkFile(name)) {
                 MergeStrategy.Discard
+            } else if (name.startsWith("META-INF/services/")) {
+                MergeStrategy.Concatenate
             } else if (name.startsWith("META-INF/")) {
                 MergeStrategy.SingleOwn
             } else {
@@ -575,7 +612,7 @@ object KeyDefaults {
         Keys.input set { InputBase(WemiRunningInInteractiveMode) }
 
         Keys.buildDirectory set BuildDirectory
-        Keys.sourceBase set SourceBaseScopeMain
+        Keys.sourceBases set SourceBase
         Keys.sourceFiles set SourceFiles
         Keys.resourceRoots set ResourceRoots
         Keys.resourceFiles set ResourceFiles
@@ -599,10 +636,6 @@ object KeyDefaults {
         Keys.outputSourcesDirectory set outputClassesDirectory("sources")
         Keys.outputHeadersDirectory set outputClassesDirectory("headers")
         Keys.compilerOptions set { CompilerFlags() }
-        extend (Configurations.compilingJava) {
-            Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
-            Keys.compilerOptions[JavaCompilerFlags.targetVersion] = JavaVersion.V1_8
-        }
         Keys.compile set Compile
 
         //Keys.mainClass TODO Detect main class?
@@ -611,6 +644,9 @@ object KeyDefaults {
         Keys.runArguments set RunArguments
         Keys.run set Run
         Keys.runMain set RunMain
+
+        Keys.testParameters set TestParameters
+        Keys.test set Test
 
         Keys.assemblyMergeStrategy set AssemblyMergeStrategy
         Keys.assemblyRenameFunction set AssemblyRenameFunction
