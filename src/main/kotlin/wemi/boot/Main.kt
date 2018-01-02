@@ -8,6 +8,7 @@ import com.darkyen.tproll.util.TimeFormatter
 import org.slf4j.LoggerFactory
 import wemi.Configurations
 import wemi.WemiVersion
+import wemi.WithExitCode
 import wemi.util.Tokens
 import wemi.util.WemiDefaultClassLoader
 import wemi.util.div
@@ -19,16 +20,28 @@ import kotlin.system.exitProcess
 
 private val LOG = LoggerFactory.getLogger("Main")
 
-val EXIT_CODE_SUCCESS = 0
-//val EXIT_CODE_UNKNOWN_ERROR = 1 // Do not use
-val EXIT_CODE_ARGUMENT_ERROR = 2
-val EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR = 3
-val EXIT_CODE_MACHINE_OUTPUT_THROWN_EXCEPTION_ERROR = 4
-val EXIT_CODE_MACHINE_OUTPUT_NO_PROJECT_ERROR = 5
-val EXIT_CODE_MACHINE_OUTPUT_NO_CONFIGURATION_ERROR = 6
-val EXIT_CODE_MACHINE_OUTPUT_NO_KEY_ERROR = 7
-val EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR = 8
-val EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND = 9
+// Standard exit codes
+const val EXIT_CODE_SUCCESS = 0
+@Suppress("unused")
+@Deprecated("Using this exit code is too vague and is thrown by JVM")
+const val EXIT_CODE_UNKNOWN_ERROR = 1
+const val EXIT_CODE_ARGUMENT_ERROR = 2
+const val EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR = 3
+/**
+ * Exit code to be returned when all conditions for [wemi.WithExitCode] are met,
+ * but the key evaluation failed, for any reason, including unset key and evaluation throwing an exception.
+ */
+const val EXIT_CODE_TASK_ERROR = 4
+/** Exit code reserved for general purpose task failure,
+ * for example to be returned by [wemi.WithExitCode.processExitCode]. */
+const val EXIT_CODE_TASK_FAILURE = 5
+// Machine-output exit codes
+const val EXIT_CODE_MACHINE_OUTPUT_THROWN_EXCEPTION_ERROR = 51
+const val EXIT_CODE_MACHINE_OUTPUT_NO_PROJECT_ERROR = 52
+const val EXIT_CODE_MACHINE_OUTPUT_NO_CONFIGURATION_ERROR = 53
+const val EXIT_CODE_MACHINE_OUTPUT_NO_KEY_ERROR = 54
+const val EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR = 55
+const val EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND = 56
 
 internal var WemiRunningInInteractiveMode = false
     private set
@@ -195,6 +208,7 @@ fun main(args: Array<String>) {
     Configurations
     // ------------------------------------
 
+    var exitCode = EXIT_CODE_SUCCESS
     val taskTokens = TaskParser.createTokens(TaskParser.parseTokens(taskArguments))
     val tasks = TaskParser.parseTasks(taskTokens)
 
@@ -233,16 +247,30 @@ fun main(args: Array<String>) {
             } while (formattedErrors.hasNext())
         }
 
+        var lastTaskResult:CLI.KeyEvaluationResult? = null
         for (task in tasks) {
-            CLI.evaluateKeyAndPrint(task)
+            lastTaskResult = CLI.evaluateKeyAndPrint(task)
         }
 
         if (interactive) {
             CLI.beginInteractive()
+        } else if (lastTaskResult != null) {
+            if (lastTaskResult.status == CLI.KeyEvaluationStatus.Success) {
+                val data = lastTaskResult.data
+                if (data is WithExitCode) {
+                    exitCode = data.processExitCode()
+                    LOG.debug("WithExitCode - using the exit code of '{}': {}", tasks.last(), exitCode)
+                } else {
+                    LOG.debug("WithExitCode - {} does not provide exit code", tasks.last())
+                }
+            } else {
+                exitCode = EXIT_CODE_TASK_ERROR
+                LOG.debug("WithExitCode - {} evaluation failed", tasks.last())
+            }
         }
     }
 
-    exitProcess(EXIT_CODE_SUCCESS)
+    exitProcess(exitCode)
 }
 
 /**

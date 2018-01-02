@@ -166,22 +166,27 @@ object CLI {
         }
     }
 
-    fun evaluateKeyAndPrint(task: Task) {
+    /**
+     * Evaluates the key and prints human readable, formatted output.
+     */
+    fun evaluateKeyAndPrint(task: Task):KeyEvaluationResult {
         // TODO Ideally, this would get rewritten with Done message if nothing was written between them
         print(formatLabel("→ "))
         println(formatInput(task.key))
 
         val beginTime = System.currentTimeMillis()
-        val (key, data, status) = evaluateKey(task)
+        val keyEvaluationResult = evaluateKey(task)
+        val (key, data, status) = keyEvaluationResult
         val duration = System.currentTimeMillis() - beginTime
 
-        base@when (status) {
+        when (status) {
             CLI.KeyEvaluationStatus.Success -> {
                 print(formatLabel("Done "))
                 print(formatInput(task.key))
                 @Suppress("UNCHECKED_CAST")
                 val prettyPrinter:((Any?) -> CharSequence)? = key?.prettyPrinter as ((Any?) -> CharSequence)?
 
+                var prettyPrinted = false
                 if (prettyPrinter != null) {
                     val printed: CharSequence? =
                         try {
@@ -193,24 +198,26 @@ object CLI {
                     if (printed != null) {
                         println(formatLabel(": "))
                         println(printed)
-                        return@base
+                        prettyPrinted = true
                     }
                 }
 
-                when (data) {
-                    null, is Unit -> println()
-                    is Collection<*> -> {
-                        print(formatLabel(" ("))
-                        print(data.size)
-                        println(formatLabel("): "))
+                if (!prettyPrinted) {
+                    when (data) {
+                        null, is Unit -> println()
+                        is Collection<*> -> {
+                            print(formatLabel(" ("))
+                            print(data.size)
+                            println(formatLabel("): "))
 
-                        for (item:Any? in data) {
-                            println("  "+ formatValue(PrettyPrinter.toString(item)))
+                            for (item:Any? in data) {
+                                println("  "+ formatValue(PrettyPrinter.toString(item)))
+                            }
                         }
-                    }
-                    else -> {
-                        print(formatLabel(": "))
-                        println(formatValue(PrettyPrinter.toString(data)))
+                        else -> {
+                            print(formatLabel(": "))
+                            println(formatValue(PrettyPrinter.toString(data)))
+                        }
                     }
                 }
             }
@@ -256,6 +263,8 @@ object CLI {
         if (duration > 100) {
             println(format("\tin " + formatTimeDuration(duration), Color.Cyan))
         }
+
+        return keyEvaluationResult
     }
 
     enum class KeyEvaluationStatus {

@@ -5,7 +5,7 @@ import wemi.dependency.*
 import java.net.URL
 
 /** Version of Wemi build system */
-val WemiVersion = "0.0-SNAPSHOT"
+val WemiVersion = "0.1-SNAPSHOT"
 
 internal val WemiVersionIsSnapshot = WemiVersion.endsWith("-SNAPSHOT")
 

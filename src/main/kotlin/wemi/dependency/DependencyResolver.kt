@@ -4,50 +4,56 @@ import org.slf4j.LoggerFactory
 import java.io.File
 
 /**
- *
+ * Provides entry points to the DependencyResolver API for resolving library dependencies.
  */
 object DependencyResolver {
 
     private val LOG = LoggerFactory.getLogger(DependencyResolver.javaClass)
 
-    @Suppress("NOTHING_TO_INLINE")
-    private inline fun StringBuilder?.tried(repo:Repository):StringBuilder {
-        val sb = this?: StringBuilder()
-
-        if (sb.isEmpty()) {
-            sb.append("tried: ").append(repo.name)
-        } else {
-            sb.append(", ").append(repo.name)
-        }
-
-        return sb
-    }
-
     fun resolveSingleDependency(dependency: Dependency, repositories: RepositoryChain): ResolvedDependency {
         var log:StringBuilder? = null
 
         LOG.debug("Resolving {}", dependency)
-        // Try preferred repository first
-        if (dependency.dependencyId.preferredRepository != null) {
-            LOG.debug("Trying in {}", dependency.dependencyId.preferredRepository)
-            val resolved = dependency.dependencyId.preferredRepository.resolveInRepository(dependency, repositories)
-            if (!resolved.hasError) {
-                LOG.debug("Resolution success {}", resolved)
-                return resolved
-            } else {
-                log = log.tried(dependency.dependencyId.preferredRepository)
+
+        fun resolveInRepository(repository: Repository?):ResolvedDependency? {
+            if (repository == null) {
+                return null
             }
-        }
-        // Try ordered repositories
-        for (repository in repositories) {
+
             LOG.debug("Trying in {}", repository)
             val resolved = repository.resolveInRepository(dependency, repositories)
             if (!resolved.hasError) {
                 LOG.debug("Resolution success {}", resolved)
                 return resolved
             } else {
-                log = log.tried(repository)
+                val sb = log ?: StringBuilder()
+                if (sb.isEmpty()) {
+                    sb.append("tried: ").append(repository.name)
+                } else {
+                    sb.append(", ").append(repository.name)
+                }
+                log = sb
             }
+
+            return null
+        }
+
+        // Try preferred repository and its cache first
+        val preferred = (resolveInRepository(dependency.dependencyId.preferredRepository?.cache)
+                ?: resolveInRepository(dependency.dependencyId.preferredRepository))
+        if (preferred != null) {
+            return preferred
+        }
+
+        // Try ordered repositories
+        for (repository in repositories) {
+            // Skip preferred repositories as those were already tried
+            if (repository == dependency.dependencyId.preferredRepository
+                    || repository == dependency.dependencyId.preferredRepository?.cache) {
+                continue
+            }
+
+            resolveInRepository(repository)?.let { return it }
         }
 
         // Fail

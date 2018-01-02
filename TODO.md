@@ -1,7 +1,5 @@
 # Things to do next
 
-1. When last task in non-interactive mode fails (exception?), exit with 1 or something
-
 1. Use Path instead of File everywhere
 
 1. Update to latest Idea

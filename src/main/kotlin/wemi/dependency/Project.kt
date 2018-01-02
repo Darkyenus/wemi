@@ -15,6 +15,7 @@ import java.io.File
  * @param version of project (aka revision)
  *
  * @param preferredRepository preferredRepository in which to search for this project first
+ *          (its cache, if any, is searched even earlier)
  */
 data class DependencyId(val group: String,
                         val name: String,

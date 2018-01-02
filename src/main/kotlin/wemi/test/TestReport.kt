@@ -3,6 +3,7 @@ package wemi.test
 import com.esotericsoftware.jsonbeans.Json
 import com.esotericsoftware.jsonbeans.JsonSerializable
 import com.esotericsoftware.jsonbeans.JsonValue
+import wemi.WithExitCode
 import wemi.boot.MachineWritable
 import wemi.util.putArrayStrings
 import wemi.util.writeStringArray
@@ -10,8 +11,7 @@ import wemi.util.writeStringArray
 /**
  * Returned by the test
  */
-class TestReport : LinkedHashMap<TestIdentifier, TestData>(), JsonSerializable, MachineWritable {
-
+class TestReport : LinkedHashMap<TestIdentifier, TestData>(), JsonSerializable, MachineWritable, WithExitCode {
     private fun TestIdentifier.write(json: Json) {
         json.writeValue("id", id, String::class.java)
         json.writeValue("parentId", parentId, String::class.java)
@@ -66,6 +66,17 @@ class TestReport : LinkedHashMap<TestIdentifier, TestData>(), JsonSerializable, 
 
     override fun writeMachine(json: Json) {
         write(json)
+    }
+
+    /**
+     * Returns [wemi.boot.EXIT_CODE_SUCCESS] when all tests are either successful or skipped.
+     * [wemi.boot.EXIT_CODE_TASK_FAILURE] otherwise.
+     */
+    override fun processExitCode(): Int {
+        if (values.all { it.status == TestStatus.SUCCESSFUL || it.status == TestStatus.SKIPPED }) {
+            return wemi.boot.EXIT_CODE_SUCCESS
+        }
+        return wemi.boot.EXIT_CODE_TASK_FAILURE
     }
 }
 
