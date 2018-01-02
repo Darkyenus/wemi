@@ -9,7 +9,7 @@ import wemi.boot.CLI
 import wemi.dependency.Dependency
 import wemi.dependency.DependencyId
 import wemi.dependency.MavenCentral
-import wemi.test.TestReport.Status.*
+import wemi.test.TestStatus.*
 import wemi.util.*
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
@@ -146,10 +146,10 @@ fun TestReport.prettyPrint():CharSequence {
     val keys = keys.toMutableList()
     keys.sortBy { it.id }
 
-    val roots = ArrayList<TreeNode<TestReport.Identifier>>()
-    val stack = ArrayDeque<TreeNode<TestReport.Identifier>>()
+    val roots = ArrayList<TreeNode<TestIdentifier>>()
+    val stack = ArrayDeque<TreeNode<TestIdentifier>>()
 
-    fun popUntilChild(identifier: TestReport.Identifier):TreeNode<TestReport.Identifier>? {
+    fun popUntilChild(identifier: TestIdentifier):TreeNode<TestIdentifier>? {
         if (stack.isEmpty()) {
             return null
         }

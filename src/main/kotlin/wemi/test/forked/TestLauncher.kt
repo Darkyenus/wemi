@@ -121,7 +121,7 @@ fun main(args: Array<String>) {
 
 private class ReportBuildingListener : TestExecutionListener {
 
-    private val testReport = LinkedHashMap<TestIdentifier, TestReport.Data>()
+    private val testReport = LinkedHashMap<TestIdentifier, TestData>()
     private val startTimes = HashMap<TestIdentifier, Long>()
     var complete = false
         private set
@@ -130,13 +130,13 @@ private class ReportBuildingListener : TestExecutionListener {
         complete = true
     }
 
-    private fun TestIdentifier.data(): TestReport.Data {
-        return testReport.getOrPut(this) { TestReport.Data() }
+    private fun TestIdentifier.data(): TestData {
+        return testReport.getOrPut(this) { TestData() }
     }
 
     override fun executionSkipped(testIdentifier: TestIdentifier, reason: String?) {
         testIdentifier.data().apply {
-            status = TestReport.Status.SKIPPED
+            status = TestStatus.SKIPPED
             skipReason = reason
         }
     }
@@ -149,9 +149,9 @@ private class ReportBuildingListener : TestExecutionListener {
         testIdentifier.data().apply {
             duration = startTimes.remove(testIdentifier)?.let { System.currentTimeMillis() - it } ?: -1L
             status = when (testExecutionResult.status) {
-                SUCCESSFUL -> TestReport.Status.SUCCESSFUL
-                ABORTED -> TestReport.Status.ABORTED
-                FAILED -> TestReport.Status.FAILED
+                SUCCESSFUL -> TestStatus.SUCCESSFUL
+                ABORTED -> TestStatus.ABORTED
+                FAILED -> TestStatus.FAILED
                 else -> throw IllegalArgumentException("unknown status: ${testExecutionResult.status}")
             }
             val throwable = testExecutionResult.throwable.orElse(null)
@@ -168,7 +168,7 @@ private class ReportBuildingListener : TestExecutionListener {
             val timestamp = entry.timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             reports.ensureCapacity(entry.keyValuePairs.size)
             for ((k, v) in entry.keyValuePairs) {
-                reports.add(TestReport.Data.ReportEntry(timestamp, k, v))
+                reports.add(TestData.ReportEntry(timestamp, k, v))
             }
         }
     }
@@ -181,8 +181,8 @@ private class ReportBuildingListener : TestExecutionListener {
         return result
     }
 
-    private fun TestIdentifier.toWemi():wemi.test.TestReport.Identifier {
-        return wemi.test.TestReport.Identifier(
+    private fun TestIdentifier.toWemi():wemi.test.TestIdentifier {
+        return wemi.test.TestIdentifier(
                 uniqueId, parentId.orElse(null), displayName,
                 isTest, isContainer, tags.map { it.name }.toSet(), source.orElse(null)?.toString())
     }
