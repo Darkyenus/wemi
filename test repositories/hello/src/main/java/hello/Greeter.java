@@ -1,4 +1,4 @@
-package com.hello;
+package hello;
 
 import java.util.Random;
 import org.slf4j.LoggerFactory;
@@ -17,9 +17,14 @@ public class Greeter {
         this.greetings = greetings;
     }
 
-    public void greet(String name) {
+    public String createGreeting(String name) {
         final Random random = HelloWemiKt.getRandom();
-        System.out.println(this.greetings[random.nextInt(this.greetings.length)].replace("{}", name));
+        return this.greetings[random.nextInt(this.greetings.length)].replace("{}", name);
+    }
+
+    public void greet(String name) {
+        final String greeting = createGreeting(name);
+        System.out.println(greeting);
         LOG.warn("Greeted {}", name);
     }
 

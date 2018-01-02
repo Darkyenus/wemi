@@ -1,3 +1,5 @@
+import wemi.Configurations.testing
+
 ///repository jitpack at https://jitpack.io
 ///dependency com.github.esotericsoftware:jsonbeans:0.9
 
@@ -15,6 +17,16 @@ val hello by project {
     libraryDependencies add { dependency("com.github.Darkyenus:tproll:v1.2.4") }
     libraryDependencies add { dependency("com.h2database:h2:1.4.196") }
 
-    mainClass set { "com.hello.HelloWemiKt" }
+    extend(testing) {
+        // JUnit 5
+        libraryDependencies add { JUnitAPI }
+        libraryDependencies add { JUnitEngine }
+
+        // JUnit 4
+        //libraryDependencies add { dependency("junit:junit:4.12") }
+        //libraryDependencies add { JUnit4Engine }
+    }
+
+    mainClass set { "hello.HelloWemiKt" }
 
 }
