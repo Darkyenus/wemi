@@ -86,8 +86,9 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
 
     val stdout = ByteArrayOutputStream()
     val stderr = LineReadingOutputStream { line ->
-        if (line.isNotBlank()) {
-            TEST_OUTPUT_LOG.info("{}", line)
+        val trimmedLine = line.dropLastWhile { it.isWhitespace() }
+        if (trimmedLine.isNotEmpty()) {
+            TEST_OUTPUT_LOG.info("{}", trimmedLine)
         }
     }
 
@@ -134,13 +135,6 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
         null
     }
 }
-
-private val ICON_SUCCESS = CLI.format("✔", CLI.Color.Green)
-private val ICON_SKIPPED = CLI.format("↷", CLI.Color.Magenta)
-private val ICON_FAILED = CLI.format("✘", CLI.Color.Red)
-private val ICON_ABORTED = CLI.format("■", CLI.Color.Yellow)
-private val ICON_NOT_RUN = CLI.format("?", CLI.Color.Yellow)
-
 
 fun TestReport.prettyPrint():CharSequence {
     val keys = keys.toMutableList()
@@ -210,11 +204,11 @@ fun TestReport.prettyPrint():CharSequence {
         // Status
         sb.append(' ')
         when (data.status) {
-            SUCCESSFUL -> sb.append(ICON_SUCCESS)
-            ABORTED -> sb.append(ICON_ABORTED)
-            SKIPPED -> sb.append(ICON_SKIPPED)
-            FAILED -> sb.append(ICON_FAILED)
-            NOT_RUN -> sb.append(ICON_NOT_RUN)
+            SUCCESSFUL -> sb.append(CLI.ICON_SUCCESS)
+            ABORTED -> sb.append(CLI.ICON_ABORTED)
+            SKIPPED -> sb.append(CLI.ICON_SKIPPED)
+            FAILED -> sb.append(CLI.ICON_FAILURE)
+            NOT_RUN -> sb.append(CLI.ICON_UNKNOWN)
         }
 
         // Skip reason
@@ -295,18 +289,18 @@ fun TestReport.prettyPrint():CharSequence {
     }
 
     result.append('\n')
-    result.append(String.format(
-                      "  %10d containers found\n"
-                    + "  %10d containers skipped\n"
-                    + "  %10d containers aborted\n"
-                    + "  %10d containers successful\n"
-                    + "  %10d containers failed\n\n"
+    result.append(String.format("           - Summary -           \n"
+                    + "[%7d containers found       ]\n"
+                    + "[%7d containers skipped     ]\n"
+                    + "[%7d containers aborted     ]\n"
+                    + "[%7d containers successful  ]\n"
+                    + "[%7d containers failed      ]\n"
 
-                    + "  %10d tests found\n"
-                    + "  %10d tests skipped\n"
-                    + "  %10d tests aborted\n"
-                    + "  %10d tests successful\n"
-                    + "  %10d tests failed\n",
+                    + "[%7d tests found            ]\n"
+                    + "[%7d tests skipped          ]\n"
+                    + "[%7d tests aborted          ]\n"
+                    + "[%7d tests successful       ]\n"
+                    + "[%7d tests failed           ]\n",
             containersFound,
             containersSkipped,
             containersAborted,

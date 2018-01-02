@@ -455,6 +455,13 @@ object CLI {
         Underline(4), // Input
     }
 
+    internal val ICON_SUCCESS = CLI.format("✔", CLI.Color.Green)
+    internal val ICON_FAILURE = CLI.format("✘", CLI.Color.Red)
+    internal val ICON_UNKNOWN = CLI.format("?", CLI.Color.Yellow)
+    internal val ICON_SKIPPED = CLI.format("↷", CLI.Color.Magenta)
+    internal val ICON_SEE_ABOVE = CLI.format("↑", CLI.Color.Magenta)//⤴ seems to be clipped in some contexts
+    internal val ICON_ABORTED = CLI.format("■", CLI.Color.Yellow)
+
     private fun printLabeled(label:String, items:Map<String, WithDescriptiveString>) {
         println(formatLabel("${items.size} $label${if (items.isEmpty()) "" else "s"}:"))
         for (value in items.values) {

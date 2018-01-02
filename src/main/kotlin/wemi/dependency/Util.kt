@@ -1,5 +1,6 @@
 package wemi.dependency
 
+import wemi.boot.CLI
 import wemi.util.TreeNode
 import wemi.util.printTree
 
@@ -105,13 +106,13 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots:Collection<D
         val resolved = this@prettyPrint[dependencyId]
 
         when {
-            resolved == null -> result.append("❓")
-            resolved.hasError -> result.append("❌⛔️")
-            else -> result.append("✅")
+            resolved == null -> result.append(CLI.ICON_UNKNOWN)
+            resolved.hasError -> result.append(CLI.ICON_FAILURE)
+            else -> result.append(CLI.ICON_SUCCESS)
         }
 
         if (status == StatusCyclic) {
-            result.append(" ⤴")
+            result.append(CLI.ICON_SEE_ABOVE)
         } else {
             val resolvedFrom = resolved?.resolvedFrom
             if (resolvedFrom != null) {

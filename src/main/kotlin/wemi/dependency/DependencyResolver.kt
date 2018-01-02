@@ -63,14 +63,13 @@ object DependencyResolver {
         }
 
         val resolvedProject = resolveSingleDependency(mapper(dependency), repositories)
-        if (resolvedProject.hasError) {
-            return false
-        }
         resolved.put(dependency.dependencyId, resolvedProject)
 
-        var ok = true
+        var ok = !resolvedProject.hasError
         for (transitiveDependency in resolvedProject.dependencies) {
-            ok = ok and doResolveArtifacts(resolved, transitiveDependency, repositories, mapper)
+            if (!doResolveArtifacts(resolved, transitiveDependency, repositories, mapper)) {
+                ok = false
+            }
         }
         return ok
     }
@@ -94,7 +93,9 @@ object DependencyResolver {
         var ok = true
 
         for (project in projects) {
-            ok = ok and doResolveArtifacts(resolved, project, repositories, mapper)
+            if (!doResolveArtifacts(resolved, project, repositories, mapper)) {
+                ok = false
+            }
         }
 
         return ok

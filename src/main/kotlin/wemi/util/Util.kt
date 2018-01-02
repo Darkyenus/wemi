@@ -338,14 +338,13 @@ fun <T>printTree(roots:Collection<TreeNode<T>>, result:StringBuilder = StringBui
 
     fun TreeNode<T>.println() {
         run {
-            //TODO Prefix may be wrong here!
             val prePrintLength = result.length
             this.value.print(result)
             // Add prefixes before new line-breaks
             var i = result.length - 1
             while (i >= prePrintLength) {
                 if (result[i] == '\n') {
-                    result.insert(i, prefix)
+                    result.insert(i+1, prefix)
                 }
                 i--
             }
