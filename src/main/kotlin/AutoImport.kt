@@ -1,6 +1,6 @@
 @file:Suppress("NOTHING_TO_INLINE", "unused")
 
-import wemi.dependency.Dependency
+import wemi.Configurations
 import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository
 import wemi.KotlinReflect as _KotlinReflect
@@ -36,15 +36,22 @@ inline fun repository(name: String, url: String, checksum: Repository.M2.Checksu
 
 // Helper functions
 inline fun Scope.kotlinDependency(name: String) = _kotlinDependency(name)
-val Scope.KotlinStdlib: Dependency
+val Scope.KotlinStdlib
     inline get() = _KotlinStdLib
-val Scope.KotlinReflect: Dependency
+val Scope.KotlinReflect
     inline get() = _KotlinReflect
-val Scope.JUnitAPI: Dependency
-    get() = _JUnitAPI
-val Scope.JUnitEngine: Dependency
-    get() = _JUnitEngine
+val Scope.JUnitAPI
+    inline get() = _JUnitAPI
+val Scope.JUnitEngine
+    inline get() = _JUnitEngine
 
+// Configurations
+val compiling
+    inline get() = Configurations.compiling
+val running
+    inline get() = Configurations.running
+val testing
+    inline get() = Configurations.testing
 
 // Keys
 val projectGroup
