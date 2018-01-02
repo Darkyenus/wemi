@@ -38,20 +38,33 @@ val JUnitEngineVersion = "5.0.2"
 /**
  * Dependency on JUnit 5 API
  *
+ * To use JUnit 5 tests, add this as a testing dependency, together with [JUnitEngine].
+ *
  * @see [JUnitEngineVersion] for used version (based on Wemi version)
  */
-@Suppress("unused")
+@Suppress("unused")//Scope.
 val Scope.JUnitAPI: Dependency
     get() = Dependency(DependencyId("org.junit.jupiter", "junit-jupiter-api", JUnitEngineVersion, MavenCentral))
 
 /**
  * Dependency on JUnit 5 Engine
  *
+ * To use JUnit 5 tests, add this as a testing dependency, together with [JUnitAPI].
+ *
  * @see [JUnitEngineVersion] for used version (based on Wemi version)
  */
-@Suppress("unused")
+@Suppress("unused")//Scope.
 val Scope.JUnitEngine: Dependency
     get() = Dependency(DependencyId("org.junit.jupiter", "junit-jupiter-engine", JUnitEngineVersion, MavenCentral))
+
+/**
+ * Dependency on JUnit 4 Engine
+ *
+ * To use JUnit 4 tests, add this as a testing dependency, together with JUnit 4.
+ */
+@Suppress("unused")//Scope. and not auto-imported
+val Scope.JUnit4Engine: Dependency
+    get() = Dependency(DependencyId("org.junit.vintage", "junit-vintage-engine", "4.12.2", MavenCentral))
 
 /**
  * DependencyId for the launcher needed to execute tests based on JUnit platform.
