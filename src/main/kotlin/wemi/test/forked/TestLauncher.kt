@@ -9,12 +9,15 @@ import org.junit.platform.engine.DiscoverySelector
 import org.junit.platform.engine.Filter
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.engine.TestExecutionResult.Status.*
+import org.junit.platform.engine.TestSource
 import org.junit.platform.engine.discovery.ClassNameFilter.excludeClassNamePatterns
 import org.junit.platform.engine.discovery.ClassNameFilter.includeClassNamePatterns
 import org.junit.platform.engine.discovery.DiscoverySelectors.*
 import org.junit.platform.engine.discovery.PackageNameFilter.excludePackageNames
 import org.junit.platform.engine.discovery.PackageNameFilter.includePackageNames
 import org.junit.platform.engine.reporting.ReportEntry
+import org.junit.platform.engine.support.descriptor.ClassSource
+import org.junit.platform.engine.support.descriptor.MethodSource
 import org.junit.platform.launcher.EngineFilter.excludeEngines
 import org.junit.platform.launcher.EngineFilter.includeEngines
 import org.junit.platform.launcher.TagFilter.excludeTags
@@ -25,6 +28,7 @@ import org.junit.platform.launcher.TestPlan
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder
 import org.junit.platform.launcher.core.LauncherFactory
 import wemi.test.*
+import wemi.util.appendWithStackTrace
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.nio.file.Path
@@ -60,7 +64,7 @@ fun main(args: Array<String>) {
         }
 
         val launcher = LauncherFactory.create()
-        val reportBuilder = ReportBuildingListener()
+        val reportBuilder = ReportBuildingListener(testParameters.filterStackTraces)
         launcher.registerTestExecutionListeners(reportBuilder)
 
         val discoveryRequest = LauncherDiscoveryRequestBuilder().apply {
@@ -119,7 +123,7 @@ fun main(args: Array<String>) {
     System.exit(exitCode)
 }
 
-private class ReportBuildingListener : TestExecutionListener {
+private class ReportBuildingListener(val filterStackTraces:Boolean) : TestExecutionListener {
 
     private val testReport = LinkedHashMap<TestIdentifier, TestData>()
     private val startTimes = HashMap<TestIdentifier, Long>()
@@ -145,6 +149,25 @@ private class ReportBuildingListener : TestExecutionListener {
         startTimes[testIdentifier] = System.currentTimeMillis()
     }
 
+    private fun createStackTraceMapper(source: TestSource):((Array<StackTraceElement>) -> List<StackTraceElement>)? {
+        val className:String = when (source) {
+            is MethodSource -> source.className ?: return null
+            is ClassSource -> source.className ?: return null
+            else -> return null
+        }
+        return { originalStackTrace ->
+            val filtered = originalStackTrace.dropLastWhile {
+                it.className != className
+            }
+
+            if (filtered.isEmpty()) {
+                originalStackTrace.toList()
+            } else {
+                filtered
+            }
+        }
+    }
+
     override fun executionFinished(testIdentifier: TestIdentifier, testExecutionResult: TestExecutionResult) {
         testIdentifier.data().apply {
             duration = startTimes.remove(testIdentifier)?.let { System.currentTimeMillis() - it } ?: -1L
@@ -156,9 +179,19 @@ private class ReportBuildingListener : TestExecutionListener {
             }
             val throwable = testExecutionResult.throwable.orElse(null)
             if (throwable != null) {
-                val stackTrace = StringBuilder()
-                throwable.printStackTrace(StringBuilderWriter(stackTrace))
-                this.stackTrace = stackTrace.toString()
+                val filter = if (filterStackTraces && testIdentifier.source.isPresent)
+                    createStackTraceMapper(testIdentifier.source.get())
+                else null
+
+                if (filter == null) {
+                    val stackTrace = StringBuilder()
+                    throwable.printStackTrace(StringBuilderWriter(stackTrace))
+                    this.stackTrace = stackTrace.toString()
+                } else {
+                    val stackTrace = StringBuilder()
+                    stackTrace.appendWithStackTrace(throwable, filter)
+                    this.stackTrace = stackTrace.toString()
+                }
             }
         }
     }

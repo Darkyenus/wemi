@@ -16,6 +16,15 @@ class TestParameters : JsonSerializable {
      */
     val configuration:MutableMap<String, String> = HashMap()
 
+    /**
+     * Whether or not shown stack-traces should be filtered.
+     * This involves removing the entries that are inside the JUnit framework and don't contribute much value
+     * to the regular user.
+     *
+     * True by default.
+     */
+    var filterStackTraces = true
+
     val select = Selectors()
 
     val filter = Filters()
@@ -123,6 +132,8 @@ class TestParameters : JsonSerializable {
         }
         json.writeArrayEnd()
 
+        json.writeValue("filterStackTraces", filterStackTraces, Boolean::class.java)
+
         // Selector
         json.writeObjectStart("selector")
         json.writeStringArray(select.uris, "uris", skipEmpty = true)
@@ -149,6 +160,8 @@ class TestParameters : JsonSerializable {
         value.get("configuration")?.forEach {
             configuration[it.name] = it.asString()
         }
+
+        filterStackTraces = value.getBoolean("filterStackTraces", true)
 
         // Selector
         value.get("selector")?.let { selectorValue ->
