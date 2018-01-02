@@ -1,8 +1,12 @@
 package wemi.dependency
 
+import wemi.util.TreeNode
+import wemi.util.printTree
+
 /**
- *
+ * @see [prettyPrint]
  */
+@Suppress("unused") // Used
 @JvmName("prettyPrintFromDependency")
 fun Map<DependencyId, ResolvedDependency>.prettyPrint(roots:Collection<Dependency>):CharSequence {
     return prettyPrint(roots.map { it.dependencyId })
@@ -12,63 +16,93 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(roots:Collection<Dependenc
  * Returns a pretty-printed string in which the system is displayed as a tree of dependencies.
  * Uses full range of unicode characters for clarity.
  */
-fun Map<DependencyId, ResolvedDependency>.prettyPrint(roots:Collection<DependencyId>):CharSequence {
+fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots:Collection<DependencyId>?):CharSequence {
     /*
     ╤ org.foo:proj:1.0 ✅
     │ ╘ com.bar:pr:2.0 ❌⛔️
     ╞ org.foo:proj:1.0 ✅⤴︎
     ╘ com.baz:pr:2.0 ❌⛔️
 
-    Box drawing:
-    ╤ root
-    ═ single node root
-    ╘ new start
-    ╞ branch
-    │ continuation
-
     Status symbols:
     OK ✅
     Error ❌⛔️
     Missing ❓
-    Already shown ⤴︎
+    Already shown ⤴
      */
-    val realRoots:Collection<DependencyId> = if (roots.isEmpty()) {
-        // No explicit roots, guess them
-        val keys: HashSet<DependencyId> = HashSet(this.keys)
-        for (resolved in this.values) {
-            for (dependency in resolved.dependencies) {
-                keys.remove(dependency.dependencyId)
-            }
-        }
+    val StatusNormal:Byte = 0
+    val StatusNotResolved:Byte = 1
+    val StatusCyclic:Byte = 2
+    class NodeData(val dependencyId: DependencyId, var status:Byte)
 
-        if (keys.isEmpty()) {
-            // Can't guess, use everything as a root
-            this.keys
-        } else {
-            keys
-        }
-    } else roots
+    val nodes = HashMap<DependencyId, TreeNode<NodeData>>()
 
-    if (realRoots.isEmpty()) {
-        return ""
+    // Build nodes
+    for (depId in keys) {
+        nodes.put(depId, TreeNode(NodeData(depId, StatusNormal)))
     }
 
-    val alreadyPrinted = HashSet<DependencyId>()
+    // Connect nodes (even with cycles)
+    nodes.forEach { depId, node ->
+        this@prettyPrint[depId]?.dependencies?.forEach { dep ->
+            var nodeToConnect = nodes[dep.dependencyId]
+            if (nodeToConnect == null) {
+                nodeToConnect = TreeNode(NodeData(dep.dependencyId, StatusNotResolved))
+                nodes[dep.dependencyId] = nodeToConnect
+            }
+            node.add(nodeToConnect)
+        }
+    }
 
-    val result = StringBuilder()
-    val prefix = StringBuilder()
+    val remainingNodes = HashMap(nodes)
 
-    fun DependencyId.println() {
-        result.append(this.group).append(':').append(this.name).append(':').append(this.version)
-        for ((key, value) in attributes) {
+    fun liftNode(dependencyId: DependencyId):TreeNode<NodeData> {
+        // Lift what was asked
+        val liftedNode = remainingNodes.remove(dependencyId) ?: return TreeNode(NodeData(dependencyId, StatusCyclic))
+        val resultNode = TreeNode(liftedNode.value)
+        // Lift all dependencies too and return them in the result node
+        for (dependencyNode in liftedNode) {
+            resultNode.add(liftNode(dependencyNode.value.dependencyId))
+        }
+        return resultNode
+    }
+
+    val roots = ArrayList<TreeNode<NodeData>>()
+
+    // Lift explicit roots
+    explicitRoots?.forEach { root ->
+        val liftedNode = liftNode(root)
+        // Check for nodes that are in explicitRoots but were never resolved to begin with
+        if (liftedNode.value.status == StatusCyclic && !this.containsKey(liftedNode.value.dependencyId)) {
+            liftedNode.value.status = StatusNotResolved
+        }
+        roots.add(liftedNode)
+    }
+
+    // Lift implicit roots
+    for (key in this.keys) {
+        if (remainingNodes.containsKey(key)) {
+            roots.add(liftNode(key))
+        }
+    }
+
+    // Lift rest as roots
+    while (remainingNodes.isNotEmpty()) { //This should never happen?
+        val (dependencyId, _) = remainingNodes.iterator().next()
+        roots.add(liftNode(dependencyId))
+    }
+
+    // Now we can start printing!
+
+    return printTree(roots) { result ->
+        val dependencyId = this.dependencyId
+
+        result.append(dependencyId.group).append(':').append(dependencyId.name).append(':').append(dependencyId.version)
+        for ((key, value) in dependencyId.attributes) {
             result.append(' ').append(key.name).append('=').append(value)
         }
         result.append(' ')
 
-        val firstTime = !alreadyPrinted.contains(this)
-        alreadyPrinted.add(this)
-
-        val resolved = this@prettyPrint[this]
+        val resolved = this@prettyPrint[dependencyId]
 
         when {
             resolved == null -> result.append("❓")
@@ -76,62 +110,13 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(roots:Collection<Dependenc
             else -> result.append("✅")
         }
 
-        val resolvedFrom = resolved?.resolvedFrom
-        if (firstTime && resolvedFrom != null) {
-            result.append(" from ").append(resolvedFrom)
-        }
-
-        if (!firstTime) {
-            result.append(" ⤴︎\n")
-        } else if (resolved == null) {
-            result.append('\n')
+        if (status == StatusCyclic) {
+            result.append(" ⤴")
         } else {
-            result.append('\n')
-            // Print hierarchy
-            val prevPrefixLength = prefix.length
-            val dependenciesSize = resolved.dependencies.size
-            resolved.dependencies.forEachIndexed { index, dependency ->
-                prefix.setLength(prevPrefixLength)
-                result.append(prefix)
-                if (index + 1 == dependenciesSize) {
-                    result.append("╘ ")
-                    prefix.append("  ")
-                } else {
-                    result.append("╞ ")
-                    prefix.append("│ ")
-                }
-
-                dependency.dependencyId.println()
+            val resolvedFrom = resolved?.resolvedFrom
+            if (resolvedFrom != null) {
+                result.append(" from ").append(resolvedFrom)
             }
-            prefix.setLength(prevPrefixLength)
         }
     }
-
-    val rootsSize = realRoots.size
-
-    realRoots.forEachIndexed { rootIndex, root ->
-        if (rootIndex + 1 == rootsSize) {
-            prefix.setLength(0)
-            prefix.append("  ")
-        } else {
-            prefix.setLength(0)
-            prefix.append("│ ")
-        }
-
-        if (rootIndex == 0) {
-            if (rootsSize == 1) {
-                result.append("═ ")
-            } else {
-                result.append("╤ ")
-            }
-        } else if (rootIndex + 1 == rootsSize) {
-            result.append("╘ ")
-        } else {
-            result.append("╞ ")
-        }
-
-        root.println()
-    }
-
-    return result
 }

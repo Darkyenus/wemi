@@ -7,7 +7,7 @@ import java.net.URL
 /** Version of Wemi build system */
 val WemiVersion = "0.0-SNAPSHOT"
 
-val WemiVersionIsSnapshot = WemiVersion.endsWith("-SNAPSHOT")
+internal val WemiVersionIsSnapshot = WemiVersion.endsWith("-SNAPSHOT")
 
 /** Version of Kotlin used for build scripts */
 val WemiKotlinVersion = KotlinCompilerVersion.Version1_1_4
@@ -72,16 +72,6 @@ fun dependency(groupNameVersion: String, preferredRepository: Repository?, varar
     return dependency(group, name, version, preferredRepository, *attributes)
 }
 
-fun Scope.kotlinDependency(name: String): Dependency {
-    return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-" + name, Keys.kotlinVersion.get().string))
-}
-
-val Scope.KotlinStdlib: Dependency
-    get() = kotlinDependency("stdlib")
-
-val Scope.KotlinReflect: Dependency
-    get() = kotlinDependency("reflect")
-
 fun repository(name: String, url: String, checksum: Repository.M2.Checksum): Repository.M2 {
     val usedUrl = URL(url)
     return Repository.M2(name,
@@ -89,3 +79,13 @@ fun repository(name: String, url: String, checksum: Repository.M2.Checksum): Rep
             if (usedUrl.protocol.equals("file", ignoreCase = true)) null else LocalM2Repository,
             checksum)
 }
+
+fun Scope.kotlinDependency(name: String): Dependency {
+    return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-" + name, Keys.kotlinVersion.get().string, MavenCentral))
+}
+
+val Scope.KotlinStdlib: Dependency
+    get() = kotlinDependency("stdlib")
+
+val Scope.KotlinReflect: Dependency
+    get() = kotlinDependency("reflect")

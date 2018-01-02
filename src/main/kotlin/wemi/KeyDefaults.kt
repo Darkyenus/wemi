@@ -94,7 +94,7 @@ object KeyDefaults {
     val ExternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
         val resolved = Keys.resolvedLibraryDependencies.get()
         if (!resolved.complete) {
-            throw WemiException("Failed to resolve all artifacts\n${resolved.value.prettyPrint(emptyList<DependencyId>())}")
+            throw WemiException("Failed to resolve all artifacts\n${resolved.value.prettyPrint(null)}")
         }
         val unmanaged = Keys.unmanagedDependencies.get()
 

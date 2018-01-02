@@ -327,3 +327,86 @@ fun Json.writeStringArray(from:Collection<String>, name:String, skipEmpty:Boolea
         writeArrayEnd()
     }
 }
+
+fun <T>printTree(roots:Collection<TreeNode<T>>, result:StringBuilder = StringBuilder(),
+                 print:T.(StringBuilder) -> Unit):CharSequence {
+    if (roots.isEmpty()) {
+        return ""
+    }
+
+    val prefix = StringBuilder()
+
+    fun TreeNode<T>.println() {
+        run {
+            //TODO Prefix may be wrong here!
+            val prePrintLength = result.length
+            this.value.print(result)
+            // Add prefixes before new line-breaks
+            var i = result.length - 1
+            while (i >= prePrintLength) {
+                if (result[i] == '\n') {
+                    result.insert(i, prefix)
+                }
+                i--
+            }
+        }
+        result.append('\n')
+
+        // Print children
+        val prevPrefixLength = prefix.length
+        val dependenciesSize = this.size
+        this.forEachIndexed { index, dependency ->
+            prefix.setLength(prevPrefixLength)
+            result.append(prefix)
+            if (index + 1 == dependenciesSize) {
+                result.append("╘ ")
+                prefix.append("  ")
+            } else {
+                result.append("╞ ")
+                prefix.append("│ ")
+            }
+
+            dependency.println()
+        }
+        prefix.setLength(prevPrefixLength)
+    }
+
+    val rootsSize = roots.size
+
+    roots.forEachIndexed { rootIndex, root ->
+        if (rootIndex + 1 == rootsSize) {
+            prefix.setLength(0)
+            prefix.append("  ")
+        } else {
+            prefix.setLength(0)
+            prefix.append("│ ")
+        }
+
+        if (rootIndex == 0) {
+            if (rootsSize == 1) {
+                result.append("═ ")
+            } else {
+                result.append("╤ ")
+            }
+        } else if (rootIndex + 1 == rootsSize) {
+            result.append("╘ ")
+        } else {
+            result.append("╞ ")
+        }
+
+        root.println()
+    }
+
+    return result
+}
+
+open class TreeNode<T>(val value: T):ArrayList<TreeNode<T>>() {
+
+    fun find(value: T):TreeNode<T>? {
+        return this.find {it.value == value}
+    }
+
+    operator fun get(value: T):TreeNode<T> {
+        return find(value) ?: (TreeNode(value).also { add(it) })
+    }
+}

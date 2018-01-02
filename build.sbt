@@ -9,7 +9,7 @@ crossPaths := false
 
 autoScalaLibrary := false
 
-kotlinVersion := "1.1.4"
+kotlinVersion := "1.1.4-3"
 
 kotlinLib("stdlib")
 
@@ -37,10 +37,6 @@ libraryDependencies += "org.junit.platform" % "junit-platform-launcher" % "1.0.2
 
 // For tests
 libraryDependencies += "org.junit.jupiter" % "junit-jupiter-api" % "5.0.2" % Test
-
-//region Remove me
-libraryDependencies += "org.junit.platform" % "junit-platform-console" % "1.0.2" % Test
-//endregion
 
 assemblyMergeStrategy in assembly := {stuff => if (stuff.endsWith(".kotlin_module")) {
   MergeStrategy.deduplicate
