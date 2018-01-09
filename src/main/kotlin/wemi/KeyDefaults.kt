@@ -133,7 +133,7 @@ object KeyDefaults {
         }
 
         for ((_, project) in AllProjects) {
-            clearedCount += project.projectScope.scopeCache.cleanCache()
+            clearedCount += project.projectScope.cleanCache()
         }
 
         clearedCount

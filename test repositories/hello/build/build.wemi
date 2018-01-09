@@ -1,7 +1,7 @@
-import wemi.Configurations.testing
-
 ///repository jitpack at https://jitpack.io
 ///dependency com.github.esotericsoftware:jsonbeans:0.9
+
+val foxColor by key<String>("Color of an animal")
 
 val hello by project {
 
@@ -17,6 +17,10 @@ val hello by project {
     libraryDependencies add { dependency("com.github.Darkyenus:tproll:v1.2.4") }
     libraryDependencies add { dependency("com.h2database:h2:1.4.196") }
 
+    extend(running) {
+        projectName set { "Greeting Simulator ${startYear.get()}" }
+    }
+
     extend(testing) {
         // JUnit 5
         libraryDependencies add { JUnitAPI }
@@ -29,4 +33,22 @@ val hello by project {
 
     mainClass set { "hello.HelloWemiKt" }
 
+
+    foxColor set { "Red" }
+}
+
+val arctic by configuration("When in snowy regions") {
+    foxColor set {"White"}
+}
+
+val wonderland by configuration("When in wonderland") {
+    foxColor set {"Rainbow"}
+
+    extend (arctic) {
+        foxColor set {"Transparent"}
+    }
+}
+
+val heaven by configuration("Like wonderland, but better", wonderland) {
+    foxColor set { "Octarine" }
 }

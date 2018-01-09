@@ -58,7 +58,7 @@ object Configurations {
         }
     }
 
-    val compilingJava by configuration("Configuration used when compiling Java sources", compiling) {
+    val compilingJava by configuration("Configuration layer used when compiling Java sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { JavaSourceFileExtensions }
         Keys.javaCompiler set { ToolProvider.getSystemJavaCompiler() }
@@ -67,7 +67,7 @@ object Configurations {
         Keys.compilerOptions[JavaCompilerFlags.targetVersion] = JavaVersion.V1_8
     }
 
-    val compilingKotlin by configuration("Configuration used when compiling Kotlin sources", compiling) {
+    val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { KotlinSourceFileExtensions }
         Keys.kotlinCompiler set { kotlinCompiler(WemiKotlinVersion) }

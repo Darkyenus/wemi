@@ -244,7 +244,7 @@ object CLI {
             CLI.KeyEvaluationStatus.NotAssigned -> {
                 val error = data as WemiException.KeyNotAssignedException
                 print(format("Failure: ", Color.Red))
-                print(formatInput(error.scope.scopeToString() + error.key.name))
+                print(formatInput(error.scope.toString() + error.key.name))
                 println(format(" is not set", Color.Red))
             }
             CLI.KeyEvaluationStatus.Exception -> {

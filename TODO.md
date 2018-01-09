@@ -6,6 +6,10 @@
 
 1. Update to latest kotlin
 
+1. Add IntelliJ file type for pretty icon on ./wemi files
+
+1. Trace debug system for debugging keys (+ print current key trace on first Ctrl-T/C and java stack trace on second Ctrl-T with same key trace)
+
 1. Javadoc everything
 
 1. New project wizard (IDE)

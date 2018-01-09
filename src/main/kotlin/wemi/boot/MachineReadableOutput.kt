@@ -110,7 +110,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task:Task) {
             }
             CLI.KeyEvaluationStatus.NotAssigned -> {
                 val error = data as WemiException.KeyNotAssignedException
-                LOG.error("Can't evaluate {} - {}{} not set", task, error.scope.scopeToString(), error.key.name)
+                LOG.error("Can't evaluate {} - {}{} not set", task, error.scope.toString(), error.key.name)
                 exitProcess(EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR)
             }
             CLI.KeyEvaluationStatus.Exception -> {

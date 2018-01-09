@@ -213,7 +213,7 @@ fun <Result> Scope.withInput(vararg inputPairs:Pair<String, String>, action:Scop
             Keys.input.modify { old ->
                 InputExtensionBinding(old, inputExtension)
             }
-        }, parent = null, action = action)
+        }, action = action)
 }
 
 /**
@@ -231,7 +231,7 @@ fun <Result> Scope.withInput(vararg freeInput:String, action:Scope.()->Result):R
             Keys.input.modify { old ->
                 InputExtensionBinding(old, inputExtension)
             }
-        }, parent = null, action = action)
+        }, action = action)
 }
 
 /**
@@ -250,7 +250,7 @@ fun <Result> Scope.withMixedInput(freeInput: Array<out String>, boundInput:Map<S
         Keys.input.modify { old ->
             InputExtensionBinding(old, inputExtension)
         }
-    }, parent = null, action = action)
+    }, action = action)
 }
 
 

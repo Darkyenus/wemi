@@ -78,11 +78,13 @@ Key definition looks like this:
 ```kotlin
 val compile by key<File>("Compile sources and return the result")
 ```
-Internally, the key is defined using `KeyDelegate<Value>` object. It is not important for the general usage,
-but it explains how the key definition works. In above example, `Key<File>` is stored inside variable `compile`.
+Here variable `compile` is of type `Key<File>` and holds a reference to the created key.
 `compile` is also the name of the key and would be used to invoke this key from the user interface.
-As seen, key's reference description is also specified during declaration and so would be the default value and
-any other options or metadata.
+As seen, key's description is also specified during declaration and so can be the default value,
+custom output printer and whether or not should the result of the key be cached.
+
+*Key declaration leverages Kotlin's delegate system (through `KeyDelegate<Value>` object) which the reason for the
+`by` syntax and a mechanism through which Wemi can assign the variable name to the key, for its invocation from outside.*
 
 Standard keys are defined in `wemi.Keys` object.
 
@@ -93,12 +95,13 @@ These two objects are very similar in their usage. Bound values are set during t
 added nor removed later. Through these objects, bound values are typically only set, but not read/queried.
 *Values are bound to projects and configurations, but queried through **scopes**.*
 
-Configurations may be derived from each other. It is then said that the configuration has a parent which is
-the configuration it is derived from. The parent configuration is then used during the value *querying*.
+Configurations may be derived from each other. It is then said that the configuration has a parent.
+The parent configuration is then used during the value *querying*.
 
 Project definition may look like this:
 ```kotlin
 val calculator by project {
+    // Initializer
     projectGroup set {"com.example"}
     projectName set {"scientific-calculator"}
     projectVersion set {"3.14"}
@@ -108,9 +111,10 @@ val calculator by project {
     mainClass set { "com.example.CalculatorMainKt" }
 }
 ```
-Like the key, project and configuration (see below) is also declared using a delegate. It is also only required for
-the syntax and is not important to know for general usage. Above example declares a project named `calculator`, which is
-for later reference in code stored in the `calculator` variable. Rest of the example shows how the keys are bound:
+Like the key, project and configuration (see below) is also declared using a `by` syntax.
+Above example declares a project named `calculator`, which is for later reference in code stored
+in the `calculator` variable. Rest of the example shows how the keys are bound:
+
 When in the project or configuration initializer, write `<key> set { <value> }`. This works only in the scope of
 project or configuration and the braces around value are mandatory and intentional - they signify that the `<value>` is not
 evaluated immediately, but later and possibly multiple times. Keys of type `Collection` can be also set using the `add` command,
@@ -118,7 +122,7 @@ more on that in the section about *scopes*.
 
 Configuration definition may look like this:
 ```kotlin
-val compilingJava by configuration("Configuration used when compiling Java sources", compiling) {
+val compilingJava by configuration("Configuration used when compiling Java sources") {
 	sourceRoots set { 
 		val base = sourceBase.get()
 		listOf(base / "kotlin", base / "java")
@@ -126,9 +130,7 @@ val compilingJava by configuration("Configuration used when compiling Java sourc
 }
 ```
 As you can see, it is very similar to the project definition, and the similarity is internal as well.
-Configuration however also holds mandatory reference description, like keys, and this example `compilingJava`
-configuration is derived from (or *extends* if you will) the `compiling` configuration, which it references as a variable.
-Configuration, however, does not have to be derived and in most cases won't be.
+The main difference to notice is that configuration has a description, like keys.
 
 It is a soft convention to name configurations with the description of the activity in which the configuration will be used,
 with the verb in *present participle*, that is, ending with *-ing*. If the configuration is not used for an activity,
@@ -161,12 +163,12 @@ nor any other part of the scope stack. However, it can add more configurations o
 `using (configuration) {}` clause. For example, given following key binding:
 ```kotlin
 compile set {
-	val comp = using (compilingJava) { compiler.get() }
+	val comp = using (compiling) { compiler.get() }
 	val compOptions = compileOptions.get()
 	comp.compileWithOptions(compOptions)
 }
 ```
-evaluating `myProject/foo:compile` will then evaluate, in order tasks `myProject/foo:compilingJava:compiler` and
+evaluating `myProject/foo:compile` will then evaluate, in order tasks `myProject/foo:compiling:compiler` and
 `myProject/foo:compileOptions`. `using` clauses can be freely nested.
 
 Note that you can push only a configuration on the stack, it is not possible to change the project with it.
@@ -175,76 +177,70 @@ To see how to evaluate the key in an arbitrary configuration, you can check [how
 ### Configuration extensions
 While the scope system outlined above is powerful, some things are still not possible to do easily in it.
 For example, the `compile` key depends on two keys: `compiler` and `compileOptions`.
-`compileOptions` is queried directly, but `compiler` is queried through `compilingJava`.
+`compileOptions` is queried directly, but `compiler` is queried through `compiling`.
 It is possible to override used `compileOptions` by overriding it in the project (when no other configuration is used).
-But to override `compiler` one would have to put the override in the definition of `compilingJava` configuration, but that is not possible,
+But to override `compiler` one would have to put the override in the definition of `compiling` configuration, but that is not possible,
 because configuration definitions are immutable. This is where configuration extensions come in to play.
 
-To fix this, you can use `extend (configuration) {}` clause, when defining key bindings. For example, when overriding
-`compilingJava:compiler` as seen in previous example, one would type:
+To fix this, you can use `extend (<configuration>) {}` clause, when defining key bindings. For example, when overriding
+`compiling:compiler` as seen in previous example, one would type:
 ```kotlin
-compile set { /* see previous section */ }
-
-extend (compilingJava) {
-	MyJavaCompiler()
+extend (compiling) {
+    compiler set { MyJavaCompiler() }
 }
 ```
-This will change the querying order when evaluating `compilingJava:compiler` to first check the new extension configuration
-and only then, if the key is not bound, check the original configuration. In fact, configurations defined with the
-`extend` clause, are implemented by creating a new, anonymous configuration, that extends the original configuration,
-and is silently used when accessing the extended configuration in the scope in which the extension is defined.
+This will change the querying order when evaluating `compiling:compiler` to first check the new extension configuration
+and only then, if the key is not bound, check the original configuration.
 `extend`s, like `using`s, can be freely nested for even more specific overrides.
 
 #### Querying order
 When key in scope is queried, configurations and project in the scope is searched for the value binding in a specified order.
 The order is:
 1. The rightmost configuration
-2. The rightmost configuration's parent, if any 
-3. The rightmost configuration's parent's parent, if any
-4. And so on, until the base configuration of the rightmost configuration is checked
-5. The second rightmost configurations and its parents, like steps 1. to 4.
-6. All other configurations from right to left, including and ending with the leftmost configuration, like steps 1. to 5.
-7. The project
-8. Key's default value
-9. Fail
+2. The rightmost configuration's parents, if it was an extension or configuration with a parent
+3. The second, third, etc. rightmost configurations and its parents, like steps 1., 2.
+4. The project
+5. Key's default value
+6. Fail
 
 When the binding is encountered, it is evaluated, returned and no more items in the order are checked.
-There are multiple methods to query the value, they differ in the behavior of the step 9., when no value is found.
+There are multiple methods to query the value, they differ in the behavior of the last step, when no value is found.
 Remember that the value bound is not directly the value, but a function that produces the value, from the scope.
 
 For example, in project defined by this:
 ```kotlin
-val fruit by key<String>("The fruit key to choose the fruit, with no default value")
+val color by key<String>("Color of an animal")
 
-val fooing by configuration("This is base configuration") {
-	fruit set {"Orange"}
+val arctic by configuration("When in snowy regions") {
+	color set {"White"}
 }
 
-val mooing by configuration("This is derived from fooing", fooing) {
-	fruit set {"Pear"}
+val wonderland by configuration("When in wonderland") {
+    color set {"Rainbow"}
+    
+    extend (arctic) {
+        color set {"Transparent"}
+    }
 }
 
-val booing by configuration("This configuration is also derived", mooing) {
+val heaven by configuration("Like wonderland, but better", wonderland) {
+    // Here heaven extends wonderland
+    foxColor set { "Octarine" }
 }
 
-val tree by project {
-	fruit set {"Coconut"}
-}
-
-val bush by project {
-	fruit set {"Blueberry"}
+val fox by project {
+	color set {"Red"}
 }
 ```
 | Query                | Will evaluate to |
 |----------------------|------------------|
-| `tree/fruit`         | Coconut          |
-| `bush/fruit`         | Blueberry          |
-| `tree/fooing:fruit`         | Orange          |
-| `tree/mooing:fruit`         | Pear          |
-| `tree/booing:fruit`         | Pear          |
-| `bush/booing:fruit`         | Pear          |
-| `bush/booing:fooing:fruit`         | Orange          |
-| `tree/booing:mooing:fooing:fruit`         | Orange          |
+| `fox/color`         | Red          |
+| `fox/arctic:color`         | White          |
+| `fox/wonderland:color`         | Rainbow          |
+| `fox/wonderland:arctic:color`         | Transparent          |
+| `fox/arctic:wonderland:color`         | Rainbow          |
+| `fox/heaven:color`         | Octarine          |
+| `fox/heaven:arctic:color`         | Transparent          |
 
 As mentioned above, there is one more feature, modifying, in our case appending, which is achieved using method `add` instead of `set`.
 This is useful when you want to add more elements to a `Collection` bound to a key.
