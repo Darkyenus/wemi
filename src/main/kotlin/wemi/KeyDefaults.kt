@@ -21,9 +21,9 @@ import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
 import wemi.util.*
 import java.io.BufferedOutputStream
-import java.io.File
-import java.io.FileOutputStream
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.*
 import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
@@ -32,24 +32,24 @@ import kotlin.collections.ArrayList
 
 object KeyDefaults {
 
-    val BuildDirectory: BoundKeyValue<File> = { Keys.projectRoot.get() / "build" }
+    val BuildDirectory: BoundKeyValue<Path> = { Keys.projectRoot.get() / "build" }
 
-    val SourceBase: BoundKeyValue<Collection<File>> = {
+    val SourceBase: BoundKeyValue<Collection<Path>> = {
         listOf(Keys.projectRoot.get() / "src/main")
     }
 
-    val SourceRootsJavaKotlin: BoundKeyValue<Collection<File>> = {
+    val SourceRootsJavaKotlin: BoundKeyValue<Collection<Path>> = {
         val bases = Keys.sourceBases.get()
-        val roots = ArrayList<File>()
+        val roots = ArrayList<Path>()
         for (base in bases) {
             roots.add(base / "kotlin")
             roots.add(base / "java")
         }
         roots
     }
-    val ResourceRoots: BoundKeyValue<Collection<File>> = {
+    val ResourceRoots: BoundKeyValue<Collection<Path>> = {
         val bases = Keys.sourceBases.get()
-        val roots = ArrayList<File>()
+        val roots = ArrayList<Path>()
         for (base in bases) {
             roots.add(base / "resources")
         }
@@ -138,21 +138,21 @@ object KeyDefaults {
 
         clearedCount
     }
-    val JavaHome: BoundKeyValue<File> = {wemi.run.JavaHome}
-    val JavaExecutable: BoundKeyValue<File> = {wemi.run.javaExecutable(Keys.javaHome.get())}
+    val JavaHome: BoundKeyValue<Path> = {wemi.run.JavaHome}
+    val JavaExecutable: BoundKeyValue<Path> = {wemi.run.javaExecutable(Keys.javaHome.get())}
 
-    fun outputClassesDirectory(tag:String): BoundKeyValue<File> = {
+    fun outputClassesDirectory(tag:String): BoundKeyValue<Path> = {
         Keys.buildDirectory.get() / "cache/$tag-${Keys.projectName.get().toSafeFileName()}"
     }
 
     private val CompileLOG = LoggerFactory.getLogger("Compile")
-    val Compile: BoundKeyValue<File> = {
+    val Compile: BoundKeyValue<Path> = {
         using(Configurations.compiling) {
             val output = Keys.outputClassesDirectory.get()
             val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
-            val javaSourceRoots = mutableSetOf<File>()
+            val javaSourceRoots = mutableSetOf<Path>()
             for ((file, _, root) in javaSources) {
-                javaSourceRoots.add((root ?: file).absoluteFile)
+                javaSourceRoots.add((root ?: file).toAbsolutePath())
             }
             val kotlinSources = using(compilingKotlin) { Keys.sourceFiles.get() }
 
@@ -160,7 +160,7 @@ object KeyDefaults {
 
             // Compile Kotlin
             if (kotlinSources.isNotEmpty()) {
-                val sources:MutableList<File> = mutableListOf()
+                val sources:MutableList<Path> = mutableListOf()
                 for ((file, _, _) in kotlinSources) {
                     sources.add(file)
                 }
@@ -185,11 +185,11 @@ object KeyDefaults {
                 val writer = StringBuilderWriter(writerSb)
                 val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
 
-                output.mkdirs()
+                Files.createDirectories(output)
                 val sourcesOut = using(compilingJava) { Keys.outputSourcesDirectory.get() }
-                sourcesOut.mkdirs()
+                Files.createDirectories(sourcesOut)
                 val headersOut = using(compilingJava) { Keys.outputHeadersDirectory.get() }
-                headersOut.mkdirs()
+                Files.createDirectories(headersOut)
 
                 val pathSeparator = System.getProperty("path.separator", ":")
                 val compilerOptions = ArrayList<String>()
@@ -220,7 +220,7 @@ object KeyDefaults {
                 compilerOptions.add("-h")
                 compilerOptions.add(headersOut.absolutePath)
 
-                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.file })
+                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.file.toFile() })
 
                 val success = compiler.getTask(
                         writer,
@@ -250,7 +250,7 @@ object KeyDefaults {
             output
         }
     }
-    val RunDirectory: BoundKeyValue<File> = { Keys.projectRoot.get() }
+    val RunDirectory: BoundKeyValue<Path> = { Keys.projectRoot.get() }
     val RunOptions: BoundKeyValue<Collection<String>> = {
         val options = mutableListOf<String>()
         options.add("-ea")
@@ -313,7 +313,7 @@ object KeyDefaults {
             val internalClasspath = Keys.internalClasspath.get().map { it.classpathEntry }.distinct()
             val wemiClasspathEntry = wemiLauncherFileWithJarExtension(WemiBuildScript!!.cacheFolder)
 
-            val classpathEntries = ArrayList<File>(internalClasspath.size + externalClasspath.size + 1)
+            val classpathEntries = ArrayList<Path>(internalClasspath.size + externalClasspath.size + 1)
             classpathEntries.addAll(internalClasspath)
             classpathEntries.addAll(externalClasspath)
             classpathEntries.add(wemiClasspathEntry)
@@ -360,14 +360,14 @@ object KeyDefaults {
         }
     }
     private val AssemblyLOG = LoggerFactory.getLogger("Assembly")
-    val Assembly: BoundKeyValue<File> = {
+    val Assembly: BoundKeyValue<Path> = {
         val loadedSources = mutableMapOf<String, MutableList<AssemblySource>>()
 
         fun addSource(locatedFile: LocatedFile, own:Boolean) {
             val file = locatedFile.file
-            if (file.extension.equals("jar", ignoreCase = true)) {
+            if (file.nameHasExtension("jar")) {
                 // Add jar entries
-                val zip = ZipFile(file, ZipFile.OPEN_READ, StandardCharsets.UTF_8)
+                val zip = ZipFile(file.toFile(), ZipFile.OPEN_READ, StandardCharsets.UTF_8)
                 for (entry in zip.entries()) {
                     if (entry.isDirectory) continue
 
@@ -571,7 +571,7 @@ object KeyDefaults {
 
         val outputFile = Keys.buildDirectory.get() / (Keys.projectName.get() + "-" + Keys.projectVersion.get() + "-assembly.jar")
 
-        JarOutputStream(BufferedOutputStream(FileOutputStream(outputFile, false))).use { out ->
+        JarOutputStream(BufferedOutputStream(Files.newOutputStream(outputFile))).use { out ->
             for ((path, value) in assemblySources) {
                 val (source, data) = value
 
@@ -580,7 +580,7 @@ object KeyDefaults {
                 entry.size = data.size.toLong()
                 if (source != null) {
                     if (source.file != null) {
-                        entry.time = source.file.lastModified()
+                        entry.time = source.file.lastModified.toMillis()
                     }
                     if (source.zipEntry != null) {
                         if (source.zipEntry.time != -1L) {

@@ -1,7 +1,5 @@
 # Things to do next
 
-1. Use Path instead of File everywhere
-
 1. Update to latest Idea
 
 1. Update to latest kotlin

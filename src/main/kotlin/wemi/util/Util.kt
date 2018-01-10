@@ -3,7 +3,7 @@ package wemi.util
 import com.esotericsoftware.jsonbeans.Json
 import com.esotericsoftware.jsonbeans.JsonValue
 import wemi.boot.CLI
-import java.io.File
+import java.nio.file.Path
 import java.util.*
 
 /**
@@ -68,7 +68,7 @@ fun formatTimeDuration(ms:Long):CharSequence {
     return result
 }
 
-fun File.nameHasExtension(extensions:Collection<String>):Boolean {
+fun Path.nameHasExtension(extensions:Collection<String>):Boolean {
     val name = this.name
     val length = name.length
     for (extension in extensions) {
@@ -77,6 +77,17 @@ fun File.nameHasExtension(extensions:Collection<String>):Boolean {
                 && name[length - extension.length - 1] == '.') {
             return true
         }
+    }
+    return false
+}
+
+fun Path.nameHasExtension(extension:String):Boolean {
+    val name = this.name
+    val length = name.length
+    if (length >= extension.length + 1
+            && name.endsWith(extension, ignoreCase = true)
+            && name[length - extension.length - 1] == '.') {
+        return true
     }
     return false
 }

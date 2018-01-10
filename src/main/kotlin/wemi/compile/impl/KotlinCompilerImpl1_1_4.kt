@@ -39,14 +39,17 @@ import wemi.boot.WemiBuildFileExtensions
 import wemi.compile.*
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
 import wemi.util.LocatedFile
+import wemi.util.absolutePath
+import wemi.util.isDirectory
 import wemi.util.nameHasExtension
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
+import java.nio.file.Path
 import java.util.*
 
 
-@Suppress("unused")
+@Suppress("unused", "ClassName")
 /**
  * Kotlin compiler interface implementation, DO NOT TOUCH FROM OTHER CLASSES THAN [KotlinCompiler]!!!
  */
@@ -273,13 +276,13 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
             when {
                 file.isDirectory -> {
                     configuration.addKotlinSourceRoot(file.absolutePath)
-                    configuration.addJavaSourceRoot(file)
+                    configuration.addJavaSourceRoot(file.toFile())
                 }
                 file.nameHasExtension(KotlinSourceFileExtensions) -> {
                     configuration.addKotlinSourceRoot(file.absolutePath)
                 }
                 file.nameHasExtension(JavaSourceFileExtensions) -> {
-                    configuration.addJavaSourceRoot(file, source.packageName)
+                    configuration.addJavaSourceRoot(file.toFile(), source.packageName)
                 }
                 flags.useDefault(KotlinJVMCompilerFlags.compilingWemiBuildFiles, false)
                         && file.nameHasExtension(WemiBuildFileExtensions) -> {
@@ -292,9 +295,9 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         }
     }
 
-    private fun setupClasspath(configuration: CompilerConfiguration, flags: CompilerFlags, classpath: List<File>) {
+    private fun setupClasspath(configuration: CompilerConfiguration, flags: CompilerFlags, classpath: List<Path>) {
         for (classpathItem in classpath) {
-            configuration.add(JVMConfigurationKeys.CONTENT_ROOTS, JvmClasspathRoot(classpathItem))
+            configuration.add(JVMConfigurationKeys.CONTENT_ROOTS, JvmClasspathRoot(classpathItem.toFile()))
         }
 
         for (modularRoot in flags.useOrNull(KotlinJVMCompilerFlags.javaModulePath)?.split(File.pathSeparatorChar).orEmpty()) {
@@ -302,17 +305,17 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         }
     }
 
-    private fun setupDestination(configuration: CompilerConfiguration, destination: File) {
-        if (destination.name.endsWith(".jar", ignoreCase = true)) {
-            configuration.put(JVMConfigurationKeys.OUTPUT_JAR, destination)
+    private fun setupDestination(configuration: CompilerConfiguration, destination: Path) {
+        if (destination.nameHasExtension("jar")) {
+            configuration.put(JVMConfigurationKeys.OUTPUT_JAR, destination.toFile())
         } else {
-            configuration.put(JVMConfigurationKeys.OUTPUT_DIRECTORY, destination)
+            configuration.put(JVMConfigurationKeys.OUTPUT_DIRECTORY, destination.toFile())
         }
     }
 
     override fun compile(sources: List<LocatedFile>,
-                         classpath: List<File>,
-                         destination: File,
+                         classpath: List<Path>,
+                         destination: Path,
                          flags: CompilerFlags,
                          logger: Logger,
                          loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {

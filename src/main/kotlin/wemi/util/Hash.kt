@@ -1,6 +1,7 @@
 package wemi.util
 
-import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
 import java.security.DigestInputStream
 import java.security.MessageDigest
 import java.util.*
@@ -51,9 +52,9 @@ fun fromHexString(data: CharSequence): ByteArray? {
     }
 }
 
-fun File.hash(algorithm:String = "MD5"):ByteArray {
+fun Path.hash(algorithm:String = "MD5"):ByteArray {
     val md = MessageDigest.getInstance(algorithm)
-    DigestInputStream(inputStream(), md).use {
+    DigestInputStream(Files.newInputStream(this), md).use {
         val buf = ByteArray(1024)
         while (it.read(buf) != -1) {}
         it.close()

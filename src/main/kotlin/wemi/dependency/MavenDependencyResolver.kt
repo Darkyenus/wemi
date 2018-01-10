@@ -8,13 +8,11 @@ import org.xml.sax.*
 import org.xml.sax.helpers.DefaultHandler
 import org.xml.sax.helpers.XMLReaderFactory
 import wemi.dependency.MavenDependencyResolver.PomBuildingXMLHandler.Companion.SupportedModelVersion
-import wemi.util.div
-import wemi.util.fromHexString
-import wemi.util.toFile
-import wemi.util.toHexString
+import wemi.util.*
 import java.io.ByteArrayInputStream
-import java.io.File
 import java.net.URL
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.*
 import kotlin.collections.HashMap
 
@@ -26,7 +24,7 @@ private val LOG = LoggerFactory.getLogger("MavenDependencyResolver")
  */
 internal object MavenDependencyResolver {
 
-    private val PomFile = ArtifactKey<File>("pomFile", true)
+    private val PomFile = ArtifactKey<Path>("pomFile", true)
     private val PomData = ArtifactKey<ByteArray>("pomData", false)
     private val PomKey = ArtifactKey<Pom>("pom", false)
     private val PomUrlKey = ArtifactKey<URL>("pomUrl", true)
@@ -204,7 +202,7 @@ internal object MavenDependencyResolver {
         }
     }
 
-    private fun retrieveFile(path: String, repository: Repository.M2): Pair<ByteArray?, File?> {
+    private fun retrieveFile(path: String, repository: Repository.M2): Pair<ByteArray?, Path?> {
         val url = repository.url / path
         if (repository.local) {
             LOG.debug("Retrieving file '{}' from {}", path, repository)
@@ -260,19 +258,19 @@ internal object MavenDependencyResolver {
             LOG.debug("Not computing checksum for '{}' in {}", path, repository)
         }
 
-        var retrievedFile: File? = null
+        var retrievedFile: Path? = null
 
         val cache = repository.cache
         if (cache != null) {
             // We should cache it!
-            val dataFile: File? = (cache.url / path).toFile()
+            val dataFile: Path? = (cache.url / path).toPath()
 
             if (dataFile == null) {
                 LOG.warn("Can't save '{}' from {} into cache at {} - cache is not local?", path, repository, cache)
             } else if (dataFile.exists()) {
                 var fileIsEqual = true
 
-                if (dataFile.length() != response.body.size.toLong()) {
+                if (dataFile.size != response.body.size.toLong()) {
                     fileIsEqual = false
                 }
 
@@ -285,7 +283,7 @@ internal object MavenDependencyResolver {
             } else {
                 var dataFileWritten = false
                 try {
-                    dataFile.parentFile.mkdirs()
+                    Files.createDirectories(dataFile.parent)
                     dataFile.writeBytes(response.body)
                     LOG.debug("File '{}' from {} cached successfully", path, repository)
                     retrievedFile = dataFile
@@ -295,7 +293,7 @@ internal object MavenDependencyResolver {
                 }
 
                 if (dataFileWritten && cache.checksum != Repository.M2.Checksum.None) {
-                    val checksumFile: File = (cache.url / (path + cache.checksum.suffix)).toFile()!!
+                    val checksumFile: Path = (cache.url / (path + cache.checksum.suffix)).toPath()!!
                     var checksumString: String? = null
                     if (repository.checksum == cache.checksum) {
                         checksumString = computedChecksumString
@@ -314,7 +312,7 @@ internal object MavenDependencyResolver {
             }
         } else {
             try {
-                retrievedFile = (repository.url / path).toFile()
+                retrievedFile = (repository.url / path).toPath()
             } catch (e: IllegalArgumentException) {
                 LOG.debug("File '{}' from {} does not have local representation", path, repository, e)
             }

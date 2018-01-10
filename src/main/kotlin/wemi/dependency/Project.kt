@@ -4,7 +4,8 @@ import com.esotericsoftware.jsonbeans.Json
 import org.slf4j.LoggerFactory
 import wemi.boot.MachineWritable
 import wemi.collections.TinyMap
-import java.io.File
+import wemi.util.readBytes
+import java.nio.file.Path
 
 /**
  * Unique identifier for project/module to be resolved.
@@ -155,7 +156,7 @@ data class Dependency(val dependencyId: DependencyId, val exclusions: List<Depen
 @Suppress("unused")// T is used only in syntax
 class ArtifactKey<T>(val name: String, val printOut:Boolean) {
     companion object {
-        val ArtifactFile = ArtifactKey<File>("artifactFile", true)
+        val ArtifactFile = ArtifactKey<Path>("artifactFile", true)
         val ArtifactData = ArtifactKey<ByteArray>("artifactData", false)
     }
 
@@ -192,7 +193,7 @@ data class ResolvedDependency(val id: DependencyId,
         json.writeObjectEnd()
     }
 
-    var artifact: File?
+    var artifact: Path?
         get() = this.getKey(ArtifactKey.ArtifactFile)
         set(value) {
             if (value == null) {

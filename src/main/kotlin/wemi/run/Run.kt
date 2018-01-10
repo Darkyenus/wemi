@@ -3,30 +3,32 @@ package wemi.run
 import org.jline.utils.OSUtils
 import org.slf4j.LoggerFactory
 import wemi.WemiException
+import wemi.util.absolutePath
 import wemi.util.div
-import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 
 private val LOG = LoggerFactory.getLogger("Run")
 
 /**
- *
+ * Java home, as set by the java.home property.
  */
-
-val JavaHome:File = File(
+val JavaHome: Path = Paths.get(
         System.getProperty("java.home", null)
         ?: throw WemiException("java.home property is not set, can't find java executable")
-).absoluteFile
+).toAbsolutePath()
 
-fun javaExecutable(javaHome:File):File = run {
-    val windowsFile = (javaHome / "bin/java.exe").absoluteFile
-    val unixFile = (javaHome / "bin/java").absoluteFile
-    val winExists = windowsFile.exists()
-    val unixExists = unixFile.exists()
+fun javaExecutable(javaHome:Path):Path {
+    val windowsFile = (javaHome / "bin/java.exe").toAbsolutePath()
+    val unixFile = (javaHome / "bin/java").toAbsolutePath()
+    val winExists = Files.exists(windowsFile)
+    val unixExists = Files.exists(unixFile)
 
     if (winExists && !unixExists) {
-        windowsFile
+        return windowsFile
     } else if (!winExists && unixExists) {
-        unixFile
+        return unixFile
     } else if (!winExists && !unixExists) {
         if (OSUtils.IS_WINDOWS) {
             throw WemiException("Java executable should be at $windowsFile, but it does not exist")
@@ -35,14 +37,14 @@ fun javaExecutable(javaHome:File):File = run {
         }
     } else {
         if (OSUtils.IS_WINDOWS) {
-            windowsFile
+            return windowsFile
         } else {
-            unixFile
+            return unixFile
         }
     }
 }
 
-fun prepareJavaProcess(javaExecutable:File, workingDirectory:File, classpath:Collection<File>,
+fun prepareJavaProcess(javaExecutable:Path, workingDirectory:Path, classpath:Collection<Path>,
                        mainClass:String, javaOptions:Collection<String>, args:Collection<String>):ProcessBuilder {
     val command = mutableListOf<String>()
     command.add(javaExecutable.absolutePath)
@@ -54,6 +56,6 @@ fun prepareJavaProcess(javaExecutable:File, workingDirectory:File, classpath:Col
 
     LOG.debug("Starting command {} in {}", command, workingDirectory)
     return ProcessBuilder(command)
-            .directory(workingDirectory)
+            .directory(workingDirectory.toFile())
             .inheritIO()
 }

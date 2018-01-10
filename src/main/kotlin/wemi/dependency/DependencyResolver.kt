@@ -1,7 +1,7 @@
 package wemi.dependency
 
 import org.slf4j.LoggerFactory
-import java.io.File
+import java.nio.file.Path
 
 /**
  * Provides entry points to the DependencyResolver API for resolving library dependencies.
@@ -80,7 +80,7 @@ object DependencyResolver {
         return ok
     }
 
-    fun resolveArtifacts(projects: Collection<Dependency>, repositories: RepositoryChain): List<File>? {
+    fun resolveArtifacts(projects: Collection<Dependency>, repositories: RepositoryChain): List<Path>? {
         val resolved = mutableMapOf<DependencyId, ResolvedDependency>()
         val ok = resolve(resolved, projects, repositories)
 
@@ -91,7 +91,7 @@ object DependencyResolver {
         return resolved.artifacts()
     }
 
-    fun Map<DependencyId, ResolvedDependency>.artifacts():List<File> {
+    fun Map<DependencyId, ResolvedDependency>.artifacts():List<Path> {
         return mapNotNull { it.value.artifact }
     }
 

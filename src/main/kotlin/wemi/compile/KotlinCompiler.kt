@@ -7,7 +7,7 @@ import wemi.dependency.*
 import wemi.util.ForceClassLoader
 import wemi.util.LocatedFile
 import wemi.util.WemiDefaultClassLoader
-import java.io.File
+import java.nio.file.Path
 
 interface KotlinCompiler {
     /**
@@ -17,8 +17,8 @@ interface KotlinCompiler {
      * @param flags custom arguments, parsed by kotlin compiler
      */
     fun compile(sources: List<LocatedFile>,
-                classpath: List<File>,
-                destination: File,
+                classpath: List<Path>,
+                destination: Path,
                 flags: CompilerFlags,
                 logger: Logger = LoggerFactory.getLogger("KotlinCompiler"),
                 loggerMarker: Marker? = null): CompileExitStatus
@@ -54,7 +54,7 @@ fun kotlinCompiler(forVersion:KotlinCompilerVersion):KotlinCompiler {
                     ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
             val implementationClassName = forVersion.implementationClassName
-            val loader = ForceClassLoader(artifacts.map { file -> file.toURI().toURL() }.toTypedArray(),
+            val loader = ForceClassLoader(artifacts.map { file -> file.toUri().toURL() }.toTypedArray(),
                     WemiDefaultClassLoader, implementationClassName)
             val clazz = Class.forName(implementationClassName, true, loader)
 

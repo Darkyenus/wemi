@@ -3,6 +3,7 @@ package wemi
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
 import java.net.URL
+import java.nio.file.Path
 
 /** Version of Wemi build system */
 val WemiVersion = "0.1-SNAPSHOT"
@@ -30,7 +31,7 @@ typealias BoundKeyValue<Value> = Scope.() -> Value
 /** Value modifier that can be additionally bound to a key in [BindingHolder] */
 typealias BoundKeyValueModifier<Value> = Scope.(Value) -> Value
 
-fun project(projectRoot: java.io.File, initializer: Project.() -> Unit): ProjectDelegate {
+fun project(projectRoot: Path, initializer: Project.() -> Unit): ProjectDelegate {
     return ProjectDelegate(projectRoot, initializer)
 }
 

@@ -1,8 +1,17 @@
 package wemi.util
 
 import com.esotericsoftware.jsonbeans.Json
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import wemi.boot.MachineWritable
-import java.io.File
+import java.io.IOException
+import java.nio.file.FileVisitResult
+import java.nio.file.FileVisitor
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.attribute.BasicFileAttributes
+
+private val LOG: Logger = LoggerFactory.getLogger("LocatedFile")
 
 @Suppress("NOTHING_TO_INLINE")
 /**
@@ -16,22 +25,22 @@ import java.io.File
  * @property root to which [path] is relative to
  * @property simple is true if the (File) constructor has been used and the file is not really "located"
  */
-class LocatedFile private constructor(val file: File, val root:File, val path: String, val simple:Boolean)
+class LocatedFile private constructor(val file: Path, val root: Path, val path: String, val simple:Boolean)
     : MachineWritable {
 
-    constructor(file:File) : this(file, file.parentFile, file.name, true)
-    constructor(file:File, location: String, root:File) : this(file, root, location, false)
+    constructor(file:Path) : this(file, file.parent, file.name, true)
+    constructor(file:Path, location: String, root:Path) : this(file, root, location, false)
 
     init {
         assert(!file.isDirectory) {"LocatedFile.file must not be a directory: " + this}
         assert(!root.isDirectory) {"LocatedFile.root must be a directory: " + this}
     }
 
-    operator inline fun component1():  File = file
+    operator inline fun component1():  Path = file
     operator inline fun component2():  String? = path
-    operator inline fun component3():  File? = root
+    operator inline fun component3():  Path? = root
 
-    val classpathEntry:File
+    val classpathEntry:Path
         get() = if (simple) file else root
 
     val packageName:String
@@ -55,21 +64,21 @@ class LocatedFile private constructor(val file: File, val root:File, val path: S
 
     override fun writeMachine(json: Json) {
         json.writeObjectStart()
-        json.writeValue("file", file, File::class.java)
-        json.writeValue("root", root, File::class.java)
+        json.writeValue("file", file, Path::class.java)
+        json.writeValue("root", root, Path::class.java)
         json.writeValue("path", path, String::class.java)
         json.writeValue("simple", simple, Boolean::class.java)
         json.writeObjectEnd()
     }
 }
 
-fun constructLocatedFiles(from: File, to: MutableCollection<LocatedFile>) {
+fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>) {
     constructLocatedFiles(from, to) { _ -> true }
 }
 
-inline fun constructLocatedFiles(from: File, to: MutableCollection<LocatedFile>, filter: (File) -> Boolean) {
+fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, filter: (Path) -> Boolean) {
     // Walking is hard, don't do it if we don't have to
-    if (from.isFile) {
+    if (!from.isDirectory) {
         if (!from.isHidden && filter(from)) {
             to.add(LocatedFile(from))
         }
@@ -78,24 +87,35 @@ inline fun constructLocatedFiles(from: File, to: MutableCollection<LocatedFile>,
 
     val pathStack = StringBuilder(64)
 
-    from.walkTopDown()
-            .onEnter { directory ->
-                if (directory !== from) {
-                    pathStack.append(directory.name).append('/')
-                }
-                true
+    Files.walkFileTree(from, object : FileVisitor<Path> {
+        override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes?): FileVisitResult {
+            if (dir !== from) {
+                pathStack.append(dir.name).append('/')
             }
-            .onLeave { directory ->
-                if (directory !== from) {
-                    pathStack.setLength(pathStack.length - directory.name.length + 1)
-                }
+            return FileVisitResult.CONTINUE
+        }
+
+        override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+            if (!attrs.isDirectory && !file.isHidden && filter(file)) {
+                val originalLength = pathStack.length
+                pathStack.append(file.name)
+                to.add(LocatedFile(file, pathStack.toString(), from))
+                pathStack.setLength(originalLength)
             }
-            .forEach { file ->
-                if (!file.isDirectory && !file.isHidden && filter(file)) {
-                    val originalLength = pathStack.length
-                    pathStack.append(file.name)
-                    to.add(LocatedFile(file, pathStack.toString(), from))
-                    pathStack.setLength(originalLength)
-                }
+
+            return FileVisitResult.CONTINUE
+        }
+
+        override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
+            if (dir !== from) {
+                pathStack.setLength(pathStack.length - dir.name.length + 1)
             }
+            return FileVisitResult.CONTINUE
+        }
+
+        override fun visitFileFailed(file: Path?, exc: IOException?): FileVisitResult {
+            LOG.warn("Can't visit {} to constructLocatedFiles", file, exc)
+            return FileVisitResult.CONTINUE
+        }
+    })
 }

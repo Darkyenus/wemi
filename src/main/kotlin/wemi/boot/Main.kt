@@ -15,6 +15,7 @@ import wemi.util.div
 import java.io.*
 import java.net.URL
 import java.net.URLClassLoader
+import java.nio.file.Paths
 import java.time.Duration
 import kotlin.system.exitProcess
 
@@ -142,7 +143,7 @@ fun main(args: Array<String>) {
     WemiRunningInInteractiveMode = interactive
 
     // Find root
-    val root = File(".").absoluteFile
+    val root = Paths.get(".").toAbsolutePath()
 
     val buildFolder = root / "build"
     val buildScriptSources = findBuildScriptSources(buildFolder)
@@ -159,7 +160,7 @@ fun main(args: Array<String>) {
         TPLogger.setLogFunction(LogFunctionMultiplexer(
                 FileLogFunction(TimeFormatter.AbsoluteTimeFormatter(),
                         LogFileHandler(
-                                buildFolder / "logs",
+                                (buildFolder / "logs").toFile(),
                                 DateTimeFileCreationStrategy(
                                         DateTimeFileCreationStrategy.DEFAULT_DATE_TIME_FILE_NAME_FORMATTER,
                                         false,
@@ -185,10 +186,10 @@ fun main(args: Array<String>) {
         PrettyPrinter.setApplicationRootDirectory(buildScript.wemiRoot)
 
         val urls = arrayOfNulls<URL>(1 + buildScript.classpath.size)
-        urls[0] = buildScript.scriptJar.toURI().toURL()
+        urls[0] = buildScript.scriptJar.toUri().toURL()
         var i = 1
         for (file in buildScript.classpath) {
-            urls[i++] = file.toURI().toURL()
+            urls[i++] = file.toUri().toURL()
         }
         val loader = URLClassLoader(urls, WemiDefaultClassLoader)
         LOG.debug("Loading build file {}", buildScript)

@@ -5,7 +5,7 @@ package wemi
 import org.slf4j.LoggerFactory
 import wemi.KeyDefaults.applyDefaults
 import wemi.boot.BuildScriptIntrospection.initializeBuildScriptInfo
-import java.io.File
+import java.nio.file.Path
 import java.util.*
 import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
@@ -20,14 +20,14 @@ internal object BuildScriptData {
 }
 
 class ProjectDelegate internal constructor(
-        private val projectRoot: File,
+        private val projectRoot: Path,
         private val initializer: Project.() -> Unit
 ) : ReadOnlyProperty<Any?, Project> {
 
     private lateinit var project: Project
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): ProjectDelegate {
-        this.project = Project(property.name, projectRoot.absoluteFile)
+        this.project = Project(property.name, projectRoot.toAbsolutePath())
         synchronized(BuildScriptData.AllProjects) {
             for ((_, project) in BuildScriptData.AllProjects) {
                 if (project.name == this.project.name) {

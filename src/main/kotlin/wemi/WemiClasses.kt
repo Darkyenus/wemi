@@ -10,7 +10,7 @@ import wemi.boot.MachineWritable
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
 import wemi.util.WithDescriptiveString
-import java.io.File
+import java.nio.file.Path
 
 /** wemi.Key which can have value of type [Value] assigned, through [Project] or [Configuration]. */
 class Key<Value> internal constructor(val name:String,
@@ -83,7 +83,7 @@ class ConfigurationExtension internal constructor(val extending: Configuration, 
     override fun toString(): String = "extend($extending) from $from"
 }
 
-class Project internal constructor(val name: String, val projectRoot: File)
+class Project internal constructor(val name: String, val projectRoot: Path)
     : BindingHolder(), WithDescriptiveString, MachineWritable {
 
     override fun toString(): String = name

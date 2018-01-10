@@ -3,6 +3,7 @@
 import wemi.Configurations
 import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository
+import java.nio.file.Paths
 import wemi.KotlinReflect as _KotlinReflect
 import wemi.KotlinStdlib as _KotlinStdLib
 import wemi.kotlinDependency as _kotlinDependency
@@ -23,10 +24,10 @@ typealias ProjectId = wemi.dependency.DependencyId
 typealias ProjectDependency = wemi.dependency.Dependency
 typealias ProjectExclusion = wemi.dependency.DependencyExclusion
 
-typealias File = java.io.File
+typealias Path = java.nio.file.Path
 
 // Core Functions
-inline fun project(projectRoot: File = File("."), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, initializer)
+inline fun project(projectRoot: Path = path("."), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, initializer)
 inline fun <Value> key(description: String, defaultValue: Value, cached: Boolean = false) = wemi.key(description, defaultValue, cached)
 inline fun <Value> key(description: String, cached: Boolean = false) = wemi.key<Value>(description, cached)
 inline fun configuration(description: String, parent: Configuration? = null, noinline initializer: Configuration.() -> Unit) = wemi.configuration(description, parent, initializer)
@@ -44,6 +45,8 @@ val Scope.JUnitAPI
     inline get() = _JUnitAPI
 val Scope.JUnitEngine
     inline get() = _JUnitEngine
+
+fun path(path:String):Path = Paths.get(path)
 
 // Configurations
 val compiling

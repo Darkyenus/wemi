@@ -10,7 +10,6 @@ import org.jline.terminal.TerminalBuilder
 import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.util.*
-import java.io.File
 import java.io.IOException
 import java.io.PrintStream
 import java.nio.file.Files
@@ -60,23 +59,27 @@ object CLI {
             field = value
         }
 
-    internal fun findDefaultProject(root: File):Project? {
+    internal fun findDefaultProject(root: Path):Project? {
         val allProjects = AllProjects
         when {
             allProjects.isEmpty() -> return null
             allProjects.size == 1 -> return allProjects.values.first()
             else -> {
                 var closest: Project? = null
+                var closestDist = -1
                 for (project in allProjects.values) {
                     when {
                         project.projectRoot == root -> return project
                         closest == null -> closest = project
                         else -> // Compare how close they are!
                             try {
-                                val projectDist = project.projectRoot.toRelativeString(root).count { it == File.pathSeparatorChar }
-                                val closestDist = closest.projectRoot.toRelativeString(root).count { it == File.pathSeparatorChar }
+                                if (closestDist == -1) {
+                                    closestDist = root.relativize(closest.projectRoot).nameCount
+                                }
+                                val projectDist = root.relativize(project.projectRoot).nameCount
                                 if (projectDist < closestDist) {
                                     closest = project
+                                    closestDist = projectDist
                                 }
                             } catch (_: IllegalArgumentException) {
                                 //May happen if projects are on different roots, but lets not deal with that.
@@ -88,7 +91,7 @@ object CLI {
         }
     }
 
-    internal fun init(root: File) {
+    internal fun init(root: Path) {
         val shouldBeDefault = findDefaultProject(root)
         if (shouldBeDefault == null) {
             printWarning("No project found")
@@ -483,7 +486,7 @@ object CLI {
 
     private fun getHistoryFile(name:String):Path? {
         val buildScript = WemiBuildScript ?: return null
-        val historiesFolder = buildScript.buildFolder.toPath().resolve("cache/history/")
+        val historiesFolder = buildScript.buildFolder.resolve("cache/history/")
         Files.createDirectories(historiesFolder)
         val fileName = StringBuilder()
         for (c in name) {
