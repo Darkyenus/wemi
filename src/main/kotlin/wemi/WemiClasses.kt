@@ -330,7 +330,7 @@ sealed class BindingHolder {
      * [value] will be evaluated every time someone queries receiver key and this [BindingHolder] is
      * the topmost in the query [Scope] with the key bound.
      *
-     * If the key already has [BoundKeyValue] bound in this scope, it will be replaced with a warning.
+     * If the key already has [BoundKeyValue] bound in this scope, it will be replaced.
      *
      * @see modify
      */
@@ -339,7 +339,7 @@ sealed class BindingHolder {
         @Suppress("UNCHECKED_CAST")
         val old = binding.put(this as Key<Any>, value as BoundKeyValue<Any?>)
         if (old != null) {
-            LOG.warn("Overriding previous value bound to {} in {}", this, this@BindingHolder)
+            LOG.debug("Overriding previous value bound to {} in {}", this, this@BindingHolder)
         }
     }
 

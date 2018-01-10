@@ -51,6 +51,12 @@
         </action>
     </actions>
 
+    <application-components>
+        <component>
+            <implementation-class>com.darkyen.wemi.intellij.WemiApplicationComponent</implementation-class>
+        </component>
+    </application-components>
+
     <extensions defaultExtensionNs="com.intellij">
         <!-- Import -->
         <postStartupActivity implementation="com.darkyen.wemi.intellij.importing.OfferImportStartupActivity"/>

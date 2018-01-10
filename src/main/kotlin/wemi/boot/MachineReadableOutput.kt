@@ -4,6 +4,7 @@ import com.esotericsoftware.jsonbeans.*
 import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.util.absolutePath
+import java.io.File
 import java.io.IOException
 import java.io.OutputStreamWriter
 import java.io.PrintStream
@@ -199,6 +200,12 @@ private val MACHINE_READABLE_JSON_WRITING = object: Json(){
                         }
                         this.writeArrayEnd()
                     }
+                    value is File -> {
+                        writer.value(value.absolutePath)
+                    }
+                    value is Path -> {
+                        writer.value(value.absolutePath)
+                    }
                     Enum::class.java.isAssignableFrom(actualType) -> {
                         //Does not respect enumNames!!!
                         writer.value((value as Enum<*>).name)
@@ -215,16 +222,6 @@ private val MACHINE_READABLE_JSON_WRITING = object: Json(){
         }
     }
 }.apply {
-    this.setSerializer(Path::class.java, object : JsonSerializer<Path> {
-        override fun write(json: Json, value: Path?, type: Class<*>?) {
-            json.writeValue(value?.absolutePath as Any?, String::class.java)
-        }
-
-        override fun read(json: Json, value: JsonValue, type: Class<*>?): Path {
-            throw NotImplementedError("Only writing is supported")
-        }
-    })
-
     this.setOutputType(com.esotericsoftware.jsonbeans.OutputType.json)
     this.setUsePrototypes(false)
     this.setEnumNames(true)

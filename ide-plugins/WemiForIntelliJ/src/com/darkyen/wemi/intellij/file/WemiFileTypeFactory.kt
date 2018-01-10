@@ -1,7 +1,6 @@
 package com.darkyen.wemi.intellij.file
 
-import com.intellij.openapi.fileTypes.FileTypeConsumer
-import com.intellij.openapi.fileTypes.FileTypeFactory
+import com.intellij.openapi.fileTypes.*
 
 /**
  * Register .wemi files as kotlin files
