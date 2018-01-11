@@ -102,12 +102,11 @@ val resolvedLibraryDependencies
     inline get() = wemi.Keys.resolvedLibraryDependencies
 val unmanagedDependencies
     inline get() = wemi.Keys.unmanagedDependencies
+
 val externalClasspath
     inline get() = wemi.Keys.externalClasspath
 val internalClasspath
     inline get() = wemi.Keys.internalClasspath
-val classpath
-    inline get() = wemi.Keys.classpath
 
 val clean
     inline get() = wemi.Keys.clean

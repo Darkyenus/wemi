@@ -41,9 +41,10 @@ object BuildScriptIntrospection {
         Keys.repositories set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositories }
         Keys.repositoryChain set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositoryChain }
         Keys.libraryDependencies set { Keys.buildScript.get().buildScriptClasspathConfiguration.dependencies }
-        Keys.classpath set { Keys.buildScript.get().classpath.map { LocatedFile(it) } }
+        Keys.externalClasspath set { Keys.buildScript.get().classpath.map { LocatedFile(it) } }
         Keys.compilerOptions set { Keys.buildScript.get().buildFlags }
         Keys.compile set { Keys.buildScript.get().scriptJar }
+        Keys.resourceFiles set { emptyList() }
         Keys.sourceFiles set { Keys.buildScript.get().sources }
     }
 

@@ -29,6 +29,8 @@ import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import kotlin.collections.ArrayList
+import kotlin.collections.LinkedHashMap
+import kotlin.collections.LinkedHashSet
 
 object KeyDefaults {
 
@@ -114,9 +116,6 @@ object KeyDefaults {
         classpath.addAll(resources)
 
         classpath
-    }
-    val Classpath: BoundKeyValue<Collection<LocatedFile>> = {
-        Keys.externalClasspath.get() + Keys.internalClasspath.get()
     }
     val Clean: BoundKeyValue<Int> = {
         val folders = arrayOf(
@@ -264,13 +263,17 @@ object KeyDefaults {
     val Run: BoundKeyValue<Int> = {
         using(Configurations.running) {
             val javaExecutable = Keys.javaExecutable.get()
-            val classpath = Keys.classpath.get()
+            val classpathEntries = LinkedHashSet<Path>()
+            for (locatedFile in Keys.externalClasspath.get()) {
+                classpathEntries.add(locatedFile.classpathEntry)
+            }
+            for (locatedFile in Keys.internalClasspath.get()) {
+                classpathEntries.add(locatedFile.classpathEntry)
+            }
             val directory = Keys.runDirectory.get()
             val mainClass = Keys.mainClass.get()
             val options = Keys.runOptions.get()
             val arguments = Keys.runArguments.get()
-
-            val classpathEntries = classpath.map { it.classpathEntry }.distinct()
 
             val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, classpathEntries,
                     mainClass, options, arguments)
@@ -626,7 +629,6 @@ object KeyDefaults {
         Keys.unmanagedDependencies set { emptyList() }
         Keys.internalClasspath set InternalClasspath
         Keys.externalClasspath set ExternalClasspath
-        Keys.classpath set Classpath
 
         Keys.clean set Clean
 

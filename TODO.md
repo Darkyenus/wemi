@@ -1,8 +1,11 @@
 # Things to do next
 
+1. Allow projects to depend on other projects and implement this in IDE plugin
+
 1. Update to latest kotlin
 
-1. Trace debug system for debugging keys (+ print current key trace on first Ctrl-T/C and java stack trace on second Ctrl-T with same key trace)
+1. Trace debug mode
+	1. Trace debug system for debugging keys (+ print current key trace on first Ctrl-T/C and java stack trace on second Ctrl-T with same key trace)
 
 1. Javadoc everything
 
@@ -16,10 +19,6 @@
 1. Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
 
 1. Self hosting
-
-1. Trace debug mode
-
-1. Allow projects to depend on other projects and implement this in IDE plugin
 
 1. Kotlin JS
 

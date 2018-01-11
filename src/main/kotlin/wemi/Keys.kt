@@ -46,11 +46,11 @@ object Keys {
     val libraryDependencyProjectMapper by key<(Dependency) -> Dependency>("Function applied to ProjectDependencies encountered while resolving. Used for example when retrieving sources.", defaultValue = {it})
     val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved ->
         resolved.value.prettyPrint(null)
-    })
+    }, cached = true)
     val unmanagedDependencies by key<Collection<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers")
-    val externalClasspath by key<Collection<LocatedFile>>("External classpath of the project, usually dependencies", cached = true)
-    val internalClasspath by key<Collection<LocatedFile>>("Internal classpath of the project, usually compiled sources and resources")
-    val classpath by key<Collection<LocatedFile>>("Full classpath of the project, combined external and internal classpath")
+
+    val externalClasspath by key<Collection<LocatedFile>>("Classpath of the project, elements from external sources, i.e. library and project dependencies")
+    val internalClasspath by key<Collection<LocatedFile>>("Classpath of the project, created internally, i.e. compiled sources and resources")
 
     val clean by key<Int>("Clean compile directories and internal cache, returns approximate amount of items cleaned")
 
