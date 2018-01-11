@@ -2,8 +2,6 @@
 
 1. Update to latest kotlin
 
-1. Update to latest Idea
-
 1. Trace debug system for debugging keys (+ print current key trace on first Ctrl-T/C and java stack trace on second Ctrl-T with same key trace)
 
 1. Javadoc everything
