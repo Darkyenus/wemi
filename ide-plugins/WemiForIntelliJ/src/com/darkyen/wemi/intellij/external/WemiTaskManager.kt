@@ -1,12 +1,14 @@
 package com.darkyen.wemi.intellij.external
 
 import com.darkyen.wemi.intellij.WemiLauncherSession
+import com.darkyen.wemi.intellij.execution.WemiRunConfiguration
 import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
 import com.darkyen.wemi.intellij.util.LineReadingOutputStream
 import com.intellij.openapi.externalSystem.model.ExternalSystemException
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
 import com.intellij.openapi.externalSystem.task.ExternalSystemTaskManager
+import java.util.regex.Pattern
 
 /**
  * May be run in a different process from the rest of the IDE
@@ -14,6 +16,8 @@ import com.intellij.openapi.externalSystem.task.ExternalSystemTaskManager
 class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
 
     private val taskThreadBinding = mutableMapOf<ExternalSystemTaskId, Thread>()
+
+    private val JVM_AGENT_PORT_PATTERN = Pattern.compile("-agentlib:jwdp=.*address=(\\d+).*")
 
     /**
      * @param id of this task run
@@ -23,6 +27,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
      * @param jvmAgentSetup
      * @param listener
      */
+    @Throws(ExternalSystemException::class)
     override fun executeTasks(id: ExternalSystemTaskId,
                               taskNames: List<String>,
                               projectPath: String,
@@ -38,7 +43,30 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
             }
 
             val launcher = settings!!.launcher
-            val vmOptions = if (jvmAgentSetup == null) settings.vmOptions else settings.vmOptions + jvmAgentSetup
+
+            val deferDebug = settings.deferDebugToWemi
+            if (deferDebug == null) {
+                listener.onTaskOutput(id, "WEMI: Defer debug flag is not set", false)
+            }
+
+            var jvmAgent = jvmAgentSetup
+            if (jvmAgent.isNullOrBlank()) {
+                jvmAgent = null
+            }
+
+            if (deferDebug != false && jvmAgent != null) {
+                val matcher = JVM_AGENT_PORT_PATTERN.matcher(jvmAgent)
+                if (matcher.matches()) {
+                    val port = matcher.group(1)
+
+                    settings.env[WemiRunConfiguration.WEMI_SUPPRESS_DEBUG_ENVIRONMENT_VARIABLE_NAME] = port
+                    jvmAgent = null
+                } else {
+                    listener.onTaskOutput(id, "WEMI: Wanted to defer debug, but failed to extract port from: $jvmAgent\n", false)
+                }
+            }
+
+            val vmOptions = if (jvmAgent == null) settings.vmOptions else settings.vmOptions + jvmAgent
 
             val prefixConfigurations = settings.prefixConfigurationsArray()
             val tasks = taskNames.map {
@@ -59,7 +87,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                 var javaVmExecutable = settings.javaVmExecutable
                 if (javaVmExecutable.isBlank()) {
                     javaVmExecutable = "java"
-                    listener.onTaskOutput(id, "Using implicit java executable from PATH\n", false)
+                    listener.onTaskOutput(id, "WEMI: Using implicit java executable from PATH\n", false)
                 }
 
                 launcher.createTaskSession(javaVmExecutable, vmOptions, settings.env, settings.isPassParentEnvs, tasks)
@@ -99,7 +127,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
 
         val thread = removed ?: return false
 
-        listener.onTaskOutput(id, "Wemi resolution task is being cancelled\n", false)
+        listener.onTaskOutput(id, "WEMI: Task is being cancelled\n", false)
         listener.beforeCancel(id)
 
         // This is a hack, but will have to do for now
