@@ -155,5 +155,12 @@ private val DELETING_FILE_VISITOR = object : FileVisitor<Path> {
 }
 
 fun Path.deleteRecursively() {
-    Files.walkFileTree(this, DELETING_FILE_VISITOR)
+    if (!Files.exists(this)) {
+        return
+    }
+    if (Files.isDirectory(this)) {
+        Files.walkFileTree(this, DELETING_FILE_VISITOR)
+    } else {
+        Files.delete(this)
+    }
 }

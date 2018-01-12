@@ -48,6 +48,7 @@ object Keys {
         resolved.value.prettyPrint(null)
     }, cached = true)
     val unmanagedDependencies by key<Collection<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers")
+    val projectDependencies by key<Collection<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath")
 
     val externalClasspath by key<Collection<LocatedFile>>("Classpath of the project, elements from external sources, i.e. library and project dependencies")
     val internalClasspath by key<Collection<LocatedFile>>("Classpath of the project, created internally, i.e. compiled sources and resources")

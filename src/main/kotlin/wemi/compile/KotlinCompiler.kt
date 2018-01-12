@@ -16,8 +16,8 @@ interface KotlinCompiler {
      * @param classpath for user class files
      * @param flags custom arguments, parsed by kotlin compiler
      */
-    fun compile(sources: List<LocatedFile>,
-                classpath: List<Path>,
+    fun compile(sources: Collection<LocatedFile>,
+                classpath: Collection<Path>,
                 destination: Path,
                 flags: CompilerFlags,
                 logger: Logger = LoggerFactory.getLogger("KotlinCompiler"),

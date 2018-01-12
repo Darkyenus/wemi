@@ -7,6 +7,7 @@ import java.nio.file.Paths
 import wemi.KotlinReflect as _KotlinReflect
 import wemi.KotlinStdlib as _KotlinStdLib
 import wemi.kotlinDependency as _kotlinDependency
+import wemi.dependency.dependency as _dependency
 import wemi.test.JUnitAPI as _JUnitAPI
 import wemi.test.JUnitEngine as _JUnitEngine
 
@@ -45,6 +46,7 @@ val Scope.JUnitAPI
     inline get() = _JUnitAPI
 val Scope.JUnitEngine
     inline get() = _JUnitEngine
+inline fun Project.dependency(vararg configurations:Configuration) = this._dependency(*configurations)
 
 fun path(path:String):Path = Paths.get(path)
 
@@ -102,6 +104,8 @@ val resolvedLibraryDependencies
     inline get() = wemi.Keys.resolvedLibraryDependencies
 val unmanagedDependencies
     inline get() = wemi.Keys.unmanagedDependencies
+val projectDependencies
+    inline get() = wemi.Keys.projectDependencies
 
 val externalClasspath
     inline get() = wemi.Keys.externalClasspath

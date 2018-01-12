@@ -15,6 +15,7 @@ import wemi.compile.CompilerFlags
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.dependency.*
+import wemi.run.javaExecutable
 import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
 import wemi.test.TestReport
@@ -29,7 +30,6 @@ import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import kotlin.collections.ArrayList
-import kotlin.collections.LinkedHashMap
 import kotlin.collections.LinkedHashSet
 
 object KeyDefaults {
@@ -49,6 +49,7 @@ object KeyDefaults {
         }
         roots
     }
+
     val ResourceRoots: BoundKeyValue<Collection<Path>> = {
         val bases = Keys.sourceBases.get()
         val roots = ArrayList<Path>()
@@ -81,32 +82,50 @@ object KeyDefaults {
         result
     }
 
-    val Repositories: BoundKeyValue<Collection<Repository>> = {
-        DefaultRepositories
-    }
-    val LibraryDependencies: BoundKeyValue<Collection<Dependency>> = {
-        listOf(KotlinStdlib)
-    }
     val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<DependencyId, ResolvedDependency>>> = {
         val repositories = Keys.repositoryChain.get()
         val resolved = mutableMapOf<DependencyId, ResolvedDependency>()
         val complete = DependencyResolver.resolve(resolved, Keys.libraryDependencies.get(), repositories, Keys.libraryDependencyProjectMapper.get())
         Partial(resolved, complete)
     }
+
+    private val ExternalClasspath_LOG = LoggerFactory.getLogger("ProjectDependencyResolution")
+    private val ExternalClasspath_CircularDependencyProtection = CycleChecker<Scope>()
     val ExternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
+        val result = ArrayList<LocatedFile>()
+
         val resolved = Keys.resolvedLibraryDependencies.get()
         if (!resolved.complete) {
             throw WemiException("Failed to resolve all artifacts\n${resolved.value.prettyPrint(null)}", showStacktrace = false)
         }
-        val unmanaged = Keys.unmanagedDependencies.get()
-
-        val result = mutableListOf<LocatedFile>()
-        result.addAll(unmanaged)
         for ((_, resolvedDependency) in resolved.value) {
             result.add(LocatedFile(resolvedDependency.artifact ?: continue))
         }
+
+        ExternalClasspath_CircularDependencyProtection.block(this, failure = {
+            //TODO Show cycle
+            throw WemiException("Cyclic dependencies in projectDependencies are not allowed", showStacktrace = false)
+        }, action = {
+            val projectDependencies = Keys.projectDependencies.get()
+
+            for (projectDependency in projectDependencies) {
+                // Enter a different scope
+                projectDependency.project.projectScope.run {
+                    using(*projectDependency.configurations) {
+                        ExternalClasspath_LOG.debug("Resolving project dependency on {}", this)
+                        result.addAll(Keys.externalClasspath.get())
+                        result.addAll(Keys.internalClasspath.get())
+                    }
+                }
+            }
+        })
+
+        val unmanaged = Keys.unmanagedDependencies.get()
+        result.addAll(unmanaged)
+
         result
     }
+
     val InternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
         val compiled = Keys.compile.get()
         val resources = Keys.resourceFiles.get()
@@ -117,6 +136,7 @@ object KeyDefaults {
 
         classpath
     }
+
     val Clean: BoundKeyValue<Int> = {
         val folders = arrayOf(
                 Keys.outputClassesDirectory.get(),
@@ -137,8 +157,6 @@ object KeyDefaults {
 
         clearedCount
     }
-    val JavaHome: BoundKeyValue<Path> = {wemi.run.JavaHome}
-    val JavaExecutable: BoundKeyValue<Path> = {wemi.run.javaExecutable(Keys.javaHome.get())}
 
     fun outputClassesDirectory(tag:String): BoundKeyValue<Path> = {
         Keys.buildDirectory.get() / "cache/$tag-${Keys.projectName.get().toSafeFileName()}"
@@ -155,7 +173,7 @@ object KeyDefaults {
             }
             val kotlinSources = using(compilingKotlin) { Keys.sourceFiles.get() }
 
-            val externalClasspath = Keys.externalClasspath.get()
+            val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
 
             // Compile Kotlin
             if (kotlinSources.isNotEmpty()) {
@@ -168,7 +186,7 @@ object KeyDefaults {
                 val compiler = using(compilingKotlin) { Keys.kotlinCompiler.get() }
                 val compilerFlags = using(compilingKotlin) { Keys.compilerOptions.get() }
 
-                val compileResult = compiler.compile(javaSources + kotlinSources, externalClasspath.map { it.file }.toList(), output, compilerFlags, CompileLOG, null)
+                val compileResult = compiler.compile(javaSources + kotlinSources, externalClasspath, output, compilerFlags, CompileLOG, null)
                 if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
                     throw WemiException("Kotlin compilation failed: "+compileResult, showStacktrace = false)
                 }
@@ -204,7 +222,7 @@ object KeyDefaults {
                     compilerOptions.add(it.version)
                 }
                 compilerOptions.add("-classpath")
-                val classpathString = externalClasspath.joinToString(pathSeparator) { it.file.absolutePath }
+                val classpathString = externalClasspath.joinToString(pathSeparator) { it.absolutePath }
                 if (kotlinSources.isNotEmpty()) {
                     compilerOptions.add(classpathString + pathSeparator + output.absolutePath)
                 } else {
@@ -249,7 +267,7 @@ object KeyDefaults {
             output
         }
     }
-    val RunDirectory: BoundKeyValue<Path> = { Keys.projectRoot.get() }
+
     val RunOptions: BoundKeyValue<Collection<String>> = {
         val options = mutableListOf<String>()
         options.add("-ea")
@@ -259,7 +277,7 @@ object KeyDefaults {
         }
         options
     }
-    val RunArguments: BoundKeyValue<Collection<String>> = { emptyList() }
+
     val Run: BoundKeyValue<Int> = {
         using(Configurations.running) {
             val javaExecutable = Keys.javaExecutable.get()
@@ -351,6 +369,7 @@ object KeyDefaults {
             }
         }
     }
+
     val AssemblyRenameFunction: BoundKeyValue<(AssemblySource, String) -> String?> = {
         { root, name ->
             val injectedName = root.name
@@ -362,6 +381,7 @@ object KeyDefaults {
             }
         }
     }
+
     private val AssemblyLOG = LoggerFactory.getLogger("Assembly")
     val Assembly: BoundKeyValue<Path> = {
         val loadedSources = mutableMapOf<String, MutableList<AssemblySource>>()
@@ -620,20 +640,19 @@ object KeyDefaults {
         Keys.resourceRoots set ResourceRoots
         Keys.resourceFiles set ResourceFiles
 
-        Keys.repositories set Repositories
-        Keys.repositoryChain set {
-            createRepositoryChain(Keys.repositories.get())
-        }
-        Keys.libraryDependencies set LibraryDependencies
+        Keys.repositories set { DefaultRepositories }
+        Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
+        Keys.libraryDependencies set { listOf(KotlinStdlib) }
         Keys.resolvedLibraryDependencies set ResolvedLibraryDependencies
         Keys.unmanagedDependencies set { emptyList() }
+        Keys.projectDependencies set { emptyList() }
         Keys.internalClasspath set InternalClasspath
         Keys.externalClasspath set ExternalClasspath
 
         Keys.clean set Clean
 
-        Keys.javaHome set JavaHome
-        Keys.javaExecutable set JavaExecutable
+        Keys.javaHome set { wemi.run.JavaHome }
+        Keys.javaExecutable set { javaExecutable(Keys.javaHome.get()) }
         Keys.outputClassesDirectory set outputClassesDirectory("classes")
         Keys.outputSourcesDirectory set outputClassesDirectory("sources")
         Keys.outputHeadersDirectory set outputClassesDirectory("headers")
@@ -641,9 +660,9 @@ object KeyDefaults {
         Keys.compile set Compile
 
         //Keys.mainClass TODO Detect main class?
-        Keys.runDirectory set RunDirectory
+        Keys.runDirectory set { Keys.projectRoot.get() }
         Keys.runOptions set RunOptions
-        Keys.runArguments set RunArguments
+        Keys.runArguments set { emptyList() }
         Keys.run set Run
         Keys.runMain set RunMain
 

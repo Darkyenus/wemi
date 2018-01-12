@@ -321,43 +321,35 @@ object CLI {
                 ?: return KeyEvaluationResult(null, task.key, KeyEvaluationStatus.NoKey)
 
         return try {
-            KeyEvaluationResult(key, project.projectScope.run {
-                // Attach input, if any
-                if (task.input.isEmpty()) {
-                    evaluateInNestedScope(key, configurations, 0)
-                } else {
-                    val freeInput = ArrayList<String>()
-                    val boundInput = HashMap<String, String>()
+            val result = project.projectScope.run {
+                using(configurations) {
+                    // Attach input, if any
+                    if (task.input.isEmpty()) {
+                        this
+                    } else {
+                        val freeInput = ArrayList<String>()
+                        val boundInput = HashMap<String, String>()
 
-                    for ((k, v) in task.input) {
-                        if (k == null) {
-                            freeInput.add(v)
-                        } else {
-                            boundInput.put(k, v)
+                        for ((k, v) in task.input) {
+                            if (k == null) {
+                                freeInput.add(v)
+                            } else {
+                                boundInput.put(k, v)
+                            }
                         }
-                    }
 
-                    withMixedInput(freeInput.toTypedArray(), boundInput) {
-                        evaluateInNestedScope(key, configurations, 0)
+                        withMixedInput(freeInput.toTypedArray(), boundInput) { this }
+                    }.run {
+                        key.get()
                     }
                 }
+            }
 
-            }, KeyEvaluationStatus.Success)
+            KeyEvaluationResult(key, result, KeyEvaluationStatus.Success)
         } catch (e: WemiException.KeyNotAssignedException) {
             KeyEvaluationResult(key, e, KeyEvaluationStatus.NotAssigned)
         } catch (e: WemiException) {
             KeyEvaluationResult(key, e, KeyEvaluationStatus.Exception)
-        }
-    }
-
-    // Now this is some mind-bending stuff!
-    private fun <Value> Scope.evaluateInNestedScope(key: Key<Value>, all:List<Configuration>, index:Int):Value {
-        return if (index == all.size) {
-            key.get()
-        } else {
-            using(all[index]) {
-                evaluateInNestedScope(key, all, index + 1)
-            }
         }
     }
 

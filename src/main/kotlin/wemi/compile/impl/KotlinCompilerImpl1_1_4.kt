@@ -270,7 +270,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
     /**
      * @param sources java and kotlin source files (or source roots)
      */
-    private fun setupSources(configuration: CompilerConfiguration, flags: CompilerFlags, sources: List<LocatedFile>, messageCollector: MessageCollector) {
+    private fun setupSources(configuration: CompilerConfiguration, flags: CompilerFlags, sources: Collection<LocatedFile>, messageCollector: MessageCollector) {
         for (source in sources) {
             val file = source.file
             when {
@@ -295,7 +295,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         }
     }
 
-    private fun setupClasspath(configuration: CompilerConfiguration, flags: CompilerFlags, classpath: List<Path>) {
+    private fun setupClasspath(configuration: CompilerConfiguration, flags: CompilerFlags, classpath: Collection<Path>) {
         for (classpathItem in classpath) {
             configuration.add(JVMConfigurationKeys.CONTENT_ROOTS, JvmClasspathRoot(classpathItem.toFile()))
         }
@@ -313,8 +313,8 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         }
     }
 
-    override fun compile(sources: List<LocatedFile>,
-                         classpath: List<Path>,
+    override fun compile(sources: Collection<LocatedFile>,
+                         classpath: Collection<Path>,
                          destination: Path,
                          flags: CompilerFlags,
                          logger: Logger,

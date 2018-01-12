@@ -157,6 +157,22 @@ class Scope internal constructor(
         return Scope("<anonymous>", listOf(anonymousConfiguration), this)
     }
 
+    inline fun <Result> Scope.using(vararg configurations: Configuration, action: Scope.() -> Result):Result {
+        var scope = this
+        for (configuration in configurations) {
+            scope = scope.scopeFor(configuration)
+        }
+        return scope.action()
+    }
+
+    inline fun <Result> Scope.using(configurations: Collection<Configuration>, action: Scope.() -> Result):Result {
+        var scope = this
+        for (configuration in configurations) {
+            scope = scope.scopeFor(configuration)
+        }
+        return scope.action()
+    }
+
     inline fun <Result> Scope.using(configuration: Configuration, action: Scope.() -> Result):Result {
         return scopeFor(configuration).action()
     }
