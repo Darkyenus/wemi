@@ -1,6 +1,8 @@
 # Things to do next
 
-1. Allow projects to depend on other projects and implement this in IDE plugin
+1. Allow to assembly executable files (add possibility to prepend bash script)
+
+1. Self hosting
 
 1. Update to latest kotlin
 
@@ -17,8 +19,6 @@
 1. IDE (IntelliJ, other Jetbrains later) integrations
 
 1. Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
-
-1. Self hosting
 
 1. Kotlin JS
 

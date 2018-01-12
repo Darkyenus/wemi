@@ -17,7 +17,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
 
     private val taskThreadBinding = mutableMapOf<ExternalSystemTaskId, Thread>()
 
-    private val JVM_AGENT_PORT_PATTERN = Pattern.compile("-agentlib:jwdp=.*address=(\\d+).*")
+    private val JVM_AGENT_PORT_PATTERN = Pattern.compile("-agentlib:jdwp=.*address=(\\d+).*")
 
     /**
      * @param id of this task run
@@ -44,6 +44,8 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
 
             val launcher = settings!!.launcher
 
+            var env = settings.env.toMutableMap()
+
             val deferDebug = settings.deferDebugToWemi
             if (deferDebug == null) {
                 listener.onTaskOutput(id, "WEMI: Defer debug flag is not set", false)
@@ -59,7 +61,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                 if (matcher.matches()) {
                     val port = matcher.group(1)
 
-                    settings.env[WemiRunConfiguration.WEMI_SUPPRESS_DEBUG_ENVIRONMENT_VARIABLE_NAME] = port
+                    env[WemiRunConfiguration.WEMI_SUPPRESS_DEBUG_ENVIRONMENT_VARIABLE_NAME] = port
                     jvmAgent = null
                 } else {
                     listener.onTaskOutput(id, "WEMI: Wanted to defer debug, but failed to extract port from: $jvmAgent\n", false)
@@ -82,7 +84,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
             }
 
             session = if (settings.javaVmExecutable.isBlank() && vmOptions.isEmpty()) {
-                launcher.createTaskSession(settings.env, settings.isPassParentEnvs, tasks)
+                launcher.createTaskSession(env, settings.isPassParentEnvs, tasks)
             } else {
                 var javaVmExecutable = settings.javaVmExecutable
                 if (javaVmExecutable.isBlank()) {
@@ -90,7 +92,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                     listener.onTaskOutput(id, "WEMI: Using implicit java executable from PATH\n", false)
                 }
 
-                launcher.createTaskSession(javaVmExecutable, vmOptions, settings.env, settings.isPassParentEnvs, tasks)
+                launcher.createTaskSession(javaVmExecutable, vmOptions, env, settings.isPassParentEnvs, tasks)
             }
 
             val stdout = LineReadingOutputStream { line -> listener.onTaskOutput(id, line.toString(), true) }

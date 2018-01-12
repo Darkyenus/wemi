@@ -183,6 +183,44 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             }
         }
 
+        // Inter-project dependencies
+        for (project in projects.values) {
+            // We currently only process projects and ignore configurations because there is no way to map that
+            val compiling = session.task(project.name, "compiling", task = "projectDependencies")
+                    .data(JsonValue.ValueType.array).map { it.getString("project") }
+            val running = session.task(project.name, "running", task = "projectDependencies")
+                    .data(JsonValue.ValueType.array).map { it.getString("project") }
+            val testing = session.task(project.name, "testing", task = "projectDependencies")
+                    .data(JsonValue.ValueType.array).map { it.getString("project") }
+
+            val all = LinkedHashSet<String>(compiling)
+            all.addAll(running)
+            all.addAll(testing)
+
+            var order = 0
+            for (depProjectName in all) {
+                if (depProjectName == project.name) {
+                    continue
+                }
+                val inCompiling = compiling.contains(depProjectName)
+                val inRunning = running.contains(depProjectName)
+                val inTesting = testing.contains(depProjectName)
+
+                val scope = toDependencyScope(inCompiling, inRunning, inTesting, depProjectName)
+                val myModule = projectModules[project.name]!!
+                val moduleDependencyData = ModuleDependencyData(
+                        myModule.data,
+                        projectModules[depProjectName]!!.data
+                )
+                moduleDependencyData.scope = scope
+                moduleDependencyData.order = order++
+                moduleDependencyData.isExported = true
+
+                myModule.createChild(ProjectKeys.MODULE_DEPENDENCY, moduleDependencyData)
+            }
+        }
+
+
         // Tasks
         listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving tasks"))
         for (task in session.jsonArray(project = null, task = "#keysWithDescription", includeUserConfigurations = false)) {
@@ -376,28 +414,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         fun projectUsesLibrary(project: String, library:WemiLibraryCombinedDependency, inCompile:Boolean, inRuntime:Boolean, inTest:Boolean) {
             val projectMap = hashToDependencyAndProjects.getOrPut(library.hash) { Pair(library, mutableMapOf()) }.second
 
-            val scope:DependencyScope
-            if (inCompile && inRuntime) {
-                if (!inTest) {
-                    LOG.warn("Dependency $library will be included in test configurations, but shouldn't be")
-                }
-                scope = DependencyScope.COMPILE
-            } else if (inCompile && !inRuntime) {
-                if (!inTest) {
-                    LOG.warn("Dependency $library will be included in test configurations, but shouldn't be")
-                }
-                scope = DependencyScope.PROVIDED
-            } else if (!inCompile && inRuntime) {
-                if (!inTest) {
-                    LOG.warn("Dependency $library will be included in test configurations, but shouldn't be")
-                }
-                scope = DependencyScope.RUNTIME
-            } else {
-                assert(inTest)
-                scope = DependencyScope.TEST
-            }
-
-            projectMap[project] = scope
+            projectMap[project] = toDependencyScope(inCompile, inRuntime, inTest, library)
         }
 
         fun apply(project:DataNode<ProjectData>, modules:Map<String, DataNode<ModuleData>>) {
@@ -556,6 +573,28 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 throw WemiSessionException(this, type)
             }
             return data
+        }
+
+        private fun toDependencyScope(inCompile:Boolean, inRuntime:Boolean, inTest:Boolean, dependencyLogInfo:Any):DependencyScope {
+            if (inCompile && inRuntime) {
+                if (!inTest) {
+                    LOG.warn("Dependency $dependencyLogInfo will be included in test configurations, but shouldn't be")
+                }
+                return DependencyScope.COMPILE
+            } else if (inCompile && !inRuntime) {
+                if (!inTest) {
+                    LOG.warn("Dependency $dependencyLogInfo will be included in test configurations, but shouldn't be")
+                }
+                return DependencyScope.PROVIDED
+            } else if (!inCompile && inRuntime) {
+                if (!inTest) {
+                    LOG.warn("Dependency $dependencyLogInfo will be included in test configurations, but shouldn't be")
+                }
+                return DependencyScope.RUNTIME
+            } else {
+                assert(inTest)
+                return DependencyScope.TEST
+            }
         }
     }
 
