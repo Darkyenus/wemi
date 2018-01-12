@@ -1,6 +1,8 @@
 
 import wemi.Keys.runOptions
 import wemi.dependency.Repository
+import wemi.util.div
+import wemi.util.executable
 
 val gdxVersion = "1.9.7"
 
@@ -25,6 +27,19 @@ val lwjgl3 by project(path("lwjgl3")) {
 
     runOptions add {"-XstartOnFirstThread"}
     mainClass set {"game.Main"}
+
+    assemblyPrependData set {
+        "#!/usr/bin/env sh\nexec java -XstartOnFirstThread -jar \"$0\" \"$@\"\n".toByteArray(Charsets.UTF_8)
+    }
+
+    assemblyOutputFile set {
+        buildDirectory.get() / "game"
+    }
+
+    assembly modify { assembled ->
+        assembled.executable = true
+        assembled
+    }
 }
 
 val lwjgl2 by project(path("./lwjgl2/")) {

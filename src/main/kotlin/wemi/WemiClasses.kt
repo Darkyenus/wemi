@@ -185,7 +185,9 @@ class Scope internal constructor(
         return scopeFor(anonConfig).action()
     }
 
-    private inline fun <Value, Output> getKeyValue(key: Key<Value>, otherwise:()->Output):Output where Value : Output {
+    private fun <Value : Output, Output> getKeyValue(key: Key<Value>, otherwise:Output, useOtherwise:Boolean):Output {
+        var foundValue:Value? = key.defaultValue
+        var foundValueValid = key.hasDefaultValue
         val allModifiersReverse:ArrayList<BoundKeyValueModifier<Value>> = ArrayList()
 
         var scope:Scope = this
@@ -216,58 +218,51 @@ class Scope internal constructor(
                 if (lazyValue != null) {
                     // Unpack the value
 
-                    var result = lazyValue()
-                    for (i in allModifiersReverse.indices.reversed()) {
-                        result = allModifiersReverse[i].invoke(this, result)
-                    }
-                    if (key.cached) {
-                        putCached(key, result)
-                    }
-                    return result
+                    foundValue = lazyValue()
+                    foundValueValid = true
+                    break
                 }
             }
 
             scope = scope.parent ?:break
         }
 
-        return otherwise()
+        if (foundValueValid) {
+            @Suppress("UNCHECKED_CAST")
+            var result = foundValue as Value
+            for (i in allModifiersReverse.indices.reversed()) {
+                result = allModifiersReverse[i].invoke(this, result)
+            }
+            if (key.cached) {
+                putCached(key, result)
+            }
+            return result
+        }
+
+        if (useOtherwise) {
+            return otherwise
+        } else {
+            throw WemiException.KeyNotAssignedException(key, this@Scope)
+        }
     }
 
     /** Return the value bound to this wemi.key in this scope.
      * Throws exception if no value set. */
     fun <Value> Key<Value>.get():Value {
-        return getKeyValue(this) {
-            // We have to check default value
-            if (hasDefaultValue) {
-                @Suppress("UNCHECKED_CAST")
-                defaultValue as Value
-            } else {
-                throw WemiException.KeyNotAssignedException(this, this@Scope)
-            }
-        }
+        @Suppress("UNCHECKED_CAST")
+        return getKeyValue(this, null, false) as Value
     }
 
     /** Return the value bound to this wemi.key in this scope.
-     * Returns [unset] if no value set.
-     * @param acceptDefault if wemi.key has default value, return that, otherwise return [unset] */
-    fun <Value> Key<Value>.getOrElse(unset:Value, acceptDefault:Boolean = true):Value {
-        return getKeyValue(this) {
-            // We have to check default value
-            @Suppress("UNCHECKED_CAST")
-            if (acceptDefault && this.hasDefaultValue) {
-                this.defaultValue as Value
-            } else {
-                unset
-            }
-        }
+     * Returns [unset] if no value set. */
+    fun <Value : Else, Else> Key<Value>.getOrElse(unset:Else):Else {
+        return getKeyValue(this, unset, true)
     }
 
     /** Return the value bound to this wemi.key in this scope.
      * Returns `null` if no value set. */
     fun <Value> Key<Value>.getOrNull():Value? {
-        return getKeyValue(this) {
-            this.defaultValue
-        }
+        return getKeyValue(this, null, true)
     }
 
     private fun <Value>getCached(key:Key<Value>):Value? {

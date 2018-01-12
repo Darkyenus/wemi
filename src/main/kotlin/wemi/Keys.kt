@@ -47,8 +47,8 @@ object Keys {
     val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved ->
         resolved.value.prettyPrint(null)
     }, cached = true)
-    val unmanagedDependencies by key<Collection<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers")
-    val projectDependencies by key<Collection<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath")
+    val unmanagedDependencies by key<Collection<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = emptyList())
+    val projectDependencies by key<Collection<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = emptyList())
 
     val externalClasspath by key<Collection<LocatedFile>>("Classpath of the project, elements from external sources, i.e. library and project dependencies")
     val internalClasspath by key<Collection<LocatedFile>>("Classpath of the project, created internally, i.e. compiled sources and resources")
@@ -69,7 +69,7 @@ object Keys {
     val mainClass by key<String>("Main class of the project")
     val runDirectory by key<Path>("Initial working directory of the project launched by 'run'")
     val runOptions by key<Collection<String>>("Options given to 'java' when running the project")
-    val runArguments by key<Collection<String>>("Options given to the application when running the project")
+    val runArguments by key<Collection<String>>("Options given to the application when running the project", defaultValue = emptyList())
     val run by key<Int>("Compile and run the project, return exit code")
     val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code")
 
@@ -78,5 +78,7 @@ object Keys {
 
     val assemblyMergeStrategy by key<(String) -> MergeStrategy>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
     val assemblyRenameFunction by key<(AssemblySource, String) -> String?>("Function for renaming assembled duplicate files for which merge strategy is Rename. First argument is the source of the data, second is the path inside the root. Returns new path or null to discard. Paths after rename must not conflict, rules are not recursive.")
+    val assemblyPrependData by key<ByteArray>("Data to prepend to the jar created by assembly task", defaultValue = ByteArray(0))
+    val assemblyOutputFile by key<Path>("File to which assembled jar should be saved")
     val assembly by key<Path>("Assembly the project and its dependencies into a fat jar")
 }

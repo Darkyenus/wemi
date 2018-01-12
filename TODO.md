@@ -1,7 +1,5 @@
 # Things to do next
 
-1. Allow to assembly executable files (add possibility to prepend bash script)
-
 1. Self hosting
 
 1. Update to latest kotlin

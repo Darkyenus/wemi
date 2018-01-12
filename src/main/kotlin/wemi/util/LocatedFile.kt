@@ -72,12 +72,12 @@ class LocatedFile private constructor(val file: Path, val root: Path, val path: 
     }
 }
 
-fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>) {
-    constructLocatedFiles(from, to) { _ -> true }
-}
-
-fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, filter: (Path) -> Boolean) {
+fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, filter: (Path) -> Boolean = { true }) {
     // Walking is hard, don't do it if we don't have to
+    if (!from.exists()) {
+        return
+    }
+
     if (!from.isDirectory) {
         if (!from.isHidden && filter(from)) {
             to.add(LocatedFile(from))

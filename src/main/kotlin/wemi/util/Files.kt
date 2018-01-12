@@ -9,6 +9,7 @@ import java.net.URLDecoder
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
+import java.nio.file.attribute.PosixFilePermission
 
 /**
  * Custom URL implementation
@@ -92,6 +93,32 @@ inline var Path.lastModified:FileTime
 
 inline val Path.size:Long
     get() = Files.size(this)
+
+/**
+ * Path's POSIX executable flag status.
+ * Path is considered executable when at least one of Owner:Group:Others has executable bit set.
+ * When setting executable, all three bits are set/cleared.
+ */
+var Path.executable:Boolean
+    get() {
+        val permissions = Files.getPosixFilePermissions(this)
+        return permissions.contains(PosixFilePermission.OTHERS_EXECUTE)
+                || permissions.contains(PosixFilePermission.GROUP_EXECUTE)
+                || permissions.contains(PosixFilePermission.OWNER_EXECUTE)
+    }
+    set(value) {
+        val permissions = Files.getPosixFilePermissions(this).toMutableSet()
+        if (value) {
+            permissions.add(PosixFilePermission.OWNER_EXECUTE)
+            permissions.add(PosixFilePermission.GROUP_EXECUTE)
+            permissions.add(PosixFilePermission.OTHERS_EXECUTE)
+        } else {
+            permissions.remove(PosixFilePermission.OWNER_EXECUTE)
+            permissions.remove(PosixFilePermission.GROUP_EXECUTE)
+            permissions.remove(PosixFilePermission.OTHERS_EXECUTE)
+        }
+        Files.setPosixFilePermissions(this, permissions)
+    }
 
 inline fun Path.forEachLine(action: (String) -> Unit) {
     for (line in Files.lines(this, Charsets.UTF_8)) {

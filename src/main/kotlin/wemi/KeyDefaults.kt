@@ -29,6 +29,7 @@ import java.util.*
 import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 import kotlin.collections.ArrayList
 import kotlin.collections.LinkedHashSet
 
@@ -592,9 +593,18 @@ object KeyDefaults {
             throw WemiException("assembly task failed", showStacktrace = false)
         }
 
-        val outputFile = Keys.buildDirectory.get() / (Keys.projectName.get() + "-" + Keys.projectVersion.get() + "-assembly.jar")
+        val outputFile = Keys.assemblyOutputFile.get()
 
-        JarOutputStream(BufferedOutputStream(Files.newOutputStream(outputFile))).use { out ->
+        val prependData = Keys.assemblyPrependData.get()
+
+        BufferedOutputStream(Files.newOutputStream(outputFile)).use { out ->
+
+            if (prependData.isNotEmpty()) {
+                out.write(prependData)
+            }
+
+            val jarOut = JarOutputStream(out)
+
             for ((path, value) in assemblySources) {
                 val (source, data) = value
 
@@ -612,9 +622,9 @@ object KeyDefaults {
                     }
                 }
 
-                out.putNextEntry(entry)
-                out.write(data)
-                out.closeEntry()
+                jarOut.putNextEntry(entry)
+                jarOut.write(data)
+                jarOut.closeEntry()
 
                 if (AssemblyLOG.isDebugEnabled) {
                     if (source != null) {
@@ -624,8 +634,12 @@ object KeyDefaults {
                     }
                 }
             }
-            out.finish()
-            out.flush()
+
+            jarOut.finish()
+            jarOut.flush()
+            jarOut.close()
+
+            AssemblyLOG.debug("{} entries written", assemblySources.size)
         }
 
         outputFile
@@ -644,8 +658,6 @@ object KeyDefaults {
         Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
         Keys.libraryDependencies set { listOf(KotlinStdlib) }
         Keys.resolvedLibraryDependencies set ResolvedLibraryDependencies
-        Keys.unmanagedDependencies set { emptyList() }
-        Keys.projectDependencies set { emptyList() }
         Keys.internalClasspath set InternalClasspath
         Keys.externalClasspath set ExternalClasspath
 
@@ -662,7 +674,6 @@ object KeyDefaults {
         //Keys.mainClass TODO Detect main class?
         Keys.runDirectory set { Keys.projectRoot.get() }
         Keys.runOptions set RunOptions
-        Keys.runArguments set { emptyList() }
         Keys.run set Run
         Keys.runMain set RunMain
 
@@ -671,6 +682,7 @@ object KeyDefaults {
 
         Keys.assemblyMergeStrategy set AssemblyMergeStrategy
         Keys.assemblyRenameFunction set AssemblyRenameFunction
+        Keys.assemblyOutputFile set { Keys.buildDirectory.get() / (Keys.projectName.get() + "-" + Keys.projectVersion.get() + "-assembly.jar") }
         Keys.assembly set Assembly
     }
 }
