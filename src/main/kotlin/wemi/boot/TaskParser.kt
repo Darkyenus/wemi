@@ -116,7 +116,9 @@ object TaskParser : Parser {
         return null
     }
 
-    private fun Tokens<String, TokenType>.matchTask():Task? {
+    private fun Tokens<String, TokenType>.matchTask(machineReadable:Boolean):Task? {
+        var flags = 0
+
         val project = matchSuffixedIdentifier(PROJECT_SEPARATOR, TokenType.Project)
         val configurations = ArrayList<String>()
         while (true) {
@@ -127,12 +129,30 @@ object TaskParser : Parser {
             error("Key name expected")
             return null
         }
-        if (!matches { it.isValidIdentifier() || (it.startsWith('#') && it.substring(1).isValidIdentifier()) }) {
+
+        val key = peek()!!.let { key ->
+            var start = 0
+            var end = key.length
+
+            if (machineReadable) {
+                if (key.startsWith('#')) {
+                    start++
+                    flags = flags or Task.FLAG_MACHINE_READABLE_COMMAND
+                }
+                if (key.endsWith('?')) {
+                    end--
+                    flags = flags or Task.FLAG_MACHINE_READABLE_OPTIONAL
+                }
+            }
+
+            key.substring(start, end)
+        }
+
+        if (!key.isValidIdentifier()) {
             error("Key is not a valid identifier")
             return null
         }
-
-        val key = next(TokenType.Key)!!
+        next(TokenType.Key)
 
         val input = ArrayList<Pair<String?, String>>()
 
@@ -147,10 +167,10 @@ object TaskParser : Parser {
             input.add(inputKey to value)
         }
 
-        return Task(project, configurations, key, input)
+        return Task(project, configurations, key, input, flags)
     }
 
-    fun parseTasks(tokens: Tokens<String, TokenType>): List<Task> {
+    fun parseTasks(tokens: Tokens<String, TokenType>, machineReadable: Boolean = false): List<Task> {
         val tasks = ArrayList<Task>()
 
         tokens.run {
@@ -160,7 +180,7 @@ object TaskParser : Parser {
             }
 
             while (true) {
-                val task = matchTask()
+                val task = matchTask(machineReadable)
                 if (task != null) {
                     tasks.add(task)
                 }

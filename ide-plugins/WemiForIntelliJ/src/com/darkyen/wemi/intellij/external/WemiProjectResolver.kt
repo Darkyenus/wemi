@@ -263,8 +263,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         return WemiProjectData(
                 projectName,
                 session.string(projectName, task = "projectName"),
-                session.string(projectName, task = "projectGroup"),
-                session.string(projectName, task = "projectVersion"),
+                session.stringOrNull(projectName, task = "projectGroup?"),
+                session.stringOrNull(projectName, task = "projectVersion?"),
                 session.string(projectName, task = "projectRoot"),
                 compilerOptions.let {
                     it.mapGet("sourceVersion")?.asString() ?: ""
@@ -431,8 +431,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
     private class WemiProjectData(
             val name:String,
             val artifactName:String,
-            val artifactGroup:String,
-            val artifactVersion:String,
+            val artifactGroup:String?,
+            val artifactVersion:String?,
             val rootPath:String,
             val javaSourceVersion:String,
             val javaTargetVersion:String,
@@ -458,8 +458,12 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             data.sourceCompatibility = javaSourceVersion
             data.targetCompatibility = javaTargetVersion
             data.externalName = artifactName
-            data.group = artifactGroup
-            data.version = artifactVersion
+            if (artifactGroup != null) {
+                data.group = artifactGroup
+            }
+            if (artifactVersion != null) {
+                data.version = artifactVersion
+            }
             return data
         }
 
@@ -517,6 +521,12 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     .asString()
         }
 
+        fun WemiLauncherSession.stringOrNull(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):String? {
+            return task(project = project, configurations = *configurations, task = task, includeUserConfigurations = includeUserConfigurations)
+                    .data(JsonValue.ValueType.stringValue, orNull = true)
+                    .asString()
+        }
+
         fun WemiLauncherSession.jsonObject(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):JsonValue {
             return task(project = project, configurations = *configurations, task = task, includeUserConfigurations = includeUserConfigurations)
                     .data(JsonValue.ValueType.`object`)
@@ -536,10 +546,13 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             return null
         }
 
-        fun WemiLauncherSession.Companion.Result.data(type:JsonValue.ValueType? = null):JsonValue {
-            if (this.data == null
-                    || this.status != WemiLauncherSession.Companion.ResultStatus.SUCCESS
-                    || (type != null && data.type() != type)) {
+        fun WemiLauncherSession.Companion.Result.data(type:JsonValue.ValueType? = null, orNull:Boolean = false):JsonValue {
+            if (this.data == null || this.status != WemiLauncherSession.Companion.ResultStatus.SUCCESS) {
+                throw WemiSessionException(this, type)
+            }
+            val valueType = this.data.type()
+            val typeIsValid = type == null || (valueType == type) || (orNull && valueType == JsonValue.ValueType.nullValue)
+            if (!typeIsValid) {
                 throw WemiSessionException(this, type)
             }
             return data

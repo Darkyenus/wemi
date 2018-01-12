@@ -19,25 +19,25 @@ import kotlin.system.exitProcess
 private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
 
 fun machineReadableEvaluateAndPrint(out: PrintStream, task:Task) {
-    if (task.key.startsWith('#') && task.couldBeCommand) {
+    if (task.isCommand) {
         when (task.key) {
-            "#version" -> {
+            "version" -> {
                 machineReadablePrint(out, WemiVersion)
                 return
             }
-            "#projects" -> {
+            "projects" -> {
                 machineReadablePrint(out, AllProjects.values)
                 return
             }
-            "#configurations" -> {
+            "configurations" -> {
                 machineReadablePrint(out, AllConfigurations.values)
                 return
             }
-            "#keys" -> {
+            "keys" -> {
                 machineReadablePrint(out, AllKeys.values)
                 return
             }
-            "#keysWithDescription" -> {
+            "keysWithDescription" -> {
                 machineReadablePrint(out, object : MachineWritable {
                     override fun writeMachine(json: Json) {
                         json.writeArrayStart()
@@ -52,7 +52,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task:Task) {
                 })
                 return
             }
-            "#buildScripts" -> {
+            "buildScripts" -> {
                 machineReadablePrint(out, object : MachineWritable {
                     override fun writeMachine(json: Json) {
                         json.writeArrayStart()
@@ -76,10 +76,15 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task:Task) {
                 })
                 return
             }
-            "#defaultProject" -> {
+            "defaultProject" -> {
                 machineReadablePrint(out, CLI.findDefaultProject(Paths.get("."))?.name)
                 return
             }
+        }
+
+        if ((task.flags and Task.FLAG_MACHINE_READABLE_OPTIONAL) != 0) {
+            machineReadablePrint(out, null)
+            return
         }
 
         LOG.error("Can't evaluate {} - unknown command", task)
@@ -112,9 +117,13 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task:Task) {
                 exitProcess(EXIT_CODE_MACHINE_OUTPUT_NO_KEY_ERROR)
             }
             CLI.KeyEvaluationStatus.NotAssigned -> {
-                val error = data as WemiException.KeyNotAssignedException
-                LOG.error("Can't evaluate {} - {}{} not set", task, error.scope.toString(), error.key.name)
-                exitProcess(EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR)
+                if ((task.flags and Task.FLAG_MACHINE_READABLE_OPTIONAL) != 0) {
+                    machineReadablePrint(out, null)
+                } else {
+                    val error = data as WemiException.KeyNotAssignedException
+                    LOG.error("Can't evaluate {} - {}{} not set", task, error.scope.toString(), error.key.name)
+                    exitProcess(EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR)
+                }
             }
             CLI.KeyEvaluationStatus.Exception -> {
                 val we = data as WemiException

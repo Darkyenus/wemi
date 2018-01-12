@@ -238,7 +238,7 @@ object CLI {
             }
             CLI.KeyEvaluationStatus.NoKey -> {
                 val keyString = data as String
-                if (task.couldBeCommand) {
+                if (task.isCommand) {
                     printWarning("Can't evaluate $task - no key or command named '$keyString' found", keyString, AllKeys.keys + commands.keys)
                 } else {
                     printWarning("Can't evaluate $task - no key named '$keyString' found", keyString, AllKeys.keys)
@@ -399,7 +399,7 @@ object CLI {
         }
 
         for (task in tasks) {
-            if (task.couldBeCommand) {
+            if (task.isCommand) {
                 val commandFunction = commands[task.key]
                 if (commandFunction != null) {
                     commandFunction()

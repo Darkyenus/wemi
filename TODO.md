@@ -2,8 +2,6 @@
 
 1. Allow projects to depend on other projects and implement this in IDE plugin
 
-1. Project group may not have been set, do not query it directly from intellij plugin
-
 1. Update to latest kotlin
 
 1. Trace debug mode

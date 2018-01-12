@@ -28,10 +28,18 @@ class Task(
          * Input pairs to use, represents key-value relationship.
          * When first String (key) is null, represents a free input argument.
          */
-        val input: List<Pair<String?, String>>) {
+        val input: List<Pair<String?, String>>,
+        /**
+         * Internal flags.
+         *  @see FLAG_MACHINE_READABLE_COMMAND
+         *  @see FLAG_MACHINE_READABLE_OPTIONAL
+         */
+        internal val flags:Int = 0) {
 
-    val couldBeCommand:Boolean
-        get() = project == null && configurations.isEmpty()
+    val isCommand:Boolean
+        get() = project == null
+                && configurations.isEmpty()
+                && (flags and FLAG_MACHINE_READABLE_COMMAND) == FLAG_MACHINE_READABLE_COMMAND
 
     override fun toString(): String {
         val sb = StringBuilder()
@@ -74,5 +82,16 @@ class Task(
         result = 31 * result + key.hashCode()
         result = 31 * result + input.hashCode()
         return result
+    }
+
+    companion object {
+        /**
+         * Task is a command (starts with #)
+         */
+        val FLAG_MACHINE_READABLE_COMMAND = 1 shl 0
+        /**
+         * Task is optional (ends with ?)
+         */
+        val FLAG_MACHINE_READABLE_OPTIONAL = 1 shl 1
     }
 }

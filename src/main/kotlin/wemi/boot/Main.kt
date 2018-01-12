@@ -211,7 +211,7 @@ fun main(args: Array<String>) {
 
     var exitCode = EXIT_CODE_SUCCESS
     val taskTokens = TaskParser.createTokens(TaskParser.parseTokens(taskArguments))
-    val tasks = TaskParser.parseTasks(taskTokens)
+    val tasks = TaskParser.parseTasks(taskTokens, machineReadableOutput)
 
     if (machineReadableOutput) {
         taskTokens.machineReadableCheckErrors()
@@ -228,7 +228,7 @@ fun main(args: Array<String>) {
 
                 val parsedTokens = TaskParser.parseTokens(line, 0)
                 val lineTaskTokens = TaskParser.createTokens(parsedTokens.tokens)
-                val lineTasks = TaskParser.parseTasks(lineTaskTokens)
+                val lineTasks = TaskParser.parseTasks(lineTaskTokens, true)
 
                 lineTaskTokens.machineReadableCheckErrors()
 
