@@ -34,7 +34,7 @@ private val WemiLauncherFileWithJarExtensionCache = mutableMapOf<Path, Path>()
 internal fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
     return WemiLauncherFileWithJarExtensionCache.getOrPut(cacheFolder) lazy@ {
         val wemiLauncherFile = WemiLauncherFile
-        if (wemiLauncherFile.name.endsWith(".jar", ignoreCase = true) || wemiLauncherFile.isDirectory) {
+        if (wemiLauncherFile.name.endsWith(".jar", ignoreCase = true) || wemiLauncherFile.isDirectory()) {
             LOG.debug("WemiLauncherFileWithJar is unchanged {}", wemiLauncherFile)
             return@lazy wemiLauncherFile
         }

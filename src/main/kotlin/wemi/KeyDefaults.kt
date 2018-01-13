@@ -65,7 +65,7 @@ object KeyDefaults {
         val result = ArrayList<LocatedFile>()
 
         for (root in roots) {
-            constructLocatedFiles(root, result) { it.nameHasExtension(extensions) }
+            constructLocatedFiles(root, result) { it.name.pathHasExtension(extensions) }
         }
 
         result
@@ -388,7 +388,7 @@ object KeyDefaults {
 
         fun addSource(locatedFile: LocatedFile, own: Boolean) {
             val file = locatedFile.file
-            if (file.nameHasExtension("jar")) {
+            if (file.name.pathHasExtension("jar")) {
                 // Add jar entries
                 val zip = ZipFile(file.toFile(), ZipFile.OPEN_READ, StandardCharsets.UTF_8)
                 for (entry in zip.entries()) {
@@ -406,7 +406,7 @@ object KeyDefaults {
                 // Add file entry
                 loadedSources.getOrPut(locatedFile.path) { mutableListOf() }.add(object : AssemblySource(locatedFile.root, file, null, own) {
 
-                    override fun load(): ByteArray = file.readBytes()
+                    override fun load(): ByteArray = Files.readAllBytes(file)
 
                     override val name: String = locatedFile.toString()
                 })

@@ -17,50 +17,61 @@ import java.nio.file.Paths
 
 private val LOG = LoggerFactory.getLogger("BuildFiles")
 
+/**
+ * Kotlin std-lib dependency used when compiling the build scripts.
+ *
+ * TODO Shouldn't be the stdlib in wemi enough?
+ */
 val BuildFileStdLib = Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-stdlib", WemiKotlinVersion.string))
 
+/**
+ * Extensions that a valid Wemi build script file have.
+ * Without leading dot.
+ */
 val WemiBuildFileExtensions = listOf("wemi", "wemi.kt")
 
 /**
- * Build file is a file with .wemi extension, anywhere in current or parent directory.
+ * Build file is a file with [WemiBuildFileExtensions], in [buildFolder].
  */
-fun findBuildScriptSources(buildFolder: Path): List<Path> {
-    var result: MutableList<Path>? = null
+internal fun findBuildScriptSources(buildFolder: Path): List<Path> {
+    var result: ArrayList<Path>? = null
 
-    buildFolder.forChildren { file ->
-        if (!file.isDirectory && !file.isHidden && !file.name.startsWith('.') && file.nameHasExtension(WemiBuildFileExtensions)) {
-            var r = result
-            if (r == null) {
-                r = ArrayList()
-                result = r
+    Files.newDirectoryStream(buildFolder).use { stream ->
+        for (path in stream) {
+            if (!path.isDirectory() && !path.isHidden() && !path.name.startsWith('.') && path.name.pathHasExtension(WemiBuildFileExtensions)) {
+                var r = result
+                if (r == null) {
+                    r = ArrayList()
+                    result = r
+                }
+                r.add(path)
             }
-            r.add(file)
         }
     }
 
     return result ?: emptyList()
 }
 
-private fun prepareBuildFileCacheFolder(buildFolder: Path): Path? {
-    val folder = buildFolder / "cache"
-    if (folder.exists() && !folder.isDirectory) {
-        LOG.error("Build directory {} exists and is not a directory", folder)
+/**
+ * Retrieve the compiled build script.
+ *
+ * Tries to use existing files before compiling.
+ */
+internal fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScript? {
+    val cacheFolder = buildFolder / "cache"
+    if (cacheFolder.exists() && !cacheFolder.isDirectory()) {
+        LOG.error("Build directory {} exists and is not a directory", cacheFolder)
         return null
-    } else if (!folder.exists()) {
+    } else if (!cacheFolder.exists()) {
         try {
-            Files.createDirectories(folder)
+            Files.createDirectories(cacheFolder)
         } catch (e: IOException) {
-            LOG.error("Could not create build directory {}", folder, e)
+            LOG.error("Could not create build directory {}", cacheFolder, e)
             return null
         }
     }
 
-    return folder
-}
-
-fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScript? {
-    val cacheFolder = prepareBuildFileCacheFolder(buildFolder) ?: return null
-    val combinedBuildFileName = buildScriptSources.joinToString("-") { it.nameWithoutExtension }
+    val combinedBuildFileName = buildScriptSources.joinToString("-") { it.name.pathWithoutExtension() }
 
     val resultJar = cacheFolder / (combinedBuildFileName + "-cache.jar")
     val classpathFile = cacheFolder / (combinedBuildFileName + ".classpath")
@@ -72,7 +83,7 @@ fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSourc
         recompileReason = "Requested"
         LOG.debug("Rebuilding build scripts: Requested")
         true
-    } else if (!resultJar.exists() || resultJar.isDirectory) {
+    } else if (!resultJar.exists() || resultJar.isDirectory()) {
         recompileReason = "No cache"
         LOG.debug("Rebuilding build scripts: No cache at {}", resultJar)
         true
@@ -80,7 +91,7 @@ fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSourc
         recompileReason = "Script changed"
         LOG.debug("Rebuilding build scripts: Old cache")
         true
-    } else if (!classpathFile.exists() || classpathFile.isDirectory) {
+    } else if (!classpathFile.exists() || classpathFile.isDirectory()) {
         recompileReason = "Missing cache metadata"
         LOG.debug("Rebuilding build scripts: No classpath cache")
         true
@@ -149,10 +160,13 @@ fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSourc
 
     // Figure out the init class
     return BuildScript(rootFolder, resultJar, buildFolder, cacheFolder,
-            classpath, buildScriptSources.map { transformFileNameToKotlinClassName(it.nameWithoutExtension) },
+            classpath, buildScriptSources.map { transformFileNameToKotlinClassName(it.name.pathWithoutExtension()) },
             classpathConfiguration, sources, buildFlags)
 }
 
+/**
+ * Transform the [fileNameWithoutExtension] into the name of class that will Kotlin compiler produce (without .class).
+ */
 private fun transformFileNameToKotlinClassName(fileNameWithoutExtension: String): String {
     val sb = StringBuilder()
     // If file name starts with digit, _ is prepended
@@ -176,12 +190,26 @@ private fun transformFileNameToKotlinClassName(fileNameWithoutExtension: String)
     return sb.toString()
 }
 
+/**
+ * Regex used to find lines with directives.
+ *
+ * Directives must begin line with `///` then have directory identifier and then arbitrary text for the directive.
+ */
 private val DirectiveRegex = "///\\s*([a-zA-Z0-9\\-]+)\\s+(.*?)\\s*".toRegex()
 
+/**
+ * <repository name> at <repository address>
+ */
 private val M2RepositoryDirectiveRegex = "(\\S+)\\s+at\\s+(\\S+:\\S+)".toRegex()
 
+/**
+ * <group> : <name> : <version>
+ */
 private val LibraryDirectiveRegex = "(\\S+)\\s*:\\s*(\\S+)\\s*:\\s*(\\S+)".toRegex()
 
+/**
+ * Configuration of classpath for a build script.
+ */
 class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Path>) {
     private var _repositories: List<Repository>? = null
     private var _repositoryChain: RepositoryChain? = null
@@ -231,6 +259,9 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
         _dependencies = buildDependencyLibraries
     }
 
+    /**
+     * Repositories used when resolving dependencies for the build scripts
+     */
     val repositories: List<Repository>
         get() {
             if (_repositories == null) {
@@ -239,6 +270,9 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
             return _repositories!!
         }
 
+    /**
+     * Repository chain used when resolving dependencies for the build scripts
+     */
     val repositoryChain: RepositoryChain
         get() {
             if (_repositoryChain == null) {
@@ -247,6 +281,9 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
             return _repositoryChain!!
         }
 
+    /**
+     * Dependencies of the build script
+     */
     val dependencies: List<Dependency>
         get() {
             if (_dependencies == null) {

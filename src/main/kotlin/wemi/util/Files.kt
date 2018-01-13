@@ -12,13 +12,19 @@ import java.nio.file.attribute.FileTime
 import java.nio.file.attribute.PosixFilePermission
 
 /**
- * Custom URL implementation
+ * Creates an URL with given path appended.
  */
-
 operator fun URL.div(path: CharSequence): URL {
     return URL(this, path.toString())
 }
 
+/**
+ * Appends given path to the receiver path.
+ *
+ * Makes best effort to modify the receiver CharSequence, i.e.first it checks if it is a StringBuilder that can be used.
+ *
+ * @return this + '/' + [path], possibly in modified receiver this
+ */
 operator fun CharSequence.div(path: CharSequence): StringBuilder {
     val sb: StringBuilder
 
@@ -35,6 +41,13 @@ operator fun CharSequence.div(path: CharSequence): StringBuilder {
     return sb
 }
 
+/**
+ * Attempts to convert the URL to a file in a local file system.
+ *
+ * If the URL points into a file inside jar archive, Path of the archive is returned.
+ *
+ * If the conversion fails, returns null.
+ */
 fun URL.toPath(): Path? {
     if (host != null
             && !host.isBlank()
@@ -61,44 +74,117 @@ fun URL.toPath(): Path? {
 @Suppress("NOTHING_TO_INLINE")
 operator inline fun Path.div(path: String): Path = this.resolve(path)
 
-inline val Path.isDirectory: Boolean
-    get() = Files.isDirectory(this)
+/** @see [Files.isDirectory] */
+@Suppress("NOTHING_TO_INLINE")
+inline fun Path.isDirectory(): Boolean = Files.isDirectory(this)
 
-inline val Path.isHidden: Boolean
-    get() = Files.isHidden(this)
+/** @see [Files.exists] */
+@Suppress("NOTHING_TO_INLINE")
+inline fun Path.isHidden(): Boolean = Files.isHidden(this)
 
+/** @see [Files.exists] */
 @Suppress("NOTHING_TO_INLINE")
 inline fun Path.exists(): Boolean = Files.exists(this)
 
+/** @return name of the file, without the rest of the path, with extension */
 inline val Path.name: String
     get() = this.fileName?.toString() ?: ""
 
-inline val Path.nameWithoutExtension: String
-    get() {
-        val name = this.name
-        val lastDot = name.lastIndexOf('.')
-        return if (lastDot == -1) {
-            name
-        } else {
-            name.substring(0, lastDot)
+/**
+ * Retrieve the extension from the given file path.
+ * Returns empty string when the file has no extension.
+ */
+fun String.pathExtension():String {
+    val lastDot = lastIndexOf('.')
+    val lastSlash = lastIndexOf('/')
+    return if (lastDot == -1 || lastDot < lastSlash) {
+        ""
+    } else {
+        substring(lastDot + 1)
+    }
+}
+
+/**
+ * Retrieve the file path without the file' extension.
+ * Returns this string when the file has no extension.
+ */
+fun String.pathWithoutExtension():String {
+    val lastDot = lastIndexOf('.')
+    val lastSlash = lastIndexOf('/')
+    return if (lastDot == -1 || lastDot < lastSlash) {
+        this
+    } else {
+        this.substring(0, lastDot)
+    }
+}
+
+/**
+ * Return true if this file path has specified extension.
+ *
+ * Not case sensitive.
+ */
+fun String.pathHasExtension(extension: String):Boolean {
+    val length = this.length
+    if (length >= extension.length + 1
+            && this.endsWith(extension, ignoreCase = true)
+            && this[length - extension.length - 1] == '.') {
+        return true
+    }
+    return false
+}
+
+/**
+ * Return true if this file path has any of the specified extensions.
+ *
+ * Not case sensitive.
+ */
+fun String.pathHasExtension(extensions: Iterable<String>): Boolean {
+    val name = this
+    val length = name.length
+    for (extension in extensions) {
+        if (length >= extension.length + 1
+                && name.endsWith(extension, ignoreCase = true)
+                && name[length - extension.length - 1] == '.') {
+            return true
         }
     }
+    return false
+}
 
+/**
+ * @return absolute path to this Path
+ */
 inline val Path.absolutePath: String
     get() = this.toAbsolutePath().toString()
 
+/**
+ * Last modified time of the file denoted by the [Path], as specified by the filesystem.
+ *
+ * @see Files.getLastModifiedTime
+ */
 inline var Path.lastModified: FileTime
     get() = Files.getLastModifiedTime(this)
     set(value) {
         Files.setLastModifiedTime(this, value)
     }
 
+/**
+ * Size of the file on disk.
+ *
+ * @see [Files.size]
+ */
 inline val Path.size: Long
     get() = Files.size(this)
 
+/**
+ * Reads the Path, line by line, and calls action for each line.
+ */
 inline fun Path.forEachLine(action: (String) -> Unit) {
-    for (line in Files.lines(this, Charsets.UTF_8)) {
-        action(line)
+    Files.newBufferedReader(this, Charsets.UTF_8).use { br ->
+        while (true) {
+            val line = br.readLine() ?: break
+            action(line)
+        }
     }
 }
 
@@ -129,31 +215,22 @@ var Path.executable: Boolean
         Files.setPosixFilePermissions(this, permissions)
     }
 
+/**
+ * Write given text into this path.
+ *
+ * File will be overwritten.
+ *
+ * Parent directory must exist.
+ */
 fun Path.writeText(text: CharSequence) {
     OutputStreamWriter(Files.newOutputStream(this)).use {
         it.append(text)
     }
 }
 
-fun Path.writeBytes(bytes: ByteArray, offset: Int = 0, length: Int = bytes.size) {
-    Files.newOutputStream(this).use {
-        it.write(bytes, offset, length)
-    }
-}
-
-@Suppress("NOTHING_TO_INLINE")
-inline fun Path.readBytes(): ByteArray {
-    return Files.readAllBytes(this)
-}
-
-inline fun Path.forChildren(action: (Path) -> Unit) {
-    Files.newDirectoryStream(this).use { stream ->
-        for (path in stream) {
-            action(path)
-        }
-    }
-}
-
+/**
+ * Used by [deleteRecursively]
+ */
 private val DELETING_FILE_VISITOR = object : FileVisitor<Path> {
 
     private val LOG: Logger = LoggerFactory.getLogger("Files.deleteRecursively".javaClass)
@@ -184,6 +261,11 @@ private val DELETING_FILE_VISITOR = object : FileVisitor<Path> {
     }
 }
 
+/**
+ * Delete this file.
+ *
+ * Does nothing when the file does not exist, deletes children files if the path is a non-empty directory.
+ */
 fun Path.deleteRecursively() {
     if (!Files.exists(this)) {
         return

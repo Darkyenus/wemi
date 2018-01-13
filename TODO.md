@@ -1,5 +1,9 @@
 # Things to do next
 
+1. Remove BuildScriptIntrospection map
+
+1. Check compile dependencies: BuildScript.BuildFileStdLib
+
 1. Self hosting
 
 1. Update to latest kotlin

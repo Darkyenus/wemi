@@ -1,7 +1,7 @@
 package wemi.assembly
 
 /**
- *
+ * Strategies to use when merging files during assembly.
  */
 enum class MergeStrategy {
     /** Only the first copy is kept */

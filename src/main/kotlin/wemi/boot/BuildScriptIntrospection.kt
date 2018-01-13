@@ -13,16 +13,22 @@ object BuildScriptIntrospection {
 
     private val LOG = LoggerFactory.getLogger(javaClass)
 
-    private val _buildFileProjects = mutableMapOf<BuildScript, MutableList<Project>>()
+    /**
+     * Internal mutable [buildScriptProjects].
+     */
+    private val buildFileProjectsMutable = HashMap<BuildScript, MutableList<Project>>()
 
+    /**
+     * Which [Project]s belong to which BuildScript
+     */
     val buildScriptProjects: Map<BuildScript, List<Project>>
-        get() = _buildFileProjects
+        get() = buildFileProjectsMutable
 
     private val CURRENTLY_INITIALIZED_BUILD_SCRIPT_LOCK = Object()
     private var currentlyInitializedBuildScript: BuildScript? = null
         set(value) {
             if (value != null) {
-                _buildFileProjects.getOrPut(value) { mutableListOf() }
+                buildFileProjectsMutable.getOrPut(value) { mutableListOf() }
             }
             field = value
         }
@@ -53,7 +59,7 @@ object BuildScriptIntrospection {
         if (buildScript == null) {
             LOG.debug("Project {} is being initialized at unexpected time, introspection will not be available", this)
         } else {
-            _buildFileProjects.getValue(buildScript).add(this)
+            buildFileProjectsMutable.getValue(buildScript).add(this)
             Keys.buildScript set { buildScript }
         }
 

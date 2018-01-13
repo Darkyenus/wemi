@@ -68,30 +68,6 @@ fun formatTimeDuration(ms: Long): CharSequence {
     return result
 }
 
-fun Path.nameHasExtension(extensions: Collection<String>): Boolean {
-    val name = this.name
-    val length = name.length
-    for (extension in extensions) {
-        if (length >= extension.length + 1
-                && name.endsWith(extension, ignoreCase = true)
-                && name[length - extension.length - 1] == '.') {
-            return true
-        }
-    }
-    return false
-}
-
-fun Path.nameHasExtension(extension: String): Boolean {
-    val name = this.name
-    val length = name.length
-    if (length >= extension.length + 1
-            && name.endsWith(extension, ignoreCase = true)
-            && name[length - extension.length - 1] == '.') {
-        return true
-    }
-    return false
-}
-
 typealias Index = Int
 typealias CodePoint = Int
 

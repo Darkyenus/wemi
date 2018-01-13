@@ -32,8 +32,8 @@ class LocatedFile private constructor(val file: Path, val root: Path, val path: 
     constructor(file: Path, location: String, root: Path) : this(file, root, location, false)
 
     init {
-        assert(!file.isDirectory) { "LocatedFile.file must not be a directory: " + this }
-        assert(!root.isDirectory) { "LocatedFile.root must be a directory: " + this }
+        assert(!file.isDirectory()) { "LocatedFile.file must not be a directory: " + this }
+        assert(!root.isDirectory()) { "LocatedFile.root must be a directory: " + this }
     }
 
     operator inline fun component1(): Path = file
@@ -82,8 +82,8 @@ fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, filter
         return
     }
 
-    if (!from.isDirectory) {
-        if (!from.isHidden && filter(from)) {
+    if (!from.isDirectory()) {
+        if (!from.isHidden() && filter(from)) {
             to.add(LocatedFile(from))
         }
         return
@@ -100,7 +100,7 @@ fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, filter
         }
 
         override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-            if (!attrs.isDirectory && !file.isHidden && filter(file)) {
+            if (!attrs.isDirectory && !file.isHidden() && filter(file)) {
                 val originalLength = pathStack.length
                 pathStack.append(file.name)
                 to.add(LocatedFile(file, pathStack.toString(), from))

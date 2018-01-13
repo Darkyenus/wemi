@@ -4,7 +4,7 @@ import com.esotericsoftware.jsonbeans.Json
 import org.slf4j.LoggerFactory
 import wemi.boot.MachineWritable
 import wemi.collections.TinyMap
-import wemi.util.readBytes
+import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -213,7 +213,7 @@ data class ResolvedDependency(val id: DependencyId,
             val artifact = this.artifact
             if (artifact != null) {
                 try {
-                    val bytes = artifact.readBytes()
+                    val bytes = Files.readAllBytes(artifact)
                     this.putKey(wemi.dependency.ArtifactKey.ArtifactData, bytes)
                     return bytes
                 } catch (e: Exception) {

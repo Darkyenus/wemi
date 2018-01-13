@@ -15,6 +15,9 @@ abstract class AssemblySource(
         /** Is this from the [wemi.Keys.internalClasspath]? */
         val own: Boolean) {
 
+    /**
+     * Lazily loaded data of the source that should be included in the assembled archive
+     */
     val data: ByteArray by lazy(LazyThreadSafetyMode.NONE) { load() }
 
     /** Load the actual data */

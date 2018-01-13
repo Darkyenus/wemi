@@ -21,7 +21,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
     /*
     ╤ org.foo:proj:1.0 ✅
     │ ╘ com.bar:pr:2.0 ❌⛔️
-    ╞ org.foo:proj:1.0 ✅⤴︎
+    ╞ org.foo:proj:1.0 ✅⤴
     ╘ com.baz:pr:2.0 ❌⛔️
 
     Status symbols:

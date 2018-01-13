@@ -38,10 +38,7 @@ import org.slf4j.Marker
 import wemi.boot.WemiBuildFileExtensions
 import wemi.compile.*
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
-import wemi.util.LocatedFile
-import wemi.util.absolutePath
-import wemi.util.isDirectory
-import wemi.util.nameHasExtension
+import wemi.util.*
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
@@ -274,18 +271,18 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
         for (source in sources) {
             val file = source.file
             when {
-                file.isDirectory -> {
+                file.isDirectory() -> {
                     configuration.addKotlinSourceRoot(file.absolutePath)
                     configuration.addJavaSourceRoot(file.toFile())
                 }
-                file.nameHasExtension(KotlinSourceFileExtensions) -> {
+                file.name.pathHasExtension(KotlinSourceFileExtensions) -> {
                     configuration.addKotlinSourceRoot(file.absolutePath)
                 }
-                file.nameHasExtension(JavaSourceFileExtensions) -> {
+                file.name.pathHasExtension(JavaSourceFileExtensions) -> {
                     configuration.addJavaSourceRoot(file.toFile(), source.packageName)
                 }
                 flags.useDefault(KotlinJVMCompilerFlags.compilingWemiBuildFiles, false)
-                        && file.nameHasExtension(WemiBuildFileExtensions) -> {
+                        && file.name.pathHasExtension(WemiBuildFileExtensions) -> {
                     configuration.addKotlinSourceRoot(file.absolutePath)
                 }
                 else -> {
@@ -306,7 +303,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
     }
 
     private fun setupDestination(configuration: CompilerConfiguration, destination: Path) {
-        if (destination.nameHasExtension("jar")) {
+        if (destination.name.pathHasExtension("jar")) {
             configuration.put(JVMConfigurationKeys.OUTPUT_JAR, destination.toFile())
         } else {
             configuration.put(JVMConfigurationKeys.OUTPUT_DIRECTORY, destination.toFile())

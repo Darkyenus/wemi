@@ -284,7 +284,9 @@ internal object MavenDependencyResolver {
                 var dataFileWritten = false
                 try {
                     Files.createDirectories(dataFile.parent)
-                    dataFile.writeBytes(response.body)
+                    Files.newOutputStream(dataFile).use {
+                        it.write(response.body, 0, response.body.size)
+                    }
                     LOG.debug("File '{}' from {} cached successfully", path, repository)
                     retrievedFile = dataFile
                     dataFileWritten = true
