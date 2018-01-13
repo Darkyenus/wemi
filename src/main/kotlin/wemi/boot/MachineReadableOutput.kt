@@ -19,7 +19,7 @@ import kotlin.system.exitProcess
 private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
 
 fun machineReadableEvaluateAndPrint(out: PrintStream, task:Task) {
-    if (task.isCommand) {
+    if (task.isMachineReadableCommand) {
         when (task.key) {
             "version" -> {
                 machineReadablePrint(out, WemiVersion)

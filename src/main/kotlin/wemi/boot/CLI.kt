@@ -1,5 +1,6 @@
 package wemi.boot
 
+import com.darkyen.tproll.TPLogger
 import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TerminalColor
 import org.jline.reader.*
@@ -238,7 +239,7 @@ object CLI {
             }
             CLI.KeyEvaluationStatus.NoKey -> {
                 val keyString = data as String
-                if (task.isCommand) {
+                if (task.couldBeCommand) {
                     printWarning("Can't evaluate $task - no key or command named '$keyString' found", keyString, AllKeys.keys + commands.keys)
                 } else {
                     printWarning("Can't evaluate $task - no key named '$keyString' found", keyString, AllKeys.keys)
@@ -353,30 +354,62 @@ object CLI {
         }
     }
 
-    private val commands = mapOf(
-            "exit" to {
-                throw EndOfFileException()
-            },
-            "projects" to {
-                printLabeled("project", AllProjects)
-            },
-            "configurations" to {
-                printLabeled("configuration", AllConfigurations)
-            },
-            "keys" to {
-                printLabeled("key", AllKeys)
-            },
-            "help" to {
-                println(formatLabel("Wemi $WemiVersion (Kotlin $WemiKotlinVersion)"))
-                print(formatLabel("Commands: "))
-                println("exit, projects, configurations, keys, help")
-                print(formatLabel("Keys: "))
-                println("Configurations and projects hold values/behavior of keys. That can be mundane data like version of\n" +
-                        "the project in 'projectVersion' key or complex operation, like compiling and running in 'run' key.\n" +
-                        "To evaluate the key, simply type its name. If you want to run the key in a different project or\n" +
-                        "in a configuration, prefix it with its name and slash, for example: desktop/run")
+    private val commands: Map<String, (Task) -> Unit> = HashMap<String, (Task) -> Unit>().apply {
+        put("exit") {
+            throw EndOfFileException()
+        }
+        put("project") { task ->
+            val projectName = task.input.find { it.first == null || it.first == "project" }?.second
+            if (projectName == null) {
+                printWarning("project <project> - switch default project")
+            } else {
+                val project = AllProjects.findCaseInsensitive(projectName)
+                if (project == null) {
+                    printWarning("No project named '$projectName' found", projectName, AllProjects.keys)
+                } else {
+                    defaultProject = project
+                }
             }
-    )
+        }
+        put("projects") {
+            printLabeled("project", AllProjects)
+        }
+        put("configurations") {
+            printLabeled("configuration", AllConfigurations)
+        }
+        put("keys") {
+            printLabeled("key", AllKeys)
+        }
+        put("log") { task ->
+            val level = task.input.find { it.first == null || it.first == "level" }?.second
+            if (level == null) {
+                printWarning("log <level> - change log level")
+            } else {
+                when (level.toLowerCase()) {
+                    "trace", "t" -> TPLogger.TRACE()
+                    "debug", "d" -> TPLogger.DEBUG()
+                    "info", "i" -> TPLogger.INFO()
+                    "warn", "warning", "w" -> TPLogger.WARN()
+                    "error", "err", "e" -> TPLogger.ERROR()
+                    else -> {
+                        printWarning("Unknown log level")
+                        print(formatLabel("Possible log levels: "))
+                        println("trace, debug, info, warn, error")
+                    }
+                }
+            }
+        }
+        put("help") {
+            println(formatLabel("Wemi $WemiVersion (Kotlin $WemiKotlinVersion)"))
+            print(formatLabel("Commands: "))
+            println("exit, project <project>, projects, configurations, keys, log <level>, help")
+            print(formatLabel("Keys: "))
+            println("Configurations and projects hold values/behavior of keys. That can be mundane data like version of\n" +
+                    "the project in 'projectVersion' key or complex operation, like compiling and running in 'run' key.\n" +
+                    "To evaluate the key, simply type its name. If you want to run the key in a different project or\n" +
+                    "in a configuration, prefix it with its name and slash, for example: desktop/run")
+        }
+    }
 
     /**
      * Evaluate command from the REPL
@@ -399,10 +432,10 @@ object CLI {
         }
 
         for (task in tasks) {
-            if (task.isCommand) {
+            if (task.couldBeCommand) {
                 val commandFunction = commands[task.key]
                 if (commandFunction != null) {
-                    commandFunction()
+                    commandFunction(task)
                     continue
                 }
             }

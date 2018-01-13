@@ -36,10 +36,13 @@ class Task(
          */
         internal val flags:Int = 0) {
 
-    val isCommand:Boolean
+    internal val isMachineReadableCommand:Boolean
+        get() = couldBeCommand
+                && (flags and FLAG_MACHINE_READABLE_COMMAND) == FLAG_MACHINE_READABLE_COMMAND
+
+    internal val couldBeCommand:Boolean
         get() = project == null
                 && configurations.isEmpty()
-                && (flags and FLAG_MACHINE_READABLE_COMMAND) == FLAG_MACHINE_READABLE_COMMAND
 
     override fun toString(): String {
         val sb = StringBuilder()
