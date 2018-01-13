@@ -17,7 +17,7 @@ object Configurations {
 
     //region Stage configurations
     val compiling by configuration("Configuration used when compiling") {}
-    
+
     val running by configuration("Configuration used when running, sources are resources") {}
     //endregion
 
@@ -35,7 +35,7 @@ object Configurations {
     //region IDE configurations
     val retrievingSources by configuration("Used to retrieve sources") {
         Keys.libraryDependencyProjectMapper set {
-            {(projectId, exclusions): Dependency ->
+            { (projectId, exclusions): Dependency ->
                 val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (M2ClassifierAttribute to "sources"))
                 Dependency(sourcesProjectId, exclusions)
             }
@@ -44,7 +44,7 @@ object Configurations {
 
     val retrievingDocs by configuration("Used to retrieve docs") {
         Keys.libraryDependencyProjectMapper set {
-            {(projectId, exclusions): Dependency ->
+            { (projectId, exclusions): Dependency ->
                 val javadocProjectId = projectId.copy(attributes = projectId.attributes + (M2ClassifierAttribute to "javadoc"))
                 Dependency(javadocProjectId, exclusions)
             }

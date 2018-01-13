@@ -7,7 +7,7 @@ package wemi.assembly
  */
 object FileRecognition {
 
-    private fun extension(name:String):String? {
+    private fun extension(name: String): String? {
         val extensionSeparator = name.lastIndexOf('.')
         return if (extensionSeparator == -1) {
             null
@@ -16,7 +16,7 @@ object FileRecognition {
         }
     }
 
-    fun isReadme(name:String):Boolean {
+    fun isReadme(name: String): Boolean {
         if (name.contains("readme", ignoreCase = true) ||
                 name.contains("about", ignoreCase = true)) {
             val extension = FileRecognition.extension(name)
@@ -29,7 +29,7 @@ object FileRecognition {
         return false
     }
 
-    fun isLicenseFile(name:String):Boolean {
+    fun isLicenseFile(name: String): Boolean {
         if (name.contains("license", ignoreCase = true) ||
                 name.contains("licence", ignoreCase = true) ||
                 name.contains("notice", ignoreCase = true) ||
@@ -44,7 +44,7 @@ object FileRecognition {
         return false
     }
 
-    fun isSystemJunkFile(name:String):Boolean {
+    fun isSystemJunkFile(name: String): Boolean {
         return name.equals(".DS_Store", ignoreCase = true) ||
                 name.equals("Thumbs.db", ignoreCase = true)
     }

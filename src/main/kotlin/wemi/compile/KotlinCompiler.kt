@@ -31,21 +31,21 @@ interface KotlinCompiler {
     }
 }
 
-enum class KotlinCompilerVersion(val string:String, internal val implementationClassName:String) {
+enum class KotlinCompilerVersion(val string: String, internal val implementationClassName: String) {
     Version1_1_4("1.1.4", "wemi.compile.impl.KotlinCompilerImpl1_1_4");
 
     override fun toString(): String = string
 }
 
-private val KotlinCompilerImplementationDependenciesByVersion:Map<KotlinCompilerVersion, Collection<Dependency>> = mapOf(
+private val KotlinCompilerImplementationDependenciesByVersion: Map<KotlinCompilerVersion, Collection<Dependency>> = mapOf(
         KotlinCompilerVersion.Version1_1_4 to listOf(
                 Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4"))
         )
 )
 
-private val KotlinCompilerCacheByVersion:MutableMap<KotlinCompilerVersion, KotlinCompiler> = HashMap()
+private val KotlinCompilerCacheByVersion: MutableMap<KotlinCompilerVersion, KotlinCompiler> = HashMap()
 
-fun kotlinCompiler(forVersion:KotlinCompilerVersion):KotlinCompiler {
+fun kotlinCompiler(forVersion: KotlinCompilerVersion): KotlinCompiler {
     synchronized(KotlinCompilerCacheByVersion) {
         var kotlinCompiler = KotlinCompilerCacheByVersion[forVersion]
         if (kotlinCompiler == null) {
@@ -105,6 +105,7 @@ object KotlinJVMCompilerFlags {
         JAVA_1_6("1.6"),
         JAVA_1_8("1.8")
     }
+
     val jvmTarget = CompilerFlag<BytecodeTarget>("jvmTarget", "Target version of the generated JVM bytecode")
     val javaParameters = CompilerFlag<Boolean>("javaParameters", "Generate metadata for Java 1.8 reflection on method parameters")
 
@@ -132,6 +133,7 @@ object KotlinJVMCompilerFlags {
         Warn,
         Enable
     }
+
     val jsr305GlobalReportLevel = CompilerFlag<Jsr305GlobalReportLevel>("jsr305GlobalReportLevel", "Specify global behavior for JSR-305 nullability annotations: ignore, or treat as other supported nullability annotations")
 
     //TODO What?

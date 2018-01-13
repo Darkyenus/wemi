@@ -25,25 +25,25 @@ private val LOG: Logger = LoggerFactory.getLogger("LocatedFile")
  * @property root to which [path] is relative to
  * @property simple is true if the (File) constructor has been used and the file is not really "located"
  */
-class LocatedFile private constructor(val file: Path, val root: Path, val path: String, val simple:Boolean)
+class LocatedFile private constructor(val file: Path, val root: Path, val path: String, val simple: Boolean)
     : MachineWritable {
 
-    constructor(file:Path) : this(file, file.parent, file.name, true)
-    constructor(file:Path, location: String, root:Path) : this(file, root, location, false)
+    constructor(file: Path) : this(file, file.parent, file.name, true)
+    constructor(file: Path, location: String, root: Path) : this(file, root, location, false)
 
     init {
-        assert(!file.isDirectory) {"LocatedFile.file must not be a directory: " + this}
-        assert(!root.isDirectory) {"LocatedFile.root must be a directory: " + this}
+        assert(!file.isDirectory) { "LocatedFile.file must not be a directory: " + this }
+        assert(!root.isDirectory) { "LocatedFile.root must be a directory: " + this }
     }
 
-    operator inline fun component1():  Path = file
-    operator inline fun component2():  String? = path
-    operator inline fun component3():  Path? = root
+    operator inline fun component1(): Path = file
+    operator inline fun component2(): String? = path
+    operator inline fun component3(): Path? = root
 
-    val classpathEntry:Path
+    val classpathEntry: Path
         get() = if (simple) file else root
 
-    val packageName:String
+    val packageName: String
         get() {
             val fileNameStart = path.lastIndexOf('/')
             if (fileNameStart <= 0) {
@@ -53,13 +53,17 @@ class LocatedFile private constructor(val file: Path, val root: Path, val path: 
             val chars = CharArray(fileNameStart)
             for (i in chars.indices) {
                 val c = path[i]
-                chars[i] = if (c == '/') { '.' } else { c }
+                chars[i] = if (c == '/') {
+                    '.'
+                } else {
+                    c
+                }
             }
             return String(chars)
         }
 
     override fun toString(): String {
-        return root.absolutePath+"//"+path
+        return root.absolutePath + "//" + path
     }
 
     override fun writeMachine(json: Json) {

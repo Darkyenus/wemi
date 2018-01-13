@@ -13,15 +13,15 @@ import wemi.util.WithDescriptiveString
 import java.nio.file.Path
 
 /** wemi.Key which can have value of type [Value] assigned, through [Project] or [Configuration]. */
-class Key<Value> internal constructor(val name:String,
-                                          val description:String,
-                                          /** True if defaultValue is set, false if not.
-                                           * Needed, because we don't know whether or not is [Value] nullable
-                                           * or not, so we need to know if we should return null or not. */
-                                          internal val hasDefaultValue:Boolean,
-                                          internal val defaultValue:Value?,
-                                          internal val cached:Boolean,
-                                          internal val prettyPrinter:((Value) -> CharSequence)?) : WithDescriptiveString, MachineWritable {
+class Key<Value> internal constructor(val name: String,
+                                      val description: String,
+                                      /** True if defaultValue is set, false if not.
+                                       * Needed, because we don't know whether or not is [Value] nullable
+                                       * or not, so we need to know if we should return null or not. */
+                                      internal val hasDefaultValue: Boolean,
+                                      internal val defaultValue: Value?,
+                                      internal val cached: Boolean,
+                                      internal val prettyPrinter: ((Value) -> CharSequence)?) : WithDescriptiveString, MachineWritable {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -56,7 +56,7 @@ class Key<Value> internal constructor(val name:String,
 
 class Configuration internal constructor(val name: String,
                                          val description: String,
-                                         val parent:Configuration?)
+                                         val parent: Configuration?)
     : BindingHolder(), WithDescriptiveString, MachineWritable {
 
     override fun toString(): String {
@@ -79,7 +79,7 @@ class AnonymousConfiguration @PublishedApi internal constructor() : BindingHolde
     override fun toDescriptiveAnsiString(): String = AnonymousConfigurationDescriptiveAnsiString
 }
 
-class ConfigurationExtension internal constructor(val extending: Configuration, val from:BindingHolder) : BindingHolder() {
+class ConfigurationExtension internal constructor(val extending: Configuration, val from: BindingHolder) : BindingHolder() {
     override fun toString(): String = "extend($extending) from $from"
 }
 
@@ -94,7 +94,7 @@ class Project internal constructor(val name: String, val projectRoot: Path)
         json.writeValue(name as Any, String::class.java)
     }
 
-    val projectScope:Scope = Scope(name, listOf(this), null)
+    val projectScope: Scope = Scope(name, listOf(this), null)
 }
 
 /**
@@ -106,15 +106,15 @@ class Project internal constructor(val name: String, val projectRoot: Path)
  * @param parent of the scope, only [Project] may have null parent.
  */
 class Scope internal constructor(
-        private val name:String,
-        private val holders:List<BindingHolder>,
-        private val parent:Scope?) {
+        private val name: String,
+        private val holders: List<BindingHolder>,
+        private val parent: Scope?) {
 
-    private val configurationScopeCache:MutableMap<Configuration, Scope> = java.util.HashMap()
+    private val configurationScopeCache: MutableMap<Configuration, Scope> = java.util.HashMap()
 
-    private var valueCache:MutableMap<Key<*>, Any?>? = null
+    private var valueCache: MutableMap<Key<*>, Any?>? = null
 
-    private inline fun traverseHoldersBack(action:(BindingHolder) -> Unit) {
+    private inline fun traverseHoldersBack(action: (BindingHolder) -> Unit) {
         var scope = this
         while (true) {
             scope.holders.forEach(action)
@@ -123,7 +123,7 @@ class Scope internal constructor(
     }
 
     @PublishedApi
-    internal fun scopeFor(configuration: Configuration):Scope {
+    internal fun scopeFor(configuration: Configuration): Scope {
         val scopes = configurationScopeCache
         synchronized(scopes) {
             return scopes.getOrPut(configuration) {
@@ -151,13 +151,13 @@ class Scope internal constructor(
     }
 
     @PublishedApi
-    internal fun scopeFor(anonymousConfiguration: AnonymousConfiguration):Scope {
+    internal fun scopeFor(anonymousConfiguration: AnonymousConfiguration): Scope {
         // Cannot be extended
         anonymousConfiguration.locked = true // Here because of visibility rules
         return Scope("<anonymous>", listOf(anonymousConfiguration), this)
     }
 
-    inline fun <Result> Scope.using(vararg configurations: Configuration, action: Scope.() -> Result):Result {
+    inline fun <Result> Scope.using(vararg configurations: Configuration, action: Scope.() -> Result): Result {
         var scope = this
         for (configuration in configurations) {
             scope = scope.scopeFor(configuration)
@@ -165,7 +165,7 @@ class Scope internal constructor(
         return scope.action()
     }
 
-    inline fun <Result> Scope.using(configurations: Collection<Configuration>, action: Scope.() -> Result):Result {
+    inline fun <Result> Scope.using(configurations: Collection<Configuration>, action: Scope.() -> Result): Result {
         var scope = this
         for (configuration in configurations) {
             scope = scope.scopeFor(configuration)
@@ -173,24 +173,24 @@ class Scope internal constructor(
         return scope.action()
     }
 
-    inline fun <Result> Scope.using(configuration: Configuration, action: Scope.() -> Result):Result {
+    inline fun <Result> Scope.using(configuration: Configuration, action: Scope.() -> Result): Result {
         return scopeFor(configuration).action()
     }
 
-    inline fun <Result> Scope.using(anonInitializer:AnonymousConfiguration.()->Unit,
-                                    action:Scope.() -> Result):Result {
+    inline fun <Result> Scope.using(anonInitializer: AnonymousConfiguration.() -> Unit,
+                                    action: Scope.() -> Result): Result {
         val anonConfig = AnonymousConfiguration()
         anonConfig.anonInitializer()
         // Locking is deferred to scopeFor because of visibility rules for inlined functions
         return scopeFor(anonConfig).action()
     }
 
-    private fun <Value : Output, Output> getKeyValue(key: Key<Value>, otherwise:Output, useOtherwise:Boolean):Output {
-        var foundValue:Value? = key.defaultValue
+    private fun <Value : Output, Output> getKeyValue(key: Key<Value>, otherwise: Output, useOtherwise: Boolean): Output {
+        var foundValue: Value? = key.defaultValue
         var foundValueValid = key.hasDefaultValue
-        val allModifiersReverse:ArrayList<BoundKeyValueModifier<Value>> = ArrayList()
+        val allModifiersReverse: ArrayList<BoundKeyValueModifier<Value>> = ArrayList()
 
-        var scope:Scope = this
+        var scope: Scope = this
         while (true) {
             // Check the cache
             if (key.cached) {
@@ -224,7 +224,7 @@ class Scope internal constructor(
                 }
             }
 
-            scope = scope.parent ?:break
+            scope = scope.parent ?: break
         }
 
         if (foundValueValid) {
@@ -248,24 +248,24 @@ class Scope internal constructor(
 
     /** Return the value bound to this wemi.key in this scope.
      * Throws exception if no value set. */
-    fun <Value> Key<Value>.get():Value {
+    fun <Value> Key<Value>.get(): Value {
         @Suppress("UNCHECKED_CAST")
         return getKeyValue(this, null, false) as Value
     }
 
     /** Return the value bound to this wemi.key in this scope.
      * Returns [unset] if no value set. */
-    fun <Value : Else, Else> Key<Value>.getOrElse(unset:Else):Else {
+    fun <Value : Else, Else> Key<Value>.getOrElse(unset: Else): Else {
         return getKeyValue(this, unset, true)
     }
 
     /** Return the value bound to this wemi.key in this scope.
      * Returns `null` if no value set. */
-    fun <Value> Key<Value>.getOrNull():Value? {
+    fun <Value> Key<Value>.getOrNull(): Value? {
         return getKeyValue(this, null, true)
     }
 
-    private fun <Value>getCached(key:Key<Value>):Value? {
+    private fun <Value> getCached(key: Key<Value>): Value? {
         synchronized(this) {
             val valueCache = this.valueCache ?: return null
             @Suppress("UNCHECKED_CAST")
@@ -273,10 +273,10 @@ class Scope internal constructor(
         }
     }
 
-    private fun <Value>putCached(key:Key<Value>, value:Value) {
+    private fun <Value> putCached(key: Key<Value>, value: Value) {
         synchronized(this) {
             val maybeNullCache = valueCache
-            val cache:MutableMap<Key<*>, Any?>
+            val cache: MutableMap<Key<*>, Any?>
             if (maybeNullCache == null) {
                 cache = mutableMapOf()
                 this.valueCache = cache
@@ -288,7 +288,7 @@ class Scope internal constructor(
         }
     }
 
-    internal fun cleanCache():Int {
+    internal fun cleanCache(): Int {
         synchronized(this) {
             val valueCache = this.valueCache
             this.valueCache = null
@@ -296,7 +296,7 @@ class Scope internal constructor(
         }
     }
 
-    private fun buildToString(sb:StringBuilder) {
+    private fun buildToString(sb: StringBuilder) {
         parent?.buildToString(sb)
         sb.append(name)
         if (parent == null) {
@@ -382,7 +382,7 @@ sealed class BindingHolder {
      * @param initializer that will be executed to populate the configuration
      */
     @Suppress("MemberVisibilityCanPrivate")
-    fun extend(configuration: Configuration, initializer:ConfigurationExtension.() -> Unit) {
+    fun extend(configuration: Configuration, initializer: ConfigurationExtension.() -> Unit) {
         ensureUnlocked()
         val extensions = this@BindingHolder.configurationExtensions
         if (extensions.containsKey(this)) {
@@ -406,7 +406,7 @@ sealed class BindingHolder {
      * extend(c, init)
      * ```
      */
-    fun extendMultiple(vararg configurations: Configuration, initializer:ConfigurationExtension.() -> Unit) {
+    fun extendMultiple(vararg configurations: Configuration, initializer: ConfigurationExtension.() -> Unit) {
         ensureUnlocked()
         val extensions = this@BindingHolder.configurationExtensions
         for (configuration in configurations) {
@@ -428,7 +428,7 @@ sealed class BindingHolder {
      * @see modify
      */
     infix inline fun <Value> Key<Collection<Value>>.add(crossinline additionalValue: BoundKeyValue<Value>) {
-        this.modify { collection:Collection<Value> ->
+        this.modify { collection: Collection<Value> ->
             //TODO Optimize?
             collection + additionalValue()
         }
@@ -440,7 +440,7 @@ sealed class BindingHolder {
      * @see modify
      */
     infix inline fun <Value> Key<Collection<Value>>.remove(crossinline valueToRemove: BoundKeyValue<Value>) {
-        this.modify { collection:Collection<Value> ->
+        this.modify { collection: Collection<Value> ->
             collection - valueToRemove()
         }
     }
@@ -451,7 +451,7 @@ sealed class BindingHolder {
      * @see BindingHolder.plusAssign
      * @see BindingHolder.minusAssign
      */
-    operator fun <Type> Key<CompilerFlags>.get(flag:CompilerFlag<Collection<Type>>):CompilerFlagKeySetting<Collection<Type>> {
+    operator fun <Type> Key<CompilerFlags>.get(flag: CompilerFlag<Collection<Type>>): CompilerFlagKeySetting<Collection<Type>> {
         return CompilerFlagKeySetting(this, flag)
     }
 
@@ -460,7 +460,7 @@ sealed class BindingHolder {
      *
      * @see modify
      */
-    operator fun <Type> Key<CompilerFlags>.set(flag: CompilerFlag<Type>, value:Type) {
+    operator fun <Type> Key<CompilerFlags>.set(flag: CompilerFlag<Type>, value: Type) {
         this.modify { flags: CompilerFlags ->
             flags[flag] = value
             flags
@@ -473,7 +473,7 @@ sealed class BindingHolder {
      *
      * @see modify
      */
-    operator fun <Type> CompilerFlagKeySetting<Collection<Type>>.plusAssign(value:Type) {
+    operator fun <Type> CompilerFlagKeySetting<Collection<Type>>.plusAssign(value: Type) {
         key.modify { flags: CompilerFlags ->
             flags[flag].let {
                 flags[flag] = if (it == null) listOf(value) else it + value
@@ -489,7 +489,7 @@ sealed class BindingHolder {
      * @see modify
      */
     @Suppress("MemberVisibilityCanPrivate")
-    operator fun <Type> CompilerFlagKeySetting<Collection<Type>>.minusAssign(value:Type) {
+    operator fun <Type> CompilerFlagKeySetting<Collection<Type>>.minusAssign(value: Type) {
         key.modify { flags: CompilerFlags ->
             flags[flag]?.let {
                 flags[flag] = it - value
@@ -502,8 +502,8 @@ sealed class BindingHolder {
      * Boilerplate for [BindingHolder.plusAssign] and [BindingHolder.minusAssign].
      */
     class CompilerFlagKeySetting<Type> internal constructor(
-            internal val key:Key<CompilerFlags>,
-            internal val flag:CompilerFlag<Type>)
+            internal val key: Key<CompilerFlags>,
+            internal val flag: CompilerFlag<Type>)
     //endregion
 }
 

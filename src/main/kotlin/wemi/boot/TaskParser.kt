@@ -2,8 +2,10 @@ package wemi.boot
 
 import org.jline.reader.ParsedLine
 import org.jline.reader.Parser
-import wemi.util.*
-import kotlin.collections.ArrayList
+import wemi.util.Tokens
+import wemi.util.forCodePoints
+import wemi.util.forCodePointsIndexed
+import wemi.util.isValidIdentifier
 
 /**
  * Parses task lines.
@@ -30,7 +32,7 @@ object TaskParser : Parser {
         return ParsedTaskLine(line, cursor)
     }
 
-    class ParsedTaskLine(val line:String, val cursor:Int) : ParsedLine {
+    class ParsedTaskLine(val line: String, val cursor: Int) : ParsedLine {
         val parsed = parseTokens(line, cursor)
 
         override fun words(): List<String> = parsed.tokens
@@ -59,7 +61,7 @@ object TaskParser : Parser {
             INPUT_SEPARATOR[0].toInt(),
             TASK_SEPARATOR[0].toInt())
 
-    fun createTokens(parsedTokens: List<String>):Tokens<String, TokenType> {
+    fun createTokens(parsedTokens: List<String>): Tokens<String, TokenType> {
         var limit = parsedTokens.size
         if (limit > 0 && parsedTokens.last().isBlank()) {
             limit--
@@ -76,8 +78,8 @@ object TaskParser : Parser {
      */
     class MarkedLine(val tokens: List<String>, val positionWord: Int, val positionInWord: Int) {
 
-        private var _tokenTypes:Array<TokenType>? = null
-        private var _tasks:List<Task>? = null
+        private var _tokenTypes: Array<TokenType>? = null
+        private var _tasks: List<Task>? = null
 
         private fun initialize() {
             if (_tokenTypes != null) {
@@ -89,7 +91,7 @@ object TaskParser : Parser {
             _tokenTypes = tokens.memos
         }
 
-        val tokenTypes:Array<TokenType>
+        val tokenTypes: Array<TokenType>
             get() {
                 if (_tokenTypes == null) {
                     initialize()
@@ -97,7 +99,7 @@ object TaskParser : Parser {
                 return _tokenTypes!!
             }
 
-        val tasks:List<Task>
+        val tasks: List<Task>
             get() {
                 if (_tasks == null) {
                     initialize()
@@ -106,7 +108,7 @@ object TaskParser : Parser {
             }
     }
 
-    private fun Tokens<String, TokenType>.matchSuffixedIdentifier(suffixToken:String, identifierType:TokenType):String? {
+    private fun Tokens<String, TokenType>.matchSuffixedIdentifier(suffixToken: String, identifierType: TokenType): String? {
         if (matches { it.isValidIdentifier() } && matches(skip = 1, value = suffixToken)) {
             val identifier = next(identifierType)
             // Skip suffix
@@ -116,7 +118,7 @@ object TaskParser : Parser {
         return null
     }
 
-    private fun Tokens<String, TokenType>.matchTask(machineReadable:Boolean):Task? {
+    private fun Tokens<String, TokenType>.matchTask(machineReadable: Boolean): Task? {
         var flags = 0
 
         val project = matchSuffixedIdentifier(PROJECT_SEPARATOR, TokenType.Project)

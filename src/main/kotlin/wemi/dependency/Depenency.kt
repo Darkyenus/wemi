@@ -25,7 +25,7 @@ data class DependencyId(val group: String,
                         val preferredRepository: Repository? = null,
                         val attributes: Map<DependencyAttribute, String> = emptyMap()) : MachineWritable {
 
-    fun attribute(attribute: DependencyAttribute):String? {
+    fun attribute(attribute: DependencyAttribute): String? {
         return attributes[attribute] ?: attribute.defaultValue
     }
 
@@ -86,7 +86,7 @@ data class DependencyId(val group: String,
     }
 }
 
-data class DependencyAttribute(val name: String, val makesUnique: Boolean, val defaultValue:String? = null) : MachineWritable {
+data class DependencyAttribute(val name: String, val makesUnique: Boolean, val defaultValue: String? = null) : MachineWritable {
     override fun toString(): String = name
 
     override fun writeMachine(json: Json) {
@@ -154,7 +154,7 @@ data class Dependency(val dependencyId: DependencyId, val exclusions: List<Depen
  * @param printOut true if this key should be included in print outs, such as machine writable or [toString()]
  */
 @Suppress("unused")// T is used only in syntax
-class ArtifactKey<T>(val name: String, val printOut:Boolean) {
+class ArtifactKey<T>(val name: String, val printOut: Boolean) {
     companion object {
         val ArtifactFile = ArtifactKey<Path>("artifactFile", true)
         val ArtifactData = ArtifactKey<ByteArray>("artifactData", false)
@@ -216,7 +216,7 @@ data class ResolvedDependency(val id: DependencyId,
                     val bytes = artifact.readBytes()
                     this.putKey(wemi.dependency.ArtifactKey.ArtifactData, bytes)
                     return bytes
-                } catch (e:Exception) {
+                } catch (e: Exception) {
                     LOG.warn("Failed to load artifactData of {}", this, e)
                 }
             }
@@ -232,17 +232,17 @@ data class ResolvedDependency(val id: DependencyId,
         }
 
 
-    fun <T>getKey(key: ArtifactKey<T>): T? {
+    fun <T> getKey(key: ArtifactKey<T>): T? {
         @Suppress("UNCHECKED_CAST")
         return super.get(key) as T?
     }
 
-    fun <T>putKey(key: ArtifactKey<T>, value: T): T? {
+    fun <T> putKey(key: ArtifactKey<T>, value: T): T? {
         @Suppress("UNCHECKED_CAST")
         return super.put(key, value as Any) as T?
     }
 
-    fun <T>removeKey(key: ArtifactKey<T>): T? {
+    fun <T> removeKey(key: ArtifactKey<T>): T? {
         @Suppress("UNCHECKED_CAST")
         return super.remove(key) as T?
     }
@@ -272,7 +272,7 @@ data class ResolvedDependency(val id: DependencyId,
     }
 
     override fun toString(): String {
-        return "ResolvedDependency(id=$id, data=${super.filteredToString { k, _ -> k.printOut} }, dependencies=$dependencies, resolvedFrom=$resolvedFrom, hasError=$hasError, log=$log)"
+        return "ResolvedDependency(id=$id, data=${super.filteredToString { k, _ -> k.printOut }}, dependencies=$dependencies, resolvedFrom=$resolvedFrom, hasError=$hasError, log=$log)"
     }
 
 

@@ -11,11 +11,11 @@ object DependencyResolver {
     private val LOG = LoggerFactory.getLogger(DependencyResolver.javaClass)
 
     fun resolveSingleDependency(dependency: Dependency, repositories: RepositoryChain): ResolvedDependency {
-        var log:StringBuilder? = null
+        var log: StringBuilder? = null
 
         LOG.debug("Resolving {}", dependency)
 
-        fun resolveInRepository(repository: Repository?):ResolvedDependency? {
+        fun resolveInRepository(repository: Repository?): ResolvedDependency? {
             if (repository == null) {
                 return null
             }
@@ -58,12 +58,12 @@ object DependencyResolver {
 
         // Fail
         LOG.debug("Failed to resolve {}", dependency.dependencyId)
-        return ResolvedDependency(dependency.dependencyId, emptyList(), null, true, log?:"no repositories to search in")
+        return ResolvedDependency(dependency.dependencyId, emptyList(), null, true, log ?: "no repositories to search in")
     }
 
     private fun doResolveArtifacts(resolved: MutableMap<DependencyId, ResolvedDependency>,
                                    dependency: Dependency, repositories: RepositoryChain,
-                                   mapper:(Dependency) -> Dependency): Boolean {
+                                   mapper: (Dependency) -> Dependency): Boolean {
         if (resolved.contains(dependency.dependencyId)) {
             return true
         }
@@ -91,11 +91,11 @@ object DependencyResolver {
         return resolved.artifacts()
     }
 
-    fun Map<DependencyId, ResolvedDependency>.artifacts():List<Path> {
+    fun Map<DependencyId, ResolvedDependency>.artifacts(): List<Path> {
         return mapNotNull { it.value.artifact }
     }
 
-    fun resolve(resolved:MutableMap<DependencyId, ResolvedDependency>, projects: Collection<Dependency>, repositories: RepositoryChain, mapper:((Dependency) -> Dependency) = {it}): Boolean {
+    fun resolve(resolved: MutableMap<DependencyId, ResolvedDependency>, projects: Collection<Dependency>, repositories: RepositoryChain, mapper: ((Dependency) -> Dependency) = { it }): Boolean {
         var ok = true
 
         for (project in projects) {

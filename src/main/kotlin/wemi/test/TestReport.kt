@@ -84,14 +84,14 @@ class TestReport : LinkedHashMap<TestIdentifier, TestData>(), JsonSerializable, 
  * Unique, immutable, test identifier
  */
 class TestIdentifier(
-        val id:String,
-        val parentId:String?,
-        val displayName:String,
+        val id: String,
+        val parentId: String?,
+        val displayName: String,
 
-        val isTest:Boolean,
-        val isContainer:Boolean,
-        val tags:Set<String>,
-        val testSource:String?
+        val isTest: Boolean,
+        val isContainer: Boolean,
+        val tags: Set<String>,
+        val testSource: String?
 ) {
 
     override fun equals(other: Any?): Boolean {
@@ -147,9 +147,9 @@ class TestData : JsonSerializable {
 
     var duration = -1L
 
-    var skipReason:String? = null
+    var skipReason: String? = null
 
-    var stackTrace:String? = null
+    var stackTrace: String? = null
 
     val reports: ArrayList<ReportEntry> = ArrayList(0)
 
@@ -182,7 +182,7 @@ class TestData : JsonSerializable {
         }
     }
 
-    data class ReportEntry(val timestamp:Long, val key:String, val value:String)
+    data class ReportEntry(val timestamp: Long, val key: String, val value: String)
 
     override fun toString(): String {
         val sb = StringBuilder()

@@ -29,7 +29,6 @@ import java.util.*
 import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
-import java.util.zip.ZipOutputStream
 import kotlin.collections.ArrayList
 import kotlin.collections.LinkedHashSet
 
@@ -159,7 +158,7 @@ object KeyDefaults {
         clearedCount
     }
 
-    fun outputClassesDirectory(tag:String): BoundKeyValue<Path> = {
+    fun outputClassesDirectory(tag: String): BoundKeyValue<Path> = {
         Keys.buildDirectory.get() / "cache/$tag-${Keys.projectName.get().toSafeFileName()}"
     }
 
@@ -178,7 +177,7 @@ object KeyDefaults {
 
             // Compile Kotlin
             if (kotlinSources.isNotEmpty()) {
-                val sources:MutableList<Path> = mutableListOf()
+                val sources: MutableList<Path> = mutableListOf()
                 for ((file, _, _) in kotlinSources) {
                     sources.add(file)
                 }
@@ -189,7 +188,7 @@ object KeyDefaults {
 
                 val compileResult = compiler.compile(javaSources + kotlinSources, externalClasspath, output, compilerFlags, CompileLOG, null)
                 if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
-                    throw WemiException("Kotlin compilation failed: "+compileResult, showStacktrace = false)
+                    throw WemiException("Kotlin compilation failed: " + compileResult, showStacktrace = false)
                 }
 
                 compilerFlags.warnAboutUnusedFlags("Kotlin compiler")
@@ -318,14 +317,14 @@ object KeyDefaults {
         }
     }
 
-    val TestParameters:BoundKeyValue<TestParameters> = {
+    val TestParameters: BoundKeyValue<TestParameters> = {
         val testParameters = wemi.test.TestParameters()
         testParameters.filter.classNamePatterns.include("^.*Tests?$")
         testParameters.select.classpathRoots.add(Keys.outputClassesDirectory.get().absolutePath)
         testParameters
     }
 
-    val Test:BoundKeyValue<TestReport> = {
+    val Test: BoundKeyValue<TestReport> = {
         using(Configurations.testing) {
             val javaExecutable = Keys.javaExecutable.get()
             val directory = Keys.runDirectory.get()
@@ -387,7 +386,7 @@ object KeyDefaults {
     val Assembly: BoundKeyValue<Path> = {
         val loadedSources = mutableMapOf<String, MutableList<AssemblySource>>()
 
-        fun addSource(locatedFile: LocatedFile, own:Boolean) {
+        fun addSource(locatedFile: LocatedFile, own: Boolean) {
             val file = locatedFile.file
             if (file.nameHasExtension("jar")) {
                 // Add jar entries
@@ -459,7 +458,7 @@ object KeyDefaults {
                     assemblySources[path] = Pair(last, last.data)
                 }
                 MergeStrategy.SingleOwn -> {
-                    var own:AssemblySource? = null
+                    var own: AssemblySource? = null
                     for (source in dataList) {
                         if (source.own) {
                             if (own == null) {

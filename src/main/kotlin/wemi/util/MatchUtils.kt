@@ -73,7 +73,7 @@ object MatchUtils {
         return match(T::class.java, from, toString, target)
     }
 
-    fun <T> match(type:Class<T>, from: Array<T>, toString: (T) -> CharSequence, target: CharSequence): Array<T> {
+    fun <T> match(type: Class<T>, from: Array<T>, toString: (T) -> CharSequence, target: CharSequence): Array<T> {
         val BAD_SCORE = 1000
         var bestScore = BAD_SCORE
 

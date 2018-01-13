@@ -35,11 +35,11 @@ fun project(projectRoot: Path, initializer: Project.() -> Unit): ProjectDelegate
     return ProjectDelegate(projectRoot, initializer)
 }
 
-fun <Value> key(description: String, defaultValue: Value, cached: Boolean = false, prettyPrinter:((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+fun <Value> key(description: String, defaultValue: Value, cached: Boolean = false, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
     return KeyDelegate(description, true, defaultValue, cached, prettyPrinter)
 }
 
-fun <Value> key(description: String, cached: Boolean = false, prettyPrinter:((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+fun <Value> key(description: String, cached: Boolean = false, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
     return KeyDelegate(description, false, null, cached, prettyPrinter)
 }
 

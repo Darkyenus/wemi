@@ -16,10 +16,10 @@ private val LOG = LoggerFactory.getLogger("Run")
  */
 val JavaHome: Path = Paths.get(
         System.getProperty("java.home", null)
-        ?: throw WemiException("java.home property is not set, can't find java executable")
+                ?: throw WemiException("java.home property is not set, can't find java executable")
 ).toAbsolutePath()
 
-fun javaExecutable(javaHome:Path):Path {
+fun javaExecutable(javaHome: Path): Path {
     val windowsFile = (javaHome / "bin/java.exe").toAbsolutePath()
     val unixFile = (javaHome / "bin/java").toAbsolutePath()
     val winExists = Files.exists(windowsFile)
@@ -36,16 +36,16 @@ fun javaExecutable(javaHome:Path):Path {
             throw WemiException("Java executable should be at $unixFile, but it does not exist")
         }
     } else {
-        if (OSUtils.IS_WINDOWS) {
-            return windowsFile
+        return if (OSUtils.IS_WINDOWS) {
+            windowsFile
         } else {
-            return unixFile
+            unixFile
         }
     }
 }
 
-fun prepareJavaProcess(javaExecutable:Path, workingDirectory:Path, classpath:Collection<Path>,
-                       mainClass:String, javaOptions:Collection<String>, args:Collection<String>):ProcessBuilder {
+fun prepareJavaProcess(javaExecutable: Path, workingDirectory: Path, classpath: Collection<Path>,
+                       mainClass: String, javaOptions: Collection<String>, args: Collection<String>): ProcessBuilder {
     val command = mutableListOf<String>()
     command.add(javaExecutable.absolutePath)
     command.add("-cp")

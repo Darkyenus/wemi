@@ -54,11 +54,11 @@ class ProjectDelegate internal constructor(
 }
 
 class KeyDelegate<Value> internal constructor(
-        private val description:String,
-        private val hasDefaultValue:Boolean,
-        private val defaultValue:Value?,
-        private val cached:Boolean,
-        private val prettyPrinter:((Value) -> CharSequence)?) : ReadOnlyProperty<Any?, Key<Value>> {
+        private val description: String,
+        private val hasDefaultValue: Boolean,
+        private val defaultValue: Value?,
+        private val cached: Boolean,
+        private val prettyPrinter: ((Value) -> CharSequence)?) : ReadOnlyProperty<Any?, Key<Value>> {
 
     private lateinit var key: Key<Value>
 

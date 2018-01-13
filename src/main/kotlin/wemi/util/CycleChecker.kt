@@ -10,9 +10,9 @@ import kotlin.collections.ArrayList
  */
 internal class CycleChecker<in Token> {
 
-    private val tokens:MutableMap<Thread, MutableList<Token>> = Collections.synchronizedMap(HashMap())
+    private val tokens: MutableMap<Thread, MutableList<Token>> = Collections.synchronizedMap(HashMap())
 
-    internal fun enter(token:Token):Boolean {
+    internal fun enter(token: Token): Boolean {
         val thread = Thread.currentThread()
         val tokens = tokens.getOrPut(thread) { ArrayList() }
         if (tokens.contains(token)) {
@@ -31,7 +31,7 @@ internal class CycleChecker<in Token> {
         }
     }
 
-    internal inline fun <Result> block(token: Token, failure:() -> Result, action:()->Result):Result {
+    internal inline fun <Result> block(token: Token, failure: () -> Result, action: () -> Result): Result {
         return if (enter(token)) {
             try {
                 action()

@@ -61,19 +61,19 @@ fun URL.toPath(): Path? {
 @Suppress("NOTHING_TO_INLINE")
 operator inline fun Path.div(path: String): Path = this.resolve(path)
 
-inline val Path.isDirectory:Boolean
-        get() = Files.isDirectory(this)
+inline val Path.isDirectory: Boolean
+    get() = Files.isDirectory(this)
 
-inline val Path.isHidden:Boolean
+inline val Path.isHidden: Boolean
     get() = Files.isHidden(this)
 
 @Suppress("NOTHING_TO_INLINE")
-inline fun Path.exists():Boolean = Files.exists(this)
+inline fun Path.exists(): Boolean = Files.exists(this)
 
-inline val Path.name:String
+inline val Path.name: String
     get() = this.fileName?.toString() ?: ""
 
-inline val Path.nameWithoutExtension:String
+inline val Path.nameWithoutExtension: String
     get() {
         val name = this.name
         val lastDot = name.lastIndexOf('.')
@@ -84,22 +84,31 @@ inline val Path.nameWithoutExtension:String
         }
     }
 
-inline val Path.absolutePath:String
+inline val Path.absolutePath: String
     get() = this.toAbsolutePath().toString()
 
-inline var Path.lastModified:FileTime
+inline var Path.lastModified: FileTime
     get() = Files.getLastModifiedTime(this)
-    set(value) { Files.setLastModifiedTime(this, value) }
+    set(value) {
+        Files.setLastModifiedTime(this, value)
+    }
 
-inline val Path.size:Long
+inline val Path.size: Long
     get() = Files.size(this)
+
+inline fun Path.forEachLine(action: (String) -> Unit) {
+    for (line in Files.lines(this, Charsets.UTF_8)) {
+        action(line)
+    }
+}
 
 /**
  * Path's POSIX executable flag status.
  * Path is considered executable when at least one of Owner:Group:Others has executable bit set.
  * When setting executable, all three bits are set/cleared.
  */
-var Path.executable:Boolean
+@Suppress("unused")
+var Path.executable: Boolean
     get() {
         val permissions = Files.getPosixFilePermissions(this)
         return permissions.contains(PosixFilePermission.OTHERS_EXECUTE)
@@ -120,30 +129,24 @@ var Path.executable:Boolean
         Files.setPosixFilePermissions(this, permissions)
     }
 
-inline fun Path.forEachLine(action: (String) -> Unit) {
-    for (line in Files.lines(this, Charsets.UTF_8)) {
-        action(line)
-    }
-}
-
-fun Path.writeText(text:CharSequence) {
+fun Path.writeText(text: CharSequence) {
     OutputStreamWriter(Files.newOutputStream(this)).use {
         it.append(text)
     }
 }
 
-fun Path.writeBytes(bytes:ByteArray, offset:Int = 0, length:Int = bytes.size) {
+fun Path.writeBytes(bytes: ByteArray, offset: Int = 0, length: Int = bytes.size) {
     Files.newOutputStream(this).use {
         it.write(bytes, offset, length)
     }
 }
 
 @Suppress("NOTHING_TO_INLINE")
-inline fun Path.readBytes():ByteArray {
+inline fun Path.readBytes(): ByteArray {
     return Files.readAllBytes(this)
 }
 
-inline fun Path.forChildren(action:(Path) -> Unit) {
+inline fun Path.forChildren(action: (Path) -> Unit) {
     Files.newDirectoryStream(this).use { stream ->
         for (path in stream) {
             action(path)

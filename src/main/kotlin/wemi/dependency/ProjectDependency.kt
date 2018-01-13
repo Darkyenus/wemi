@@ -13,8 +13,8 @@ import wemi.boot.MachineWritable
  *
  * @see dependency
  */
-class ProjectDependency internal constructor(val project: Project, val configurations:Array<out Configuration>)
-    :MachineWritable {
+class ProjectDependency internal constructor(val project: Project, val configurations: Array<out Configuration>)
+    : MachineWritable {
 
     override fun writeMachine(json: Json) {
         json.writeObjectStart()
@@ -41,6 +41,6 @@ class ProjectDependency internal constructor(val project: Project, val configura
 /**
  * Create a ProjectDependency for depending on this [Project], optionally with given configurations on top.
  */
-fun Project.dependency(vararg configurations:Configuration):ProjectDependency {
+fun Project.dependency(vararg configurations: Configuration): ProjectDependency {
     return ProjectDependency(this, configurations)
 }

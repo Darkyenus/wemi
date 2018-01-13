@@ -52,11 +52,12 @@ fun fromHexString(data: CharSequence): ByteArray? {
     }
 }
 
-fun Path.hash(algorithm:String = "MD5"):ByteArray {
+fun Path.hash(algorithm: String = "MD5"): ByteArray {
     val md = MessageDigest.getInstance(algorithm)
     DigestInputStream(Files.newInputStream(this), md).use {
         val buf = ByteArray(1024)
-        while (it.read(buf) != -1) {}
+        while (it.read(buf) != -1) {
+        }
         it.close()
     }
     return md.digest()

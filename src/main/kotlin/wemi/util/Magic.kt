@@ -31,8 +31,8 @@ internal val WemiLauncherFile: Path = __ResourceHook.javaClass.getResource("Magi
 
 private val WemiLauncherFileWithJarExtensionCache = mutableMapOf<Path, Path>()
 
-internal fun wemiLauncherFileWithJarExtension(cacheFolder:Path):Path {
-    return WemiLauncherFileWithJarExtensionCache.getOrPut(cacheFolder) lazy@{
+internal fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
+    return WemiLauncherFileWithJarExtensionCache.getOrPut(cacheFolder) lazy@ {
         val wemiLauncherFile = WemiLauncherFile
         if (wemiLauncherFile.name.endsWith(".jar", ignoreCase = true) || wemiLauncherFile.isDirectory) {
             LOG.debug("WemiLauncherFileWithJar is unchanged {}", wemiLauncherFile)
@@ -67,14 +67,14 @@ internal fun wemiLauncherFileWithJarExtension(cacheFolder:Path):Path {
             val result = Files.createSymbolicLink(linked, wemiLauncherFile)
             LOG.debug("WemiLauncherFileWithJar is just linked {}", result)
             return@lazy result
-        } catch (e:Exception) {
+        } catch (e: Exception) {
             LOG.warn("Failed to link {} to {}, copying", wemiLauncherFile, linked, e)
 
             try {
                 Files.copy(wemiLauncherFile, linked)
                 LOG.debug("WemiLauncherFileWithJar is just copied {}", linked)
                 return@lazy linked
-            } catch (e:Exception) {
+            } catch (e: Exception) {
                 LOG.warn("Failed to copy {} to {}, returning non-jar file", wemiLauncherFile, linked, e)
                 return@lazy wemiLauncherFile
             }
@@ -82,4 +82,4 @@ internal fun wemiLauncherFileWithJarExtension(cacheFolder:Path):Path {
     }
 }
 
-internal val WemiDefaultClassLoader : ClassLoader = __ResourceHook::class.java.classLoader
+internal val WemiDefaultClassLoader: ClassLoader = __ResourceHook::class.java.classLoader

@@ -14,7 +14,7 @@ object JavaCompilerFlags {
     val targetVersion = CompilerFlag<JavaVersion>("targetVersion", "Version of the created class files")
 }
 
-enum class JavaVersion(val version:String) : MachineWritable {
+enum class JavaVersion(val version: String) : MachineWritable {
     V1_5("1.5"),
     V1_6("1.6"),
     V1_7("1.7"),

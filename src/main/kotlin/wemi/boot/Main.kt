@@ -47,7 +47,7 @@ const val EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND = 56
 internal var WemiRunningInInteractiveMode = false
     private set
 
-internal var WemiBuildScript:BuildScript? = null
+internal var WemiBuildScript: BuildScript? = null
     private set
 
 /**
@@ -248,7 +248,7 @@ fun main(args: Array<String>) {
             } while (formattedErrors.hasNext())
         }
 
-        var lastTaskResult:CLI.KeyEvaluationResult? = null
+        var lastTaskResult: CLI.KeyEvaluationResult? = null
         for (task in tasks) {
             lastTaskResult = CLI.evaluateKeyAndPrint(task)
         }

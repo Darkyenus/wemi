@@ -22,7 +22,7 @@ sealed class Repository(val name: String) : MachineWritable {
      * @param dependency to resolve
      * @param chain of repositories which may be queried for looking up dependencies
      */
-    abstract fun resolveInRepository(dependency: Dependency, chain:RepositoryChain):ResolvedDependency
+    abstract fun resolveInRepository(dependency: Dependency, chain: RepositoryChain): ResolvedDependency
 
     /** Maven preferredRepository. */
     class M2(name: String, val url: URL, override val cache: M2? = null, val checksum: Checksum = M2.Checksum.SHA1) : Repository(name) {

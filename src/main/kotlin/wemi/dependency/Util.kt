@@ -9,7 +9,7 @@ import wemi.util.printTree
  */
 @Suppress("unused") // Used
 @JvmName("prettyPrintFromDependency")
-fun Map<DependencyId, ResolvedDependency>.prettyPrint(roots:Collection<Dependency>):CharSequence {
+fun Map<DependencyId, ResolvedDependency>.prettyPrint(roots: Collection<Dependency>): CharSequence {
     return prettyPrint(roots.map { it.dependencyId })
 }
 
@@ -17,7 +17,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(roots:Collection<Dependenc
  * Returns a pretty-printed string in which the system is displayed as a tree of dependencies.
  * Uses full range of unicode characters for clarity.
  */
-fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots:Collection<DependencyId>?):CharSequence {
+fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<DependencyId>?): CharSequence {
     /*
     ╤ org.foo:proj:1.0 ✅
     │ ╘ com.bar:pr:2.0 ❌⛔️
@@ -30,10 +30,11 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots:Collection<D
     Missing ❓
     Already shown ⤴
      */
-    val StatusNormal:Byte = 0
-    val StatusNotResolved:Byte = 1
-    val StatusCyclic:Byte = 2
-    class NodeData(val dependencyId: DependencyId, var status:Byte)
+    val StatusNormal: Byte = 0
+    val StatusNotResolved: Byte = 1
+    val StatusCyclic: Byte = 2
+
+    class NodeData(val dependencyId: DependencyId, var status: Byte)
 
     val nodes = HashMap<DependencyId, TreeNode<NodeData>>()
 
@@ -56,7 +57,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots:Collection<D
 
     val remainingNodes = HashMap(nodes)
 
-    fun liftNode(dependencyId: DependencyId):TreeNode<NodeData> {
+    fun liftNode(dependencyId: DependencyId): TreeNode<NodeData> {
         // Lift what was asked
         val liftedNode = remainingNodes.remove(dependencyId) ?: return TreeNode(NodeData(dependencyId, StatusCyclic))
         val resultNode = TreeNode(liftedNode.value)

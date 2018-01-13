@@ -12,7 +12,7 @@ import java.nio.charset.CodingErrorAction
  * Stream utilities
  */
 
-fun readFully(into: OutputStream, stream: InputStream, buffer:ByteArray = ByteArray(1024)):Int {
+fun readFully(into: OutputStream, stream: InputStream, buffer: ByteArray = ByteArray(1024)): Int {
     var read = 0
     while (true) {
         val available = stream.available()
@@ -29,7 +29,7 @@ fun readFully(into: OutputStream, stream: InputStream, buffer:ByteArray = ByteAr
     return read
 }
 
-open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private val onLineRead:(CharSequence) -> Unit) : OutputStream() {
+open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private val onLineRead: (CharSequence) -> Unit) : OutputStream() {
 
     private val decoder: CharsetDecoder = charset.newDecoder()
             .onMalformedInput(CodingErrorAction.REPLACE)
@@ -49,7 +49,7 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
         outputSB.setLength(0)
     }
 
-    private fun decode(endOfInput:Boolean) {
+    private fun decode(endOfInput: Boolean) {
         inputBuffer.flip()
         while (true) {
             val result = decoder.decode(inputBuffer, outputBuffer, endOfInput)

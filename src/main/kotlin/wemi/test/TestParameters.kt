@@ -14,7 +14,7 @@ class TestParameters : JsonSerializable {
     /**
      * The configuration parameters to be used.
      */
-    val configuration:MutableMap<String, String> = HashMap()
+    val configuration: MutableMap<String, String> = HashMap()
 
     /**
      * Whether or not shown stack-traces should be filtered.
@@ -70,7 +70,7 @@ class TestParameters : JsonSerializable {
          */
         val classpathRoots = mutableListOf<String>()
 
-        fun isEmpty():Boolean {
+        fun isEmpty(): Boolean {
             return uris.isEmpty()
                     && files.isEmpty()
                     && directories.isEmpty()
@@ -121,7 +121,6 @@ class TestParameters : JsonSerializable {
             return "(engines=$engines, classNamePatterns=$classNamePatterns, packages=$packages, tags=$tags)"
         }
     }
-
 
 
     override fun write(json: Json) {
@@ -188,30 +187,31 @@ class TestParameters : JsonSerializable {
         return "TestParameters(configuration=$configuration, select=$select, filter=$filter)"
     }
 
+    @Suppress("unused")
     /**
      * Mutable collection coupling included and excluded patterns.
      */
     class IncludeExcludeList : JsonSerializable {
-        val included:MutableList<String> = ArrayList()
-        val excluded:MutableList<String> = ArrayList()
+        val included: MutableList<String> = ArrayList()
+        val excluded: MutableList<String> = ArrayList()
 
-        fun include(item:String) {
+        fun include(item: String) {
             included.add(item)
         }
 
-        fun include(vararg items:String) {
+        fun include(vararg items: String) {
             included.addAll(items)
         }
 
-        fun exclude(item:String) {
+        fun exclude(item: String) {
             excluded.add(item)
         }
 
-        fun exclude(vararg items:String) {
+        fun exclude(vararg items: String) {
             excluded.addAll(items)
         }
 
-        fun isEmpty():Boolean = included.isEmpty() && excluded.isEmpty()
+        fun isEmpty(): Boolean = included.isEmpty() && excluded.isEmpty()
 
         override fun write(json: Json) {
             if (included.isNotEmpty()) {

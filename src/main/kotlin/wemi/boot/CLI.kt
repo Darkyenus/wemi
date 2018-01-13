@@ -60,7 +60,7 @@ object CLI {
             field = value
         }
 
-    internal fun findDefaultProject(root: Path):Project? {
+    internal fun findDefaultProject(root: Path): Project? {
         val allProjects = AllProjects
         when {
             allProjects.isEmpty() -> return null
@@ -101,7 +101,7 @@ object CLI {
         }
 
         val out = Terminal.writer()
-        System.setOut(PrintStream(object : LineReadingOutputStream(onLineRead = {line -> out.append(line)}){
+        System.setOut(PrintStream(object : LineReadingOutputStream(onLineRead = { line -> out.append(line) }) {
             override fun flush() {
                 super.flush()
                 out.flush()
@@ -150,7 +150,7 @@ object CLI {
         println(format(text, foreground = Color.Red))
     }
 
-    private fun printWarning(text: CharSequence, input:String, possibilities:Collection<String>) {
+    private fun printWarning(text: CharSequence, input: String, possibilities: Collection<String>) {
         println(format(text, foreground = Color.Red))
 
         val matchResult = MatchUtils.match(possibilities.toTypedArray(), { it.toLowerCase() }, input.toLowerCase())
@@ -173,7 +173,7 @@ object CLI {
     /**
      * Evaluates the key and prints human readable, formatted output.
      */
-    fun evaluateKeyAndPrint(task: Task):KeyEvaluationResult {
+    fun evaluateKeyAndPrint(task: Task): KeyEvaluationResult {
         // TODO Ideally, this would get rewritten with Done message if nothing was written between them
         print(formatLabel("→ "))
         println(formatInput(task.key))
@@ -188,16 +188,16 @@ object CLI {
                 print(formatLabel("Done "))
                 print(formatInput(task.key))
                 @Suppress("UNCHECKED_CAST")
-                val prettyPrinter:((Any?) -> CharSequence)? = key?.prettyPrinter as ((Any?) -> CharSequence)?
+                val prettyPrinter: ((Any?) -> CharSequence)? = key?.prettyPrinter as ((Any?) -> CharSequence)?
 
                 var prettyPrinted = false
                 if (prettyPrinter != null) {
                     val printed: CharSequence? =
-                        try {
-                            prettyPrinter(data)
-                        } catch (e:Exception) {
-                            null
-                        }
+                            try {
+                                prettyPrinter(data)
+                            } catch (e: Exception) {
+                                null
+                            }
 
                     if (printed != null) {
                         println(formatLabel(": "))
@@ -214,8 +214,8 @@ object CLI {
                             print(data.size)
                             println(formatLabel("): "))
 
-                            for (item:Any? in data) {
-                                println("  "+ formatValue(PrettyPrinter.toString(item)))
+                            for (item: Any? in data) {
+                                println("  " + formatValue(PrettyPrinter.toString(item)))
                             }
                         }
                         else -> {
@@ -286,7 +286,7 @@ object CLI {
         Exception
     }
 
-    data class KeyEvaluationResult(val key:Key<*>?, val data:Any?, val status: KeyEvaluationStatus)
+    data class KeyEvaluationResult(val key: Key<*>?, val data: Any?, val status: KeyEvaluationStatus)
 
     /**
      * Evaluates given command. Syntax is:
@@ -307,7 +307,7 @@ object CLI {
                 return KeyEvaluationResult(null, task.project, KeyEvaluationStatus.NoProject)
             }
         } else if (project == null) {
-            return KeyEvaluationResult(null,null, KeyEvaluationStatus.NoProject)
+            return KeyEvaluationResult(null, null, KeyEvaluationStatus.NoProject)
         }
 
         // Parse Configurations
@@ -414,7 +414,7 @@ object CLI {
     /**
      * Evaluate command from the REPL
      */
-    private fun evaluateCommand(command:String) {
+    private fun evaluateCommand(command: String) {
         if (command.isBlank()) {
             return
         }
@@ -466,7 +466,7 @@ object CLI {
                 break
             } catch (_: IOException) {
                 break
-            } catch (e:Exception) {
+            } catch (e: Exception) {
                 LOG.error("Error in interactive loop", e)
             }
         }
@@ -499,7 +499,7 @@ object CLI {
     internal val ICON_SEE_ABOVE = CLI.format("↑", CLI.Color.Magenta)//⤴ seems to be clipped in some contexts
     internal val ICON_ABORTED = CLI.format("■", CLI.Color.Yellow)
 
-    private fun printLabeled(label:String, items:Map<String, WithDescriptiveString>) {
+    private fun printLabeled(label: String, items: Map<String, WithDescriptiveString>) {
         println(formatLabel("${items.size} $label${if (items.isEmpty()) "" else "s"}:"))
         for (value in items.values) {
             print("   ")
@@ -509,7 +509,7 @@ object CLI {
 
     private val histories = HashMap<String, SimpleHistory>()
 
-    private fun getHistoryFile(name:String):Path? {
+    private fun getHistoryFile(name: String): Path? {
         val buildScript = WemiBuildScript ?: return null
         val historiesFolder = buildScript.buildFolder.resolve("cache/history/")
         Files.createDirectories(historiesFolder)
@@ -525,7 +525,7 @@ object CLI {
         return historiesFolder.resolve(fileName.toString())
     }
 
-    internal fun getHistory(name:String):SimpleHistory {
+    internal fun getHistory(name: String): SimpleHistory {
         return histories.getOrPut(name) {
             SimpleHistory(getHistoryFile(name))
         }
@@ -534,7 +534,7 @@ object CLI {
     /**
      * Retrieves the history, but only if it exists, either in cache or in filesystem.
      */
-    internal fun getExistingHistory(name:String):SimpleHistory? {
+    internal fun getExistingHistory(name: String): SimpleHistory? {
         val existing = histories[name]
         if (existing != null) {
             return existing
@@ -563,7 +563,7 @@ object CLI {
 
     private val HISTORY_LOG = LoggerFactory.getLogger(SimpleHistory::class.java)
 
-    internal class SimpleHistory(private val path:Path?) : History {
+    internal class SimpleHistory(private val path: Path?) : History {
 
         private val DEFAULT_HISTORY_SIZE = 50
 
@@ -585,7 +585,7 @@ object CLI {
             }
             val lines = try {
                 Files.readAllLines(path, Charsets.UTF_8)
-            } catch (e:Exception) {
+            } catch (e: Exception) {
                 HISTORY_LOG.warn("Failed to load from path {}", path, e)
                 return
             }
@@ -611,7 +611,7 @@ object CLI {
                         }
                     }
                 }
-            } catch (e:Exception) {
+            } catch (e: Exception) {
                 HISTORY_LOG.warn("Failed to write to path {}", path, e)
                 return
             }
@@ -678,7 +678,7 @@ object CLI {
 
                 override fun previousIndex(): Int = iterator.previousIndex()
 
-                private fun map(index:Int, line:String):History.Entry {
+                private fun map(index: Int, line: String): History.Entry {
                     return object : History.Entry {
                         override fun index(): Int = index
 

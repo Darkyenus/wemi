@@ -289,7 +289,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
                     configuration.addKotlinSourceRoot(file.absolutePath)
                 }
                 else -> {
-                    messageCollector.report(WARNING, "Unrecognized source file, ignoring: "+file.absolutePath)
+                    messageCollector.report(WARNING, "Unrecognized source file, ignoring: " + file.absolutePath)
                 }
             }
         }
@@ -351,7 +351,7 @@ internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
                     // the file type registry before it is too late. By masquerading as a plugin, we get to
                     // execute arbitrary code when the FileTypeRegistry global is properly initialized,
                     // so we can register our type.
-                    configuration.add(ComponentRegistrar.PLUGIN_COMPONENT_REGISTRARS, object:ComponentRegistrar {
+                    configuration.add(ComponentRegistrar.PLUGIN_COMPONENT_REGISTRARS, object : ComponentRegistrar {
                         override fun registerProjectComponents(project: MockProject, configuration: CompilerConfiguration) {
                             val registry = FileTypeRegistry.getInstance() as CoreFileTypeRegistry
                             // This registers the KotlinFileType multiple times, but the official code does that as well

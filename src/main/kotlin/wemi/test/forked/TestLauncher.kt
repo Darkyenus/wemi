@@ -27,7 +27,10 @@ import org.junit.platform.launcher.TestIdentifier
 import org.junit.platform.launcher.TestPlan
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder
 import org.junit.platform.launcher.core.LauncherFactory
-import wemi.test.*
+import wemi.test.TestData
+import wemi.test.TestParameters
+import wemi.test.TestReport
+import wemi.test.TestStatus
 import wemi.util.appendWithStackTrace
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -110,7 +113,7 @@ fun main(args: Array<String>) {
         jsonWriter.flush()
 
         exitCode = 0
-    } catch (e:Throwable) {
+    } catch (e: Throwable) {
         System.err.println("Exception while running tests")
         e.printStackTrace(System.err)
 
@@ -123,7 +126,7 @@ fun main(args: Array<String>) {
     System.exit(exitCode)
 }
 
-private class ReportBuildingListener(val filterStackTraces:Boolean) : TestExecutionListener {
+private class ReportBuildingListener(val filterStackTraces: Boolean) : TestExecutionListener {
 
     private val testReport = LinkedHashMap<TestIdentifier, TestData>()
     private val startTimes = HashMap<TestIdentifier, Long>()
@@ -149,8 +152,8 @@ private class ReportBuildingListener(val filterStackTraces:Boolean) : TestExecut
         startTimes[testIdentifier] = System.currentTimeMillis()
     }
 
-    private fun createStackTraceMapper(source: TestSource):((Array<StackTraceElement>) -> List<StackTraceElement>)? {
-        val className:String = when (source) {
+    private fun createStackTraceMapper(source: TestSource): ((Array<StackTraceElement>) -> List<StackTraceElement>)? {
+        val className: String = when (source) {
             is MethodSource -> source.className ?: return null
             is ClassSource -> source.className ?: return null
             else -> return null
@@ -206,7 +209,7 @@ private class ReportBuildingListener(val filterStackTraces:Boolean) : TestExecut
         }
     }
 
-    fun testReport():TestReport {
+    fun testReport(): TestReport {
         val result = TestReport()
         testReport.forEach { k, v ->
             result.put(k.toWemi(), v)
@@ -214,20 +217,20 @@ private class ReportBuildingListener(val filterStackTraces:Boolean) : TestExecut
         return result
     }
 
-    private fun TestIdentifier.toWemi():wemi.test.TestIdentifier {
+    private fun TestIdentifier.toWemi(): wemi.test.TestIdentifier {
         return wemi.test.TestIdentifier(
                 uniqueId, parentId.orElse(null), displayName,
                 isTest, isContainer, tags.map { it.name }.toSet(), source.orElse(null)?.toString())
     }
 }
 
-private inline fun <T, F> MutableCollection<T>.addMapped(from:Collection<F>, mapper:(F)->T) {
+private inline fun <T, F> MutableCollection<T>.addMapped(from: Collection<F>, mapper: (F) -> T) {
     for (f in from) {
         this.add(mapper(f))
     }
 }
 
-private inline fun <C> C.ifNotEmpty(action:(C)->Unit) where C : Collection<*> {
+private inline fun <C> C.ifNotEmpty(action: (C) -> Unit) where C : Collection<*> {
     if (this.isNotEmpty()) {
         action(this)
     }

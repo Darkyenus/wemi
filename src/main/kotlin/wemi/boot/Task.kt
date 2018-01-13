@@ -1,5 +1,7 @@
 package wemi.boot
 
+import wemi.boot.Task.Companion.FLAG_MACHINE_READABLE_COMMAND
+import wemi.boot.Task.Companion.FLAG_MACHINE_READABLE_OPTIONAL
 import wemi.boot.TaskParser.CONFIGURATION_SEPARATOR
 import wemi.boot.TaskParser.INPUT_SEPARATOR
 import wemi.boot.TaskParser.PROJECT_SEPARATOR
@@ -34,13 +36,13 @@ class Task(
          *  @see FLAG_MACHINE_READABLE_COMMAND
          *  @see FLAG_MACHINE_READABLE_OPTIONAL
          */
-        internal val flags:Int = 0) {
+        internal val flags: Int = 0) {
 
-    internal val isMachineReadableCommand:Boolean
+    internal val isMachineReadableCommand: Boolean
         get() = couldBeCommand
                 && (flags and FLAG_MACHINE_READABLE_COMMAND) == FLAG_MACHINE_READABLE_COMMAND
 
-    internal val couldBeCommand:Boolean
+    internal val couldBeCommand: Boolean
         get() = project == null
                 && configurations.isEmpty()
 

@@ -1,6 +1,9 @@
 package wemi.boot
 
-import com.esotericsoftware.jsonbeans.*
+import com.esotericsoftware.jsonbeans.Json
+import com.esotericsoftware.jsonbeans.JsonException
+import com.esotericsoftware.jsonbeans.JsonSerializable
+import com.esotericsoftware.jsonbeans.JsonSerializer
 import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.util.absolutePath
@@ -18,7 +21,7 @@ import kotlin.system.exitProcess
 
 private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
 
-fun machineReadableEvaluateAndPrint(out: PrintStream, task:Task) {
+fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
     if (task.isMachineReadableCommand) {
         when (task.key) {
             "version" -> {
@@ -144,9 +147,9 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task:Task) {
     }
 }
 
-private val MACHINE_READABLE_JSON_WRITING = object: Json(){
+private val MACHINE_READABLE_JSON_WRITING = object : Json() {
 
-    fun isSimpleType(type:Class<*>):Boolean {
+    fun isSimpleType(type: Class<*>): Boolean {
         return type.isPrimitive || type == String::class.java || type == Int::class.java || type == Boolean::class.java
                 || type == Float::class.java || type == Long::class.java || type == Double::class.java
                 || type == Short::class.java || type == Byte::class.java || type == Char::class.java
@@ -236,7 +239,7 @@ private val MACHINE_READABLE_JSON_WRITING = object: Json(){
     this.setEnumNames(true)
 }
 
-private fun machineReadablePrint(out: PrintStream, thing:Any?) {
+private fun machineReadablePrint(out: PrintStream, thing: Any?) {
     val writer = OutputStreamWriter(out)
     val json = MACHINE_READABLE_JSON_WRITING
     json.setWriter(writer)

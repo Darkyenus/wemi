@@ -49,7 +49,7 @@ private fun prepareBuildFileCacheFolder(buildFolder: Path): Path? {
     } else if (!folder.exists()) {
         try {
             Files.createDirectories(folder)
-        } catch (e:IOException) {
+        } catch (e: IOException) {
             LOG.error("Could not create build directory {}", folder, e)
             return null
         }
@@ -58,7 +58,7 @@ private fun prepareBuildFileCacheFolder(buildFolder: Path): Path? {
     return folder
 }
 
-fun getCompiledBuildScript(rootFolder:Path, buildFolder: Path, buildScriptSources:List<Path>, forceCompile: Boolean): BuildScript? {
+fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScript? {
     val cacheFolder = prepareBuildFileCacheFolder(buildFolder) ?: return null
     val combinedBuildFileName = buildScriptSources.joinToString("-") { it.nameWithoutExtension }
 
@@ -88,7 +88,7 @@ fun getCompiledBuildScript(rootFolder:Path, buildFolder: Path, buildScriptSource
         recompileReason = "Updated launcher"
         LOG.debug("Rebuilding build scripts: Launcher updated ({})", WemiLauncherFile)
         true
-    } else recompile@{
+    } else recompile@ {
         // All seems good, try to load the result classpath
         classpathFile.forEachLine { line ->
             if (line.isNotBlank()) {
@@ -153,7 +153,7 @@ fun getCompiledBuildScript(rootFolder:Path, buildFolder: Path, buildScriptSource
             classpathConfiguration, sources, buildFlags)
 }
 
-private fun transformFileNameToKotlinClassName(fileNameWithoutExtension:String):String {
+private fun transformFileNameToKotlinClassName(fileNameWithoutExtension: String): String {
     val sb = StringBuilder()
     // If file name starts with digit, _ is prepended
     if (fileNameWithoutExtension.isNotEmpty() && fileNameWithoutExtension[0] in '0'..'9') {
@@ -182,10 +182,10 @@ private val M2RepositoryDirectiveRegex = "(\\S+)\\s+at\\s+(\\S+:\\S+)".toRegex()
 
 private val LibraryDirectiveRegex = "(\\S+)\\s*:\\s*(\\S+)\\s*:\\s*(\\S+)".toRegex()
 
-class BuildScriptClasspathConfiguration(private val buildScriptSources:List<Path>) {
-    private var _repositories : List<Repository>? = null
-    private var _repositoryChain : RepositoryChain? = null
-    private var _dependencies : List<Dependency>? = null
+class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Path>) {
+    private var _repositories: List<Repository>? = null
+    private var _repositoryChain: RepositoryChain? = null
+    private var _dependencies: List<Dependency>? = null
 
     private fun resolve() {
         val repositories = mutableListOf<Repository>()
@@ -231,7 +231,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources:List<Path
         _dependencies = buildDependencyLibraries
     }
 
-    val repositories : List<Repository>
+    val repositories: List<Repository>
         get() {
             if (_repositories == null) {
                 resolve()
@@ -239,7 +239,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources:List<Path
             return _repositories!!
         }
 
-    val repositoryChain : RepositoryChain
+    val repositoryChain: RepositoryChain
         get() {
             if (_repositoryChain == null) {
                 resolve()
@@ -247,7 +247,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources:List<Path
             return _repositoryChain!!
         }
 
-    val dependencies : List<Dependency>
+    val dependencies: List<Dependency>
         get() {
             if (_dependencies == null) {
                 resolve()
@@ -264,9 +264,9 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources:List<Path
  * @property classpath used to compile and to run the scriptJar
  * @property initClasses main classes of the [scriptJar]
  */
-data class BuildScript(val wemiRoot:Path,
-                       val scriptJar:Path,
-                       val buildFolder:Path, val cacheFolder:Path,
-                       val classpath:List<Path>, val initClasses:List<String>,
+data class BuildScript(val wemiRoot: Path,
+                       val scriptJar: Path,
+                       val buildFolder: Path, val cacheFolder: Path,
+                       val classpath: List<Path>, val initClasses: List<String>,
                        val buildScriptClasspathConfiguration: BuildScriptClasspathConfiguration,
-                       val sources:List<LocatedFile>, val buildFlags: CompilerFlags)
+                       val sources: List<LocatedFile>, val buildFlags: CompilerFlags)

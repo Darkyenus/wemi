@@ -12,11 +12,11 @@ import wemi.boot.TaskParser.TokenType.*
  */
 internal object TaskCompleter : Completer {
 
-    private val candidates:List<Candidate> by lazy {
+    private val candidates: List<Candidate> by lazy {
         val candidates = ArrayList<Candidate>()
 
         for (name in BuildScriptData.AllProjects.keys) {
-            val item = name+TaskParser.PROJECT_SEPARATOR
+            val item = name + TaskParser.PROJECT_SEPARATOR
             candidates.add(Candidate(
                     item,
                     item,
@@ -28,7 +28,7 @@ internal object TaskCompleter : Completer {
         }
 
         for (config in BuildScriptData.AllConfigurations.values) {
-            val item = config.name+TaskParser.CONFIGURATION_SEPARATOR
+            val item = config.name + TaskParser.CONFIGURATION_SEPARATOR
             candidates.add(Candidate(
                     item,
                     item,

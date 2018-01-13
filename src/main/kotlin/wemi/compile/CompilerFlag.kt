@@ -11,7 +11,7 @@ import wemi.boot.MachineWritable
  * @see CompilerFlags
  */
 @Suppress("unused")//Type is technically unused, but helps when compile-time type-checking
-class CompilerFlag<Type>(val name:String, val description:String) : MachineWritable {
+class CompilerFlag<Type>(val name: String, val description: String) : MachineWritable {
     override fun writeMachine(json: Json) {
         json.writeValue(name as Any, String::class.java)
     }
@@ -30,12 +30,12 @@ class CompilerFlags : MachineWritable {
     private val used = HashSet<CompilerFlag<*>>()
 
     /** Set the value associated with given flag */
-    operator fun <T>set(flag:CompilerFlag<T>, value:T) {
+    operator fun <T> set(flag: CompilerFlag<T>, value: T) {
         map[flag] = value
     }
 
     /** Get the value associated with given flag */
-    operator fun <T>get(flag: CompilerFlag<T>):T? {
+    operator fun <T> get(flag: CompilerFlag<T>): T? {
         @Suppress("UNCHECKED_CAST")
         return map[flag] as T?
     }
@@ -43,14 +43,14 @@ class CompilerFlags : MachineWritable {
 
     /** Used by the compiler to get the value associated with given flag and mark it as used for [forEachUnused].
      * @param default value used if the flag is not set */
-    fun <T>useDefault(flag: CompilerFlag<T>, default:T):T {
+    fun <T> useDefault(flag: CompilerFlag<T>, default: T): T {
         used.add(flag)
         @Suppress("UNCHECKED_CAST")
         return map.getOrDefault(flag, default) as T
     }
 
     /** Used by the compiler to get the value associated with given flag and mark it as used for [forEachUnused]. */
-    fun <T>useOrNull(flag: CompilerFlag<T>):T? {
+    fun <T> useOrNull(flag: CompilerFlag<T>): T? {
         used.add(flag)
         @Suppress("UNCHECKED_CAST")
         return map.getOrDefault(flag, null) as T?
@@ -58,7 +58,7 @@ class CompilerFlags : MachineWritable {
 
     /** Used by the compiler to get the value associated with given flag and mark it as used for [forEachUnused].
      * @param action called if flag is set */
-    fun <T>use(flag: CompilerFlag<T>, action:(T)->Unit) {
+    fun <T> use(flag: CompilerFlag<T>, action: (T) -> Unit) {
         used.add(flag)
         if (map.containsKey(flag)) {
             @Suppress("UNCHECKED_CAST")
@@ -67,7 +67,7 @@ class CompilerFlags : MachineWritable {
     }
 
     /** Iterate through all set but unused keys (used flag is set when querying with [use] method). */
-    private fun forEachUnused(action:(CompilerFlag<*>) -> Unit) {
+    private fun forEachUnused(action: (CompilerFlag<*>) -> Unit) {
         for ((key, _) in map) {
             if (!used.contains(key)) {
                 action(key)
@@ -75,7 +75,7 @@ class CompilerFlags : MachineWritable {
         }
     }
 
-    fun warnAboutUnusedFlags(compilerName:String) {
+    fun warnAboutUnusedFlags(compilerName: String) {
         val sb = StringBuilder()
         forEachUnused {
             if (sb.isNotEmpty()) {

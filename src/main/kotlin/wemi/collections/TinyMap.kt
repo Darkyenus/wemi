@@ -6,7 +6,7 @@ package wemi.collections
 @Suppress("unused")
 open class TinyMap<K, V> {
 
-    private var size2:Int = 0
+    private var size2: Int = 0
 
     /**
      * Amount of keys in the map
@@ -17,9 +17,9 @@ open class TinyMap<K, V> {
     /**
      * Keys and values, sequentially
      */
-    private var keysValues:Array<Any?> = EMPTY_ARRAY
+    private var keysValues: Array<Any?> = EMPTY_ARRAY
 
-    private fun indexOf(key:K):Int {
+    private fun indexOf(key: K): Int {
         var i = 0
         val size2 = size2
         val keysValues = this.keysValues
@@ -32,7 +32,7 @@ open class TinyMap<K, V> {
         return -1
     }
 
-    private fun ensureCapacity(extra:Int):Array<Any?> {
+    private fun ensureCapacity(extra: Int): Array<Any?> {
         val size2 = size2
         val needed = size2 + (extra shl 1)
         val oldKeysValues = keysValues
@@ -149,7 +149,7 @@ open class TinyMap<K, V> {
         return oldValue as V?
     }
 
-    protected fun forEachEntry(action:((K,V) -> Unit)) {
+    protected fun forEachEntry(action: ((K, V) -> Unit)) {
         var i = 0
         val size2 = size2
         val keysValues = this.keysValues
@@ -178,7 +178,7 @@ open class TinyMap<K, V> {
         val keysValues = this.keysValues
         while (i < size2) {
             val myKey = keysValues[i]
-            val myValue = keysValues[i+1]
+            val myValue = keysValues[i + 1]
 
             if (other[myKey] != myValue) {
                 return false
@@ -197,7 +197,7 @@ open class TinyMap<K, V> {
         val keysValues = this.keysValues
         while (i < size2) {
             val myKeyHash = keysValues[i]?.hashCode() ?: 0
-            val myValueHash = keysValues[i+1]?.hashCode() ?: 0
+            val myValueHash = keysValues[i + 1]?.hashCode() ?: 0
             result += myKeyHash * 31 + myValueHash
             i += 2
         }
@@ -206,14 +206,14 @@ open class TinyMap<K, V> {
     }
 
     override fun toString(): String {
-        val sb = StringBuilder(8 + size2 * 12 )
+        val sb = StringBuilder(8 + size2 * 12)
         sb.append('{')
         var i = 0
         val size2 = size2
         val keysValues = this.keysValues
         while (i < size2) {
             val myKey = keysValues[i]
-            val myValue = keysValues[i+1]
+            val myValue = keysValues[i + 1]
 
             if (i != 0) {
                 sb.append(", ")
@@ -226,8 +226,8 @@ open class TinyMap<K, V> {
         return sb.toString()
     }
 
-    fun filteredToString(predicate:(K,V) -> Boolean): String {
-        val sb = StringBuilder(8 + size2 * 12 )
+    fun filteredToString(predicate: (K, V) -> Boolean): String {
+        val sb = StringBuilder(8 + size2 * 12)
         sb.append('{')
         var i = 0
         val size2 = size2
@@ -235,7 +235,7 @@ open class TinyMap<K, V> {
         var first = true
         while (i < size2) {
             val myKey = keysValues[i]
-            val myValue = keysValues[i+1]
+            val myValue = keysValues[i + 1]
 
             @Suppress("UNCHECKED_CAST")
             if (predicate(myKey as K, myValue as V)) {

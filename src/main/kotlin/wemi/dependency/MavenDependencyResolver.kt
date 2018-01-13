@@ -29,7 +29,7 @@ internal object MavenDependencyResolver {
     private val PomKey = ArtifactKey<Pom>("pom", false)
     private val PomUrlKey = ArtifactKey<URL>("pomUrl", true)
 
-    fun resolveInM2Repository(dependency: Dependency, repository: Repository.M2, chain:RepositoryChain): ResolvedDependency {
+    fun resolveInM2Repository(dependency: Dependency, repository: Repository.M2, chain: RepositoryChain): ResolvedDependency {
         val (dependencyId, exclusions) = dependency
 
         // Just retrieving raw pom file
@@ -40,7 +40,7 @@ internal object MavenDependencyResolver {
         val resolvedPom = retrievePom(dependencyId, repository, chain)
         val pom = resolvedPom.getKey(PomKey) ?:
                 return ResolvedDependency(dependencyId, emptyList(), repository, true,
-                        "Failed to resolve pom: "+resolvedPom.log)
+                        "Failed to resolve pom: " + resolvedPom.log)
 
         if (resolvedPom.hasError) {
             LOG.warn("Retrieved pom for {} from {}, but resolution claims error ({}). Something may go wrong.", dependencyId, repository, resolvedPom.log)
@@ -95,13 +95,13 @@ internal object MavenDependencyResolver {
             var artifactId: String? = null,
             var version: String? = null,
             var packaging: String = "jar",
-            val properties:MutableMap<String, String> = HashMap()
+            val properties: MutableMap<String, String> = HashMap()
     ) {
 
         val dependencies = ArrayList<Dependency>()
 
-        private fun String.translate():String {
-            if (!startsWith("\${", ignoreCase = false) || !endsWith('}', ignoreCase = false)){
+        private fun String.translate(): String {
+            if (!startsWith("\${", ignoreCase = false) || !endsWith('}', ignoreCase = false)) {
                 return this
             }
 
@@ -427,7 +427,7 @@ internal object MavenDependencyResolver {
         private val elementStack = ArrayList<String>()
         private val elementCharacters = StringBuilder()
 
-        private fun atElement(path: Array<String>, ignoreLast:Int = 0): Boolean {
+        private fun atElement(path: Array<String>, ignoreLast: Int = 0): Boolean {
             if (elementStack.size - ignoreLast != path.size) {
                 return false
             }

@@ -9,7 +9,7 @@ import java.util.*
 /**
  *
  */
-fun <V> Map<String, V>.findCaseInsensitive(key:String):V? {
+fun <V> Map<String, V>.findCaseInsensitive(key: String): V? {
     synchronized(this) {
         return getOrElse(key) {
             for ((k, v) in this) {
@@ -22,7 +22,7 @@ fun <V> Map<String, V>.findCaseInsensitive(key:String):V? {
     }
 }
 
-fun formatTimeDuration(ms:Long):CharSequence {
+fun formatTimeDuration(ms: Long): CharSequence {
     val Second = 1000
     val Minute = Second * 60
     val Hour = Minute * 60
@@ -68,7 +68,7 @@ fun formatTimeDuration(ms:Long):CharSequence {
     return result
 }
 
-fun Path.nameHasExtension(extensions:Collection<String>):Boolean {
+fun Path.nameHasExtension(extensions: Collection<String>): Boolean {
     val name = this.name
     val length = name.length
     for (extension in extensions) {
@@ -81,7 +81,7 @@ fun Path.nameHasExtension(extensions:Collection<String>):Boolean {
     return false
 }
 
-fun Path.nameHasExtension(extension:String):Boolean {
+fun Path.nameHasExtension(extension: String): Boolean {
     val name = this.name
     val length = name.length
     if (length >= extension.length + 1
@@ -95,7 +95,7 @@ fun Path.nameHasExtension(extension:String):Boolean {
 typealias Index = Int
 typealias CodePoint = Int
 
-inline fun String.forCodePointsIndexed(action:(Index, CodePoint) -> Unit) {
+inline fun String.forCodePointsIndexed(action: (Index, CodePoint) -> Unit) {
     val length = this.length
     var i = 0
 
@@ -115,13 +115,13 @@ inline fun String.forCodePointsIndexed(action:(Index, CodePoint) -> Unit) {
     }
 }
 
-inline fun String.forCodePoints(action:(CodePoint) -> Unit) {
+inline fun String.forCodePoints(action: (CodePoint) -> Unit) {
     forCodePointsIndexed { _, cp ->
         action(cp)
     }
 }
 
-fun Int.isCodePointSafeInFileName():Boolean = when {
+fun Int.isCodePointSafeInFileName(): Boolean = when {
     !Character.isValidCodePoint(this) -> false
     this < ' '.toInt() -> false
     this == '/'.toInt() || this == '\\'.toInt() -> false
@@ -130,7 +130,7 @@ fun Int.isCodePointSafeInFileName():Boolean = when {
     else -> true
 }
 
-fun String.toSafeFileName(replacement:Char = '_'):String {
+fun String.toSafeFileName(replacement: Char = '_'): String {
     val sb = StringBuilder(length)
     var anyReplacements = false
 
@@ -153,7 +153,7 @@ fun String.toSafeFileName(replacement:Char = '_'):String {
 /**
  * @return true if the string is a valid identifier, using Java identifier rules
  */
-fun String.isValidIdentifier():Boolean {
+fun String.isValidIdentifier(): Boolean {
     if (isEmpty()) {
         return false
     }
@@ -169,102 +169,106 @@ fun String.isValidIdentifier():Boolean {
 }
 
 @Suppress("UNCHECKED_CAST")
-fun <T> arrayFilledWith(size:Int, with:T): Array<T> {
-    val memoArray:Array<T> = java.lang.reflect.Array.newInstance((with as Any)::class.java, size) as Array<T>
+fun <T> arrayFilledWith(size: Int, with: T): Array<T> {
+    val memoArray: Array<T> = java.lang.reflect.Array.newInstance((with as Any)::class.java, size) as Array<T>
     Arrays.fill(memoArray, with)
     return memoArray
 }
 
 typealias Mark = Int
 
-class Tokens<T, Memo>(val data:List<T>, private val limit:Int = data.size, defaultMemo:Memo? = null) {
+class Tokens<T, Memo>(val data: List<T>, private val limit: Int = data.size, defaultMemo: Memo? = null) {
 
     @Suppress("UNCHECKED_CAST")
-    val memos:Array<Memo>? = if (defaultMemo == null) { null } else { arrayFilledWith(data.size, defaultMemo) }
+    val memos: Array<Memo>? = if (defaultMemo == null) {
+        null
+    } else {
+        arrayFilledWith(data.size, defaultMemo)
+    }
 
     private var next = 0
-    private var lazyErrors:ArrayList<Pair<Int, String>>? = null
+    private var lazyErrors: ArrayList<Pair<Int, String>>? = null
 
-    val errors:List<Pair<Int, String>>
+    val errors: List<Pair<Int, String>>
         get() = lazyErrors ?: emptyList()
 
-    fun formattedErrors(colored:Boolean):Iterator<String> = object : Iterator<String> {
-            val parent = errors.iterator()
+    fun formattedErrors(colored: Boolean): Iterator<String> = object : Iterator<String> {
+        val parent = errors.iterator()
 
-            override fun hasNext(): Boolean {
-                return parent.hasNext()
-            }
-
-            override fun next(): String {
-                val (word, message) = parent.next()
-
-                val sb = StringBuilder()
-                if (word - 3 in data.indices) {
-                    sb.append("... ")
-                }
-                if (word - 2 in data.indices) {
-                    sb.append(data[word-2]).append(' ')
-                }
-                if (word - 1 in data.indices) {
-                    sb.append(data[word-1]).append(' ')
-                }
-                if (word in data.indices) {
-                    sb.append('>')
-                    if (colored) {
-                        sb.append(CLI.format(data[word].toString(), format = CLI.Format.Underline))
-                    } else {
-                        sb.append(data[word])
-                    }
-                    sb.append('<')
-
-                    sb.append(' ')
-                }
-                if (word + 1 in data.indices) {
-                    sb.append(data[word + 1]).append(' ')
-                }
-                if (word + 2 in data.indices) {
-                    sb.append(data[word + 2]).append(' ')
-                }
-                if (word + 3 in data.indices) {
-                    sb.append("... ")
-                }
-
-                if (sb.isEmpty()) {
-                    sb.append("(At word ").append(word).append('/').append(data.size).append(")")
-                } else {
-                    // Strip leading space
-                    sb.setLength(sb.length-1)
-                }
-                sb.append('\n').append('⤷').append(' ')
-                if (colored) {
-                    sb.append(CLI.format(message, CLI.Color.Red))
-                } else {
-                    sb.append(message)
-                }
-
-                return sb.toString()
-            }
+        override fun hasNext(): Boolean {
+            return parent.hasNext()
         }
 
-    fun mark():Mark = next
+        override fun next(): String {
+            val (word, message) = parent.next()
+
+            val sb = StringBuilder()
+            if (word - 3 in data.indices) {
+                sb.append("... ")
+            }
+            if (word - 2 in data.indices) {
+                sb.append(data[word - 2]).append(' ')
+            }
+            if (word - 1 in data.indices) {
+                sb.append(data[word - 1]).append(' ')
+            }
+            if (word in data.indices) {
+                sb.append('>')
+                if (colored) {
+                    sb.append(CLI.format(data[word].toString(), format = CLI.Format.Underline))
+                } else {
+                    sb.append(data[word])
+                }
+                sb.append('<')
+
+                sb.append(' ')
+            }
+            if (word + 1 in data.indices) {
+                sb.append(data[word + 1]).append(' ')
+            }
+            if (word + 2 in data.indices) {
+                sb.append(data[word + 2]).append(' ')
+            }
+            if (word + 3 in data.indices) {
+                sb.append("... ")
+            }
+
+            if (sb.isEmpty()) {
+                sb.append("(At word ").append(word).append('/').append(data.size).append(")")
+            } else {
+                // Strip leading space
+                sb.setLength(sb.length - 1)
+            }
+            sb.append('\n').append('⤷').append(' ')
+            if (colored) {
+                sb.append(CLI.format(message, CLI.Color.Red))
+            } else {
+                sb.append(message)
+            }
+
+            return sb.toString()
+        }
+    }
+
+    fun mark(): Mark = next
 
     fun Mark.rollback() {
         next = this
     }
 
-    fun Mark.errorAndRollback(error:String) {
+    fun Mark.errorAndRollback(error: String) {
         error(error)
         next = this
     }
 
-    fun error(message:String) {
+    fun error(message: String) {
         if (lazyErrors == null) {
             lazyErrors = ArrayList()
         }
         lazyErrors!!.add(next to message)
     }
 
-    fun hasNext(memo: Memo? = null):Boolean {
+    fun hasNext(memo: Memo? = null): Boolean {
         if (next < data.size && memos != null && memo != null) {
             memos[next] = memo
         }
@@ -272,7 +276,7 @@ class Tokens<T, Memo>(val data:List<T>, private val limit:Int = data.size, defau
         return next < limit
     }
 
-    fun next(memo: Memo? = null):T? {
+    fun next(memo: Memo? = null): T? {
         if (next < data.size && memos != null && memo != null) {
             memos[next] = memo
         }
@@ -284,11 +288,11 @@ class Tokens<T, Memo>(val data:List<T>, private val limit:Int = data.size, defau
         }
     }
 
-    fun peek(skip:Int = 0):T? {
+    fun peek(skip: Int = 0): T? {
         return data.getOrNull(next + skip)
     }
 
-    fun match(memo: Memo? = null, matcher:(T)->Boolean):Boolean {
+    fun match(memo: Memo? = null, matcher: (T) -> Boolean): Boolean {
         return if (next < limit && matcher(data[next])) {
             if (memos != null && memo != null) {
                 memos[next] = memo
@@ -300,12 +304,12 @@ class Tokens<T, Memo>(val data:List<T>, private val limit:Int = data.size, defau
         }
     }
 
-    fun matches(skip:Int = 0, matcher:(T)->Boolean):Boolean {
+    fun matches(skip: Int = 0, matcher: (T) -> Boolean): Boolean {
         val index = next + skip
         return index in (0 until limit) && matcher(data[index])
     }
 
-    fun match(value:T, memo: Memo? = null):Boolean {
+    fun match(value: T, memo: Memo? = null): Boolean {
         return if (next < limit && value == data[next]) {
             if (memos != null && memo != null) {
                 memos[next] = memo
@@ -317,19 +321,19 @@ class Tokens<T, Memo>(val data:List<T>, private val limit:Int = data.size, defau
         }
     }
 
-    fun matches(skip:Int = 0, value:T):Boolean {
+    fun matches(skip: Int = 0, value: T): Boolean {
         val index = next + skip
         return index in (0 until limit) && value == data[index]
     }
 }
 
-fun JsonValue?.putArrayStrings(into:MutableCollection<String>) {
+fun JsonValue?.putArrayStrings(into: MutableCollection<String>) {
     this?.forEach {
         into.add(it.asString())
     }
 }
 
-fun Json.writeStringArray(from:Collection<String>, name:String, skipEmpty:Boolean = false) {
+fun Json.writeStringArray(from: Collection<String>, name: String, skipEmpty: Boolean = false) {
     if (from.isNotEmpty() || !skipEmpty) {
         writeArrayStart(name)
         for (s in from) {
@@ -339,8 +343,8 @@ fun Json.writeStringArray(from:Collection<String>, name:String, skipEmpty:Boolea
     }
 }
 
-fun <T>printTree(roots:Collection<TreeNode<T>>, result:StringBuilder = StringBuilder(),
-                 print:T.(StringBuilder) -> Unit):CharSequence {
+fun <T> printTree(roots: Collection<TreeNode<T>>, result: StringBuilder = StringBuilder(),
+                  print: T.(StringBuilder) -> Unit): CharSequence {
     if (roots.isEmpty()) {
         return ""
     }
@@ -355,7 +359,7 @@ fun <T>printTree(roots:Collection<TreeNode<T>>, result:StringBuilder = StringBui
             var i = result.length - 1
             while (i >= prePrintLength) {
                 if (result[i] == '\n') {
-                    result.insert(i+1, prefix)
+                    result.insert(i + 1, prefix)
                 }
                 i--
             }
@@ -410,13 +414,13 @@ fun <T>printTree(roots:Collection<TreeNode<T>>, result:StringBuilder = StringBui
     return result
 }
 
-open class TreeNode<T>(val value: T):ArrayList<TreeNode<T>>() {
+open class TreeNode<T>(val value: T) : ArrayList<TreeNode<T>>() {
 
-    fun find(value: T):TreeNode<T>? {
-        return this.find {it.value == value}
+    fun find(value: T): TreeNode<T>? {
+        return this.find { it.value == value }
     }
 
-    operator fun get(value: T):TreeNode<T> {
+    operator fun get(value: T): TreeNode<T> {
         return find(value) ?: (TreeNode(value).also { add(it) })
     }
 }

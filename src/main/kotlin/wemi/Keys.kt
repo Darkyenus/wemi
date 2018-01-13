@@ -43,7 +43,7 @@ object Keys {
     val repositories by key<Collection<Repository>>("Repositories to be used when resolving dependencies")
     val repositoryChain by key<RepositoryChain>("ADVANCED - Resolved repository chain from 'repositories'")
     val libraryDependencies by key<Collection<Dependency>>("Libraries that the project depends on")
-    val libraryDependencyProjectMapper by key<(Dependency) -> Dependency>("Function applied to ProjectDependencies encountered while resolving. Used for example when retrieving sources.", defaultValue = {it})
+    val libraryDependencyProjectMapper by key<(Dependency) -> Dependency>("Function applied to ProjectDependencies encountered while resolving. Used for example when retrieving sources.", defaultValue = { it })
     val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved ->
         resolved.value.prettyPrint(null)
     }, cached = true)

@@ -22,12 +22,12 @@ object BuildScriptIntrospection {
     private var currentlyInitializedBuildScript: BuildScript? = null
         set(value) {
             if (value != null) {
-                _buildFileProjects.getOrPut(value){ mutableListOf() }
+                _buildFileProjects.getOrPut(value) { mutableListOf() }
             }
             field = value
         }
 
-    internal inline fun <T>initializingBuildScript(buildScript: BuildScript, action:()->T):T =
+    internal inline fun <T> initializingBuildScript(buildScript: BuildScript, action: () -> T): T =
             synchronized(CURRENTLY_INITIALIZED_BUILD_SCRIPT_LOCK) {
                 currentlyInitializedBuildScript = buildScript
                 val result = action()

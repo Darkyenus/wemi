@@ -80,7 +80,7 @@ internal val JUnitPlatformLauncher = DependencyId(
  * In particular, this sends the process [testParameters], logs its output and receives and returns
  * created [TestReport].
  */
-internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: TestParameters):TestReport? {
+internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: TestParameters): TestReport? {
     builder.redirectErrorStream(false)
     builder.redirectError(ProcessBuilder.Redirect.PIPE)
     builder.redirectOutput(ProcessBuilder.Redirect.PIPE)
@@ -143,20 +143,20 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
         LOG.debug("Test process returned report: {}", report)
 
         report
-    } catch (e:Exception) {
+    } catch (e: Exception) {
         LOG.error("Malformed test report output:\n{}", stdoutString, e)
         null
     }
 }
 
-fun TestReport.prettyPrint():CharSequence {
+fun TestReport.prettyPrint(): CharSequence {
     val keys = keys.toMutableList()
     keys.sortBy { it.id }
 
     val roots = ArrayList<TreeNode<TestIdentifier>>()
     val stack = ArrayDeque<TreeNode<TestIdentifier>>()
 
-    fun popUntilChild(identifier: TestIdentifier):TreeNode<TestIdentifier>? {
+    fun popUntilChild(identifier: TestIdentifier): TreeNode<TestIdentifier>? {
         if (stack.isEmpty()) {
             return null
         }
@@ -202,7 +202,7 @@ fun TestReport.prettyPrint():CharSequence {
         val data = this@prettyPrint[this]!!
 
         // Name (+ test/container)
-        var name:CharSequence = displayName
+        var name: CharSequence = displayName
         if (name.isBlank()) {
             name = id
         }
@@ -303,17 +303,17 @@ fun TestReport.prettyPrint():CharSequence {
 
     result.append('\n')
     result.append(String.format("           - Summary -           \n"
-                    + "[%7d containers found       ]\n"
-                    + "[%7d containers skipped     ]\n"
-                    + "[%7d containers aborted     ]\n"
-                    + "[%7d containers successful  ]\n"
-                    + "[%7d containers failed      ]\n"
+            + "[%7d containers found       ]\n"
+            + "[%7d containers skipped     ]\n"
+            + "[%7d containers aborted     ]\n"
+            + "[%7d containers successful  ]\n"
+            + "[%7d containers failed      ]\n"
 
-                    + "[%7d tests found            ]\n"
-                    + "[%7d tests skipped          ]\n"
-                    + "[%7d tests aborted          ]\n"
-                    + "[%7d tests successful       ]\n"
-                    + "[%7d tests failed           ]\n",
+            + "[%7d tests found            ]\n"
+            + "[%7d tests skipped          ]\n"
+            + "[%7d tests aborted          ]\n"
+            + "[%7d tests successful       ]\n"
+            + "[%7d tests failed           ]\n",
             containersFound,
             containersSkipped,
             containersAborted,

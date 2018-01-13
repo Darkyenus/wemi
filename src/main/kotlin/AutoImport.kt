@@ -11,7 +11,7 @@ import wemi.dependency.dependency as _dependency
 import wemi.test.JUnitAPI as _JUnitAPI
 import wemi.test.JUnitEngine as _JUnitEngine
 
-/**
+/*
  * Types and values that should be visible in build scripts without any explicit imports
  */
 
