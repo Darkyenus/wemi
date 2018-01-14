@@ -248,7 +248,7 @@ fun main(args: Array<String>) {
             } while (formattedErrors.hasNext())
         }
 
-        var lastTaskResult: CLI.KeyEvaluationResult? = null
+        var lastTaskResult: TaskEvaluationResult? = null
         for (task in tasks) {
             lastTaskResult = CLI.evaluateKeyAndPrint(task)
         }
@@ -256,7 +256,7 @@ fun main(args: Array<String>) {
         if (interactive) {
             CLI.beginInteractive()
         } else if (lastTaskResult != null) {
-            if (lastTaskResult.status == CLI.KeyEvaluationStatus.Success) {
+            if (lastTaskResult.status == TaskEvaluationStatus.Success) {
                 val data = lastTaskResult.data
                 if (data is WithExitCode) {
                     exitCode = data.processExitCode()

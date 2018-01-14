@@ -19,6 +19,9 @@ val JavaHome: Path = Paths.get(
                 ?: throw WemiException("java.home property is not set, can't find java executable")
 ).toAbsolutePath()
 
+/**
+ * Retrieve path to the java executable (starter of JVM), assuming that [javaHome] is the path to a valid JAVA_HOME.
+ */
 fun javaExecutable(javaHome: Path): Path {
     val windowsFile = (javaHome / "bin/java.exe").toAbsolutePath()
     val unixFile = (javaHome / "bin/java").toAbsolutePath()
@@ -44,6 +47,16 @@ fun javaExecutable(javaHome: Path): Path {
     }
 }
 
+/**
+ * Prepare [ProcessBuilder] for java JVM launch.
+ *
+ * @param javaExecutable to be used
+ * @param workingDirectory in which the process should run
+ * @param classpath of the new JVM
+ * @param mainClass to launch
+ * @param javaOptions additional raw options for JVM
+ * @param args for the launched program
+ */
 fun prepareJavaProcess(javaExecutable: Path, workingDirectory: Path, classpath: Collection<Path>,
                        mainClass: String, javaOptions: Collection<String>, args: Collection<String>): ProcessBuilder {
     val command = mutableListOf<String>()
@@ -54,7 +67,7 @@ fun prepareJavaProcess(javaExecutable: Path, workingDirectory: Path, classpath: 
     command.add(mainClass)
     command.addAll(args)
 
-    LOG.debug("Starting command {} in {}", command, workingDirectory)
+    LOG.debug("Prepared command {} in {}", command, workingDirectory)
     return ProcessBuilder(command)
             .directory(workingDirectory.toFile())
             .inheritIO()

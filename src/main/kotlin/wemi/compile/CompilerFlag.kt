@@ -25,6 +25,11 @@ class CompilerFlag<Type>(val name: String, val description: String) : MachineWri
 
 private val LOG = LoggerFactory.getLogger("CompilerFlag")
 
+/**
+ * Mutable container that holds bindings of [CompilerFlag] to their values.
+ *
+ * It also tracks which flags were already used, for later examination and diagnostics.
+ */
 class CompilerFlags : MachineWritable {
     private val map = HashMap<CompilerFlag<*>, Any?>()
     private val used = HashSet<CompilerFlag<*>>()
@@ -75,7 +80,12 @@ class CompilerFlags : MachineWritable {
         }
     }
 
-    fun warnAboutUnusedFlags(compilerName: String) {
+    /**
+     * Log a warning for all unused flags, if any.
+     *
+     * This can be useful when debugging if all flags are effective or not.
+     */
+    internal fun warnAboutUnusedFlags(compilerName: String) {
         val sb = StringBuilder()
         forEachUnused {
             if (sb.isNotEmpty()) {
@@ -106,6 +116,9 @@ class CompilerFlags : MachineWritable {
         return sb.toString()
     }
 
+    /**
+     * Written out as a [Map].
+     */
     override fun writeMachine(json: Json) {
         json.writeValue(map)
     }

@@ -70,6 +70,6 @@ object Configurations {
     val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { KotlinSourceFileExtensions }
-        Keys.kotlinCompiler set { kotlinCompiler(WemiKotlinVersion) }
+        Keys.kotlinCompiler set { WemiKotlinVersion.compilerInstance() }
     }
 }

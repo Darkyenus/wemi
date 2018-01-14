@@ -126,6 +126,9 @@ fun main(args: Array<String>) {
     System.exit(exitCode)
 }
 
+/**
+ * JUnit Platform [TestExecutionListener] for collecting test execution data for Wemi.
+ */
 private class ReportBuildingListener(val filterStackTraces: Boolean) : TestExecutionListener {
 
     private val testReport = LinkedHashMap<TestIdentifier, TestData>()

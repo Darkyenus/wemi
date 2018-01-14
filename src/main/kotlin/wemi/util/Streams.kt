@@ -9,9 +9,11 @@ import java.nio.charset.CharsetDecoder
 import java.nio.charset.CodingErrorAction
 
 /**
- * Stream utilities
+ * Read every available byte from [stream] and write it to [into].
+ * Use [buffer] for it.
+ *
+ * Works only on streams that support [InputStream.available].
  */
-
 fun readFully(into: OutputStream, stream: InputStream, buffer: ByteArray = ByteArray(1024)): Int {
     var read = 0
     while (true) {
@@ -29,6 +31,12 @@ fun readFully(into: OutputStream, stream: InputStream, buffer: ByteArray = ByteA
     return read
 }
 
+/**
+ * OutputStream that buffers bytes until they can be converted to text using given charset and until the
+ * text forms a valid line, ended with '\n'. Then it takes the line and calls [onLineRead] with it, without the line end.
+ *
+ * [close] to obtain the last line without ending '\n'.
+ */
 open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private val onLineRead: (CharSequence) -> Unit) : OutputStream() {
 
     private val decoder: CharsetDecoder = charset.newDecoder()

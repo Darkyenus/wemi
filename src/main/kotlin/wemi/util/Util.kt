@@ -7,7 +7,10 @@ import java.nio.file.Path
 import java.util.*
 
 /**
+ * Find the value:[V] that corresponds to the [key].
+ * If [key] directly is not in the map, search the map once again, but ignore case.
  *
+ * @return null if key not found
  */
 fun <V> Map<String, V>.findCaseInsensitive(key: String): V? {
     synchronized(this) {
@@ -22,6 +25,11 @@ fun <V> Map<String, V>.findCaseInsensitive(key: String): V? {
     }
 }
 
+/**
+ * Format given [ms] duration as a human readable duration string.
+ *
+ * Example output: "1 day 5 minutes 33 seconds 0 ms"
+ */
 fun formatTimeDuration(ms: Long): CharSequence {
     val Second = 1000
     val Minute = Second * 60
@@ -68,10 +76,22 @@ fun formatTimeDuration(ms: Long): CharSequence {
     return result
 }
 
+/**
+ * Represents index into the [CharSequence].
+ */
 typealias Index = Int
+/**
+ * Represents unicode code point.
+ */
 typealias CodePoint = Int
 
-inline fun String.forCodePointsIndexed(action: (Index, CodePoint) -> Unit) {
+/**
+ * Call [action] for each [CodePoint] in the char sequence.
+ * Treats incomplete codepoints as complete.
+ *
+ * @param action function that takes index at which the codepoint starts and the codepoint itself
+ */
+inline fun CharSequence.forCodePointsIndexed(action: (Index, CodePoint) -> Unit) {
     val length = this.length
     var i = 0
 
@@ -91,13 +111,22 @@ inline fun String.forCodePointsIndexed(action: (Index, CodePoint) -> Unit) {
     }
 }
 
-inline fun String.forCodePoints(action: (CodePoint) -> Unit) {
+/**
+ * @see [forCodePointsIndexed] but ignores the index
+ */
+inline fun CharSequence.forCodePoints(action: (CodePoint) -> Unit) {
     forCodePointsIndexed { _, cp ->
         action(cp)
     }
 }
 
-fun Int.isCodePointSafeInFileName(): Boolean = when {
+/**
+ * @return true if this [CodePoint] is regarded as safe to appear inside a file name,
+ * for no particular, general file system.
+ *
+ * Some rejected characters are technically valid, but confusing, for example quotes or pipe.
+ */
+fun CodePoint.isCodePointSafeInFileName(): Boolean = when {
     !Character.isValidCodePoint(this) -> false
     this < ' '.toInt() -> false
     this == '/'.toInt() || this == '\\'.toInt() -> false
@@ -106,7 +135,13 @@ fun Int.isCodePointSafeInFileName(): Boolean = when {
     else -> true
 }
 
-fun String.toSafeFileName(replacement: Char = '_'): String {
+/**
+ * Replaces all [CodePoint]s in this [CharSequence] that are not safe to appear in a file name,
+ * to [replacement].
+ *
+ * @see isCodePointSafeInFileName
+ */
+fun CharSequence.toSafeFileName(replacement: Char = '_'): CharSequence {
     val sb = StringBuilder(length)
     var anyReplacements = false
 
@@ -120,7 +155,7 @@ fun String.toSafeFileName(replacement: Char = '_'): String {
     }
 
     return if (anyReplacements) {
-        sb.toString()
+        sb
     } else {
         this
     }
@@ -144,6 +179,9 @@ fun String.isValidIdentifier(): Boolean {
     return true
 }
 
+/**
+ * Return a new array of type Array<[T]> that contains [size] elements that are [with].
+ */
 @Suppress("UNCHECKED_CAST")
 fun <T> arrayFilledWith(size: Int, with: T): Array<T> {
     val memoArray: Array<T> = java.lang.reflect.Array.newInstance((with as Any)::class.java, size) as Array<T>
@@ -319,6 +357,13 @@ fun Json.writeStringArray(from: Collection<String>, name: String, skipEmpty: Boo
     }
 }
 
+/**
+ * Print pretty, human readable ASCII tree, that starts at given [roots].
+ *
+ * Result is stored in [result] and nodes are printed through [print].
+ *
+ * [print] may even print multiple lines of text.
+ */
 fun <T> printTree(roots: Collection<TreeNode<T>>, result: StringBuilder = StringBuilder(),
                   print: T.(StringBuilder) -> Unit): CharSequence {
     if (roots.isEmpty()) {
@@ -390,6 +435,11 @@ fun <T> printTree(roots: Collection<TreeNode<T>>, result: StringBuilder = String
     return result
 }
 
+/**
+ * Tree node for [printTree].
+ *
+ * @param value of this node
+ */
 open class TreeNode<T>(val value: T) : ArrayList<TreeNode<T>>() {
 
     fun find(value: T): TreeNode<T>? {

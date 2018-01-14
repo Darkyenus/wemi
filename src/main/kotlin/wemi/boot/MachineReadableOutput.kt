@@ -15,12 +15,14 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
 
-/**
- *
- */
-
 private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
 
+/**
+ * Evaluates given task, possibly as a "machine-readable" command,
+ * and prints the resulting JSON into [out].
+ *
+ * May exit process if the task evaluation fails.
+ */
 fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
     if (task.isMachineReadableCommand) {
         when (task.key) {
@@ -95,12 +97,12 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
     }
 
     try {
-        val (_, data, status) = CLI.evaluateKey(task)
+        val (_, data, status) = task.evaluate(null)
         when (status) {
-            CLI.KeyEvaluationStatus.Success -> {
+            TaskEvaluationStatus.Success -> {
                 machineReadablePrint(out, data)
             }
-            CLI.KeyEvaluationStatus.NoProject -> {
+            TaskEvaluationStatus.NoProject -> {
                 val projectString = data as String?
                 if (projectString != null) {
                     LOG.error("Can't evaluate {} - no project named {} found", task, projectString)
@@ -109,17 +111,17 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
                 }
                 exitProcess(EXIT_CODE_MACHINE_OUTPUT_NO_PROJECT_ERROR)
             }
-            CLI.KeyEvaluationStatus.NoConfiguration -> {
+            TaskEvaluationStatus.NoConfiguration -> {
                 val configString = data as String
                 LOG.error("Can't evaluate {} - no configuration named {} found", task, configString)
                 exitProcess(EXIT_CODE_MACHINE_OUTPUT_NO_CONFIGURATION_ERROR)
             }
-            CLI.KeyEvaluationStatus.NoKey -> {
+            TaskEvaluationStatus.NoKey -> {
                 val keyString = data as String
                 LOG.error("Can't evaluate {} - no key named {} found", task, keyString)
                 exitProcess(EXIT_CODE_MACHINE_OUTPUT_NO_KEY_ERROR)
             }
-            CLI.KeyEvaluationStatus.NotAssigned -> {
+            TaskEvaluationStatus.NotAssigned -> {
                 if ((task.flags and Task.FLAG_MACHINE_READABLE_OPTIONAL) != 0) {
                     machineReadablePrint(out, null)
                 } else {
@@ -128,7 +130,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
                     exitProcess(EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR)
                 }
             }
-            CLI.KeyEvaluationStatus.Exception -> {
+            TaskEvaluationStatus.Exception -> {
                 val we = data as WemiException
 
                 val message = we.message
@@ -249,6 +251,19 @@ private fun machineReadablePrint(out: PrintStream, thing: Any?) {
     writer.flush()
 }
 
+/**
+ * Marks this object as "machine-writable" which means that it has a custom JSON representation when it is being used
+ * as an output of [machineReadableEvaluateAndPrint].
+ *
+ * Similar to [JsonSerializable].
+ */
 interface MachineWritable {
+
+    /**
+     * Write the object out to the [json], so that all relevant information may be easily read back.
+     *
+     * Json object start is not written like in [JsonSerializable],
+     * so either print as a nameless value, or create a new object/array.
+     */
     fun writeMachine(json: Json)
 }

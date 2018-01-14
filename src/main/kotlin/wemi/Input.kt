@@ -6,6 +6,7 @@ import org.jline.reader.UserInterruptException
 import org.slf4j.LoggerFactory
 import wemi.boot.CLI
 import wemi.util.Failable
+import wemi.util.SimpleHistory
 
 private val LOG = LoggerFactory.getLogger("Input")
 
@@ -50,7 +51,7 @@ internal class InputBase(private val interactive: Boolean) : Input() {
 }
 
 private fun getHistory(key: String): History {
-    return CLI.getHistory("input.$key")
+    return SimpleHistory.getHistory("input.$key")
 }
 
 /**

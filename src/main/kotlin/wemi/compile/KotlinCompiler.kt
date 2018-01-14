@@ -1,14 +1,19 @@
 package wemi.compile
 
+import com.esotericsoftware.jsonbeans.Json
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
+import wemi.boot.MachineWritable
 import wemi.dependency.*
 import wemi.util.ForceClassLoader
 import wemi.util.LocatedFile
 import wemi.util.WemiDefaultClassLoader
 import java.nio.file.Path
 
+/**
+ * Interface implemented by a Kotlin compiler bridge.
+ */
 interface KotlinCompiler {
     /**
      * @param sources kotlin files to be compiled
@@ -23,6 +28,11 @@ interface KotlinCompiler {
                 logger: Logger = LoggerFactory.getLogger("KotlinCompiler"),
                 loggerMarker: Marker? = null): CompileExitStatus
 
+    /**
+     * Exit status of a [KotlinCompiler].
+     *
+     * Closely mapped to a real Kotlin compiler exit statuses.
+     */
     enum class CompileExitStatus {
         OK,
         CANCELLED,
@@ -31,43 +41,67 @@ interface KotlinCompiler {
     }
 }
 
-enum class KotlinCompilerVersion(val string: String, internal val implementationClassName: String) {
-    Version1_1_4("1.1.4", "wemi.compile.impl.KotlinCompilerImpl1_1_4");
+/**
+ * Supported Kotlin compiler versions.
+ */
+@Suppress("EnumEntryName")
+enum class KotlinCompilerVersion (
+        /** Version name. (X.Y.Z) */
+        val string: String,
+        /** Class that implements [KotlinCompiler] for given version. */
+        private val implementationClassName: String,
+        /** Dependencies needed to load [implementationClassName]. */
+        private val compilerDependency:Collection<Dependency>) : MachineWritable {
+
+    Version1_1_4(
+            "1.1.4",
+            "wemi.compile.impl.KotlinCompilerImpl1_1_4",
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4")))
+    );
+
+    private var compilerCache:KotlinCompiler? = null
+
+    /**
+     * Retrieve the compiler instance for this version.
+     *
+     * First invocation will need to resolve some dependencies, which may take a while.
+     */
+    fun compilerInstance():KotlinCompiler {
+        synchronized(this) {
+            var kotlinCompiler = compilerCache
+            if (kotlinCompiler == null) {
+                val repositoryChain = createRepositoryChain(DefaultRepositories)
+                val artifacts = DependencyResolver.resolveArtifacts(compilerDependency, repositoryChain)
+                        ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
+
+                val implementationClassName = implementationClassName
+                val loader = ForceClassLoader(artifacts.map { file -> file.toUri().toURL() }.toTypedArray(),
+                        WemiDefaultClassLoader, implementationClassName)
+                val clazz = Class.forName(implementationClassName, true, loader)
+
+                kotlinCompiler = clazz.newInstance() as KotlinCompiler
+
+                compilerCache = kotlinCompiler
+            }
+            return kotlinCompiler
+        }
+    }
+
+    override fun writeMachine(json: Json) {
+        json.writeValue(string as Any, String::class.java)
+    }
 
     override fun toString(): String = string
 }
 
-private val KotlinCompilerImplementationDependenciesByVersion: Map<KotlinCompilerVersion, Collection<Dependency>> = mapOf(
-        KotlinCompilerVersion.Version1_1_4 to listOf(
-                Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4"))
-        )
-)
-
-private val KotlinCompilerCacheByVersion: MutableMap<KotlinCompilerVersion, KotlinCompiler> = HashMap()
-
-fun kotlinCompiler(forVersion: KotlinCompilerVersion): KotlinCompiler {
-    synchronized(KotlinCompilerCacheByVersion) {
-        var kotlinCompiler = KotlinCompilerCacheByVersion[forVersion]
-        if (kotlinCompiler == null) {
-            val repositoryChain = createRepositoryChain(DefaultRepositories)
-            val artifacts = DependencyResolver.resolveArtifacts(KotlinCompilerImplementationDependenciesByVersion[forVersion]!!, repositoryChain)
-                    ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
-
-            val implementationClassName = forVersion.implementationClassName
-            val loader = ForceClassLoader(artifacts.map { file -> file.toUri().toURL() }.toTypedArray(),
-                    WemiDefaultClassLoader, implementationClassName)
-            val clazz = Class.forName(implementationClassName, true, loader)
-
-            kotlinCompiler = clazz.newInstance() as KotlinCompiler
-
-            KotlinCompilerCacheByVersion[forVersion] = kotlinCompiler
-        }
-        return kotlinCompiler
-    }
-}
-
+/**
+ * Valid Kotlin source file extensions.
+ */
 val KotlinSourceFileExtensions = listOf("kt", "kts")
 
+/**
+ * General Kotlin compiler flags.
+ */
 object KotlinCompilerFlags {
     /* Descriptions and most names taken from the Kotlin at https://github.com/JetBrains/kotlin under Apache 2 license */
 
@@ -94,6 +128,9 @@ object KotlinCompilerFlags {
     }
 }
 
+/**
+ * Kotlin compiler flags specific to JVM
+ */
 object KotlinJVMCompilerFlags {
     val includeRuntime = CompilerFlag<Boolean>("includeRuntime", "Include Kotlin runtime in to resulting .jar")
     val jdkHome = CompilerFlag<String>("jdkHome", "Path to JDK home directory to include into classpath, if differs from default JAVA_HOME")

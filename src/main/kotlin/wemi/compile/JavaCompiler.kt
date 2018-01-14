@@ -3,10 +3,13 @@ package wemi.compile
 import com.esotericsoftware.jsonbeans.Json
 import wemi.boot.MachineWritable
 
+/**
+ * Extensions that a valid Java source file can have.
+ */
 val JavaSourceFileExtensions = listOf("java")
 
 /**
- *
+ * Flags used by the Java compiler.
  */
 object JavaCompilerFlags {
     val customFlags = CompilerFlag<Collection<String>>("customFlags", "Custom flags to be parsed by the javac CLI")
@@ -14,6 +17,11 @@ object JavaCompilerFlags {
     val targetVersion = CompilerFlag<JavaVersion>("targetVersion", "Version of the created class files")
 }
 
+/**
+ * Known Java versions.
+ *
+ * Used in [JavaCompilerFlags].
+ */
 enum class JavaVersion(val version: String) : MachineWritable {
     V1_5("1.5"),
     V1_6("1.6"),

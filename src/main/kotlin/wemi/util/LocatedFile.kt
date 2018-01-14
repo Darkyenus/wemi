@@ -76,14 +76,20 @@ class LocatedFile private constructor(val file: Path, val root: Path, val path: 
     }
 }
 
-fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, filter: (Path) -> Boolean = { true }) {
+/**
+ * Walk the filesystem, starting at [from] and create a [LocatedFile] for each encountered file,
+ * that fulfills the [predicate]. Then put the created file to [to].
+ *
+ * Created files will have their root at [from].
+ */
+fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, predicate: (Path) -> Boolean = { true }) {
     // Walking is hard, don't do it if we don't have to
     if (!from.exists()) {
         return
     }
 
     if (!from.isDirectory()) {
-        if (!from.isHidden() && filter(from)) {
+        if (!from.isHidden() && predicate(from)) {
             to.add(LocatedFile(from))
         }
         return
@@ -100,7 +106,7 @@ fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, filter
         }
 
         override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-            if (!attrs.isDirectory && !file.isHidden() && filter(file)) {
+            if (!attrs.isDirectory && !file.isHidden() && predicate(file)) {
                 val originalLength = pathStack.length
                 pathStack.append(file.name)
                 to.add(LocatedFile(file, pathStack.toString(), from))

@@ -3,7 +3,10 @@ package wemi.boot
 import com.darkyen.tproll.TPLogger
 import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TerminalColor
-import org.jline.reader.*
+import org.jline.reader.EndOfFileException
+import org.jline.reader.LineReader
+import org.jline.reader.LineReaderBuilder
+import org.jline.reader.UserInterruptException
 import org.jline.reader.impl.DefaultParser
 import org.jline.reader.impl.LineReaderImpl
 import org.jline.terminal.Terminal
@@ -13,9 +16,7 @@ import wemi.*
 import wemi.util.*
 import java.io.IOException
 import java.io.PrintStream
-import java.nio.file.Files
 import java.nio.file.Path
-import java.time.Instant
 
 /**
  * Handles user interaction in standard (possibly interactive) mode
@@ -24,21 +25,32 @@ object CLI {
 
     private val LOG = LoggerFactory.getLogger(javaClass)
 
+    /**
+     * Terminal used by [CLI]
+     */
     private val Terminal: Terminal by lazy { TerminalBuilder.terminal() }
 
+    /**
+     * Line reader used when awaiting tasks.
+     */
     private val TaskLineReader: LineReaderImpl by lazy {
         (LineReaderBuilder.builder()
                 .appName("Wemi")
                 .terminal(Terminal)
                 .parser(TaskParser)
                 .completer(TaskCompleter)
-                .history(getHistory("repl"))
+                .history(SimpleHistory.getHistory("repl"))
                 .build() as LineReaderImpl).apply {
             unsetOpt(LineReader.Option.INSERT_TAB)
             unsetOpt(LineReader.Option.MENU_COMPLETE)
         }
     }
 
+    /**
+     * Line reader used when reading user input.
+     *
+     * History should be set separately.
+     */
     internal val InputLineReader: LineReaderImpl by lazy {
         LineReaderBuilder.builder()
                 .appName("Wemi")
@@ -47,10 +59,13 @@ object CLI {
                     isEofOnEscapedNewLine = false
                     isEofOnUnclosedQuote = false
                 })
-                .history(NoHistory)
+                .history(SimpleHistory.NoHistory)
                 .build() as LineReaderImpl
     }
 
+    /**
+     * Currently selected default project in interactive CLI
+     */
     private var defaultProject: Project? = null
         set(value) {
             if (value != null) {
@@ -60,6 +75,9 @@ object CLI {
             field = value
         }
 
+    /**
+     * Find what should be the default project, assuming Wemi is launched from the given [root] path
+     */
     internal fun findDefaultProject(root: Path): Project? {
         val allProjects = AllProjects
         when {
@@ -92,6 +110,10 @@ object CLI {
         }
     }
 
+    /**
+     * Initialize CLI.
+     * Needed before any IO operations are done through [CLI].
+     */
     internal fun init(root: Path) {
         val shouldBeDefault = findDefaultProject(root)
         if (shouldBeDefault == null) {
@@ -109,22 +131,32 @@ object CLI {
         }, true))
     }
 
-    private val ColorSupported: Boolean = TerminalColor.COLOR_SUPPORTED
-
+    /**
+     * Format given text like it is a label.
+     */
     private fun formatLabel(text: CharSequence): CharSequence {
         return format(text, foreground = Color.Green, format = Format.Bold)
     }
 
+    /**
+     * Format given text like it is a value.
+     */
     private fun formatValue(text: CharSequence): CharSequence {
         return format(text, foreground = Color.Blue)
     }
 
+    /**
+     * Format given text like it is an echo of user's input.
+     */
     private fun formatInput(text: CharSequence): CharSequence {
         return format(text, format = Format.Underline)
     }
 
+    /**
+     * Format given char sequence using supplied parameters.
+     */
     fun format(text: CharSequence, foreground: Color? = null, background: Color? = null, format: Format? = null): CharSequence {
-        if (!ColorSupported || (foreground == null && background == null && format == null)) return text
+        if (!TerminalColor.COLOR_SUPPORTED || (foreground == null && background == null && format == null)) return text
         val sb = StringBuilder()
         sb.append("\u001B[")
         if (foreground != null) {
@@ -145,11 +177,21 @@ object CLI {
         return sb
     }
 
-
+    /**
+     * Print given text on a line, formatted like warning
+     */
     private fun printWarning(text: CharSequence) {
         println(format(text, foreground = Color.Red))
     }
 
+    /**
+     * Print given text on a line, formatted like warning.
+     * Then attempt to suggest a better input to the user.
+     *
+     * @param text what went wrong
+     * @param input that user entered
+     * @param possibilities what user should have entered as input for it to be valid
+     */
     private fun printWarning(text: CharSequence, input: String, possibilities: Collection<String>) {
         println(format(text, foreground = Color.Red))
 
@@ -173,18 +215,18 @@ object CLI {
     /**
      * Evaluates the key and prints human readable, formatted output.
      */
-    fun evaluateKeyAndPrint(task: Task): KeyEvaluationResult {
+    fun evaluateKeyAndPrint(task: Task): TaskEvaluationResult {
         // TODO Ideally, this would get rewritten with Done message if nothing was written between them
         print(formatLabel("→ "))
         println(formatInput(task.key))
 
         val beginTime = System.currentTimeMillis()
-        val keyEvaluationResult = evaluateKey(task)
+        val keyEvaluationResult = task.evaluate(defaultProject)
         val (key, data, status) = keyEvaluationResult
         val duration = System.currentTimeMillis() - beginTime
 
         when (status) {
-            CLI.KeyEvaluationStatus.Success -> {
+            TaskEvaluationStatus.Success -> {
                 print(formatLabel("Done "))
                 print(formatInput(task.key))
                 @Suppress("UNCHECKED_CAST")
@@ -225,7 +267,7 @@ object CLI {
                     }
                 }
             }
-            CLI.KeyEvaluationStatus.NoProject -> {
+            TaskEvaluationStatus.NoProject -> {
                 val projectString = data as String?
                 if (projectString != null) {
                     printWarning("Can't evaluate $task - no project named '$projectString' found", projectString, AllProjects.keys)
@@ -233,11 +275,11 @@ object CLI {
                     printWarning("Can't evaluate $task - no project specified")
                 }
             }
-            CLI.KeyEvaluationStatus.NoConfiguration -> {
+            TaskEvaluationStatus.NoConfiguration -> {
                 val configString = data as String
                 printWarning("Can't evaluate $task - no configuration named '$configString' found", configString, AllConfigurations.keys)
             }
-            CLI.KeyEvaluationStatus.NoKey -> {
+            TaskEvaluationStatus.NoKey -> {
                 val keyString = data as String
                 if (task.couldBeCommand) {
                     printWarning("Can't evaluate $task - no key or command named '$keyString' found", keyString, AllKeys.keys + commands.keys)
@@ -245,13 +287,13 @@ object CLI {
                     printWarning("Can't evaluate $task - no key named '$keyString' found", keyString, AllKeys.keys)
                 }
             }
-            CLI.KeyEvaluationStatus.NotAssigned -> {
+            TaskEvaluationStatus.NotAssigned -> {
                 val error = data as WemiException.KeyNotAssignedException
                 print(format("Failure: ", Color.Red))
                 print(formatInput(error.scope.toString() + error.key.name))
                 println(format(" is not set", Color.Red))
             }
-            CLI.KeyEvaluationStatus.Exception -> {
+            TaskEvaluationStatus.Exception -> {
                 val we = data as WemiException
 
                 val message = we.message
@@ -271,89 +313,9 @@ object CLI {
         return keyEvaluationResult
     }
 
-    enum class KeyEvaluationStatus {
-        /** Data contains the evaluation result */
-        Success,
-        /** Data contains invalid name of project or null if tried to use default project but that is undefined */
-        NoProject,
-        /** Data contains invalid name of configuration */
-        NoConfiguration,
-        /** Data contains invalid name of key */
-        NoKey,
-        /** Data contains [WemiException.KeyNotAssignedException] */
-        NotAssigned,
-        /** Data contains [WemiException] */
-        Exception
-    }
-
-    data class KeyEvaluationResult(val key: Key<*>?, val data: Any?, val status: KeyEvaluationStatus)
-
     /**
-     * Evaluates given command. Syntax is:
-     * `project/key`
-     * or
-     * `key`
-     *
-     * (default project will be then used)
+     * Known CLI commands.
      */
-    fun evaluateKey(task: Task): KeyEvaluationResult {
-        var project: Project? = defaultProject
-        val configurations = mutableListOf<Configuration>()
-
-        // Parse Project
-        if (task.project != null) {
-            project = AllProjects.findCaseInsensitive(task.project)
-            if (project == null) {
-                return KeyEvaluationResult(null, task.project, KeyEvaluationStatus.NoProject)
-            }
-        } else if (project == null) {
-            return KeyEvaluationResult(null, null, KeyEvaluationStatus.NoProject)
-        }
-
-        // Parse Configurations
-        for (configString in task.configurations) {
-            val config = AllConfigurations.findCaseInsensitive(configString)
-                    ?: return KeyEvaluationResult(null, configString, KeyEvaluationStatus.NoConfiguration)
-            configurations.add(config)
-        }
-
-        // Parse Key
-        val key = AllKeys.findCaseInsensitive(task.key)
-                ?: return KeyEvaluationResult(null, task.key, KeyEvaluationStatus.NoKey)
-
-        return try {
-            val result = project.projectScope.run {
-                using(configurations) {
-                    // Attach input, if any
-                    if (task.input.isEmpty()) {
-                        this
-                    } else {
-                        val freeInput = ArrayList<String>()
-                        val boundInput = HashMap<String, String>()
-
-                        for ((k, v) in task.input) {
-                            if (k == null) {
-                                freeInput.add(v)
-                            } else {
-                                boundInput.put(k, v)
-                            }
-                        }
-
-                        withMixedInput(freeInput.toTypedArray(), boundInput) { this }
-                    }.run {
-                        key.get()
-                    }
-                }
-            }
-
-            KeyEvaluationResult(key, result, KeyEvaluationStatus.Success)
-        } catch (e: WemiException.KeyNotAssignedException) {
-            KeyEvaluationResult(key, e, KeyEvaluationStatus.NotAssigned)
-        } catch (e: WemiException) {
-            KeyEvaluationResult(key, e, KeyEvaluationStatus.Exception)
-        }
-    }
-
     private val commands: Map<String, (Task) -> Unit> = HashMap<String, (Task) -> Unit>().apply {
         put("exit") {
             throw EndOfFileException()
@@ -369,6 +331,14 @@ object CLI {
                 } else {
                     defaultProject = project
                 }
+            }
+        }
+
+        fun printLabeled(label: String, items: Map<String, WithDescriptiveString>) {
+            println(formatLabel("${items.size} $label${if (items.isEmpty()) "" else "s"}:"))
+            for (value in items.values) {
+                print("   ")
+                println(value.toDescriptiveAnsiString())
             }
         }
         put("projects") {
@@ -412,7 +382,7 @@ object CLI {
     }
 
     /**
-     * Evaluate command from the REPL
+     * Evaluate command or task from the REPL.
      */
     private fun evaluateCommand(command: String) {
         if (command.isBlank()) {
@@ -444,6 +414,9 @@ object CLI {
         }
     }
 
+    /**
+     * Begin interactive REPL loop in this thread.
+     */
     internal fun beginInteractive() {
         val lineReader = TaskLineReader
 
@@ -475,6 +448,9 @@ object CLI {
         System.err.flush()
     }
 
+    /**
+     * Color for ANSI formatting
+     */
     enum class Color(internal val offset: Int) {
         Black(0),
         Red(1), // Error
@@ -486,6 +462,9 @@ object CLI {
         White(7)
     }
 
+    /**
+     * Format for ANSI formatting
+     */
     enum class Format(internal val number: Int) {
         Bold(1), // Label or Prompt
         Italic(3),
@@ -498,300 +477,4 @@ object CLI {
     internal val ICON_SKIPPED = CLI.format("↷", CLI.Color.Magenta)
     internal val ICON_SEE_ABOVE = CLI.format("↑", CLI.Color.Magenta)//⤴ seems to be clipped in some contexts
     internal val ICON_ABORTED = CLI.format("■", CLI.Color.Yellow)
-
-    private fun printLabeled(label: String, items: Map<String, WithDescriptiveString>) {
-        println(formatLabel("${items.size} $label${if (items.isEmpty()) "" else "s"}:"))
-        for (value in items.values) {
-            print("   ")
-            println(value.toDescriptiveAnsiString())
-        }
-    }
-
-    private val histories = HashMap<String, SimpleHistory>()
-
-    private fun getHistoryFile(name: String): Path? {
-        val buildScript = WemiBuildScript ?: return null
-        val historiesFolder = buildScript.buildFolder.resolve("cache/history/")
-        Files.createDirectories(historiesFolder)
-        val fileName = StringBuilder()
-        for (c in name) {
-            if (c.isLetterOrDigit() || c.isWhitespace() || c == '.' || c == '_' || c == '-') {
-                fileName.append(c)
-            } else {
-                fileName.append(c.toInt())
-            }
-        }
-
-        return historiesFolder.resolve(fileName.toString())
-    }
-
-    internal fun getHistory(name: String): SimpleHistory {
-        return histories.getOrPut(name) {
-            SimpleHistory(getHistoryFile(name))
-        }
-    }
-
-    /**
-     * Retrieves the history, but only if it exists, either in cache or in filesystem.
-     */
-    internal fun getExistingHistory(name: String): SimpleHistory? {
-        val existing = histories[name]
-        if (existing != null) {
-            return existing
-        }
-
-        val historyFile = getHistoryFile(name)
-        if (historyFile == null || !Files.exists(historyFile)) {
-            return null
-        }
-
-        val history = SimpleHistory(historyFile)
-        histories.put(name, history)
-        return history
-    }
-
-    init {
-        Runtime.getRuntime().addShutdownHook(Thread({
-            for (value in histories.values) {
-                value.save()
-            }
-            HISTORY_LOG.debug("Histories saved")
-        }, "HistorySaver"))
-    }
-
-    private val NoHistory = SimpleHistory(null)
-
-    private val HISTORY_LOG = LoggerFactory.getLogger(SimpleHistory::class.java)
-
-    internal class SimpleHistory(private val path: Path?) : History {
-
-        private val DEFAULT_HISTORY_SIZE = 50
-
-        internal val items = ArrayList<String>()
-        private var index = 0
-        private var changed = false
-
-        init {
-            load()
-        }
-
-        override fun attach(reader: LineReader) {
-            // Do nothing, we don't care about what LineReader thinks
-        }
-
-        override fun load() {
-            if (path == null || !Files.exists(path)) {
-                return
-            }
-            val lines = try {
-                Files.readAllLines(path, Charsets.UTF_8)
-            } catch (e: Exception) {
-                HISTORY_LOG.warn("Failed to load from path {}", path, e)
-                return
-            }
-            clear()
-            items.addAll(lines)
-            changed = false
-            index = size()
-        }
-
-        override fun save() {
-            if (!changed || path == null) {
-                return
-            }
-
-            try {
-                if (items.isEmpty()) {
-                    Files.deleteIfExists(path)
-                } else {
-                    Files.newBufferedWriter(path, Charsets.UTF_8).use { writer ->
-                        for (line in items) {
-                            writer.write(line)
-                            writer.append('\n')
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                HISTORY_LOG.warn("Failed to write to path {}", path, e)
-                return
-            }
-
-            changed = false
-        }
-
-        private fun clear() {
-            items.clear()
-            index = 0
-            changed = true
-        }
-
-        override fun purge() {
-            clear()
-            if (path != null) {
-                HISTORY_LOG.trace("Purging history from {}", path)
-                Files.deleteIfExists(path)
-            }
-            changed = false
-        }
-
-        override fun size(): Int {
-            return items.size
-        }
-
-        override fun isEmpty(): Boolean {
-            return items.isEmpty()
-        }
-
-        override fun index(): Int = index
-
-        override fun first(): Int = 0
-
-        override fun last(): Int = items.size - 1
-
-        override fun get(index: Int): String {
-            return items[index]
-        }
-
-        override fun add(line: String) {
-            items.remove(line)
-            items.add(line)
-            changed = true
-            while (size() > DEFAULT_HISTORY_SIZE) {
-                items.removeAt(0)
-            }
-            index = size()
-        }
-
-        override fun add(time: Instant, line: String) {
-            add(line)
-        }
-
-        // This is used when navigating the history
-        override fun iterator(index: Int): ListIterator<History.Entry> {
-            val iterator = items.listIterator(index)
-            return object : ListIterator<History.Entry> {
-                override fun hasNext(): Boolean = iterator.hasNext()
-
-                override fun hasPrevious(): Boolean = iterator.hasPrevious()
-
-                override fun nextIndex(): Int = iterator.nextIndex()
-
-                override fun previousIndex(): Int = iterator.previousIndex()
-
-                private fun map(index: Int, line: String): History.Entry {
-                    return object : History.Entry {
-                        override fun index(): Int = index
-
-                        override fun time(): Instant = Instant.EPOCH
-
-                        override fun line(): String = line
-                    }
-                }
-
-                override fun next(): History.Entry = map(iterator.nextIndex(), iterator.next())
-
-                override fun previous(): History.Entry = map(iterator.previousIndex(), iterator.previous())
-            }
-        }
-
-        //
-        // Navigation
-        //
-
-        /**
-         * This moves the history to the last entry. This entry is one position
-         * before the moveToEnd() position.
-         *
-         * @return Returns false if there were no history iterator or the history
-         * index was already at the last entry.
-         */
-        override fun moveToLast(): Boolean {
-            val lastEntry = size() - 1
-            if (lastEntry >= 0 && lastEntry != index) {
-                index = size() - 1
-                return true
-            }
-
-            return false
-        }
-
-        /**
-         * Move to the specified index in the history
-         */
-        override fun moveTo(index: Int): Boolean {
-            if (index >= 0 && index < size()) {
-                this.index = index
-                return true
-            }
-            return false
-        }
-
-        /**
-         * Moves the history index to the first entry.
-         *
-         * @return Return false if there are no iterator in the history or if the
-         * history is already at the beginning.
-         */
-        override fun moveToFirst(): Boolean {
-            if (size() > 0 && index != 0) {
-                index = 0
-                return true
-            }
-            return false
-        }
-
-        /**
-         * Move to the end of the history buffer. This will be a blank entry, after
-         * all of the other iterator.
-         */
-        override fun moveToEnd() {
-            index = size()
-        }
-
-        /**
-         * Return the content of the current buffer.
-         */
-        override fun current(): String {
-            return if (index < 0 || index >= size()) {
-                ""
-            } else {
-                items[index]
-            }
-        }
-
-        /**
-         * Move the pointer to the previous element in the buffer.
-         *
-         * @return true if we successfully went to the previous element
-         */
-        override fun previous(): Boolean {
-            if (index <= 0) {
-                return false
-            }
-            index--
-            return true
-        }
-
-        /**
-         * Move the pointer to the next element in the buffer.
-         *
-         * @return true if we successfully went to the next element
-         */
-        override fun next(): Boolean {
-            if (index >= size()) {
-                return false
-            }
-            index++
-            return true
-        }
-
-        override fun toString(): String {
-            val sb = StringBuilder()
-            for (e in this) {
-                sb.append(e.toString()).append("\n")
-            }
-            return sb.toString()
-        }
-
-    }
 }

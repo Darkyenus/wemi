@@ -6,14 +6,15 @@ import java.net.URL
 import java.security.MessageDigest
 
 /**
- * Represents preferredRepository from which artifacts may be retrieved
+ * Represents repository from which artifacts may be retrieved
  */
 sealed class Repository(val name: String) : MachineWritable {
 
     /** Local repositories are preferred, because retrieving from them is faster. */
     abstract val local: Boolean
 
-    /** Repository acting as a cache for this preferredRepository. Always searched first. */
+    /** Repository acting as a cache for this repository. Always searched first.
+     * Resolved dependencies will be stored here. */
     abstract val cache: Repository?
 
     /**
@@ -24,7 +25,13 @@ sealed class Repository(val name: String) : MachineWritable {
      */
     abstract fun resolveInRepository(dependency: Dependency, chain: RepositoryChain): ResolvedDependency
 
-    /** Maven preferredRepository. */
+    /** Maven repository.
+     *
+     * @param name of this repository, arbitrary
+     * @param url of this repository
+     * @param cache of this repository
+     * @param checksum to use when retrieving artifacts from here
+     */
     class M2(name: String, val url: URL, override val cache: M2? = null, val checksum: Checksum = M2.Checksum.SHA1) : Repository(name) {
         override val local: Boolean
             get() = cache == null
@@ -55,11 +62,28 @@ sealed class Repository(val name: String) : MachineWritable {
              * In Wemi used only when filtering.
              */
             val M2ScopeAttribute = DependencyAttribute("m2-scope", false, "compile")
+            /**
+             * Optional dependencies are skipped by default by Wemi.
+             */
             val M2OptionalAttribute = DependencyAttribute("m2-optional", false, "false")
         }
 
-        enum class Checksum(val suffix: String, val algo: String) {
+        /**
+         * Types of checksum in Maven repositories.
+         *
+         * @param suffix of files with this checksum
+         * @param algo Java digest algorithm name to use when computing this checksum
+         */
+        enum class Checksum(val suffix: String, private val algo: String) {
+            /**
+             * Special value for no checksum.
+             *
+             * Not recommended for general use - use only in extreme cases.
+             */
             None(".no-checksum", "no-op"),
+            /**
+             * Standard SHA1 algorithm with .sha1 suffix.
+             */
             SHA1(".sha1", "SHA-1");
 
             fun checksum(data: ByteArray): ByteArray {
@@ -101,7 +125,9 @@ sealed class Repository(val name: String) : MachineWritable {
 /** Special collection of repositories in preferred order and with cache repositories inlined. */
 typealias RepositoryChain = Collection<Repository>
 
-/** Sorts repositories into an efficient chain */
+/** Sorts repositories into an efficient chain.
+ * Inlines cache repositories so that they are checked first.
+ * Otherwise tries to maintain original order. */
 fun createRepositoryChain(repositories: Collection<Repository>): RepositoryChain {
     val list = mutableListOf<Repository>()
     list.addAll(repositories)
@@ -138,14 +164,30 @@ fun createRepositoryChain(repositories: Collection<Repository>): RepositoryChain
 }
 
 // Default repositories
+/**
+ * Local Maven repository stored in ~/.m2/repository
+ */
 val LocalM2Repository = Repository.M2("local", URL("file", "localhost", System.getProperty("user.home") + "/.m2/repository/"), null)
+/**
+ * Maven Central repository: https://maven.org
+ *
+ * Cached by [LocalM2Repository].
+ */
 val MavenCentral = Repository.M2("central", URL("https://repo1.maven.org/maven2/"), LocalM2Repository)
 
 // TODO Remove by 2018-02-01
 @Deprecated("Renamed", replaceWith = ReplaceWith("MavenCentral", "wemi.dependency.MavenCentral"))
 val CentralM2Repository = MavenCentral
 
+/**
+ * Repositories to use by default.
+ *
+ * @see LocalM2Repository
+ * @see MavenCentral
+ */
 val DefaultRepositories: List<Repository> = listOf(
+        /* It would seem that local is added twice here (2nd as a cache of local),
+         but that is semantically correct, because LocalM2Repository is not only a cache. */
         LocalM2Repository,
         MavenCentral
 )

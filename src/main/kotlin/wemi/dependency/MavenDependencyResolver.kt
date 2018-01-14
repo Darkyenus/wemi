@@ -16,13 +16,12 @@ import java.nio.file.Path
 import java.util.*
 import kotlin.collections.HashMap
 
-
-private val LOG = LoggerFactory.getLogger("MavenDependencyResolver")
-
 /**
- *
+ * Manages resolution of dependencies through [Repository.M2] Maven repository.
  */
 internal object MavenDependencyResolver {
+
+    private val LOG = LoggerFactory.getLogger(MavenDependencyResolver::class.java)
 
     private val PomFile = ArtifactKey<Path>("pomFile", true)
     private val PomData = ArtifactKey<ByteArray>("pomData", false)

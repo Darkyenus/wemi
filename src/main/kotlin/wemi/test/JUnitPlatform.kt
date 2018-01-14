@@ -149,6 +149,10 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
     }
 }
 
+/**
+ * Creates a human readable, ANSI-colored (if supported), tree with TestReport execution overview,
+ * including a summary at the end.
+ */
 fun TestReport.prettyPrint(): CharSequence {
     val keys = keys.toMutableList()
     keys.sortBy { it.id }
@@ -302,6 +306,7 @@ fun TestReport.prettyPrint(): CharSequence {
     }
 
     result.append('\n')
+    //TODO Colors
     result.append(String.format("           - Summary -           \n"
             + "[%7d containers found       ]\n"
             + "[%7d containers skipped     ]\n"

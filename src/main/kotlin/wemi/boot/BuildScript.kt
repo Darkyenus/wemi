@@ -5,7 +5,6 @@ import wemi.WemiKotlinVersion
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinJVMCompilerFlags
-import wemi.compile.kotlinCompiler
 import wemi.dependency.*
 import wemi.dependency.DependencyResolver.artifacts
 import wemi.util.*
@@ -142,14 +141,14 @@ internal fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildSc
         val resolved = HashMap<DependencyId, ResolvedDependency>()
         val resolutionOk = DependencyResolver.resolve(resolved, classpathConfiguration.dependencies, classpathConfiguration.repositoryChain)
         if (!resolutionOk) {
-            LOG.warn("Failed to retrieve all build file dependencies for {}:\n{}", buildScriptSources, resolved.prettyPrint(classpathConfiguration.dependencies))
+            LOG.warn("Failed to retrieve all build file dependencies for {}:\n{}", buildScriptSources, resolved.prettyPrint(classpathConfiguration.dependencies.map { it.dependencyId }))
             return null
         }
         classpath.addAll(resolved.artifacts())
 
         LOG.debug("Compiling sources: {} classpath: {} resultJar: {} buildFlags: {}", sources, classpath, resultJar, buildFlags)
 
-        val status = kotlinCompiler(WemiKotlinVersion).compile(sources, classpath, resultJar, buildFlags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
+        val status = WemiKotlinVersion.compilerInstance().compile(sources, classpath, resultJar, buildFlags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
         if (status != KotlinCompiler.CompileExitStatus.OK) {
             LOG.warn("Compilation failed for {}: {}", buildScriptSources, status)
             return null

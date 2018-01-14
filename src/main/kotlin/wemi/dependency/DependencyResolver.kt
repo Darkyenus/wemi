@@ -10,6 +10,13 @@ object DependencyResolver {
 
     private val LOG = LoggerFactory.getLogger(DependencyResolver.javaClass)
 
+    /**
+     * Resolve [dependency] using the [repositories] repository chain.
+     * [DependencyId.preferredRepository] and its cache is tried first.
+     *
+     * Does not resolve transitively.
+     * When resolution fails, returns ResolvedDependency with [ResolvedDependency.hasError] = true.
+     */
     fun resolveSingleDependency(dependency: Dependency, repositories: RepositoryChain): ResolvedDependency {
         var log: StringBuilder? = null
 
@@ -61,6 +68,19 @@ object DependencyResolver {
         return ResolvedDependency(dependency.dependencyId, emptyList(), null, true, log ?: "no repositories to search in")
     }
 
+    /**
+     * Internal.
+     *
+     * Resolves artifacts for [dependency], using [resolveSingleDependency],
+     * and artifacts for transitive dependencies by calling itself.
+     *
+     * Remembers errors, but does not stop on them and tries to resolve as much as possible.
+     *
+     * @param mapper to modify which dependency is actually resolved
+     * @param resolved cache for already resolved dependencies
+     * @param repositories to use
+     * @return true if all dependencies resolved without error
+     */
     private fun doResolveArtifacts(resolved: MutableMap<DependencyId, ResolvedDependency>,
                                    dependency: Dependency, repositories: RepositoryChain,
                                    mapper: (Dependency) -> Dependency): Boolean {
@@ -80,6 +100,11 @@ object DependencyResolver {
         return ok
     }
 
+    /**
+     * Utility method to [resolve] dependencies and retrieve their [artifacts].
+     *
+     * If any dependency fails to resolve, returns null.
+     */
     fun resolveArtifacts(projects: Collection<Dependency>, repositories: RepositoryChain): List<Path>? {
         val resolved = mutableMapOf<DependencyId, ResolvedDependency>()
         val ok = resolve(resolved, projects, repositories)
@@ -91,14 +116,25 @@ object DependencyResolver {
         return resolved.artifacts()
     }
 
+    /**
+     * Retrieve all artifacts from [ResolvedDependency].
+     * Skips those without artifact. Does not check error status or anything else.
+     */
     fun Map<DependencyId, ResolvedDependency>.artifacts(): List<Path> {
         return mapNotNull { it.value.artifact }
     }
 
-    fun resolve(resolved: MutableMap<DependencyId, ResolvedDependency>, projects: Collection<Dependency>, repositories: RepositoryChain, mapper: ((Dependency) -> Dependency) = { it }): Boolean {
+    /**
+     * Resolve [dependencies] and store what was resolved in [resolved].
+     * Resolution is done using [repositories] and using [DependencyId.preferredRepository] and its cache, if any.
+     * Actually resolved dependencies can be at any point modified with [mapper].
+     *
+     * @return true if all [dependencies] resolve correctly without error
+     */
+    fun resolve(resolved: MutableMap<DependencyId, ResolvedDependency>, dependencies: Collection<Dependency>, repositories: RepositoryChain, mapper: ((Dependency) -> Dependency) = { it }): Boolean {
         var ok = true
 
-        for (project in projects) {
+        for (project in dependencies) {
             if (!doResolveArtifacts(resolved, project, repositories, mapper)) {
                 ok = false
             }

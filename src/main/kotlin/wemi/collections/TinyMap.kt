@@ -2,6 +2,13 @@ package wemi.collections
 
 /**
  * Extra-memory-lightweight implementation of [MutableMap] interface.
+ *
+ * To be used as a superclass for objects that wish to store a map with minimum overhead and provide a custom
+ * access API for it.
+ *
+ * Has almost zero overhead, single allocation when first value is entered.
+ *
+ * NOT SUITABLE IF EXPECTED AMOUNT OF VALUES > 20
  */
 @Suppress("unused")
 open class TinyMap<K, V> {
@@ -253,6 +260,7 @@ open class TinyMap<K, V> {
     }
 
     private companion object {
+        @JvmStatic
         private val EMPTY_ARRAY = emptyArray<Any?>()
     }
 }

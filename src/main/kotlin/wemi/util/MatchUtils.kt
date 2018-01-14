@@ -3,11 +3,17 @@ package wemi.util
 import java.util.*
 
 /**
- *
+ * Utilities for text or object matching.
  */
+@Suppress("MemberVisibilityCanPrivate")
 object MatchUtils {
 
-    /** @param s0 text user entered
+    /**
+     * Compute weighted levenshtein distance of [s1] and [s0].
+     * This is the minimum cost that it would take to convert s0 to s1 using only
+     * letter insertion (with [insertCost]), letter replacement ([replaceCost]) and letter deletion ([deleteCost]).
+     *
+     * @param s0 text user entered
      * @param s1 text of result
      */
     fun levenshteinDistance(s0: CharSequence, s1: CharSequence, insertCost: Int, replaceCost: Int, deleteCost: Int): Int {
@@ -69,10 +75,19 @@ object MatchUtils {
         return true
     }
 
+    /**
+     * Reified version of [match] for convenience.
+     */
     inline fun <reified T> match(from: Array<T>, noinline toString: (T) -> CharSequence, target: CharSequence): Array<T> {
         return match(T::class.java, from, toString, target)
     }
 
+    /**
+     * Given the list of possibilities of [type] [T] in [from], which can be converted to CharSequence
+     * using function [toString], return those, that user could have possibly meant, when he/she typed [target].
+     *
+     * This is just a heuristic, that is tuned to prefer laziness to typos, but handles typos as well.
+     */
     fun <T> match(type: Class<T>, from: Array<T>, toString: (T) -> CharSequence, target: CharSequence): Array<T> {
         val BAD_SCORE = 1000
         var bestScore = BAD_SCORE

@@ -189,28 +189,49 @@ class TestParameters : JsonSerializable {
 
     @Suppress("unused")
     /**
-     * Mutable collection coupling included and excluded patterns.
+     * Mutable collection coupling included and excluded names/patterns.
      */
     class IncludeExcludeList : JsonSerializable {
+        /**
+         * Names/patterns that are included.
+         */
         val included: MutableList<String> = ArrayList()
+        /**
+         * Names/patterns that are excluded.
+         */
         val excluded: MutableList<String> = ArrayList()
 
+        /**
+         * Add [item] to included items.
+         */
         fun include(item: String) {
             included.add(item)
         }
 
+        /**
+         * Add [items] to included items.
+         */
         fun include(vararg items: String) {
             included.addAll(items)
         }
 
+        /**
+         * Add [item] to excluded items.
+         */
         fun exclude(item: String) {
             excluded.add(item)
         }
 
+        /**
+         * Add [items] to excluded items.
+         */
         fun exclude(vararg items: String) {
             excluded.addAll(items)
         }
 
+        /**
+         * @return true if both [included] and [excluded] are empty
+         */
         fun isEmpty(): Boolean = included.isEmpty() && excluded.isEmpty()
 
         override fun write(json: Json) {

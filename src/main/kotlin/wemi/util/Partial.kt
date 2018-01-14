@@ -6,6 +6,9 @@ import wemi.boot.MachineWritable
 /**
  * Value that exists, but may be incomplete.
  * Some consumers don't care when the value is incomplete and can work with them. Some don't.
+ *
+ * @param value that may be partial
+ * @param complete true if the [value] is not partial
  */
 class Partial<out T>(val value: T, val complete: Boolean) : MachineWritable {
     override fun writeMachine(json: Json) {

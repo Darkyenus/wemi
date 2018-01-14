@@ -6,17 +6,23 @@ import wemi.WemiVersionIsSnapshot
 import java.nio.file.Files
 import java.nio.file.Path
 
-/**
+/*
  * File full of black magic.
  * No muggles allowed.
  */
 
 private val LOG = LoggerFactory.getLogger("Magic")
 
+/**
+ * Only used as a known and stable place to start magic from.
+ */
 @Suppress("ClassName")
-private object __ResourceHook
+private class __ResourceHook
 
-internal val WemiLauncherFile: Path = __ResourceHook.javaClass.getResource("MagicKt.class").let {
+/**
+ * .jar or folder that is a classpath entry that contains Wemi
+ */
+internal val WemiLauncherFile: Path = __ResourceHook::class.java.getResource("MagicKt.class").let {
     var result: Path = it?.toPath() ?: throw IllegalStateException("Wemi must be launched from filesystem (current URL: $it)")
 
     if (result.name == "MagicKt.class") {

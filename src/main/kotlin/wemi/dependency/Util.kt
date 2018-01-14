@@ -5,15 +5,6 @@ import wemi.util.TreeNode
 import wemi.util.printTree
 
 /**
- * @see [prettyPrint]
- */
-@Suppress("unused") // Used
-@JvmName("prettyPrintFromDependency")
-fun Map<DependencyId, ResolvedDependency>.prettyPrint(roots: Collection<Dependency>): CharSequence {
-    return prettyPrint(roots.map { it.dependencyId })
-}
-
-/**
  * Returns a pretty-printed string in which the system is displayed as a tree of dependencies.
  * Uses full range of unicode characters for clarity.
  */

@@ -6,6 +6,7 @@ import org.jline.reader.LineReader
 import org.jline.reader.ParsedLine
 import wemi.BuildScriptData
 import wemi.boot.TaskParser.TokenType.*
+import wemi.util.SimpleHistory
 
 /**
  * Provides completion for task lines, parsed by [TaskParser].
@@ -65,7 +66,7 @@ internal object TaskCompleter : Completer {
         if ((type == Input || type == Other) && tokenTypes.getOrNull(wordIndex - 2) == InputKey) {
             // Fill in from history for this key
             val inputKey = line.parsed.tokens[wordIndex - 2]
-            val history = CLI.getExistingHistory("input.$inputKey")
+            val history = SimpleHistory.getExistingHistory("input.$inputKey")
             if (history != null) {
                 for (item in history.items) {
                     candidates.add(Candidate(item))

@@ -9,7 +9,9 @@ import wemi.util.putArrayStrings
 import wemi.util.writeStringArray
 
 /**
- * Returned by the test
+ * Returned by the test.
+ *
+ * In execution order contains [TestIdentifier]s that were run and [TestData] informing about their execution.
  */
 class TestReport : LinkedHashMap<TestIdentifier, TestData>(), JsonSerializable, MachineWritable, WithExitCode {
     private fun TestIdentifier.write(json: Json) {
@@ -81,7 +83,16 @@ class TestReport : LinkedHashMap<TestIdentifier, TestData>(), JsonSerializable, 
 }
 
 /**
- * Unique, immutable, test identifier
+ * Unique, immutable, test identifier.
+ *
+ * @param id of the test, not human readable, but unique among other [TestIdentifier]s of the run
+ * @param parentId id of the parent [TestIdentifier], if any
+ * @param displayName which should be displayed to the user
+ *
+ * @param isTest if this identifies a test that was executed
+ * @param isContainer if this identifies a collection of tests (such collection can still have [TestData])
+ * @param tags assigned
+ * @param testSource in which this test/container has been found. No content/format is guaranteed, used for debugging.
  */
 class TestIdentifier(
         val id: String,
@@ -140,18 +151,40 @@ class TestIdentifier(
 
 /**
  * Results of run of test identified by [TestIdentifier].
+ *
+ * Mutable.
  */
 class TestData : JsonSerializable {
 
+    /**
+     * Status of this [TestIdentifier]'s run
+     */
     var status: TestStatus = TestStatus.NOT_RUN
 
+    /**
+     * Duration of the run, in ms.
+     * -1 when unknown.
+     */
     var duration = -1L
 
+    /**
+     * If [status] is [TestStatus.SKIPPED], this may contain why it was skipped
+     */
     var skipReason: String? = null
 
+    /**
+     * If [status] is [TestStatus.FAILED], this may contain the (possibly filtered) stack trace of the error
+     */
     var stackTrace: String? = null
 
-    val reports: ArrayList<ReportEntry> = ArrayList(0)
+    /**
+     * Custom reports made by the test execution.
+     *
+     * Those contain user data reported by the test.
+     *
+     * See http://junit.org/junit5/docs/current/user-guide/#writing-tests-dependency-injection TestReporter.
+     */
+    val reports: ArrayList<ReportEntry> = ArrayList()
 
     override fun write(json: Json) {
         json.writeValue("status", status, TestStatus::class.java)
@@ -216,10 +249,34 @@ class TestData : JsonSerializable {
     }
 }
 
+/**
+ * Status of the [TestData].
+ */
 enum class TestStatus {
+    /**
+     * Test/collection execution was successful.
+     *
+     * Note that collection may be successful even if tests contained were not.
+     */
     SUCCESSFUL,
+    /**
+     * Aborted by the user, i.e. the test would be run, but has been stopped for some reason.
+     * This does not indicate failure nor success.
+     */
     ABORTED,
+    /**
+     * Test has not been run because it was skipped for some reason.
+     * @see TestData.skipReason
+     */
     SKIPPED,
+    /**
+     * Test has been run and failed.
+     * @see TestData.stackTrace
+     */
     FAILED,
+    /**
+     * Test has not been run.
+     * This is not a standard result and indicates a problem somewhere.
+     */
     NOT_RUN
 }
