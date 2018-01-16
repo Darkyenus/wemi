@@ -57,26 +57,22 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
                 })
                 return
             }
-            "buildScripts" -> {
+            "buildScript" -> {
                 machineReadablePrint(out, object : MachineWritable {
                     override fun writeMachine(json: Json) {
-                        json.writeArrayStart()
-                        for ((buildFile, projects) in BuildScriptIntrospection.buildScriptProjects) {
+                        val buildFile = WemiBuildScript
+                        if (buildFile == null) {
+                            json.writeValue(null)
+                        } else {
                             json.writeObjectStart()
 
                             json.writeValue("buildFolder", buildFile.buildFolder)
                             json.writeValue("sources", buildFile.sources)
                             json.writeValue("scriptJar", buildFile.scriptJar)
                             json.writeValue("classpath", buildFile.classpath)
-                            json.writeArrayStart("projects")
-                            for (project in projects) {
-                                json.writeValue(project.name)
-                            }
-                            json.writeArrayEnd()
 
                             json.writeObjectEnd()
                         }
-                        json.writeArrayEnd()
                     }
                 })
                 return

@@ -193,13 +193,11 @@ fun main(args: Array<String>) {
         }
         val loader = URLClassLoader(urls, WemiDefaultClassLoader)
         LOG.debug("Loading build file {}", buildScript)
-        BuildScriptIntrospection.initializingBuildScript(buildScript) {
-            for (initClass in buildScript.initClasses) {
-                try {
-                    Class.forName(initClass, true, loader)
-                } catch (e: Exception) {
-                    LOG.warn("Failed to load build file class {} from {}", initClass, urls, e)
-                }
+        for (initClass in buildScript.initClasses) {
+            try {
+                Class.forName(initClass, true, loader)
+            } catch (e: Exception) {
+                LOG.warn("Failed to load build file class {} from {}", initClass, urls, e)
             }
         }
         LOG.debug("Build file loaded")

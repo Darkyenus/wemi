@@ -4,7 +4,7 @@ package wemi
 
 import org.slf4j.LoggerFactory
 import wemi.KeyDefaults.applyDefaults
-import wemi.boot.BuildScriptIntrospection.initializeBuildScriptInfo
+import wemi.boot.WemiBuildScript
 import java.nio.file.Path
 import java.util.*
 import kotlin.properties.ReadOnlyProperty
@@ -49,7 +49,17 @@ class ProjectDelegate internal constructor(
             Keys.projectRoot set { project.projectRoot }
         }
         this.project.applyDefaults()
-        this.project.initializeBuildScriptInfo()
+
+        // Setup Keys.buildScript
+        val buildScript = WemiBuildScript
+        if (buildScript == null) {
+            LOG.debug("Project {} is being initialized at unexpected time, introspection will not be available", this.project)
+        } else {
+            this.project.apply {
+                Keys.buildScript set { buildScript }
+            }
+        }
+
         this.project.initializer()
         this.project.locked = true
         return this

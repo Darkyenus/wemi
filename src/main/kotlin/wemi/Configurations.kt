@@ -7,6 +7,7 @@ import wemi.compile.*
 import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.M2ClassifierAttribute
 import wemi.test.JUnitPlatformLauncher
+import wemi.util.LocatedFile
 import wemi.util.div
 import javax.tools.ToolProvider
 
@@ -71,5 +72,17 @@ object Configurations {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { KotlinSourceFileExtensions }
         Keys.kotlinCompiler set { WemiKotlinVersion.compilerInstance() }
+    }
+
+    val wemiBuildScript by configuration("Setup with information about the build script " +
+            "(but not actually used for building the build script)") {
+        Keys.repositories set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositories }
+        Keys.repositoryChain set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositoryChain }
+        Keys.libraryDependencies set { Keys.buildScript.get().buildScriptClasspathConfiguration.dependencies }
+        Keys.externalClasspath set { Keys.buildScript.get().classpath.map { LocatedFile(it) } }
+        Keys.compilerOptions set { Keys.buildScript.get().buildFlags }
+        Keys.compile set { Keys.buildScript.get().scriptJar }
+        Keys.resourceFiles set { emptyList() }
+        Keys.sourceFiles set { Keys.buildScript.get().sources }
     }
 }

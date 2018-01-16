@@ -1,6 +1,6 @@
 # Things to do next
 
-1. Remove BuildScriptIntrospection map
+1. Pretty printer for libraryDependencies
 
 1. Self hosting
 

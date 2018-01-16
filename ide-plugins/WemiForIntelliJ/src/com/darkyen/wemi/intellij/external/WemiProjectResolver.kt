@@ -233,10 +233,10 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
         // Build scripts
         listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving build script modules"))
-        for (buildScript in session.jsonArray(project = null, task = "#buildScripts", includeUserConfigurations = false)) {
+        session.jsonObject(project = null, task = "#buildScript", includeUserConfigurations = false).let { buildScript ->
             // Retrieve info
             val buildFolder = buildScript.getString("buildFolder")
-            val projectsUnderBuildScript = buildScript.get("projects").asStringArray()
+            val projectsUnderBuildScript:Collection<String> = projects.keys
             val name = projectsUnderBuildScript.joinToString("-", postfix = "-build")
             val classpath = buildScript.get("classpath").asStringArray().map { File(it) }
             val scriptJar = buildScript.getString("scriptJar")
@@ -265,15 +265,18 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 libraryData.addPath(LibraryPathType.BINARY, artifact.path)
             }
             if (projectsUnderBuildScript.isNotEmpty()) {
+                //TODO This is slightly ugly
+                val projectToUseToDownloadSources = projectsUnderBuildScript.iterator().next()
+
                 if (settings.downloadSources) {
-                    for ((_, dependencies) in createWemiProjectDependencies(session, projectsUnderBuildScript[0], "wemiBuildScript", "retrievingSources")) {
+                    for ((_, dependencies) in createWemiProjectDependencies(session, projectToUseToDownloadSources, "wemiBuildScript", "retrievingSources")) {
                         for (dependency in dependencies) {
                             libraryData.addPath(LibraryPathType.SOURCE, dependency.artifact.path)
                         }
                     }
                 }
                 if (settings.downloadDocs) {
-                    for ((_, dependencies) in createWemiProjectDependencies(session, projectsUnderBuildScript[0], "wemiBuildScript", "retrievingDocs")) {
+                    for ((_, dependencies) in createWemiProjectDependencies(session, projectToUseToDownloadSources, "wemiBuildScript", "retrievingDocs")) {
                         for (dependency in dependencies) {
                             libraryData.addPath(LibraryPathType.DOC, dependency.artifact.path)
                         }
@@ -324,7 +327,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
     }
 
     private fun createWemiProjectDependencies(session: WemiLauncherSession, projectName: String, vararg config: String): Map<String, List<WemiLibraryDependency>> {
-        val dependencies = mutableMapOf<String, MutableList<WemiLibraryDependency>>()
+        val dependencies = LinkedHashMap<String, MutableList<WemiLibraryDependency>>()
 
         fun add(id:String, dep:WemiLibraryDependency) {
             dependencies.getOrPut(id) { mutableListOf() }.add(dep)

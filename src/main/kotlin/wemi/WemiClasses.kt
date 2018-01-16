@@ -287,7 +287,7 @@ class Scope internal constructor(
         val allModifiersReverse: ArrayList<BoundKeyValueModifier<Value>> = ArrayList()
 
         var scope: Scope = this
-        while (true) {
+        searchForValue@ while (true) {
             // Check the cache
             if (key.cached) {
                 val maybeCachedValue = getCached(key)
@@ -316,7 +316,7 @@ class Scope internal constructor(
 
                     foundValue = lazyValue()
                     foundValueValid = true
-                    break
+                    break@searchForValue
                 }
             }
 
