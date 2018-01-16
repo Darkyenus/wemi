@@ -1,7 +1,5 @@
 # Things to do next
 
-1. Pretty printer for libraryDependencies
-
 1. Self hosting
 
 1. Update to latest kotlin

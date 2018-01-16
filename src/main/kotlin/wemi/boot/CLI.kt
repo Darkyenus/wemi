@@ -152,13 +152,15 @@ object CLI {
         return format(text, format = Format.Underline)
     }
 
+    const val ANSI_ESCAPE = '\u001B'
+
     /**
      * Format given char sequence using supplied parameters.
      */
     fun format(text: CharSequence, foreground: Color? = null, background: Color? = null, format: Format? = null): CharSequence {
         if (!TerminalColor.COLOR_SUPPORTED || (foreground == null && background == null && format == null)) return text
         val sb = StringBuilder()
-        sb.append("\u001B[")
+        sb.append("$ANSI_ESCAPE[")
         if (foreground != null) {
             sb.append(30 + foreground.offset)
             sb.append(';')
@@ -173,7 +175,7 @@ object CLI {
         }
         sb.setCharAt(sb.length - 1, 'm')
         sb.append(text)
-        sb.append("\u001B[0m")
+        sb.append("$ANSI_ESCAPE[0m")
         return sb
     }
 
@@ -257,12 +259,31 @@ object CLI {
                             println(formatLabel("): "))
 
                             for (item: Any? in data) {
-                                println("  " + formatValue(PrettyPrinter.toString(item)))
+                                print("  ")
+                                if (item is WithDescriptiveString) {
+                                    val valueText = item.toDescriptiveAnsiString()
+                                    if (valueText.contains(ANSI_ESCAPE)) {
+                                        println(valueText)
+                                    } else {
+                                        println(formatValue(valueText))
+                                    }
+                                } else {
+                                    println(formatValue(PrettyPrinter.toString(item)))
+                                }
                             }
                         }
                         else -> {
                             print(formatLabel(": "))
-                            println(formatValue(PrettyPrinter.toString(data)))
+                            if (data is WithDescriptiveString) {
+                                val valueText = data.toDescriptiveAnsiString()
+                                if (valueText.contains(ANSI_ESCAPE)) {
+                                    println(valueText)
+                                } else {
+                                    println(formatValue(valueText))
+                                }
+                            } else {
+                                println(formatValue(PrettyPrinter.toString(data)))
+                            }
                         }
                     }
                 }

@@ -4,6 +4,7 @@ import com.esotericsoftware.jsonbeans.Json
 import org.slf4j.LoggerFactory
 import wemi.boot.MachineWritable
 import wemi.collections.TinyMap
+import wemi.util.WithDescriptiveString
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -168,12 +169,21 @@ val DefaultExclusions = listOf(
 /** Represents dependency on a [dependencyId], with transitive dependencies, which may be excluded by [exclusions].
  *
  * @param exclusions to filter transitive dependencies with. [DefaultExclusions] by default. */
-data class Dependency(val dependencyId: DependencyId, val exclusions: List<DependencyExclusion> = DefaultExclusions) : MachineWritable {
+data class Dependency(val dependencyId: DependencyId, val exclusions: List<DependencyExclusion> = DefaultExclusions) : MachineWritable, WithDescriptiveString {
+
     override fun writeMachine(json: Json) {
         json.writeObjectStart()
         json.writeValue("id", dependencyId, DependencyId::class.java)
         json.writeValue("exclusions", exclusions, List::class.java)
         json.writeObjectEnd()
+    }
+
+    override fun toDescriptiveAnsiString(): String {
+        return if (exclusions === DefaultExclusions) {
+            dependencyId.toString()
+        } else {
+            "$dependencyId, exclusions= $exclusions"
+        }
     }
 }
 
