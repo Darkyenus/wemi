@@ -31,30 +31,89 @@ typealias BoundKeyValue<Value> = Scope.() -> Value
 /** Value modifier that can be additionally bound to a key in [BindingHolder] */
 typealias BoundKeyValueModifier<Value> = Scope.(Value) -> Value
 
+/**
+ * Create a new [Project].
+ * To be used as a variable delegate target, example:
+ * ```
+ * val myProject by project(path(".")) {
+ *      // Init
+ *      projectGroup set {"com.example.my.group"}
+ * }
+ * ```
+ * These variables must be declared in the file-level scope of the build script.
+ * Creating projects elsewhere will lead to an undefined behavior.
+ *
+ * @param projectRoot path from which all other paths in the project are derived from
+ * @param initializer function which creates key value bindings for the [Project]
+ */
 fun project(projectRoot: Path, initializer: Project.() -> Unit): ProjectDelegate {
     return ProjectDelegate(projectRoot, initializer)
 }
 
+/**
+ * Create a new [Key] with a default value
+ * To be used as a variable delegate target, example:
+ * ```
+ * val mySetting by key<String>("Key to store my setting")
+ * ```
+ * These variables must be declared in the file-level scope or in an `object`.
+ *
+ * Two keys must not share the same name. Key name is derived from the name of the variable this
+ * key delegate is created by. (Key in example would be called `mySetting`.)
+ *
+ * @param description of the key, to be shown in help UI
+ * @param defaultValue of the key, used when no binding exists. NOTE: Default value is NOT LAZY like standard binding!
+ *          This same instance will be returned on each return, in every scope, so it MUST be immutable!
+ *          Recommended to be used only for keys of [Collection]s with empty immutable default.
+ * @param cached true if the successful result key evaluation should be stored in the scope for future evaluations.
+ *          Recommended to be used only for those keys, that will not change during
+ */
 fun <Value> key(description: String, defaultValue: Value, cached: Boolean = false, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
     return KeyDelegate(description, true, defaultValue, cached, prettyPrinter)
 }
 
+/**
+ * Create a new [Key] without default value.
+ *
+ * @see [key] with default value for exact documentation
+ */
 fun <Value> key(description: String, cached: Boolean = false, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
     return KeyDelegate(description, false, null, cached, prettyPrinter)
 }
 
-fun configuration(description: String, parent: Configuration?, initializer: Configuration.() -> Unit): ConfigurationDelegate {
+/**
+ * Create a new [Configuration].
+ * To be used as a variable delegate target, example:
+ * ```
+ * val myConfiguration by configuration("Configuration for my stuff") {
+ *      // Set what the configuration will change
+ *      libraryDependencies add { dependency("com.example:library:1.0") }
+ * }
+ * ```
+ * These variables must be declared in the file-level scope of the build script.
+ * Creating configurations elsewhere will lead to an undefined behavior.
+ *
+ * Two configurations must not share the same name. Configuration name is derived from the name of the variable this
+ * configuration delegate is created by. (Configuration in example would be called `myConfiguration`.)
+ *
+ * @param description of the configuration, to be shown in help UI
+ * @param parent of the new configuration, none (null) by default
+ * @param initializer function which creates key value bindings for the [Configuration]
+ */
+fun configuration(description: String, parent: Configuration? = null, initializer: Configuration.() -> Unit): ConfigurationDelegate {
     return ConfigurationDelegate(description, parent, initializer)
 }
 
-/** Convenience Dependency creator. */
+/** Convenience Dependency creator.
+ * Creates [Dependency] with default exclusions. */
 fun dependency(group: String, name: String, version: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>): Dependency {
     return Dependency(DependencyId(group, name, version, preferredRepository, attributes = mapOf(*attributes)))
 }
 
 /** Convenience Dependency creator.
  * @param groupNameVersion Gradle-like semicolon separated group, name and version of the dependency.
- *          If the amount of ':'s isn't exactly 2, or one of the triplet is empty, runtime exception is thrown. */
+ *          If the amount of ':'s isn't exactly 2, or one of the triplet is empty, runtime exception is thrown.
+ */
 fun dependency(groupNameVersion: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>): Dependency {
     val first = groupNameVersion.indexOf(':')
     val second = groupNameVersion.indexOf(':', startIndex = maxOf(first + 1, 0))
@@ -73,7 +132,13 @@ fun dependency(groupNameVersion: String, preferredRepository: Repository?, varar
     return dependency(group, name, version, preferredRepository, *attributes)
 }
 
-fun repository(name: String, url: String, checksum: Repository.M2.Checksum): Repository.M2 {
+/**
+ * Convenience [Repository.M2] creator.
+ *
+ * If the [url] is local, no cache is used. If it is not local (that is, not `file:`),
+ * [LocalM2Repository] is used as cache.
+ */
+fun repository(name: String, url: String, checksum: Repository.M2.Checksum = Repository.M2.Checksum.SHA1): Repository.M2 {
     val usedUrl = URL(url)
     return Repository.M2(name,
             usedUrl,
@@ -81,12 +146,17 @@ fun repository(name: String, url: String, checksum: Repository.M2.Checksum): Rep
             checksum)
 }
 
+/**
+ * Convenience creator of dependencies on kotlin libraries.
+ *
+ * Returns dependency on `org.jetbrains.kotlin:kotlin-$name:$Keys.kotlinVersion}`.
+ *
+ * Example possible `name` values:
+ * - `stdlib` standard Kotlin library
+ * - `reflect` reflection support library
+ * - `stdlib-jdk8` standard library extension for Java 8 JVM
+ * - And more, see http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.jetbrains.kotlin%22
+ */
 fun Scope.kotlinDependency(name: String): Dependency {
     return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-" + name, Keys.kotlinVersion.get().string, MavenCentral))
 }
-
-val Scope.KotlinStdlib: Dependency
-    get() = kotlinDependency("stdlib")
-
-val Scope.KotlinReflect: Dependency
-    get() = kotlinDependency("reflect")

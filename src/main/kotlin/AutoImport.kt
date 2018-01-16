@@ -4,8 +4,6 @@ import wemi.Configurations
 import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository
 import java.nio.file.Paths
-import wemi.KotlinReflect as _KotlinReflect
-import wemi.KotlinStdlib as _KotlinStdLib
 import wemi.kotlinDependency as _kotlinDependency
 import wemi.dependency.dependency as _dependency
 import wemi.test.JUnitAPI as _JUnitAPI
@@ -38,10 +36,6 @@ inline fun repository(name: String, url: String, checksum: Repository.M2.Checksu
 
 // Helper functions
 inline fun Scope.kotlinDependency(name: String) = _kotlinDependency(name)
-val Scope.KotlinStdlib
-    inline get() = _KotlinStdLib
-val Scope.KotlinReflect
-    inline get() = _KotlinReflect
 val Scope.JUnitAPI
     inline get() = _JUnitAPI
 val Scope.JUnitEngine

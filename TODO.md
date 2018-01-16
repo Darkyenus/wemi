@@ -11,8 +11,6 @@
 1. Trace debug mode
 	1. Trace debug system for debugging keys (+ print current key trace on first Ctrl-T/C and java stack trace on second Ctrl-T with same key trace)
 
-1. Javadoc everything
-
 1. New project wizard (IDE)
 
 1. Allow projects to inherit from parent project configuration/config set

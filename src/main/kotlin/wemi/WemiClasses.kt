@@ -1,4 +1,4 @@
-@file:Suppress("unused")
+@file:Suppress("unused", "MemberVisibilityCanPrivate")
 
 package wemi
 
@@ -12,16 +12,38 @@ import wemi.compile.CompilerFlags
 import wemi.util.WithDescriptiveString
 import java.nio.file.Path
 
-/** wemi.Key which can have value of type [Value] assigned, through [Project] or [Configuration]. */
-class Key<Value> internal constructor(val name: String,
-                                      val description: String,
-                                      /** True if defaultValue is set, false if not.
-                                       * Needed, because we don't know whether or not is [Value] nullable
-                                       * or not, so we need to know if we should return null or not. */
-                                      internal val hasDefaultValue: Boolean,
-                                      internal val defaultValue: Value?,
-                                      internal val cached: Boolean,
-                                      internal val prettyPrinter: ((Value) -> CharSequence)?) : WithDescriptiveString, MachineWritable {
+/** 
+ * Key which can have value of type [Value] assigned, through [Project] or [Configuration].
+ */
+class Key<Value> internal constructor(
+        /**
+         * Name of the key. Specified by the variable name this key was declared at.
+         */
+        val name: String,
+        /**
+         * Human readable description of this key.
+         * Values bound to this key should follow this as a specification.
+         */
+        val description: String,
+        /** True if defaultValue is set, false if not.
+         * Needed, because we don't know whether or not is [Value] nullable
+         * or not, so we need to know if we should return null or not. */
+        internal val hasDefaultValue: Boolean,
+        /**
+         * Default value used for this key, when no other value is bound.
+         */
+        internal val defaultValue: Value?,
+        /**
+         * True if results of this key's evaluation should be cached by the scope in which it was evaluated.
+         */
+        internal val cached: Boolean,
+        /**
+         * Optional function that can convert the result of this key's evaluation to a more readable
+         * or more informative string.
+         *
+         * Called when the key is evaluated in CLI top level.
+         */
+        internal val prettyPrinter: ((Value) -> CharSequence)?) : WithDescriptiveString, MachineWritable {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -38,10 +60,16 @@ class Key<Value> internal constructor(val name: String,
         return name.hashCode()
     }
 
+    /**
+     * Returns [name]
+     */
     override fun toString(): String {
         return name
     }
 
+    /**
+     * Returns [name] - [description]
+     */
     override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} - $description"
 
     override fun writeMachine(json: Json) {
@@ -54,15 +82,32 @@ class Key<Value> internal constructor(val name: String,
     }
 }
 
+/**
+ * Configuration is a layer of bindings that can be added to the [Scope].
+ *
+ * Configuration's bound values is the sum of it's [parent]'s values and own values, where own ones override
+ * parent ones, if any.
+ *
+ * @param name of the configuration. Specified by the variable name this configuration was declared at.
+ * @param description to be displayed in the CLI as help
+ * @param parent of the [Configuration]
+ * @see BindingHolder for info about how the values are bound
+ */
 class Configuration internal constructor(val name: String,
                                          val description: String,
                                          val parent: Configuration?)
     : BindingHolder(), WithDescriptiveString, MachineWritable {
 
+    /**
+     * @return [name]
+     */
     override fun toString(): String {
         return name
     }
 
+    /**
+     * @return [name] - [description]
+     */
     override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} - \"$description\""
 
     override fun writeMachine(json: Json) {
@@ -75,25 +120,61 @@ class Configuration internal constructor(val name: String,
 
 private val AnonymousConfigurationDescriptiveAnsiString = CLI.format("<anonymous>", format = CLI.Format.Bold).toString()
 
+/**
+ * A special version of [Configuration] that is anonymous and can be created at runtime, any time.
+ * Unlike full configuration, does not have name, description, nor parent.
+ *
+ * @see [Scope.using] about creation of these
+ */
 class AnonymousConfiguration @PublishedApi internal constructor() : BindingHolder(), WithDescriptiveString {
+    /**
+     * @return <anonymous>
+     */
     override fun toDescriptiveAnsiString(): String = AnonymousConfigurationDescriptiveAnsiString
 }
 
+/**
+ * Holds information about configuration extensions made by [BindingHolder.extend].
+ * Values bound to this take precedence over the values [extending],
+ * like values in [Configuration] take precedence over those in [Configuration.parent].
+ *
+ * @param extending which configuration is being extended by this extension
+ * @param from which this extension has been created, mostly for debugging
+ */
 class ConfigurationExtension internal constructor(val extending: Configuration, val from: BindingHolder) : BindingHolder() {
+    /**
+     * @return extend([extending]) from [from]
+     */
     override fun toString(): String = "extend($extending) from $from"
 }
 
+/**
+ * Configuration is a base binding layer for a [Scope].
+ *
+ * @param name of the configuration. Specified by the variable name this project was declared at.
+ * @param projectRoot at which this [Project] is located at in the filesystem
+ * @see BindingHolder for info about how the values are bound
+ */
 class Project internal constructor(val name: String, val projectRoot: Path)
     : BindingHolder(), WithDescriptiveString, MachineWritable {
 
+    /**
+     * @return [name]
+     */
     override fun toString(): String = name
 
+    /**
+     * @return [name] at [projectRoot]
+     */
     override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} at $projectRoot"
 
     override fun writeMachine(json: Json) {
         json.writeValue(name as Any, String::class.java)
     }
 
+    /**
+     * Scope for this [Project]. This is how where scopes start.
+     */
     val projectScope: Scope = Scope(name, listOf(this), null)
 }
 
@@ -157,6 +238,9 @@ class Scope internal constructor(
         return Scope("<anonymous>", listOf(anonymousConfiguration), this)
     }
 
+    /**
+     * Run the [action] in a scope, which is created by layering [configurations] over this [Scope].
+     */
     inline fun <Result> Scope.using(vararg configurations: Configuration, action: Scope.() -> Result): Result {
         var scope = this
         for (configuration in configurations) {
@@ -165,6 +249,9 @@ class Scope internal constructor(
         return scope.action()
     }
 
+    /**
+     * Run the [action] in a scope, which is created by layering [configurations] over this [Scope].
+     */
     inline fun <Result> Scope.using(configurations: Collection<Configuration>, action: Scope.() -> Result): Result {
         var scope = this
         for (configuration in configurations) {
@@ -173,10 +260,19 @@ class Scope internal constructor(
         return scope.action()
     }
 
+    /**
+     * Run the [action] in a scope, which is created by layering [configuration] over this [Scope].
+     */
     inline fun <Result> Scope.using(configuration: Configuration, action: Scope.() -> Result): Result {
         return scopeFor(configuration).action()
     }
 
+    /**
+     * Run the [action] in a scope, which is created by layering new anonymous configuration,
+     * created by the [anonInitializer], over this [Scope].
+     *
+     * @param anonInitializer initializer of the anonymous scope. Works exactly like standard [Configuration] initializer
+     */
     inline fun <Result> Scope.using(anonInitializer: AnonymousConfiguration.() -> Unit,
                                     action: Scope.() -> Result): Result {
         val anonConfig = AnonymousConfiguration()
@@ -288,11 +384,17 @@ class Scope internal constructor(
         }
     }
 
+    /**
+     * Forget cached values stored in this and descendant caches.
+     *
+     * @return amount of values forgotten
+     * @see Key.cached
+     */
     internal fun cleanCache(): Int {
         synchronized(this) {
             val valueCache = this.valueCache
             this.valueCache = null
-            return valueCache?.size ?: 0
+            return (valueCache?.size ?: 0) + configurationScopeCache.values.sumBy { it.cleanCache() }
         }
     }
 
@@ -306,6 +408,9 @@ class Scope internal constructor(
         }
     }
 
+    /**
+     * @return scope in the standard syntax, i.e. project/config1:config2:
+     */
     override fun toString(): String {
         val sb = StringBuilder()
         buildToString(sb)
@@ -323,7 +428,7 @@ private val LOG: Logger = LoggerFactory.getLogger("BindingHolder")
  * Also provides ways to set them during the object's initialization.
  * After the initialization, the holder is locked and no further modifications are allowed.
  *
- * [BindingHolder] forms a basic element of a [Scope].
+ * [BindingHolder] instances form building elements of a [Scope].
  */
 sealed class BindingHolder {
 

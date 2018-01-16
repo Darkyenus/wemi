@@ -50,6 +50,9 @@ internal class InputBase(private val interactive: Boolean) : Input() {
 
 }
 
+/**
+ * Get command input history for given input key
+ */
 private fun getHistory(key: String): History {
     return SimpleHistory.getHistory("input.$key")
 }

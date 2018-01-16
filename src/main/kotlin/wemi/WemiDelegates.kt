@@ -19,6 +19,11 @@ internal object BuildScriptData {
     val AllConfigurations: MutableMap<String, Configuration> = Collections.synchronizedMap(mutableMapOf<String, Configuration>())
 }
 
+/**
+ * Delegate used when declaring a new [Project].
+ *
+ * Mostly boilerplate, but takes care of creating, initializing and registering the [Project].
+ */
 class ProjectDelegate internal constructor(
         private val projectRoot: Path,
         private val initializer: Project.() -> Unit
@@ -53,6 +58,11 @@ class ProjectDelegate internal constructor(
     override fun getValue(thisRef: Any?, property: KProperty<*>): Project = project
 }
 
+/**
+ * Delegate used when declaring a new [Key].
+ *
+ * Mostly boilerplate, but takes care of creating and registering the [Key].
+ */
 class KeyDelegate<Value> internal constructor(
         private val description: String,
         private val hasDefaultValue: Boolean,
@@ -78,6 +88,11 @@ class KeyDelegate<Value> internal constructor(
     override fun getValue(thisRef: Any?, property: KProperty<*>): Key<Value> = key
 }
 
+/**
+ * Delegate used when declaring a new [Configuration].
+ *
+ * Mostly boilerplate, but takes care of creating, initializing and registering the [Configuration].
+ */
 class ConfigurationDelegate internal constructor(
         private val description: String,
         private val parent: Configuration?,

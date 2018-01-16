@@ -32,6 +32,11 @@ import java.util.zip.ZipFile
 import kotlin.collections.ArrayList
 import kotlin.collections.LinkedHashSet
 
+/**
+ * Contains default values bound to keys.
+ *
+ * This includes implementations of most tasks.
+ */
 object KeyDefaults {
 
     val BuildDirectory: BoundKeyValue<Path> = { Keys.projectRoot.get() / "build" }
@@ -655,7 +660,7 @@ object KeyDefaults {
 
         Keys.repositories set { DefaultRepositories }
         Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
-        Keys.libraryDependencies set { listOf(KotlinStdlib) }
+        Keys.libraryDependencies set { listOf(kotlinDependency("stdlib")) }
         Keys.resolvedLibraryDependencies set ResolvedLibraryDependencies
         Keys.internalClasspath set InternalClasspath
         Keys.externalClasspath set ExternalClasspath

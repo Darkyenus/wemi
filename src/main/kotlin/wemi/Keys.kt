@@ -16,7 +16,7 @@ import java.nio.file.Path
 import javax.tools.JavaCompiler
 
 /**
- *
+ * Declarations of all basic Wemi keys.
  */
 @Suppress("RemoveExplicitTypeArguments")
 object Keys {
