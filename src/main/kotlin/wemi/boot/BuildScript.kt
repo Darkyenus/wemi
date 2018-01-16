@@ -17,13 +17,6 @@ import java.nio.file.Paths
 private val LOG = LoggerFactory.getLogger("BuildFiles")
 
 /**
- * Kotlin std-lib dependency used when compiling the build scripts.
- *
- * TODO Shouldn't be the stdlib in wemi enough?
- */
-val BuildFileStdLib = Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-stdlib", WemiKotlinVersion.string))
-
-/**
  * Extensions that a valid Wemi build script file have.
  * Without leading dot.
  */
@@ -123,8 +116,6 @@ internal fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildSc
     val buildFlags = CompilerFlags()
     buildFlags[KotlinJVMCompilerFlags.compilingWemiBuildFiles] = true
     buildFlags[KotlinJVMCompilerFlags.moduleName] = combinedBuildFileName
-    // Wemi launcher has kotlin runtime bundled, which is fine
-    buildFlags[KotlinJVMCompilerFlags.skipRuntimeVersionCheck] = true
 
     val sources = buildScriptSources.map { LocatedFile(it) }
 
@@ -137,6 +128,7 @@ internal fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildSc
 
         val wemiLauncherJar = wemiLauncherFileWithJarExtension(cacheFolder)
 
+        // Wemi also contains Kotlin runtime
         classpath.add(wemiLauncherJar)
         val resolved = HashMap<DependencyId, ResolvedDependency>()
         val resolutionOk = DependencyResolver.resolve(resolved, classpathConfiguration.dependencies, classpathConfiguration.repositoryChain)
@@ -217,7 +209,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
     private fun resolve() {
         val repositories = mutableListOf<Repository>()
         repositories.addAll(DefaultRepositories)
-        val buildDependencyLibraries = mutableListOf(BuildFileStdLib)
+        val buildDependencyLibraries = ArrayList<Dependency>()
 
         for (source in buildScriptSources) {
             var lineNumber = 0
