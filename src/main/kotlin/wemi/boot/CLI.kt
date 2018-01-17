@@ -187,7 +187,7 @@ object CLI {
     }
 
     /**
-     * Evaluates the key and prints human readable, formatted output.
+     * Evaluates the key or command and prints human readable, formatted output.
      */
     fun evaluateAndPrint(task: Task): TaskEvaluationResult {
         if (task.couldBeCommand) {
