@@ -55,7 +55,7 @@ class Task(
      *
      * @param defaultProject to be used if no project is supplied
      */
-    fun evaluate(defaultProject:Project?): TaskEvaluationResult {
+    fun evaluateKey(defaultProject:Project?): TaskEvaluationResult {
         var project: Project? = defaultProject
         val configurations = mutableListOf<Configuration>()
 
@@ -185,7 +185,9 @@ enum class TaskEvaluationStatus {
     /** Data contains [WemiException.KeyNotAssignedException] */
     NotAssigned,
     /** Data contains [WemiException] */
-    Exception
+    Exception,
+    /** Task was command, data is null */
+    Command
 }
 
 /**

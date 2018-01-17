@@ -236,17 +236,18 @@ fun main(args: Array<String>) {
     } else {
         CLI.init(root)
 
+        var lastTaskResult: TaskEvaluationResult? = null
+
         val formattedErrors = taskTokens.formattedErrors(true)
         if (formattedErrors.hasNext()) {
             println(format("Errors in task input:", Color.Red))
             do {
                 println(formattedErrors.next())
             } while (formattedErrors.hasNext())
-        }
-
-        var lastTaskResult: TaskEvaluationResult? = null
-        for (task in tasks) {
-            lastTaskResult = CLI.evaluateKeyAndPrint(task)
+        } else {
+            for (task in tasks) {
+                lastTaskResult = CLI.evaluateAndPrint(task)
+            }
         }
 
         if (interactive) {

@@ -189,13 +189,21 @@ object CLI {
     /**
      * Evaluates the key and prints human readable, formatted output.
      */
-    fun evaluateKeyAndPrint(task: Task): TaskEvaluationResult {
+    fun evaluateAndPrint(task: Task): TaskEvaluationResult {
+        if (task.couldBeCommand) {
+            val commandFunction = commands[task.key]
+            if (commandFunction != null) {
+                return commandFunction(task)
+                        ?: TaskEvaluationResult(null, null, TaskEvaluationStatus.Command)
+            }
+        }
+
         // TODO Ideally, this would get rewritten with Done message if nothing was written between them
         print(formatLabel("→ "))
         println(formatInput(task.key))
 
         val beginTime = System.currentTimeMillis()
-        val keyEvaluationResult = task.evaluate(defaultProject)
+        val keyEvaluationResult = task.evaluateKey(defaultProject)
         val (key, data, status) = keyEvaluationResult
         val duration = System.currentTimeMillis() - beginTime
 
@@ -297,6 +305,7 @@ object CLI {
                     LOG.debug("Error while evaluating $task", we)
                 }
             }
+            TaskEvaluationStatus.Command -> throw IllegalArgumentException() // evaluateKey will not return this
         }
 
         if (duration > 100) {
@@ -309,7 +318,7 @@ object CLI {
     /**
      * Known CLI commands.
      */
-    private val commands: Map<String, (Task) -> Unit> = HashMap<String, (Task) -> Unit>().apply {
+    private val commands: Map<String, (Task) -> TaskEvaluationResult?> = HashMap<String, (Task) -> TaskEvaluationResult?>().apply {
         put("exit") {
             throw EndOfFileException()
         }
@@ -325,6 +334,7 @@ object CLI {
                     defaultProject = project
                 }
             }
+            null
         }
 
         fun printLabeled(label: String, items: Map<String, WithDescriptiveString>) {
@@ -336,15 +346,20 @@ object CLI {
         }
         put("projects") {
             printLabeled("project", AllProjects)
+            null
         }
         put("configurations") {
             printLabeled("configuration", AllConfigurations)
+            null
         }
         put("keys") {
             printLabeled("key", AllKeys)
+            null
         }
 
         put("trace") { task ->
+            var result:TaskEvaluationResult? = null
+
             val tasks = task.input.filter { it.first == null || it.first == "task" }
             if (tasks.isEmpty()) {
                 printWarning("trace <task> - trace task invocation")
@@ -354,7 +369,7 @@ object CLI {
 
                 for ((_, taskText) in tasks) {
                     useKeyEvaluationListener(treePrintingListener) {
-                        evaluateCommand(taskText)
+                        result = evaluateLine(taskText)
                     }
                     treePrintingListener.toTree(sb)
 
@@ -369,6 +384,8 @@ object CLI {
                     treePrintingListener.reset()
                 }
             }
+
+            result
         }
 
         put("log") { task ->
@@ -389,6 +406,7 @@ object CLI {
                     }
                 }
             }
+            null
         }
         put("help") {
             println(formatLabel("Wemi $WemiVersion (Kotlin $WemiKotlinVersion)"))
@@ -399,15 +417,18 @@ object CLI {
                     "the project in 'projectVersion' key or complex operation, like compiling and running in 'run' key.\n" +
                     "To evaluate the key, simply type its name. If you want to run the key in a different project or\n" +
                     "in a configuration, prefix it with its name and slash, for example: desktop/run")
+            null
         }
     }
 
     /**
      * Evaluate command or task from the REPL.
+     *
+     * @return result of last task evaluation, if any
      */
-    private fun evaluateCommand(command: String) {
+    private fun evaluateLine(command: String):TaskEvaluationResult? {
         if (command.isBlank()) {
-            return
+            return null
         }
 
         val parsedTokens = TaskParser.parseTokens(command, 0)
@@ -419,20 +440,14 @@ object CLI {
             do {
                 println(errors.next())
             } while (errors.hasNext())
-            return
+            return null
         }
 
+        var lastResult:TaskEvaluationResult? = null
         for (task in tasks) {
-            if (task.couldBeCommand) {
-                val commandFunction = commands[task.key]
-                if (commandFunction != null) {
-                    commandFunction(task)
-                    continue
-                }
-            }
-
-            evaluateKeyAndPrint(task)
+            lastResult = evaluateAndPrint(task)
         }
+        return lastResult
     }
 
     /**
@@ -450,7 +465,7 @@ object CLI {
                     continue
                 }
 
-                evaluateCommand(line)
+                evaluateLine(line)
             } catch (interrupt: UserInterruptException) {
                 // User wants to delete written line or exit
                 if (interrupt.partialLine.isNullOrEmpty()) {

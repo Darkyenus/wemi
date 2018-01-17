@@ -365,7 +365,7 @@ object TaskParser : Parser {
                 current.append('\\')
             }
 
-            endWord(true)
+            endWord(argument.isEmpty())
         }
 
         return words
