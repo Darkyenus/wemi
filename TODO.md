@@ -1,7 +1,5 @@
 # Things to do next
 
-1. Make sure that ./wemi invocation works no matter from where it is invoked
-
 1. Self hosting
 
 1. Update to latest kotlin

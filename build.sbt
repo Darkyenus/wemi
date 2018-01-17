@@ -46,8 +46,9 @@ assemblyMergeStrategy in assembly := {stuff => if (stuff.endsWith(".kotlin_modul
 
 mainClass in assembly := Some("wemi.boot.MainKt")
 
-import sbtassembly.AssemblyPlugin.defaultShellScript
-
-assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(defaultShellScript))
+assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(Seq(
+  "#!/usr/bin/env sh\n" +
+    "exec java -XstartOnFirstThread -jar \"$0\" -root=$(dirname \"$0\") \"$@\"\n"
+)))
 
 assemblyJarName in assembly := s"wemi"

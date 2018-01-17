@@ -28,15 +28,18 @@ val WemiBuildFileExtensions = listOf("wemi", "wemi.kt")
 internal fun findBuildScriptSources(buildFolder: Path): List<Path> {
     var result: ArrayList<Path>? = null
 
-    Files.newDirectoryStream(buildFolder).use { stream ->
-        for (path in stream) {
-            if (!path.isDirectory() && !path.isHidden() && !path.name.startsWith('.') && path.name.pathHasExtension(WemiBuildFileExtensions)) {
-                var r = result
-                if (r == null) {
-                    r = ArrayList()
-                    result = r
+    if (buildFolder.isDirectory()) {
+        Files.newDirectoryStream(buildFolder).use { stream ->
+            for (path in stream) {
+                if (!path.isDirectory() && !path.isHidden() && !path.name.startsWith('.')
+                        && path.name.pathHasExtension(WemiBuildFileExtensions)) {
+                    var r = result
+                    if (r == null) {
+                        r = ArrayList()
+                        result = r
+                    }
+                    r.add(path)
                 }
-                r.add(path)
             }
         }
     }

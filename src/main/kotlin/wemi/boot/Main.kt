@@ -7,6 +7,7 @@ import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TimeFormatter
 import org.slf4j.LoggerFactory
 import wemi.Configurations
+import wemi.WemiKotlinVersion
 import wemi.WemiVersion
 import wemi.WithExitCode
 import wemi.util.*
@@ -63,6 +64,7 @@ fun main(args: Array<String>) {
     var interactive = false
     var machineReadableOutput = false
     var allowBrokenBuildScripts = false
+    var root = Paths.get(".").toAbsolutePath()
 
     var parsingOptions = true
 
@@ -71,6 +73,8 @@ fun main(args: Array<String>) {
             if (arg == "--") {
                 parsingOptions = false
             } else if (arg.startsWith("-")) {
+                val ROOT_PREFIX = "-root="
+
                 // Parse options
                 if (arg == "-clean") {
                     cleanBuild = true
@@ -84,6 +88,18 @@ fun main(args: Array<String>) {
                     TPLogger.WARN()
                 } else if (arg == "-log=error") {
                     TPLogger.ERROR()
+                } else if (arg.startsWith(ROOT_PREFIX, ignoreCase = true)) {
+                    val newRoot = Paths.get(arg.substring(ROOT_PREFIX.length)).toAbsolutePath()
+                    if (newRoot.isDirectory()) {
+                        root = newRoot
+                    } else {
+                        errors++
+                        if (newRoot.exists()) {
+                            println("Can't use $newRoot as root, not a directory")
+                        } else {
+                            println("Can't use $newRoot as root, not exists")
+                        }
+                    }
                 } else if (arg == "-i" || arg == "-interactive") {
                     interactive = true
                 } else if (arg == "-machineReadableOutput") {
@@ -91,9 +107,9 @@ fun main(args: Array<String>) {
                 } else if (arg == "-allowBrokenBuildScripts") {
                     allowBrokenBuildScripts = true
                 } else if (arg == "-v" || arg == "-version") {
-                    println("WEMI $WemiVersion with Kotlin $KotlinVersion")
+                    println("Wemi $WemiVersion with Kotlin $WemiKotlinVersion")
                 } else if (arg == "-?" || arg == "-h" || arg == "-help") {
-                    println("WEMI")
+                    println("Wemi")
                     println("  -clean")
                     println("      Rebuild build files")
                     println("  -log=<trace|debug|info|warn|error>")
@@ -104,6 +120,8 @@ fun main(args: Array<String>) {
                     println("      Print out machine readable output, interactivity must be specified explicitly, and allows to take commands from stdin")
                     println("  -allowBrokenBuildScripts")
                     println("      Do not quit on broken build scripts (normally would exit with $EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)")
+                    println("  -root=[folder]")
+                    println("      Start with [folder] as a root of the project")
                     println("  -v[ersion]")
                     println("      Print version")
                 } else {
@@ -140,9 +158,7 @@ fun main(args: Array<String>) {
 
     WemiRunningInInteractiveMode = interactive
 
-    // Find root
-    val root = Paths.get(".").toAbsolutePath()
-
+    LOG.trace("Starting Wemi from root: {}", root)
     val buildFolder = root / "build"
     val buildScriptSources = findBuildScriptSources(buildFolder)
 
@@ -171,11 +187,28 @@ fun main(args: Array<String>) {
         ))
     }
 
-    val buildScript = getCompiledBuildScript(root, buildFolder, buildScriptSources, cleanBuild)
+    val buildScript = run {
+        if (buildScriptSources.isEmpty()) {
+            if (allowBrokenBuildScripts) {
+                null
+            } else {
+                LOG.warn("No build script sources found in {}", buildFolder)
+                exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+            }
+        } else {
+            val compiledBuildScript = getCompiledBuildScript(root, buildFolder, buildScriptSources, cleanBuild)
+            if (compiledBuildScript == null) {
+                LOG.warn("Build script failed to compile")
+                if (allowBrokenBuildScripts) {
+                    null
+                } else {
+                    exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+                }
+            } else {
+                compiledBuildScript
+            }
 
-    if (!allowBrokenBuildScripts && buildScript == null) {
-        LOG.warn("Build script failed to compile")
-        exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+        }
     }
 
     // Load build files now
