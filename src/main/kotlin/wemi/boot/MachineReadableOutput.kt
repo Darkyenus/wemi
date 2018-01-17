@@ -138,6 +138,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
                 }
                 exitProcess(EXIT_CODE_MACHINE_OUTPUT_THROWN_EXCEPTION_ERROR)
             }
+            TaskEvaluationStatus.Command -> throw IllegalArgumentException()
         }
     } catch (e: Throwable) {
         LOG.error("Can't evaluate {} - fatal exception", task, e)

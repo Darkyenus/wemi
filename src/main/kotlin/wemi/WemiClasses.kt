@@ -288,36 +288,28 @@ class Scope internal constructor(
         val listener = activeKeyEvaluationListener
         listener?.keyEvaluationStarted(this, key)
 
+        // Check the cache
+        if (key.cached) {
+            val maybeCachedValue = getCached(key)
+            if (maybeCachedValue != null) {
+                listener?.keyEvaluationSucceeded(this, null, maybeCachedValue)
+                return maybeCachedValue
+            }
+        }
+
         var foundValue: Value? = key.defaultValue
         var foundValueValid = key.hasDefaultValue
         var holderOfFoundValue:BindingHolder? = null
         val allModifiersReverse: ArrayList<BoundKeyValueModifier<Value>> = ArrayList()
 
         var scope: Scope? = this
-        // At which scope should the value be cached?
-        // Assignment of concrete scope pins it, null = [scope]
-        var scopeForCache:Scope? = null
 
         searchForValue@ while (scope != null) {
-            // Check the cache
-            if (key.cached) {
-                val maybeCachedValue = scope.getCached(key)
-                if (maybeCachedValue != null) {
-                    listener?.keyEvaluationSucceeded(scope, null, maybeCachedValue)
-                    return maybeCachedValue
-                }
-            }
-
             // Retrieve the holder
             @Suppress("UNCHECKED_CAST")
             for (holder in scope.scopeBindingHolders) {
                 val holderModifiers = holder.modifierBindings[key] as ArrayList<BoundKeyValueModifier<Value>>?
                 if (holderModifiers != null && holderModifiers.isNotEmpty()) {
-                    if (scopeForCache != null) {
-                        // This is the lowest scope that modifies this key, so this is where the cache must be stored
-                        scopeForCache = scope
-                    }
-
                     listener?.keyEvaluationHasModifiers(scope, holder, holderModifiers.size)
 
                     allModifiersReverse.ensureCapacity(holderModifiers.size)
@@ -372,10 +364,8 @@ class Scope internal constructor(
 
             // Store in cache
             if (key.cached) {
-                if (scopeForCache != null) {
-                    scopeForCache.putCached(key, result)
-                } else if (scope != null) {
-                    scope.putCached(key, result)
+                if (scope != null) {
+                    putCached(key, result)
                 } // else the value is default value which does not need to be cached
             }
 

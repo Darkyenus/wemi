@@ -30,6 +30,7 @@ import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import kotlin.collections.ArrayList
+import kotlin.collections.LinkedHashMap
 import kotlin.collections.LinkedHashSet
 
 /**
@@ -365,9 +366,11 @@ object KeyDefaults {
                 MergeStrategy.Rename
             } else if (FileRecognition.isSystemJunkFile(name)) {
                 MergeStrategy.Discard
-            } else if (name.startsWith("META-INF/services/")) {
+            } else if (name.equals("META-INF/MANIFEST.MF", ignoreCase = true)) {
+                MergeStrategy.Rename
+            } else if (name.startsWith("META-INF/services/", ignoreCase = true)) {
                 MergeStrategy.Concatenate
-            } else if (name.startsWith("META-INF/")) {
+            } else if (name.startsWith("META-INF/", ignoreCase = true)) {
                 MergeStrategy.SingleOwn
             } else {
                 MergeStrategy.Deduplicate
@@ -377,19 +380,23 @@ object KeyDefaults {
 
     val AssemblyRenameFunction: BoundKeyValue<(AssemblySource, String) -> String?> = {
         { root, name ->
-            val injectedName = root.name
-            val extensionSeparator = name.lastIndexOf('.')
-            if (extensionSeparator == -1) {
-                name + '_' + injectedName
+            if (root.own) {
+                name
             } else {
-                name.substring(0, extensionSeparator) + '_' + injectedName + name.substring(extensionSeparator)
+                val injectedName = root.name
+                val extensionSeparator = name.lastIndexOf('.')
+                if (extensionSeparator == -1) {
+                    name + '_' + injectedName
+                } else {
+                    name.substring(0, extensionSeparator) + '_' + injectedName + name.substring(extensionSeparator)
+                }
             }
         }
     }
 
     private val AssemblyLOG = LoggerFactory.getLogger("Assembly")
     val Assembly: BoundKeyValue<Path> = {
-        val loadedSources = mutableMapOf<String, MutableList<AssemblySource>>()
+        val loadedSources = LinkedHashMap<String, ArrayList<AssemblySource>>()
 
         fun addSource(locatedFile: LocatedFile, own: Boolean) {
             val file = locatedFile.file
@@ -400,7 +407,7 @@ object KeyDefaults {
                     if (entry.isDirectory) continue
 
                     val path = entry.name
-                    loadedSources.getOrPut(path) { mutableListOf() }.add(object : AssemblySource(file, file, entry, own) {
+                    loadedSources.getOrPut(path) { ArrayList() }.add(object : AssemblySource(file, file, entry, own) {
 
                         override fun load(): ByteArray = zip.getInputStream(entry).readBytes(entry.size.toInt())
 
@@ -409,7 +416,7 @@ object KeyDefaults {
                 }
             } else {
                 // Add file entry
-                loadedSources.getOrPut(locatedFile.path) { mutableListOf() }.add(object : AssemblySource(locatedFile.root, file, null, own) {
+                loadedSources.getOrPut(locatedFile.path) { ArrayList() }.add(object : AssemblySource(locatedFile.root, file, null, own) {
 
                     override fun load(): ByteArray = Files.readAllBytes(file)
 
@@ -427,13 +434,13 @@ object KeyDefaults {
         }
 
         // Trim duplicates
-        val assemblySources = mutableMapOf<String, Pair<AssemblySource?, ByteArray>>()
+        val assemblySources = LinkedHashMap<String, Pair<AssemblySource?, ByteArray>>()
         val mergeStrategyFunction = Keys.assemblyMergeStrategy.get()
 
         var hasError = false
 
-        // Renaming has to be done later
-        val renamedPaths = mutableMapOf<String, MutableList<AssemblySource>>()
+        // Renaming has to be done later, because it is not yet known which paths are clean for renaming
+        val sourcesToBeRenamed = mutableMapOf<String, MutableList<AssemblySource>>()
 
         for ((path, dataList) in loadedSources) {
             if (dataList.size == 1) {
@@ -549,15 +556,15 @@ object KeyDefaults {
                     assemblySources[path] = Pair(dataList[0], data[0])
                 }
                 MergeStrategy.Rename -> {
-                    renamedPaths.put(path, dataList)
+                    sourcesToBeRenamed.put(path, dataList)
                 }
             }
         }
 
-        if (renamedPaths.isNotEmpty()) {
+        if (sourcesToBeRenamed.isNotEmpty()) {
             val renameFunction = Keys.assemblyRenameFunction.get()
 
-            for ((path, dataList) in renamedPaths) {
+            for ((path, dataList) in sourcesToBeRenamed) {
                 if (AssemblyLOG.isDebugEnabled) {
                     AssemblyLOG.debug("Renaming {} items at {}", dataList.size, path)
                 }
