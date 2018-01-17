@@ -62,6 +62,8 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
         while (true) {
             val result = decoder.decode(inputBuffer, outputBuffer, endOfInput)
             outputBuffer.flip()
+
+            outputSB.ensureCapacity(outputBuffer.limit())
             for (i in 0 until outputBuffer.limit()) {
                 val c = outputBuffer[i]
                 outputSB.append(c)
@@ -71,6 +73,8 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
                     flushLine()
                 }
             }
+            outputBuffer.position(0)
+            outputBuffer.limit(outputBuffer.capacity())
 
             if (result.isUnderflow) {
                 break

@@ -1,11 +1,14 @@
 # Things to do next
 
+1. ./wemi "trace compile" input does not work
+
+1. Make sure that ./wemi invocation works no matter from where it is invoked
+
 1. Self hosting
 
 1. Update to latest kotlin
 
-1. Trace debug mode
-	1. Trace debug system for debugging keys (+ print current key trace on first Ctrl-T/C and java stack trace on second Ctrl-T with same key trace)
+1. Trace debug system for debugging keys (+ print current key trace on first Ctrl-T/C and java stack trace on second Ctrl-T with same key trace)
 
 1. New project wizard (IDE)
 

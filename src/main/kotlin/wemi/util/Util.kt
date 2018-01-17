@@ -1,9 +1,8 @@
 package wemi.util
 
+import com.darkyen.tproll.util.TerminalColor
 import com.esotericsoftware.jsonbeans.Json
 import com.esotericsoftware.jsonbeans.JsonValue
-import wemi.boot.CLI
-import java.nio.file.Path
 import java.util.*
 
 /**
@@ -229,7 +228,7 @@ class Tokens<T, Memo>(val data: List<T>, private val limit: Int = data.size, def
             if (word in data.indices) {
                 sb.append('>')
                 if (colored) {
-                    sb.append(CLI.format(data[word].toString(), format = CLI.Format.Underline))
+                    sb.append(format(data[word].toString(), format = Format.Underline))
                 } else {
                     sb.append(data[word])
                 }
@@ -255,7 +254,7 @@ class Tokens<T, Memo>(val data: List<T>, private val limit: Int = data.size, def
             }
             sb.append('\n').append('⤷').append(' ')
             if (colored) {
-                sb.append(CLI.format(message, CLI.Color.Red))
+                sb.append(format(message, Color.Red))
             } else {
                 sb.append(message)
             }
@@ -440,7 +439,7 @@ fun <T> printTree(roots: Collection<TreeNode<T>>, result: StringBuilder = String
  *
  * @param value of this node
  */
-open class TreeNode<T>(val value: T) : ArrayList<TreeNode<T>>() {
+class TreeNode<T>(val value: T) : ArrayList<TreeNode<T>>() {
 
     fun find(value: T): TreeNode<T>? {
         return this.find { it.value == value }
@@ -449,4 +448,63 @@ open class TreeNode<T>(val value: T) : ArrayList<TreeNode<T>>() {
     operator fun get(value: T): TreeNode<T> {
         return find(value) ?: (TreeNode(value).also { add(it) })
     }
+}
+
+const val ANSI_ESCAPE = '\u001B'
+
+/**
+ * Format given char sequence using supplied parameters.
+ */
+fun format(text: CharSequence, foreground: Color? = null, background: Color? = null, format: Format? = null): CharSequence {
+    if (!TerminalColor.COLOR_SUPPORTED || (foreground == null && background == null && format == null)) return text
+    return StringBuilder()
+            .format(foreground, background, format)
+            .append(text)
+            .format()
+}
+
+fun StringBuilder.format(foreground: Color? = null, background: Color? = null, format: Format? = null):StringBuilder {
+    if (!TerminalColor.COLOR_SUPPORTED) return this
+
+    if (foreground == null && background == null && format == null) {
+        append("$ANSI_ESCAPE[0m")
+    } else {
+        append("$ANSI_ESCAPE[")
+        if (foreground != null) {
+            append(30 + foreground.offset)
+            append(';')
+        }
+        if (background != null) {
+            append(40 + background.offset)
+            append(';')
+        }
+        if (format != null) {
+            append(format.number)
+            append(';')
+        }
+        setCharAt(length - 1, 'm')
+    }
+    return this
+}
+
+/**
+ * Color for ANSI formatting
+ */
+enum class Color(internal val offset: Int) {
+    Black(0),
+    Red(1), // Error
+    Green(2), // Label
+    Yellow(3), // Suggestion
+    Blue(4), // Value
+    Magenta(5),
+    Cyan(6), // Time
+    White(7)
+}
+
+/**
+ * Format for ANSI formatting
+ */
+enum class Format(internal val number: Int) {
+    Bold(1), // Label or Prompt
+    Underline(4), // Input
 }

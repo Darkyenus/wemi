@@ -5,8 +5,7 @@ import org.jline.reader.History
 import org.jline.reader.UserInterruptException
 import org.slf4j.LoggerFactory
 import wemi.boot.CLI
-import wemi.util.Failable
-import wemi.util.SimpleHistory
+import wemi.util.*
 
 private val LOG = LoggerFactory.getLogger("Input")
 
@@ -28,7 +27,7 @@ internal class InputBase(private val interactive: Boolean) : Input() {
                     val previousHistory = history
                     try {
                         history = getHistory(key)
-                        readLine("${CLI.format(description, format = CLI.Format.Bold)} (${CLI.format(key, format = CLI.Format.Italic)}): ")
+                        readLine("${format(description, format = Format.Bold)} (${format(key, Color.White)}): ")
                     } finally {
                         history = previousHistory
                     }
@@ -37,8 +36,8 @@ internal class InputBase(private val interactive: Boolean) : Input() {
                 value.use({
                     return it
                 }, {
-                    print(CLI.format("Invalid input: ", format = CLI.Format.Bold))
-                    println(CLI.format(it, foreground = CLI.Color.Red))
+                    print(format("Invalid input: ", format = Format.Bold))
+                    println(format(it, foreground = Color.Red))
                 })
             }
         } catch (e: UserInterruptException) {

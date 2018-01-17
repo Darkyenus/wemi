@@ -5,11 +5,12 @@ package wemi
 import com.esotericsoftware.jsonbeans.Json
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import wemi.boot.CLI
 import wemi.boot.MachineWritable
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
+import wemi.util.Format
 import wemi.util.WithDescriptiveString
+import wemi.util.format
 import java.nio.file.Path
 
 /** 
@@ -70,7 +71,7 @@ class Key<Value> internal constructor(
     /**
      * Returns [name] - [description]
      */
-    override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} - $description"
+    override fun toDescriptiveAnsiString(): String = "${format(name, format = Format.Bold)} - $description"
 
     override fun writeMachine(json: Json) {
         json.writeObjectStart()
@@ -108,7 +109,7 @@ class Configuration internal constructor(val name: String,
     /**
      * @return [name] - [description]
      */
-    override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} - \"$description\""
+    override fun toDescriptiveAnsiString(): String = "${format(name, format = Format.Bold)} - \"$description\""
 
     override fun writeMachine(json: Json) {
         json.writeObjectStart()
@@ -118,7 +119,7 @@ class Configuration internal constructor(val name: String,
     }
 }
 
-private val AnonymousConfigurationDescriptiveAnsiString = CLI.format("<anonymous>", format = CLI.Format.Bold).toString()
+private val AnonymousConfigurationDescriptiveAnsiString = format("<anonymous>", format = Format.Bold).toString()
 
 /**
  * A special version of [Configuration] that is anonymous and can be created at runtime, any time.
@@ -131,6 +132,8 @@ class AnonymousConfiguration @PublishedApi internal constructor() : BindingHolde
      * @return <anonymous>
      */
     override fun toDescriptiveAnsiString(): String = AnonymousConfigurationDescriptiveAnsiString
+
+    override fun toString(): String = "<anonymous>"
 }
 
 /**
@@ -166,7 +169,7 @@ class Project internal constructor(val name: String, val projectRoot: Path)
     /**
      * @return [name] at [projectRoot]
      */
-    override fun toDescriptiveAnsiString(): String = "${CLI.format(name, format = CLI.Format.Bold)} at $projectRoot"
+    override fun toDescriptiveAnsiString(): String = "${format(name, format = Format.Bold)} at $projectRoot"
 
     override fun writeMachine(json: Json) {
         json.writeValue(name as Any, String::class.java)
@@ -183,13 +186,13 @@ class Project internal constructor(val name: String, val projectRoot: Path)
  * Scope allows to query the values of bound [Keys].
  * Each scope is internally formed by an ordered list of [BindingHolder]s.
  *
- * @param holders list of holders contributing to the scope's holder stack. Most significant holders first.
- * @param parent of the scope, only [Project] may have null parent.
+ * @param scopeBindingHolders list of holders contributing to the scope's holder stack. Most significant holders first.
+ * @param scopeParent of the scope, only [Project] may have null parent.
  */
 class Scope internal constructor(
         private val name: String,
-        private val holders: List<BindingHolder>,
-        private val parent: Scope?) {
+        val scopeBindingHolders: List<BindingHolder>,
+        val scopeParent: Scope?) {
 
     private val configurationScopeCache: MutableMap<Configuration, Scope> = java.util.HashMap()
 
@@ -198,8 +201,8 @@ class Scope internal constructor(
     private inline fun traverseHoldersBack(action: (BindingHolder) -> Unit) {
         var scope = this
         while (true) {
-            scope.holders.forEach(action)
-            scope = scope.parent ?: break
+            scope.scopeBindingHolders.forEach(action)
+            scope = scope.scopeParent ?: break
         }
     }
 
@@ -282,26 +285,41 @@ class Scope internal constructor(
     }
 
     private fun <Value : Output, Output> getKeyValue(key: Key<Value>, otherwise: Output, useOtherwise: Boolean): Output {
+        val listener = activeKeyEvaluationListener
+        listener?.keyEvaluationStarted(this, key)
+
         var foundValue: Value? = key.defaultValue
         var foundValueValid = key.hasDefaultValue
+        var holderOfFoundValue:BindingHolder? = null
         val allModifiersReverse: ArrayList<BoundKeyValueModifier<Value>> = ArrayList()
 
-        var scope: Scope = this
-        searchForValue@ while (true) {
+        var scope: Scope? = this
+        // At which scope should the value be cached?
+        // Assignment of concrete scope pins it, null = [scope]
+        var scopeForCache:Scope? = null
+
+        searchForValue@ while (scope != null) {
             // Check the cache
             if (key.cached) {
-                val maybeCachedValue = getCached(key)
+                val maybeCachedValue = scope.getCached(key)
                 if (maybeCachedValue != null) {
+                    listener?.keyEvaluationSucceeded(scope, null, maybeCachedValue)
                     return maybeCachedValue
                 }
             }
 
             // Retrieve the holder
             @Suppress("UNCHECKED_CAST")
-            for (holder in scope.holders) {
-
+            for (holder in scope.scopeBindingHolders) {
                 val holderModifiers = holder.modifierBindings[key] as ArrayList<BoundKeyValueModifier<Value>>?
-                if (holderModifiers != null) {
+                if (holderModifiers != null && holderModifiers.isNotEmpty()) {
+                    if (scopeForCache != null) {
+                        // This is the lowest scope that modifies this key, so this is where the cache must be stored
+                        scopeForCache = scope
+                    }
+
+                    listener?.keyEvaluationHasModifiers(scope, holder, holderModifiers.size)
+
                     allModifiersReverse.ensureCapacity(holderModifiers.size)
                     var i = holderModifiers.size - 1
                     while (i >= 0) {
@@ -314,30 +332,62 @@ class Scope internal constructor(
                 if (lazyValue != null) {
                     // Unpack the value
 
-                    foundValue = lazyValue()
+                    try {
+                        foundValue = lazyValue()
+                    } catch (t:Throwable) {
+                        try {
+                            listener?.keyEvaluationFailedByError(t, true)
+                        } catch (suppressed:Throwable) {
+                            t.addSuppressed(suppressed)
+                        }
+                        throw t
+                    }
+
+                    holderOfFoundValue = holder
                     foundValueValid = true
                     break@searchForValue
                 }
             }
 
-            scope = scope.parent ?: break
+            scope = scope.scopeParent
         }
 
         if (foundValueValid) {
             @Suppress("UNCHECKED_CAST")
             var result = foundValue as Value
-            for (i in allModifiersReverse.indices.reversed()) {
-                result = allModifiersReverse[i].invoke(this, result)
+
+            // Apply modifiers
+            try {
+                for (i in allModifiersReverse.indices.reversed()) {
+                    result = allModifiersReverse[i].invoke(this, result)
+                }
+            } catch (t:Throwable) {
+                try {
+                    listener?.keyEvaluationFailedByError(t, false)
+                } catch (suppressed:Throwable) {
+                    t.addSuppressed(suppressed)
+                }
+                throw t
             }
+
+            // Store in cache
             if (key.cached) {
-                putCached(key, result)
+                if (scopeForCache != null) {
+                    scopeForCache.putCached(key, result)
+                } else if (scope != null) {
+                    scope.putCached(key, result)
+                } // else the value is default value which does not need to be cached
             }
+
+            listener?.keyEvaluationSucceeded(scope, holderOfFoundValue, result)
             return result
         }
 
         if (useOtherwise) {
+            listener?.keyEvaluationFailedByNoBinding(true, otherwise)
             return otherwise
         } else {
+            listener?.keyEvaluationFailedByNoBinding(false, null)
             throw WemiException.KeyNotAssignedException(key, this@Scope)
         }
     }
@@ -399,9 +449,9 @@ class Scope internal constructor(
     }
 
     private fun buildToString(sb: StringBuilder) {
-        parent?.buildToString(sb)
+        scopeParent?.buildToString(sb)
         sb.append(name)
-        if (parent == null) {
+        if (scopeParent == null) {
             sb.append('/')
         } else {
             sb.append(':')
@@ -610,5 +660,92 @@ sealed class BindingHolder {
             internal val key: Key<CompilerFlags>,
             internal val flag: CompilerFlag<Type>)
     //endregion
+}
+
+/**
+ * @see useKeyEvaluationListener
+ */
+@Volatile
+private var activeKeyEvaluationListener:WemiKeyEvaluationListener? = null
+
+/**
+ * Execute [action] with [listener] set to listen to any key evaluations that are done during this time.
+ *
+ * Only one listener may be active at any time.
+ */
+fun <Result>useKeyEvaluationListener(listener: WemiKeyEvaluationListener, action:()->Result):Result {
+    if (activeKeyEvaluationListener != null) {
+        throw WemiException("Failed to apply KeyEvaluationListener, someone already has listener applied")
+    }
+    try {
+        activeKeyEvaluationListener = listener
+        return action()
+    } finally {
+        assert(activeKeyEvaluationListener === listener) { "Someone has applied different listener during action()!" }
+        activeKeyEvaluationListener = null
+    }
+}
+
+/**
+ * Called with details about key evaluation.
+ * Useful for closer inspection of key evaluation.
+ *
+ * Keys are evaluated in a tree, the currently evaluated key is on a stack.
+ * @see keyEvaluationStarted for more information
+ */
+interface WemiKeyEvaluationListener {
+    /**
+     * Evaluation of a key has started.
+     *
+     * This will be always ended with [keyEvaluationFailedByNoBinding], [keyEvaluationFailedByError] or
+     * with [keyEvaluationSucceeded] call. Between those, [keyEvaluationHasModifiers] can be called
+     * and more [keyEvaluationStarted]-[keyEvaluationSucceeded]/Failed pairs can be nested, even recursively.
+     *
+     * This captures the calling stack of key evaluation.
+     *
+     * @param fromScope in which scope is the binding being searched from
+     * @param key that is being evaluated
+     */
+    fun keyEvaluationStarted(fromScope: Scope, key: Key<*>)
+
+    /**
+     * Called when evaluation of key on top of the key evaluation stack will use some modifiers, if it succeeds.
+     *
+     * @param modifierFromScope in which scope the modifier has been found
+     * @param modifierFromHolder in which holder inside the [modifierFromScope] the modifier has been found
+     * @param amount of modifiers added from this scope-holder
+     */
+    fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder:BindingHolder, amount:Int)
+
+    /**
+     * Evaluation of key on top of key evaluation stack has been successful.
+     *
+     * @param bindingFoundInScope scope in which the binding of this key has been found, null if default value
+     * @param bindingFoundInHolder holder in [bindingFoundInScope] in which the key binding has been found (null if from cache)
+     * @param result that has been used, may be null if caller considers null
+     */
+    fun <Value>keyEvaluationSucceeded(bindingFoundInScope:Scope?,
+                                      bindingFoundInHolder: BindingHolder?,
+                                      result:Value)
+
+    /**
+     * Evaluation of key on top of key evaluation stack has failed, because the key has no binding, nor default value.
+     *
+     * @param withAlternative user supplied alternative will be used if true (passed in [alternativeResult]),
+     *                          [wemi.WemiException.KeyNotAssignedException] will be thrown if false
+     */
+    fun keyEvaluationFailedByNoBinding(withAlternative:Boolean, alternativeResult:Any?)
+
+    /**
+     * Evaluation of key or one of the modifiers has thrown an exception.
+     * This means that the key evaluation has failed and the exception will be thrown.
+     *
+     * This is not invoked when the exception is [wemi.WemiException.KeyNotAssignedException] thrown by the key
+     * evaluation system itself. [keyEvaluationFailedByNoBinding] will be called for that.
+     *
+     * @param exception that was thrown
+     * @param fromKey if true, the evaluation of key threw the exception, if false it was one of the modifiers
+     */
+    fun keyEvaluationFailedByError(exception:Throwable, fromKey:Boolean)
 }
 

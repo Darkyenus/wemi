@@ -9,9 +9,7 @@ import org.slf4j.LoggerFactory
 import wemi.Configurations
 import wemi.WemiVersion
 import wemi.WithExitCode
-import wemi.util.Tokens
-import wemi.util.WemiDefaultClassLoader
-import wemi.util.div
+import wemi.util.*
 import java.io.*
 import java.net.URL
 import java.net.URLClassLoader
@@ -240,7 +238,7 @@ fun main(args: Array<String>) {
 
         val formattedErrors = taskTokens.formattedErrors(true)
         if (formattedErrors.hasNext()) {
-            println(CLI.format("Errors in task input:", CLI.Color.Red))
+            println(format("Errors in task input:", Color.Red))
             do {
                 println(formattedErrors.next())
             } while (formattedErrors.hasNext())

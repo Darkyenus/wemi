@@ -2,7 +2,6 @@ package wemi.boot
 
 import com.darkyen.tproll.TPLogger
 import com.darkyen.tproll.util.PrettyPrinter
-import com.darkyen.tproll.util.TerminalColor
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReader
 import org.jline.reader.LineReaderBuilder
@@ -150,33 +149,6 @@ object CLI {
      */
     private fun formatInput(text: CharSequence): CharSequence {
         return format(text, format = Format.Underline)
-    }
-
-    const val ANSI_ESCAPE = '\u001B'
-
-    /**
-     * Format given char sequence using supplied parameters.
-     */
-    fun format(text: CharSequence, foreground: Color? = null, background: Color? = null, format: Format? = null): CharSequence {
-        if (!TerminalColor.COLOR_SUPPORTED || (foreground == null && background == null && format == null)) return text
-        val sb = StringBuilder()
-        sb.append("$ANSI_ESCAPE[")
-        if (foreground != null) {
-            sb.append(30 + foreground.offset)
-            sb.append(';')
-        }
-        if (background != null) {
-            sb.append(40 + background.offset)
-            sb.append(';')
-        }
-        if (format != null) {
-            sb.append(format.number)
-            sb.append(';')
-        }
-        sb.setCharAt(sb.length - 1, 'm')
-        sb.append(text)
-        sb.append("$ANSI_ESCAPE[0m")
-        return sb
     }
 
     /**
@@ -371,6 +343,34 @@ object CLI {
         put("keys") {
             printLabeled("key", AllKeys)
         }
+
+        put("trace") { task ->
+            val tasks = task.input.filter { it.first == null || it.first == "task" }
+            if (tasks.isEmpty()) {
+                printWarning("trace <task> - trace task invocation")
+            } else {
+                val sb = StringBuilder()
+                val treePrintingListener = TreeBuildingKeyEvaluationListener()
+
+                for ((_, taskText) in tasks) {
+                    useKeyEvaluationListener(treePrintingListener) {
+                        evaluateCommand(taskText)
+                    }
+                    treePrintingListener.toTree(sb)
+
+                    println("🐾 ${format("Trace", format = Format.Bold)}")
+                    if (sb.isEmpty()) {
+                        println(format("\t(no keys evaluated)", foreground = Color.White))
+                    } else {
+                        println(sb)
+                    }
+
+                    sb.setLength(0)
+                    treePrintingListener.reset()
+                }
+            }
+        }
+
         put("log") { task ->
             val level = task.input.find { it.first == null || it.first == "level" }?.second
             if (level == null) {
@@ -393,7 +393,7 @@ object CLI {
         put("help") {
             println(formatLabel("Wemi $WemiVersion (Kotlin $WemiKotlinVersion)"))
             print(formatLabel("Commands: "))
-            println("exit, project <project>, projects, configurations, keys, log <level>, help")
+            println("exit, project <project>, projects, configurations, keys, trace <task>, log <level>, help")
             print(formatLabel("Keys: "))
             println("Configurations and projects hold values/behavior of keys. That can be mundane data like version of\n" +
                     "the project in 'projectVersion' key or complex operation, like compiling and running in 'run' key.\n" +
@@ -469,33 +469,11 @@ object CLI {
         System.err.flush()
     }
 
-    /**
-     * Color for ANSI formatting
-     */
-    enum class Color(internal val offset: Int) {
-        Black(0),
-        Red(1), // Error
-        Green(2), // Label
-        Yellow(3), // Suggestion
-        Blue(4), // Value
-        Magenta(5),
-        Cyan(6), // Time
-        White(7)
-    }
-
-    /**
-     * Format for ANSI formatting
-     */
-    enum class Format(internal val number: Int) {
-        Bold(1), // Label or Prompt
-        Italic(3),
-        Underline(4), // Input
-    }
-
-    internal val ICON_SUCCESS = CLI.format("✔", CLI.Color.Green)
-    internal val ICON_FAILURE = CLI.format("✘", CLI.Color.Red)
-    internal val ICON_UNKNOWN = CLI.format("?", CLI.Color.Yellow)
-    internal val ICON_SKIPPED = CLI.format("↷", CLI.Color.Magenta)
-    internal val ICON_SEE_ABOVE = CLI.format("↑", CLI.Color.Magenta)//⤴ seems to be clipped in some contexts
-    internal val ICON_ABORTED = CLI.format("■", CLI.Color.Yellow)
+    internal val ICON_SUCCESS = format("✔", Color.Green)
+    internal val ICON_FAILURE = format("✘", Color.Red)
+    internal val ICON_EXCEPTION = format("❗", Color.Red)
+    internal val ICON_UNKNOWN = format("?", Color.Yellow)
+    internal val ICON_SKIPPED = format("↷", Color.Magenta)
+    internal val ICON_SEE_ABOVE = format("↑", Color.Magenta)//⤴ seems to be clipped in some contexts
+    internal val ICON_ABORTED = format("■", Color.Yellow)
 }

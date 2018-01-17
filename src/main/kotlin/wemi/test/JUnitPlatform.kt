@@ -206,17 +206,9 @@ fun TestReport.prettyPrint(): CharSequence {
         val data = this@prettyPrint[this]!!
 
         // Name (+ test/container)
-        var name: CharSequence = displayName
-        if (name.isBlank()) {
-            name = id
-        }
-        if (isContainer) {
-            name = CLI.format(name, format = CLI.Format.Italic)
-        }
-        if (isTest) {
-            name = CLI.format(name, format = CLI.Format.Bold)
-        }
-        sb.append(name)
+        sb.format(if (isContainer) Color.White else null, format = if (isTest) Format.Bold else null)
+        sb.append(if (displayName.isBlank()) id else displayName)
+        sb.format()
 
         // Status
         sb.append(' ')
@@ -231,14 +223,12 @@ fun TestReport.prettyPrint(): CharSequence {
         // Skip reason
         val skipReason = data.skipReason
         if (skipReason != null) {
-            sb.append(' ')
-            sb.append(CLI.format(skipReason, CLI.Color.White))
+            sb.append(' ').format(Color.White).append(skipReason).format()
         }
 
         // Timing
         if (data.duration >= 0L) {
-            sb.append(' ')
-            sb.append(CLI.format(formatTimeDuration(data.duration), CLI.Color.Cyan, format = CLI.Format.Italic))
+            sb.append(' ').format(Color.Cyan).append(formatTimeDuration(data.duration)).format()
         }
 
         // Stack trace
@@ -259,10 +249,10 @@ fun TestReport.prettyPrint(): CharSequence {
                 sb.append(dateTime.toLocalDate()).append(' ').append(dateTime.toLocalTime()).append(':').append('\n')
             }
             sb.append(" ")
-            sb.append(CLI.format(report.key, CLI.Color.White))
-            sb.append(" = \"")
-            sb.append(CLI.format(report.value, CLI.Color.Blue))
-            sb.append('"')
+            sb.append(report.key)
+            sb.format(Color.White).append(" = \"").format(Color.Blue)
+            sb.append(report.value)
+            sb.format(Color.White).append('"').format()
         }
     }
 

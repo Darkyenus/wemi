@@ -33,7 +33,13 @@ fun readFully(into: OutputStream, stream: InputStream, buffer:ByteArray = ByteAr
     return read
 }
 
-class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private val onLineRead:(CharSequence) -> Unit) : OutputStream() {
+/**
+ * OutputStream that buffers bytes until they can be converted to text using given charset and until the
+ * text forms a valid line, ended with '\n'. Then it takes the line and calls [onLineRead] with it, without the line end.
+ *
+ * [close] to obtain the last line without ending '\n'.
+ */
+open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private val onLineRead: (CharSequence) -> Unit) : OutputStream() {
 
     private val decoder: CharsetDecoder = charset.newDecoder()
             .onMalformedInput(CodingErrorAction.REPLACE)
@@ -53,11 +59,13 @@ class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private val onL
         outputSB.setLength(0)
     }
 
-    private fun decode(endOfInput:Boolean) {
+    private fun decode(endOfInput: Boolean) {
         inputBuffer.flip()
         while (true) {
             val result = decoder.decode(inputBuffer, outputBuffer, endOfInput)
             outputBuffer.flip()
+
+            outputSB.ensureCapacity(outputBuffer.limit())
             for (i in 0 until outputBuffer.limit()) {
                 val c = outputBuffer[i]
                 outputSB.append(c)
@@ -67,6 +75,8 @@ class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private val onL
                     flushLine()
                 }
             }
+            outputBuffer.position(0)
+            outputBuffer.limit(outputBuffer.capacity())
 
             if (result.isUnderflow) {
                 break
