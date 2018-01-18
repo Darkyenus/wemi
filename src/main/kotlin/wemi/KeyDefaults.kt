@@ -136,7 +136,7 @@ object KeyDefaults {
         val compiled = Keys.compile.get()
         val resources = Keys.resourceFiles.get()
 
-        val classpath = ArrayList<LocatedFile>(resources.size + 16)
+        val classpath = ArrayList<LocatedFile>(resources.size + 128)
         constructLocatedFiles(compiled, classpath)
         classpath.addAll(resources)
 
@@ -383,7 +383,7 @@ object KeyDefaults {
             if (root.own) {
                 name
             } else {
-                val injectedName = root.name
+                val injectedName = root.file.name.pathWithoutExtension()
                 val extensionSeparator = name.lastIndexOf('.')
                 if (extensionSeparator == -1) {
                     name + '_' + injectedName
@@ -392,6 +392,10 @@ object KeyDefaults {
                 }
             }
         }
+    }
+
+    private fun normalizeZipPath(path:String):String {
+        return path.replace('\\', '/').removePrefix("/")
     }
 
     private val AssemblyLOG = LoggerFactory.getLogger("Assembly")
@@ -403,24 +407,26 @@ object KeyDefaults {
             if (file.name.pathHasExtension("jar")) {
                 // Add jar entries
                 val zip = ZipFile(file.toFile(), ZipFile.OPEN_READ, StandardCharsets.UTF_8)
+                //TODO CLOSE THE FILE!!!
+
                 for (entry in zip.entries()) {
                     if (entry.isDirectory) continue
 
-                    val path = entry.name
+                    val path = normalizeZipPath(entry.name)
                     loadedSources.getOrPut(path) { ArrayList() }.add(object : AssemblySource(file, file, entry, own) {
 
-                        override fun load(): ByteArray = zip.getInputStream(entry).readBytes(entry.size.toInt())
+                        override fun load(): ByteArray = zip.getInputStream(entry).use { it.readBytes(entry.size.toInt()) }
 
-                        override val name: String = file.absolutePath + '?' + path
+                        override val debugName: String = file.absolutePath + '?' + path
                     })
                 }
             } else {
                 // Add file entry
-                loadedSources.getOrPut(locatedFile.path) { ArrayList() }.add(object : AssemblySource(locatedFile.root, file, null, own) {
+                loadedSources.getOrPut(normalizeZipPath(locatedFile.path)) { ArrayList() }.add(object : AssemblySource(locatedFile.root, file, null, own) {
 
                     override fun load(): ByteArray = Files.readAllBytes(file)
 
-                    override val name: String = locatedFile.toString()
+                    override val debugName: String = locatedFile.toString()
                 })
             }
         }
@@ -440,32 +446,32 @@ object KeyDefaults {
         var hasError = false
 
         // Renaming has to be done later, because it is not yet known which paths are clean for renaming
-        val sourcesToBeRenamed = mutableMapOf<String, MutableList<AssemblySource>>()
+        val sourcesToBeRenamed = LinkedHashMap<String, MutableList<AssemblySource>>()
 
         for ((path, dataList) in loadedSources) {
             if (dataList.size == 1) {
                 val single = dataList[0]
                 if (AssemblyLOG.isTraceEnabled) {
-                    AssemblyLOG.trace("Including single item {}", single.name)
+                    AssemblyLOG.trace("Including single item {}", single.debugName)
                 }
                 assemblySources[path] = Pair(single, single.data)
                 continue
             }
 
-            // Duplicate
+            // Resolve duplicate
             val strategy = mergeStrategyFunction(path)
             when (strategy) {
                 MergeStrategy.First -> {
                     val first = dataList.first()
                     if (AssemblyLOG.isDebugEnabled) {
-                        AssemblyLOG.debug("Including first item {}", first.name)
+                        AssemblyLOG.debug("Including first item {}", first.debugName)
                     }
                     assemblySources[path] = Pair(first, first.data)
                 }
                 MergeStrategy.Last -> {
                     val last = dataList.last()
                     if (AssemblyLOG.isDebugEnabled) {
-                        AssemblyLOG.debug("Including last item {}", last.name)
+                        AssemblyLOG.debug("Including last item {}", last.debugName)
                     }
                     assemblySources[path] = Pair(last, last.data)
                 }
@@ -476,7 +482,7 @@ object KeyDefaults {
                             if (own == null) {
                                 own = source
                             } else {
-                                AssemblyLOG.error("Own file at {} is also duplicated, one is at {} and other at {}", own.name, source.name)
+                                AssemblyLOG.error("Own file at {} is also duplicated, one is at {} and other at {}", own.debugName, source.debugName)
                                 hasError = true
                             }
                         }
@@ -487,7 +493,7 @@ object KeyDefaults {
                             AssemblyLOG.debug("Discarding {} because none of the {} variants is own", path, dataList.size)
                             var i = 1
                             for (source in dataList) {
-                                AssemblyLOG.debug("\t{}) {}", i, source.name)
+                                AssemblyLOG.debug("\t{}) {}", i, source.debugName)
                                 i += 1
                             }
                         }
@@ -502,7 +508,7 @@ object KeyDefaults {
                     AssemblyLOG.error("File at {} has {} candidates, which is illegal under SingleOrError merge strategy", path, dataList.size)
                     var i = 1
                     for (source in dataList) {
-                        AssemblyLOG.error("\t{}) {}", i, source.name)
+                        AssemblyLOG.error("\t{}) {}", i, source.debugName)
                         i += 1
                     }
                     hasError = true
@@ -526,7 +532,7 @@ object KeyDefaults {
                         AssemblyLOG.debug("Including {} concatenated items ({} bytes total)", dataList.size, totalLength)
                         var i = 1
                         for (source in dataList) {
-                            AssemblyLOG.debug("\t{}) {}", i, source.name)
+                            AssemblyLOG.debug("\t{}) {}", i, source.debugName)
                             i += 1
                         }
                     }
@@ -538,7 +544,7 @@ object KeyDefaults {
                         AssemblyLOG.debug("Discarding {} items", dataList.size)
                         var i = 1
                         for (source in dataList) {
-                            AssemblyLOG.debug("\t{}) {}", i, source.name)
+                            AssemblyLOG.debug("\t{}) {}", i, source.debugName)
                             i += 1
                         }
                     }
@@ -548,7 +554,7 @@ object KeyDefaults {
 
                     for (i in 1..data.lastIndex) {
                         if (!data[0].contentEquals(data[i])) {
-                            AssemblyLOG.error("Content for path {} given by {} is not the same as the content provided by {}", path, dataList[0].name, dataList[i].name)
+                            AssemblyLOG.error("Content for path {} given by {} is not the same as the content provided by {}", path, dataList[0].debugName, dataList[i].debugName)
                             hasError = true
                         }
                     }
@@ -561,6 +567,7 @@ object KeyDefaults {
             }
         }
 
+        // Resolve those that should be renamed
         if (sourcesToBeRenamed.isNotEmpty()) {
             val renameFunction = Keys.assemblyRenameFunction.get()
 
@@ -572,16 +579,12 @@ object KeyDefaults {
 
                 for (source in dataList) {
                     val root = source.root
-                    var renamedPath = renameFunction(source, path)
-                    if (renamedPath == null || renamedPath.removePrefix("/").isBlank()) {
+                    val renamedPath = normalizeZipPath(renameFunction(source, path) ?: "")
+                    if (renamedPath.isEmpty()) {
                         if (AssemblyLOG.isDebugEnabled) {
-                            AssemblyLOG.debug("\t{}) discarding {}", debugIndex, source.name)
+                            AssemblyLOG.debug("\t{}) discarding {}", debugIndex, source.debugName)
                         }
                     } else {
-                        if (!renamedPath.startsWith("/")) {
-                            renamedPath = "/" + renamedPath
-                        }
-
                         val alreadyPresent = assemblySources.containsKey(renamedPath)
 
                         if (alreadyPresent) {
@@ -589,7 +592,7 @@ object KeyDefaults {
                             hasError = true
                         } else {
                             if (AssemblyLOG.isDebugEnabled) {
-                                AssemblyLOG.debug("\t{}) moving {} to {}", debugIndex, source.name, renamedPath)
+                                AssemblyLOG.debug("\t({}) moving {} to {}", debugIndex, source.debugName, renamedPath)
                             }
 
                             assemblySources[renamedPath] = Pair(source, source.data)
@@ -623,13 +626,10 @@ object KeyDefaults {
                 entry.method = ZipEntry.DEFLATED
                 entry.size = data.size.toLong()
                 if (source != null) {
-                    if (source.file != null) {
+                    if (source.zipEntry != null && source.zipEntry.time != -1L) {
+                        entry.time = source.zipEntry.time
+                    } else {
                         entry.time = source.file.lastModified.toMillis()
-                    }
-                    if (source.zipEntry != null) {
-                        if (source.zipEntry.time != -1L) {
-                            entry.time = source.zipEntry.time
-                        }
                     }
                 }
 
@@ -639,7 +639,7 @@ object KeyDefaults {
 
                 if (AssemblyLOG.isDebugEnabled) {
                     if (source != null) {
-                        AssemblyLOG.debug("Writing out entry {} ({} bytes) from {}", path, data.size, source.name)
+                        AssemblyLOG.debug("Writing out entry {} ({} bytes) from {}", path, data.size, source.debugName)
                     } else {
                         AssemblyLOG.debug("Writing out entry {} ({} bytes)", path, data.size)
                     }

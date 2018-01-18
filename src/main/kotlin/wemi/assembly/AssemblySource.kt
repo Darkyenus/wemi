@@ -9,7 +9,7 @@ abstract class AssemblySource(
         /** Root of this source, usually a jar file or directory with resources or .class files. */
         val root: Path,
         /** File from which the data is loaded, if any. ([data] may not directly correspond to the content of the file!) */
-        val file: Path?,
+        val file: Path,
         /** ZipEntry from which the data is loaded, if any. */
         val zipEntry: ZipEntry?,
         /** Is this from the [wemi.Keys.internalClasspath]? */
@@ -24,5 +24,5 @@ abstract class AssemblySource(
     protected abstract fun load(): ByteArray
 
     /** Debug name of the source */
-    abstract val name: String
+    abstract val debugName: String
 }

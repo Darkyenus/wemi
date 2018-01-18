@@ -118,7 +118,7 @@ fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, predic
 
         override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
             if (dir !== from) {
-                pathStack.setLength(pathStack.length - dir.name.length + 1)
+                pathStack.setLength(pathStack.length - dir.name.length - 1)
             }
             return FileVisitResult.CONTINUE
         }
