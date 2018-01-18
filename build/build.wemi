@@ -19,7 +19,7 @@ val wemi by project(path(".")) {
     repositories add { repository("jitpack", "https://jitpack.io") }
 
     libraryDependencies set { listOf(
-            dependency("org.jetbrains.kotlin", "kotlin-stdlib", "1.1.4-3"),
+            dependency("org.jetbrains.kotlin", "kotlin-stdlib", "1.1.4-7"),
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
             dependency("com.github.Darkyenus", "tproll", "v1.2.5"),
             dependency("com.github.Darkyenus", "tproll", "v1.2.5"),
@@ -31,7 +31,7 @@ val wemi by project(path(".")) {
     extend(compiling) {
         libraryDependencies add {
             /* Used ONLY in wemi.compile.impl.KotlinCompilerImpl1_1_4 */
-            dependency("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4")
+            dependency("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4-7")
         }
 
         libraryDependencies add {
@@ -65,3 +65,5 @@ val wemi by project(path(".")) {
         assembled
     }
 }
+
+
