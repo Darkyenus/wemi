@@ -49,6 +49,8 @@ val compiling
     inline get() = Configurations.compiling
 val running
     inline get() = Configurations.running
+val assembling
+    inline get() = Configurations.assembling
 val testing
     inline get() = Configurations.testing
 

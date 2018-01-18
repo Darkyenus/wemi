@@ -1,10 +1,10 @@
 import wemi.Configurations.compilingKotlin
 import wemi.compile.KotlinCompilerVersion
-import wemi.util.div
-import java.nio.file.Files
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags.BytecodeTarget
+import wemi.util.div
 import wemi.util.executable
+import java.nio.file.Files
 
 @Suppress("unused")
 val wemi by project(path(".")) {

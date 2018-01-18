@@ -1,9 +1,10 @@
-@file:Suppress("MemberVisibilityCanPrivate")
+@file:Suppress("MemberVisibilityCanBePrivate")
 
 package wemi
 
 import com.darkyen.tproll.util.StringBuilderWriter
 import org.slf4j.LoggerFactory
+import wemi.Configurations.assembling
 import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.assembly.AssemblySource
@@ -400,260 +401,262 @@ object KeyDefaults {
 
     private val AssemblyLOG = LoggerFactory.getLogger("Assembly")
     val Assembly: BoundKeyValue<Path> = {
-        val loadedSources = LinkedHashMap<String, ArrayList<AssemblySource>>()
+        using(assembling) {
+            val loadedSources = LinkedHashMap<String, ArrayList<AssemblySource>>()
 
-        fun addSource(locatedFile: LocatedFile, own: Boolean) {
-            val file = locatedFile.file
-            if (file.name.pathHasExtension("jar")) {
-                // Add jar entries
-                val zip = ZipFile(file.toFile(), ZipFile.OPEN_READ, StandardCharsets.UTF_8)
-                //TODO CLOSE THE FILE!!!
+            fun addSource(locatedFile: LocatedFile, own: Boolean) {
+                val file = locatedFile.file
+                if (file.name.pathHasExtension("jar")) {
+                    // Add jar entries
+                    val zip = ZipFile(file.toFile(), ZipFile.OPEN_READ, StandardCharsets.UTF_8)
+                    //TODO CLOSE THE FILE!!!
 
-                for (entry in zip.entries()) {
-                    if (entry.isDirectory) continue
+                    for (entry in zip.entries()) {
+                        if (entry.isDirectory) continue
 
-                    val path = normalizeZipPath(entry.name)
-                    loadedSources.getOrPut(path) { ArrayList() }.add(object : AssemblySource(file, file, entry, own) {
+                        val path = normalizeZipPath(entry.name)
+                        loadedSources.getOrPut(path) { ArrayList() }.add(object : AssemblySource(file, file, entry, own) {
 
-                        override fun load(): ByteArray = zip.getInputStream(entry).use { it.readBytes(entry.size.toInt()) }
+                            override fun load(): ByteArray = zip.getInputStream(entry).use { it.readBytes(entry.size.toInt()) }
 
-                        override val debugName: String = file.absolutePath + '?' + path
+                            override val debugName: String = file.absolutePath + '?' + path
+                        })
+                    }
+                } else {
+                    // Add file entry
+                    loadedSources.getOrPut(normalizeZipPath(locatedFile.path)) { ArrayList() }.add(object : AssemblySource(locatedFile.root, file, null, own) {
+
+                        override fun load(): ByteArray = Files.readAllBytes(file)
+
+                        override val debugName: String = locatedFile.toString()
                     })
                 }
-            } else {
-                // Add file entry
-                loadedSources.getOrPut(normalizeZipPath(locatedFile.path)) { ArrayList() }.add(object : AssemblySource(locatedFile.root, file, null, own) {
-
-                    override fun load(): ByteArray = Files.readAllBytes(file)
-
-                    override val debugName: String = locatedFile.toString()
-                })
-            }
-        }
-
-        // Load data
-        for (file in Keys.internalClasspath.get()) {
-            addSource(file, true)
-        }
-        for (file in Keys.externalClasspath.get()) {
-            addSource(file, false)
-        }
-
-        // Trim duplicates
-        val assemblySources = LinkedHashMap<String, Pair<AssemblySource?, ByteArray>>()
-        val mergeStrategyFunction = Keys.assemblyMergeStrategy.get()
-
-        var hasError = false
-
-        // Renaming has to be done later, because it is not yet known which paths are clean for renaming
-        val sourcesToBeRenamed = LinkedHashMap<String, MutableList<AssemblySource>>()
-
-        for ((path, dataList) in loadedSources) {
-            if (dataList.size == 1) {
-                val single = dataList[0]
-                if (AssemblyLOG.isTraceEnabled) {
-                    AssemblyLOG.trace("Including single item {}", single.debugName)
-                }
-                assemblySources[path] = Pair(single, single.data)
-                continue
             }
 
-            // Resolve duplicate
-            val strategy = mergeStrategyFunction(path)
-            when (strategy) {
-                MergeStrategy.First -> {
-                    val first = dataList.first()
-                    if (AssemblyLOG.isDebugEnabled) {
-                        AssemblyLOG.debug("Including first item {}", first.debugName)
+            // Load data
+            for (file in Keys.internalClasspath.get()) {
+                addSource(file, true)
+            }
+            for (file in Keys.externalClasspath.get()) {
+                addSource(file, false)
+            }
+
+            // Trim duplicates
+            val assemblySources = LinkedHashMap<String, Pair<AssemblySource?, ByteArray>>()
+            val mergeStrategyFunction = Keys.assemblyMergeStrategy.get()
+
+            var hasError = false
+
+            // Renaming has to be done later, because it is not yet known which paths are clean for renaming
+            val sourcesToBeRenamed = LinkedHashMap<String, MutableList<AssemblySource>>()
+
+            for ((path, dataList) in loadedSources) {
+                if (dataList.size == 1) {
+                    val single = dataList[0]
+                    if (AssemblyLOG.isTraceEnabled) {
+                        AssemblyLOG.trace("Including single item {}", single.debugName)
                     }
-                    assemblySources[path] = Pair(first, first.data)
+                    assemblySources[path] = Pair(single, single.data)
+                    continue
                 }
-                MergeStrategy.Last -> {
-                    val last = dataList.last()
-                    if (AssemblyLOG.isDebugEnabled) {
-                        AssemblyLOG.debug("Including last item {}", last.debugName)
+
+                // Resolve duplicate
+                val strategy = mergeStrategyFunction(path)
+                when (strategy) {
+                    MergeStrategy.First -> {
+                        val first = dataList.first()
+                        if (AssemblyLOG.isDebugEnabled) {
+                            AssemblyLOG.debug("Including first item {}", first.debugName)
+                        }
+                        assemblySources[path] = Pair(first, first.data)
                     }
-                    assemblySources[path] = Pair(last, last.data)
-                }
-                MergeStrategy.SingleOwn -> {
-                    var own: AssemblySource? = null
-                    for (source in dataList) {
-                        if (source.own) {
-                            if (own == null) {
-                                own = source
-                            } else {
-                                AssemblyLOG.error("Own file at {} is also duplicated, one is at {} and other at {}", own.debugName, source.debugName)
-                                hasError = true
+                    MergeStrategy.Last -> {
+                        val last = dataList.last()
+                        if (AssemblyLOG.isDebugEnabled) {
+                            AssemblyLOG.debug("Including last item {}", last.debugName)
+                        }
+                        assemblySources[path] = Pair(last, last.data)
+                    }
+                    MergeStrategy.SingleOwn -> {
+                        var own: AssemblySource? = null
+                        for (source in dataList) {
+                            if (source.own) {
+                                if (own == null) {
+                                    own = source
+                                } else {
+                                    AssemblyLOG.error("Own file at {} is also duplicated, one is at {} and other at {}", own.debugName, source.debugName)
+                                    hasError = true
+                                }
                             }
                         }
-                    }
 
-                    if (own == null) {
+                        if (own == null) {
+                            if (AssemblyLOG.isDebugEnabled) {
+                                AssemblyLOG.debug("Discarding {} because none of the {} variants is own", path, dataList.size)
+                                var i = 1
+                                for (source in dataList) {
+                                    AssemblyLOG.debug("\t{}) {}", i, source.debugName)
+                                    i += 1
+                                }
+                            }
+                        } else {
+                            if (AssemblyLOG.isDebugEnabled) {
+                                AssemblyLOG.debug("Using own version of {} out of {} candidates", path, dataList.size)
+                            }
+                            assemblySources[path] = Pair(own, own.data)
+                        }
+                    }
+                    MergeStrategy.SingleOrError -> {
+                        AssemblyLOG.error("File at {} has {} candidates, which is illegal under SingleOrError merge strategy", path, dataList.size)
+                        var i = 1
+                        for (source in dataList) {
+                            AssemblyLOG.error("\t{}) {}", i, source.debugName)
+                            i += 1
+                        }
+                        hasError = true
+                    }
+                    MergeStrategy.Concatenate -> {
+                        var totalLength = 0
+                        val data = Array(dataList.size) { i ->
+                            val loaded = dataList[i].data
+                            totalLength += loaded.size
+                            loaded
+                        }
+
+                        val concatenated = ByteArray(totalLength)
+                        var pointer = 0
+                        for (d in data) {
+                            System.arraycopy(d, 0, concatenated, pointer, d.size)
+                            pointer += d.size
+                        }
+
                         if (AssemblyLOG.isDebugEnabled) {
-                            AssemblyLOG.debug("Discarding {} because none of the {} variants is own", path, dataList.size)
+                            AssemblyLOG.debug("Including {} concatenated items ({} bytes total)", dataList.size, totalLength)
                             var i = 1
                             for (source in dataList) {
                                 AssemblyLOG.debug("\t{}) {}", i, source.debugName)
                                 i += 1
                             }
                         }
-                    } else {
+
+                        assemblySources[path] = Pair(null, concatenated)
+                    }
+                    MergeStrategy.Discard -> {
                         if (AssemblyLOG.isDebugEnabled) {
-                            AssemblyLOG.debug("Using own version of {} out of {} candidates", path, dataList.size)
-                        }
-                        assemblySources[path] = Pair(own, own.data)
-                    }
-                }
-                MergeStrategy.SingleOrError -> {
-                    AssemblyLOG.error("File at {} has {} candidates, which is illegal under SingleOrError merge strategy", path, dataList.size)
-                    var i = 1
-                    for (source in dataList) {
-                        AssemblyLOG.error("\t{}) {}", i, source.debugName)
-                        i += 1
-                    }
-                    hasError = true
-                }
-                MergeStrategy.Concatenate -> {
-                    var totalLength = 0
-                    val data = Array(dataList.size) { i ->
-                        val loaded = dataList[i].data
-                        totalLength += loaded.size
-                        loaded
-                    }
-
-                    val concatenated = ByteArray(totalLength)
-                    var pointer = 0
-                    for (d in data) {
-                        System.arraycopy(d, 0, concatenated, pointer, d.size)
-                        pointer += d.size
-                    }
-
-                    if (AssemblyLOG.isDebugEnabled) {
-                        AssemblyLOG.debug("Including {} concatenated items ({} bytes total)", dataList.size, totalLength)
-                        var i = 1
-                        for (source in dataList) {
-                            AssemblyLOG.debug("\t{}) {}", i, source.debugName)
-                            i += 1
-                        }
-                    }
-
-                    assemblySources[path] = Pair(null, concatenated)
-                }
-                MergeStrategy.Discard -> {
-                    if (AssemblyLOG.isDebugEnabled) {
-                        AssemblyLOG.debug("Discarding {} items", dataList.size)
-                        var i = 1
-                        for (source in dataList) {
-                            AssemblyLOG.debug("\t{}) {}", i, source.debugName)
-                            i += 1
-                        }
-                    }
-                }
-                MergeStrategy.Deduplicate -> {
-                    val data = Array(dataList.size) { i -> dataList[i].data }
-
-                    for (i in 1..data.lastIndex) {
-                        if (!data[0].contentEquals(data[i])) {
-                            AssemblyLOG.error("Content for path {} given by {} is not the same as the content provided by {}", path, dataList[0].debugName, dataList[i].debugName)
-                            hasError = true
-                        }
-                    }
-
-                    assemblySources[path] = Pair(dataList[0], data[0])
-                }
-                MergeStrategy.Rename -> {
-                    sourcesToBeRenamed.put(path, dataList)
-                }
-            }
-        }
-
-        // Resolve those that should be renamed
-        if (sourcesToBeRenamed.isNotEmpty()) {
-            val renameFunction = Keys.assemblyRenameFunction.get()
-
-            for ((path, dataList) in sourcesToBeRenamed) {
-                if (AssemblyLOG.isDebugEnabled) {
-                    AssemblyLOG.debug("Renaming {} items at {}", dataList.size, path)
-                }
-                var debugIndex = 1
-
-                for (source in dataList) {
-                    val root = source.root
-                    val renamedPath = normalizeZipPath(renameFunction(source, path) ?: "")
-                    if (renamedPath.isEmpty()) {
-                        if (AssemblyLOG.isDebugEnabled) {
-                            AssemblyLOG.debug("\t{}) discarding {}", debugIndex, source.debugName)
-                        }
-                    } else {
-                        val alreadyPresent = assemblySources.containsKey(renamedPath)
-
-                        if (alreadyPresent) {
-                            AssemblyLOG.error("Can't rename {} from {} to {}, this path is already occupied", path, root, renamedPath)
-                            hasError = true
-                        } else {
-                            if (AssemblyLOG.isDebugEnabled) {
-                                AssemblyLOG.debug("\t({}) moving {} to {}", debugIndex, source.debugName, renamedPath)
+                            AssemblyLOG.debug("Discarding {} items", dataList.size)
+                            var i = 1
+                            for (source in dataList) {
+                                AssemblyLOG.debug("\t{}) {}", i, source.debugName)
+                                i += 1
                             }
-
-                            assemblySources[renamedPath] = Pair(source, source.data)
                         }
                     }
-                    debugIndex += 1
-                }
-            }
-        }
+                    MergeStrategy.Deduplicate -> {
+                        val data = Array(dataList.size) { i -> dataList[i].data }
 
-        if (hasError) {
-            throw WemiException("assembly task failed", showStacktrace = false)
-        }
+                        for (i in 1..data.lastIndex) {
+                            if (!data[0].contentEquals(data[i])) {
+                                AssemblyLOG.error("Content for path {} given by {} is not the same as the content provided by {}", path, dataList[0].debugName, dataList[i].debugName)
+                                hasError = true
+                            }
+                        }
 
-        val outputFile = Keys.assemblyOutputFile.get()
-
-        val prependData = Keys.assemblyPrependData.get()
-
-        BufferedOutputStream(Files.newOutputStream(outputFile)).use { out ->
-
-            if (prependData.isNotEmpty()) {
-                out.write(prependData)
-            }
-
-            val jarOut = JarOutputStream(out)
-
-            for ((path, value) in assemblySources) {
-                val (source, data) = value
-
-                val entry = ZipEntry(path)
-                entry.method = ZipEntry.DEFLATED
-                entry.size = data.size.toLong()
-                if (source != null) {
-                    if (source.zipEntry != null && source.zipEntry.time != -1L) {
-                        entry.time = source.zipEntry.time
-                    } else {
-                        entry.time = source.file.lastModified.toMillis()
+                        assemblySources[path] = Pair(dataList[0], data[0])
+                    }
+                    MergeStrategy.Rename -> {
+                        sourcesToBeRenamed[path] = dataList
                     }
                 }
+            }
 
-                jarOut.putNextEntry(entry)
-                jarOut.write(data)
-                jarOut.closeEntry()
+            // Resolve those that should be renamed
+            if (sourcesToBeRenamed.isNotEmpty()) {
+                val renameFunction = Keys.assemblyRenameFunction.get()
 
-                if (AssemblyLOG.isDebugEnabled) {
+                for ((path, dataList) in sourcesToBeRenamed) {
+                    if (AssemblyLOG.isDebugEnabled) {
+                        AssemblyLOG.debug("Renaming {} items at {}", dataList.size, path)
+                    }
+                    var debugIndex = 1
+
+                    for (source in dataList) {
+                        val root = source.root
+                        val renamedPath = normalizeZipPath(renameFunction(source, path) ?: "")
+                        if (renamedPath.isEmpty()) {
+                            if (AssemblyLOG.isDebugEnabled) {
+                                AssemblyLOG.debug("\t{}) discarding {}", debugIndex, source.debugName)
+                            }
+                        } else {
+                            val alreadyPresent = assemblySources.containsKey(renamedPath)
+
+                            if (alreadyPresent) {
+                                AssemblyLOG.error("Can't rename {} from {} to {}, this path is already occupied", path, root, renamedPath)
+                                hasError = true
+                            } else {
+                                if (AssemblyLOG.isDebugEnabled) {
+                                    AssemblyLOG.debug("\t({}) moving {} to {}", debugIndex, source.debugName, renamedPath)
+                                }
+
+                                assemblySources[renamedPath] = Pair(source, source.data)
+                            }
+                        }
+                        debugIndex += 1
+                    }
+                }
+            }
+
+            if (hasError) {
+                throw WemiException("assembly task failed", showStacktrace = false)
+            }
+
+            val outputFile = Keys.assemblyOutputFile.get()
+
+            val prependData = Keys.assemblyPrependData.get()
+
+            BufferedOutputStream(Files.newOutputStream(outputFile)).use { out ->
+
+                if (prependData.isNotEmpty()) {
+                    out.write(prependData)
+                }
+
+                val jarOut = JarOutputStream(out)
+
+                for ((path, value) in assemblySources) {
+                    val (source, data) = value
+
+                    val entry = ZipEntry(path)
+                    entry.method = ZipEntry.DEFLATED
+                    entry.size = data.size.toLong()
                     if (source != null) {
-                        AssemblyLOG.debug("Writing out entry {} ({} bytes) from {}", path, data.size, source.debugName)
-                    } else {
-                        AssemblyLOG.debug("Writing out entry {} ({} bytes)", path, data.size)
+                        if (source.zipEntry != null && source.zipEntry.time != -1L) {
+                            entry.time = source.zipEntry.time
+                        } else {
+                            entry.time = source.file.lastModified.toMillis()
+                        }
+                    }
+
+                    jarOut.putNextEntry(entry)
+                    jarOut.write(data)
+                    jarOut.closeEntry()
+
+                    if (AssemblyLOG.isDebugEnabled) {
+                        if (source != null) {
+                            AssemblyLOG.debug("Writing out entry {} ({} bytes) from {}", path, data.size, source.debugName)
+                        } else {
+                            AssemblyLOG.debug("Writing out entry {} ({} bytes)", path, data.size)
+                        }
                     }
                 }
+
+                jarOut.finish()
+                jarOut.flush()
+                jarOut.close()
+
+                AssemblyLOG.debug("{} entries written", assemblySources.size)
             }
 
-            jarOut.finish()
-            jarOut.flush()
-            jarOut.close()
-
-            AssemblyLOG.debug("{} entries written", assemblySources.size)
+            outputFile
         }
-
-        outputFile
     }
 
     fun Project.applyDefaults() {

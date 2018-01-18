@@ -20,6 +20,8 @@ object Configurations {
     val compiling by configuration("Configuration used when compiling") {}
 
     val running by configuration("Configuration used when running, sources are resources") {}
+
+    val assembling by configuration("Configuration used when assembling Jar with dependencies") {}
     //endregion
 
     //region Testing configuration
