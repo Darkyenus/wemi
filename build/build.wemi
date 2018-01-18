@@ -1,0 +1,67 @@
+import wemi.Configurations.compilingKotlin
+import wemi.compile.KotlinCompilerVersion
+import wemi.util.div
+import java.nio.file.Files
+import wemi.compile.KotlinJVMCompilerFlags
+import wemi.compile.KotlinJVMCompilerFlags.BytecodeTarget
+import wemi.util.executable
+
+@Suppress("unused")
+val wemi by project(path(".")) {
+    projectName set { "wemi" }
+    projectGroup set { "com.darkyen" }
+    projectVersion set { "0.1-SNAPSHOT" }
+
+    kotlinVersion set { KotlinCompilerVersion.Version1_1_4 }
+
+    mainClass set { "wemi.boot.MainKt" }
+
+    repositories add { repository("jitpack", "https://jitpack.io") }
+
+    libraryDependencies set { listOf(
+            dependency("org.jetbrains.kotlin", "kotlin-stdlib", "1.1.4-3"),
+            dependency("org.slf4j", "slf4j-api", "1.7.25"),
+            dependency("com.github.Darkyenus", "tproll", "v1.2.5"),
+            dependency("com.github.Darkyenus", "tproll", "v1.2.5"),
+            dependency("com.github.Darkyenus", "DaveWebb", "v1.2"),
+            dependency("com.github.EsotericSoftware", "jsonbeans", "cb0f3406fc"),
+            dependency("org.jline", "jline", "3.3.0")
+        ) }
+
+    extend(compiling) {
+        libraryDependencies add {
+            /* Used ONLY in wemi.compile.impl.KotlinCompilerImpl1_1_4 */
+            dependency("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4")
+        }
+
+        libraryDependencies add {
+            /* Used ONLY in wemi.test.forked.TestLauncher */
+            dependency("org.junit.platform", "junit-platform-launcher", "1.0.2")
+        }
+    }
+
+    extend(testing) {
+        libraryDependencies add { JUnitAPI }
+        libraryDependencies add { JUnitEngine }
+    }
+
+    extend(compilingKotlin) {
+        compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = BytecodeTarget.JAVA_1_8
+    }
+
+    assemblyPrependData set {
+        "#!/usr/bin/env sh\nexec java -jar \"$0\" -root=$(dirname \"$0\") \"$@\"\n\n"
+                .toByteArray(Charsets.UTF_8)
+    }
+
+    assemblyOutputFile set {
+        val assemblyDir = buildDirectory.get() / "assembly"
+        Files.createDirectories(assemblyDir)
+        assemblyDir / "wemi"
+    }
+
+    assembly modify { assembled ->
+        assembled.executable = true
+        assembled
+    }
+}
