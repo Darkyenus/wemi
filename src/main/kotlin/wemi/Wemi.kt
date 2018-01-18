@@ -11,7 +11,7 @@ val WemiVersion = "0.1-SNAPSHOT"
 internal val WemiVersionIsSnapshot = WemiVersion.endsWith("-SNAPSHOT")
 
 /** Version of Kotlin used for build scripts */
-val WemiKotlinVersion = KotlinCompilerVersion.Version1_1_4
+val WemiKotlinVersion = KotlinCompilerVersion.Version1_1_4_3
 
 /** Immutable view into the list of loaded projects. */
 val AllProjects: Map<String, Project>

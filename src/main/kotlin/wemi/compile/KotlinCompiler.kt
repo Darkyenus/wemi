@@ -53,10 +53,10 @@ enum class KotlinCompilerVersion (
         /** Dependencies needed to load [implementationClassName]. */
         private val compilerDependency:Collection<Dependency>) : MachineWritable {
 
-    Version1_1_4(
-            "1.1.4",
-            "wemi.compile.impl.KotlinCompilerImpl1_1_4",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4")))
+    Version1_1_4_3(
+            "1.1.4-3",
+            "wemi.compile.impl.KotlinCompilerImpl1_1_4_3",
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4-3")))
     );
 
     private var compilerCache:KotlinCompiler? = null
@@ -177,5 +177,5 @@ object KotlinJVMCompilerFlags {
     val friendPaths = CompilerFlag<Array<String>>("friendPaths", "Paths to output directories for friend modules.")
 
     /** Used to allow compiling of .wemi files by Kotlin compiler */
-    internal val compilingWemiBuildFiles = CompilerFlag<Boolean>("compilingWemiBuildFiles", "Internal flag")
+    val compilingWemiBuildFiles = CompilerFlag<Boolean>("compilingWemiBuildFiles", "Internal flag")
 }

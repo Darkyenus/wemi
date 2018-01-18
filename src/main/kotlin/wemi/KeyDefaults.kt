@@ -173,6 +173,8 @@ object KeyDefaults {
     val Compile: BoundKeyValue<Path> = {
         using(Configurations.compiling) {
             val output = Keys.outputClassesDirectory.get()
+            Files.createDirectories(output)
+
             val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
             val javaSourceRoots = mutableSetOf<Path>()
             for ((file, _, root) in javaSources) {
@@ -209,7 +211,6 @@ object KeyDefaults {
                 val writer = StringBuilderWriter(writerSb)
                 val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
 
-                Files.createDirectories(output)
                 val sourcesOut = using(compilingJava) { Keys.outputSourcesDirectory.get() }
                 Files.createDirectories(sourcesOut)
                 val headersOut = using(compilingJava) { Keys.outputHeadersDirectory.get() }

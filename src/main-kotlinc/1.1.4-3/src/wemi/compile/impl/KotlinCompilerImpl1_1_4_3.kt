@@ -50,7 +50,7 @@ import java.util.*
 /**
  * Kotlin compiler interface implementation, DO NOT TOUCH FROM OTHER CLASSES THAN [KotlinCompiler]!!!
  */
-internal class KotlinCompilerImpl1_1_4 : KotlinCompiler {
+internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
 
     private fun KotlinCompilerFlags.FeatureState.internal(): LanguageFeature.State {
         return when (this) {

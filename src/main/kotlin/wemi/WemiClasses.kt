@@ -530,13 +530,10 @@ sealed class BindingHolder {
     fun extend(configuration: Configuration, initializer: ConfigurationExtension.() -> Unit) {
         ensureUnlocked()
         val extensions = this@BindingHolder.configurationExtensions
-        if (extensions.containsKey(this)) {
-            throw IllegalStateException("Configuration $configuration already extended in ${this@BindingHolder}")
-        }
-        val extension = ConfigurationExtension(configuration, this)
+        val extension = extensions.getOrPut(configuration) { ConfigurationExtension(configuration, this) }
+        extension.locked = false
         extension.initializer()
         extension.locked = true
-        extensions[configuration] = extension
     }
 
     /**
@@ -552,18 +549,9 @@ sealed class BindingHolder {
      * ```
      */
     fun extendMultiple(vararg configurations: Configuration, initializer: ConfigurationExtension.() -> Unit) {
-        ensureUnlocked()
-        val extensions = this@BindingHolder.configurationExtensions
         for (configuration in configurations) {
-            if (extensions.containsKey(this)) {
-                throw IllegalStateException("Configuration $configuration already extended in ${this@BindingHolder}")
-            }
-            val extension = ConfigurationExtension(configuration, this)
-            extension.initializer()
-            extension.locked = true
-            extensions[configuration] = extension
+            extend(configuration, initializer)
         }
-
     }
 
     //region Modify utility methods
@@ -572,7 +560,7 @@ sealed class BindingHolder {
      *
      * @see modify
      */
-    infix inline fun <Value> Key<Collection<Value>>.add(crossinline additionalValue: BoundKeyValue<Value>) {
+    inline infix fun <Value> Key<Collection<Value>>.add(crossinline additionalValue: BoundKeyValue<Value>) {
         this.modify { collection: Collection<Value> ->
             //TODO Optimize?
             collection + additionalValue()
@@ -584,7 +572,7 @@ sealed class BindingHolder {
      *
      * @see modify
      */
-    infix inline fun <Value> Key<Collection<Value>>.remove(crossinline valueToRemove: BoundKeyValue<Value>) {
+    inline infix fun <Value> Key<Collection<Value>>.remove(crossinline valueToRemove: BoundKeyValue<Value>) {
         this.modify { collection: Collection<Value> ->
             collection - valueToRemove()
         }

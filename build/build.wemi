@@ -1,18 +1,29 @@
+@file:Suppress("UnusedImport") // Because Kotlin has problems with files in default packages?
+
+import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.compile.KotlinCompilerVersion
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags.BytecodeTarget
+import wemi.createProject
 import wemi.util.div
 import wemi.util.executable
 import java.nio.file.Files
 
-@Suppress("unused")
-val wemi by project(path(".")) {
+import core
+import createKotlinCompilerProject
+import CompilerProjects
+
+val CompilerProjects = listOf(
+        createKotlinCompilerProject("1.1.4-3")
+)
+
+val core by project(path(".")) {
     projectName set { "wemi" }
     projectGroup set { "com.darkyen" }
     projectVersion set { "0.1-SNAPSHOT" }
 
-    kotlinVersion set { KotlinCompilerVersion.Version1_1_4 }
+    kotlinVersion set { KotlinCompilerVersion.Version1_1_4_3 }
 
     mainClass set { "wemi.boot.MainKt" }
 
@@ -22,18 +33,12 @@ val wemi by project(path(".")) {
             dependency("org.jetbrains.kotlin", "kotlin-stdlib", "1.1.4-3"),
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
             dependency("com.github.Darkyenus", "tproll", "v1.2.5"),
-            dependency("com.github.Darkyenus", "tproll", "v1.2.5"),
             dependency("com.github.Darkyenus", "DaveWebb", "v1.2"),
             dependency("com.github.EsotericSoftware", "jsonbeans", "cb0f3406fc"),
             dependency("org.jline", "jline", "3.3.0")
         ) }
 
     extend(compiling) {
-        libraryDependencies add {
-            /* Used ONLY in wemi.compile.impl.KotlinCompilerImpl1_1_4 */
-            dependency("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4-3")
-        }
-
         libraryDependencies add {
             /* Used ONLY in wemi.test.forked.TestLauncher */
             dependency("org.junit.platform", "junit-platform-launcher", "1.0.2")
@@ -45,8 +50,18 @@ val wemi by project(path(".")) {
         libraryDependencies add { JUnitEngine }
     }
 
-    extend(compilingKotlin) {
-        compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = BytecodeTarget.JAVA_1_8
+    extend(assembling) {
+        internalClasspath modify { cp ->
+            val cpWithCompilers = ArrayList(cp)
+
+            for (p in CompilerProjects) {
+                p.projectScope.apply {
+                    cpWithCompilers.addAll(internalClasspath.get())
+                }
+            }
+
+            cpWithCompilers
+        }
     }
 
     assemblyPrependData set {
@@ -63,6 +78,34 @@ val wemi by project(path(".")) {
     assembly modify { assembled ->
         assembled.executable = true
         assembled
+    }
+}
+
+fun createKotlinCompilerProject(version:String):Project {
+    val projectName = StringBuilder("kotlinc_")
+    for (c in version) {
+        if (c.isJavaIdentifierPart()) {
+            projectName.append(c)
+        } else {
+            projectName.append('_')
+        }
+    }
+
+    return createProject(projectName.toString(), path("src/main-kotlinc/$version")) {
+
+        extendMultiple(compilingJava, compilingKotlin) {
+            sourceRoots set { listOf(projectRoot / "src") }
+        }
+
+        projectDependencies set {
+            listOf(core.dependency())
+        }
+
+        libraryDependencies set { listOf(
+                dependency("org.jetbrains.kotlin", "kotlin-compiler", version),
+                dependency("org.slf4j", "slf4j-api", "1.7.25")
+        ) }
+
     }
 }
 

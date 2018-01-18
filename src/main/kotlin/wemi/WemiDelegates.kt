@@ -5,6 +5,7 @@ package wemi
 import org.slf4j.LoggerFactory
 import wemi.KeyDefaults.applyDefaults
 import wemi.boot.WemiBuildScript
+import wemi.util.exists
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
@@ -53,6 +54,9 @@ class ProjectDelegate internal constructor(
  */
 fun createProject(name:String, root:Path, checkRootUnique:Boolean = true, initializer: Project.() -> Unit):Project {
     val usedRoot = root.toAbsolutePath()
+    if (!usedRoot.exists()) {
+        Files.createDirectories(usedRoot)
+    }
 
     val project = Project(name, usedRoot)
     synchronized(BuildScriptData.AllProjects) {

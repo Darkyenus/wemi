@@ -141,6 +141,7 @@ fun CodePoint.isCodePointSafeInFileName(): Boolean = when {
  * @see isCodePointSafeInFileName
  */
 fun CharSequence.toSafeFileName(replacement: Char = '_'): CharSequence {
+
     val sb = StringBuilder(length)
     var anyReplacements = false
 
@@ -150,6 +151,30 @@ fun CharSequence.toSafeFileName(replacement: Char = '_'): CharSequence {
         } else {
             sb.append(replacement)
             anyReplacements = true
+        }
+    }
+
+    return if (anyReplacements) {
+        sb
+    } else {
+        this
+    }
+}
+
+/**
+ * Converts this [CharSequence], by converting each [CodePoint] with [mapper] and omitting those
+ */
+fun CharSequence.mapNotZero(mapper:(CodePoint) -> CodePoint):CharSequence {
+    val sb = StringBuilder(length)
+    var anyReplacements = false
+
+    forCodePoints { cp ->
+        val newCp = mapper(cp)
+        if (newCp != cp) {
+            anyReplacements = true
+        }
+        if (newCp != 0) {
+            sb.appendCodePoint(newCp)
         }
     }
 

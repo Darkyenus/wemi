@@ -73,7 +73,13 @@ object Configurations {
     val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { KotlinSourceFileExtensions }
-        Keys.kotlinCompiler set { WemiKotlinVersion.compilerInstance() }
+        Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance() }
+        Keys.compilerOptions modify {
+            it.apply {
+                set(KotlinJVMCompilerFlags.moduleName, Keys.projectName.get())
+            }
+        }
+        Keys.compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = KotlinJVMCompilerFlags.BytecodeTarget.JAVA_1_8
     }
 
     val wemiBuildScript by configuration("Setup with information about the build script " +
