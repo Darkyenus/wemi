@@ -76,7 +76,7 @@ object Configurations {
         Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance() }
         Keys.compilerOptions modify {
             it.apply {
-                set(KotlinJVMCompilerFlags.moduleName, Keys.projectName.get())
+                set(KotlinCompilerFlags.moduleName, Keys.projectName.get())
             }
         }
         Keys.compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = KotlinJVMCompilerFlags.BytecodeTarget.JAVA_1_8

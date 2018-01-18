@@ -13,9 +13,12 @@ import java.nio.file.Files
 import core
 import createKotlinCompilerProject
 import CompilerProjects
+import wemi.compile.KotlinJVMCompilerFlags.skipRuntimeVersionCheck
 
 val CompilerProjects = listOf(
-        createKotlinCompilerProject("1.1.4-3")
+        createKotlinCompilerProject("1.1.4-3"),
+        createKotlinCompilerProject("1.1.61"),
+        createKotlinCompilerProject("1.2.20")
 )
 
 val core by project(path(".")) {
@@ -95,6 +98,10 @@ fun createKotlinCompilerProject(version:String):Project {
 
         extendMultiple(compilingJava, compilingKotlin) {
             sourceRoots set { listOf(projectRoot / "src") }
+        }
+
+        extend(compilingKotlin) {
+            compilerOptions[skipRuntimeVersionCheck] = true
         }
 
         projectDependencies set {

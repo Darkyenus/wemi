@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.progress.CompilationCanceledException
 import org.jetbrains.kotlin.progress.CompilationCanceledStatus
 import org.jetbrains.kotlin.progress.ProgressIndicatorAndCompilationCanceledStatus
 import org.jetbrains.kotlin.util.PerformanceCounter
+import org.jetbrains.kotlin.utils.Jsr305State
 import org.jetbrains.kotlin.utils.PathUtil
 import org.slf4j.Logger
 import org.slf4j.Marker
@@ -50,7 +51,7 @@ import java.util.*
 /**
  * Kotlin compiler interface implementation, DO NOT TOUCH FROM OTHER CLASSES THAN [KotlinCompiler]!!!
  */
-internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
+internal class KotlinCompilerImpl1_2_20 : KotlinCompiler {
 
     private fun KotlinCompilerFlags.FeatureState.internal(): LanguageFeature.State {
         return when (this) {
@@ -116,21 +117,21 @@ internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
 
         val extraLanguageFeatures = HashMap<LanguageFeature, LanguageFeature.State>(0)
         flags.use(KotlinCompilerFlags.multiPlatform) {
-            extraLanguageFeatures.put(LanguageFeature.MultiPlatformProjects, it.internal())
+            extraLanguageFeatures[LanguageFeature.MultiPlatformProjects] = it.internal()
         }
 
         flags.use(KotlinCompilerFlags.coroutinesState) {
-            extraLanguageFeatures.put(LanguageFeature.Coroutines, it.internal())
+            extraLanguageFeatures[LanguageFeature.Coroutines] = it.internal()
         }
 
         val configureAnalysisFlags = HashMap<AnalysisFlag<*>, Any?>()
-        configureAnalysisFlags.put(AnalysisFlag.skipMetadataVersionCheck, flags.useDefault(KotlinCompilerFlags.skipMetadataVersionCheck, false))
-        configureAnalysisFlags.put(AnalysisFlag.multiPlatformDoNotCheckImpl, flags.useDefault(KotlinCompilerFlags.multiPlatformDoNotCheckImpl, false))
-        configureAnalysisFlags.put(AnalysisFlag.loadJsr305Annotations, when (flags.useDefault(KotlinJVMCompilerFlags.jsr305GlobalReportLevel, KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Ignore)) {
-            KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Ignore -> Jsr305State.IGNORE
-            KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Warn -> Jsr305State.WARN
-            KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Enable -> Jsr305State.ENABLE
-        })
+        configureAnalysisFlags[AnalysisFlag.skipMetadataVersionCheck] = flags.useDefault(KotlinCompilerFlags.skipMetadataVersionCheck, false)
+        configureAnalysisFlags[AnalysisFlag.multiPlatformDoNotCheckActual] = flags.useDefault(KotlinCompilerFlags.multiPlatformDoNotCheckImpl, false)
+        configureAnalysisFlags[AnalysisFlag.jsr305] = when (flags.useDefault(KotlinJVMCompilerFlags.jsr305GlobalReportLevel, KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Ignore)) {
+            KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Ignore -> Jsr305State.DISABLED
+            KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Warn -> Jsr305State.DEFAULT
+            KotlinJVMCompilerFlags.Jsr305GlobalReportLevel.Enable -> Jsr305State.STRICT
+        }
 
         configuration.languageVersionSettings = LanguageVersionSettingsImpl(
                 languageVersion,
@@ -252,6 +253,24 @@ internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
         flags.use(KotlinJVMCompilerFlags.declarationsOutputPath) {
             configuration.put(JVMConfigurationKeys.DECLARATIONS_JSON_PATH, it)
         }
+
+        // 1.2.20
+        flags.use(KotlinJVMCompilerFlags.disableReceiverAssertions) {
+            configuration.put(JVMConfigurationKeys.DISABLE_RECEIVER_ASSERTIONS, it)
+        }
+        flags.use(KotlinJVMCompilerFlags.constructorCallNormalizationMode) {
+            configuration.put(JVMConfigurationKeys.CONSTRUCTOR_CALL_NORMALIZATION_MODE, when (it) {
+                KotlinJVMCompilerFlags.JVMConstructorCallNormalizationMode.Disable -> JVMConstructorCallNormalizationMode.DISABLE
+                KotlinJVMCompilerFlags.JVMConstructorCallNormalizationMode.Enable -> JVMConstructorCallNormalizationMode.ENABLE
+                KotlinJVMCompilerFlags.JVMConstructorCallNormalizationMode.PreserveClassInitialization -> JVMConstructorCallNormalizationMode.PRESERVE_CLASS_INITIALIZATION
+            })
+        }
+        flags.use(KotlinJVMCompilerFlags.noExceptionOnExplicitEqualsForBoxedNull) {
+            configuration.put(JVMConfigurationKeys.NO_EXCEPTION_ON_EXPLICIT_EQUALS_FOR_BOXED_NULL, it)
+        }
+        flags.use(KotlinJVMCompilerFlags.compileJava) {
+            configuration.put(JVMConfigurationKeys.COMPILE_JAVA, it)
+        }
     }
 
     private fun setupReportPerf(configuration: CompilerConfiguration, flags: CompilerFlags): Boolean {
@@ -314,13 +333,13 @@ internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
                          logger: Logger,
                          loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
 
-        val messageCollector = GroupingMessageCollector(createLoggingMessageCollector(logger, loggerMarker))
+        val messageCollector = GroupingMessageCollector(createLoggingMessageCollector(logger, loggerMarker), flags.useDefault(KotlinCompilerFlags.warningsAreErrors, false))
 
         val services = Services.EMPTY
 
         try {
             val exitStatus: KotlinCompiler.CompileExitStatus
-            val canceledStatus = services.get(CompilationCanceledStatus::class.java)
+            val canceledStatus = services[CompilationCanceledStatus::class.java]
             ProgressIndicatorAndCompilationCanceledStatus.setCompilationCanceledStatus(canceledStatus)
 
             val rootDisposable = Disposer.newDisposable()

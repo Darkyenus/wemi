@@ -2,6 +2,8 @@
 
 1. Update to latest kotlin
 
+1. Source code change detection and caching
+
 1. Trace debug system for debugging keys (+ print current key trace on first Ctrl-T/C and java stack trace on second Ctrl-T with same key trace)
 
 1. Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin

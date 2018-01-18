@@ -4,6 +4,7 @@ import org.slf4j.LoggerFactory
 import wemi.WemiKotlinVersion
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
+import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.dependency.*
 import wemi.dependency.DependencyResolver.artifacts
@@ -118,7 +119,7 @@ internal fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildSc
 
     val buildFlags = CompilerFlags()
     buildFlags[KotlinJVMCompilerFlags.compilingWemiBuildFiles] = true
-    buildFlags[KotlinJVMCompilerFlags.moduleName] = combinedBuildFileName
+    buildFlags[KotlinCompilerFlags.moduleName] = combinedBuildFileName
     buildFlags[KotlinJVMCompilerFlags.jvmTarget] = KotlinJVMCompilerFlags.BytecodeTarget.JAVA_1_8
 
     val sources = buildScriptSources.map { LocatedFile(it) }

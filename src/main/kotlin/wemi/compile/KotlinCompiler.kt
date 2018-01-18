@@ -57,7 +57,18 @@ enum class KotlinCompilerVersion (
             "1.1.4-3",
             "wemi.compile.impl.KotlinCompilerImpl1_1_4_3",
             listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4-3")))
-    );
+    ),
+    Version1_1_61(
+            "1.1.61",
+            "wemi.compile.impl.KotlinCompilerImpl1_1_61",
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.61")))
+    ),
+    Version1_2_20(
+            "1.2.20",
+            "wemi.compile.impl.KotlinCompilerImpl1_2_20",
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.20")))
+    ),
+    ;
 
     private var compilerCache:KotlinCompiler? = null
 
@@ -109,6 +120,9 @@ object KotlinCompilerFlags {
     val languageVersion = CompilerFlag<String>("languageVersion", "Provide source compatibility with specified language version")
     //TODO Stronger type
     val apiVersion = CompilerFlag<String>("apiVersion", "Allow to use declarations only from the specified version of bundled libraries")
+
+    val moduleName = CompilerFlag<String>("moduleName", "Module name")
+
     val pluginOptions = CompilerFlag<Array<String>>("pluginOptions", "Pass an option to a plugin")
     val pluginClasspaths = CompilerFlag<Array<String>>("pluginClasspaths", "Load plugins from the given classpath")
     val noInline = CompilerFlag<Boolean>("noInline", "Disable method inlining")
@@ -117,7 +131,6 @@ object KotlinCompilerFlags {
     val reportOutputFiles = CompilerFlag<Boolean>("reportOutputFiles", "Report source to output files mapping")
     val multiPlatform = CompilerFlag<FeatureState>("multiPlatform", "Enable experimental language support for multi-platform projects")
     val multiPlatformDoNotCheckImpl = CompilerFlag<Boolean>("multiPlatformDoNotCheckImpl", "Do not check presence of 'impl' modifier in multi-platform projects")
-    val intellijPluginRoot = CompilerFlag<String>("intellijPluginRoot", "Path to the kotlin-compiler.jar or directory where IntelliJ configuration files can be found")
     val coroutinesState = CompilerFlag<FeatureState>("coroutinesState", "Enable coroutines or report warnings or errors on declarations and use sites of 'suspend' modifier")
 
     enum class FeatureState {
@@ -126,6 +139,10 @@ object KotlinCompilerFlags {
         EnabledWithError,
         Disabled
     }
+
+    //region 1.2.20
+    val warningsAreErrors = CompilerFlag<Boolean>("warningsAreErrors", "Treat warnings as errors")
+    //endregion
 }
 
 /**
@@ -136,7 +153,9 @@ object KotlinJVMCompilerFlags {
     val jdkHome = CompilerFlag<String>("jdkHome", "Path to JDK home directory to include into classpath, if differs from default JAVA_HOME")
     //TODO probably not needed
     val noJdk = CompilerFlag<Boolean>("noJdk", "Don't include Java runtime into classpath")
-    val moduleName = CompilerFlag<String>("moduleName", "Module name")
+
+    @Deprecated("Moved to KotlinCompilerFlags")
+    val moduleName = KotlinCompilerFlags.moduleName
 
     enum class BytecodeTarget(val string: String) {
         JAVA_1_6("1.6"),
@@ -175,6 +194,21 @@ object KotlinJVMCompilerFlags {
 
     //TODO What?
     val friendPaths = CompilerFlag<Array<String>>("friendPaths", "Paths to output directories for friend modules.")
+
+    //region 1.2.20
+    val disableReceiverAssertions = CompilerFlag<Boolean>("disableReceiverAssertions", "Disable nullability call receiver assertions")
+    val constructorCallNormalizationMode = CompilerFlag<JVMConstructorCallNormalizationMode>("constructorCallNormalizationMode", "")//TODO
+    /** See https://kotlinlang.org/docs/reference/whatsnew12.html#constructor-calls-normalization */
+    enum class JVMConstructorCallNormalizationMode {
+        Disable,
+        Enable,
+        PreserveClassInitialization
+    }
+    val noExceptionOnExplicitEqualsForBoxedNull = CompilerFlag<Boolean>("noExceptionOnExplicitEqualsForBoxedNull", "Do not throw NPE on explicit 'equals' call for null receiver of platform boxed primitive type")
+
+    /** Not supported by Wemi */
+    val compileJava = CompilerFlag<Boolean>("compileJava", "Compile Java sources")
+    //endregion
 
     /** Used to allow compiling of .wemi files by Kotlin compiler */
     val compilingWemiBuildFiles = CompilerFlag<Boolean>("compilingWemiBuildFiles", "Internal flag")

@@ -601,6 +601,19 @@ sealed class BindingHolder {
     }
 
     /**
+     * Modify [CompilerFlags] to set the given compiler [flag] to the given [value]
+     * that will be evaluated as if it was a key binding.
+     *
+     * @see modify
+     */
+    operator fun <Type> Key<CompilerFlags>.set(flag: CompilerFlag<Type>, value: BoundKeyValue<Type>) {
+        this.modify { flags: CompilerFlags ->
+            flags[flag] = value()
+            flags
+        }
+    }
+
+    /**
      * Modify [CompilerFlags] to add given [value] to the collection
      * assigned to the compiler flag of [CompilerFlagKeySetting].
      *
