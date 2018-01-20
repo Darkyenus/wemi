@@ -46,7 +46,7 @@ object Keys {
     val libraryDependencyProjectMapper by key<(Dependency) -> Dependency>("Function applied to ProjectDependencies encountered while resolving. Used for example when retrieving sources.", defaultValue = { it })
     val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved ->
         resolved.value.prettyPrint(null)
-    }, cached = true)
+    }, cacheMode = CACHE_ALWAYS)
     val unmanagedDependencies by key<Collection<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = emptyList())
     val projectDependencies by key<Collection<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = emptyList())
 
@@ -62,8 +62,8 @@ object Keys {
     val outputClassesDirectory by key<Path>("Directory to which compile key outputs classes")
     val outputSourcesDirectory by key<Path>("Directory to which compile key outputs sources")
     val outputHeadersDirectory by key<Path>("Directory to which compile key outputs headers")
-    val kotlinCompiler by key<KotlinCompiler>("Kotlin compiler", cached = true)
-    val javaCompiler by key<JavaCompiler>("Java compiler", cached = true)
+    val kotlinCompiler by key<KotlinCompiler>("Kotlin compiler", cacheMode = CACHE_ALWAYS)
+    val javaCompiler by key<JavaCompiler>("Java compiler", cacheMode = CACHE_ALWAYS)
     val compile by key<Path>("Compile sources and return the result")
 
     val mainClass by key<String>("Main class of the project")

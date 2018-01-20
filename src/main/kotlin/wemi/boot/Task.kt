@@ -81,7 +81,7 @@ class Task(
                 ?: return TaskEvaluationResult(null, this.key, TaskEvaluationStatus.NoKey)
 
         return try {
-            val result = project.projectScope.run {
+            val result = project.evaluate(configurations) {
                 using(configurations) {
                     // Attach input, if any
                     if (this@Task.input.isEmpty()) {
@@ -94,7 +94,7 @@ class Task(
                             if (k == null) {
                                 freeInput.add(v)
                             } else {
-                                boundInput.put(k, v)
+                                boundInput[k] = v
                             }
                         }
 
@@ -160,11 +160,11 @@ class Task(
         /**
          * Task is a command (starts with #)
          */
-        val FLAG_MACHINE_READABLE_COMMAND = 1 shl 0
+        const val FLAG_MACHINE_READABLE_COMMAND = 1 shl 0
         /**
          * Task is optional (ends with ?)
          */
-        val FLAG_MACHINE_READABLE_OPTIONAL = 1 shl 1
+        const val FLAG_MACHINE_READABLE_OPTIONAL = 1 shl 1
     }
 }
 

@@ -35,9 +35,9 @@ class Key<Value> internal constructor(
          */
         internal val defaultValue: Value?,
         /**
-         * True if results of this key's evaluation should be cached by the scope in which it was evaluated.
+         * Mode in which the result of this key's evaluation should be cached by the scope in which it was evaluated.
          */
-        internal val cached: Boolean,
+        internal val cacheMode: KeyCacheMode<Value>?,
         /**
          * Optional function that can convert the result of this key's evaluation to a more readable
          * or more informative string.
@@ -52,21 +52,15 @@ class Key<Value> internal constructor(
 
         other as Key<*>
 
-        if (name != other.name) return false
-
-        return true
+        return name == other.name
     }
 
-    override fun hashCode(): Int {
-        return name.hashCode()
-    }
+    override fun hashCode(): Int = name.hashCode()
 
     /**
      * Returns [name]
      */
-    override fun toString(): String {
-        return name
-    }
+    override fun toString(): String = name
 
     /**
      * Returns [name] - [description]
@@ -78,7 +72,7 @@ class Key<Value> internal constructor(
         json.writeValue("name", name, String::class.java)
         json.writeValue("description", description, String::class.java)
         json.writeValue("hasDefaultValue", hasDefaultValue, Boolean::class.java)
-        json.writeValue("cached", cached, Boolean::class.java)
+        json.writeValue("cached", cacheMode != null, Boolean::class.java)
         json.writeObjectEnd()
     }
 }
@@ -144,7 +138,10 @@ class AnonymousConfiguration @PublishedApi internal constructor() : BindingHolde
  * @param extending which configuration is being extended by this extension
  * @param from which this extension has been created, mostly for debugging
  */
-class ConfigurationExtension internal constructor(val extending: Configuration, val from: BindingHolder) : BindingHolder() {
+class ConfigurationExtension internal constructor(
+        @Suppress("MemberVisibilityCanBePrivate")
+        val extending: Configuration,
+        val from: BindingHolder) : BindingHolder() {
     /**
      * @return extend([extending]) from [from]
      */
@@ -176,9 +173,108 @@ class Project internal constructor(val name: String, val projectRoot: Path)
     }
 
     /**
-     * Scope for this [Project]. This is how where scopes start.
+     * Scope for this [Project]. This is where scopes start.
+     *
+     * @see evaluate to use this
      */
-    val projectScope: Scope = Scope(name, listOf(this), null)
+    internal val projectScope: Scope = Scope(name, listOf(this), null)
+
+    /**
+     * Evaluate the [action] in the scope of this [Project].
+     * This is the entry-point to the key-evaluation mechanism.
+     *
+     * Keys can be evaluated only inside the [action].
+     *
+     * @param configurations that should be applied to this [Project]'s [Scope] before [action] is run in it.
+     *          It is equivalent to calling [Scope.using] directly in the [action], but more efficient.
+     */
+    inline fun <Result> evaluate(vararg configurations:Configuration, action:Scope.()->Result):Result {
+        try {
+            return startEvaluate(this, configurations, null).run(action)
+        } finally {
+            endEvaluate()
+        }
+    }
+
+    inline fun <Result> evaluate(configurations:List<Configuration>, action:Scope.()->Result):Result {
+        try {
+            return startEvaluate(this, null, configurations).run(action)
+        } finally {
+            endEvaluate()
+        }
+    }
+
+    companion object {
+
+        @Volatile
+        private var currentlyEvaluatingThread:Thread? = null
+        private var currentlyEvaluatingNestLevel = 0
+        private val currentlyEvaluatingScopeRoots = ArrayList<Scope>()
+
+        /**
+         * Prepare to evaluate some keys.
+         * Must be closed with [endEvaluate].
+         *
+         * Exactly one of [configurationsArray] and [configurationsList] must be non-null.
+         *
+         * @param project that is the base of the scope
+         * @return scope that should be used to evaluate the action
+         * @see evaluate
+         */
+        @PublishedApi
+        internal fun startEvaluate(project:Project,
+                                   configurationsArray: Array<out Configuration>?,
+                                   configurationsList:List<Configuration>?):Scope {
+            // Ensure that this thread is the only thread that can be evaluating
+            synchronized(this@Companion) {
+                val currentThread = Thread.currentThread()
+                if (currentlyEvaluatingThread == null) {
+                    currentlyEvaluatingThread = currentThread
+                } else if (currentlyEvaluatingThread != currentThread) {
+                    throw IllegalStateException("Can't evaluate from $currentThread, already evaluating from $currentlyEvaluatingThread")
+                }
+            }
+
+            var scope = project.projectScope
+            if (configurationsArray != null) {
+                for (config in configurationsArray) {
+                    scope = scope.scopeFor(config)
+                }
+            } else {
+                for (config in configurationsList!!) {
+                    scope = scope.scopeFor(config)
+                }
+            }
+
+            // Add scope that will be used to the roots to be cleared later
+            if (!currentlyEvaluatingScopeRoots.contains(scope)) {
+                currentlyEvaluatingScopeRoots.add(scope)
+            }
+            currentlyEvaluatingNestLevel++
+            return scope
+        }
+
+        @PublishedApi
+        internal fun endEvaluate() {
+            currentlyEvaluatingNestLevel--
+            assert(currentlyEvaluatingNestLevel >= 0)
+            if (currentlyEvaluatingNestLevel == 0) {
+                // Time to cleanup the cache
+                // NOTE: due to the way how scopes are added, we may end up cleaning the same scope twice,
+                // albeit indirectly. In general, it is probably faster to allow this than to try to mitigate this.
+                for (scope in currentlyEvaluatingScopeRoots) {
+                    scope.cleanCache(false)
+                }
+                currentlyEvaluatingScopeRoots.clear()
+
+                // Release the thread lock
+                synchronized(this@Companion) {
+                    assert(currentlyEvaluatingThread == Thread.currentThread())
+                    currentlyEvaluatingThread = null
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -288,12 +384,23 @@ class Scope internal constructor(
         val listener = activeKeyEvaluationListener
         listener?.keyEvaluationStarted(this, key)
 
+        val cacheScope = key.cacheMode
         // Check the cache
-        if (key.cached) {
-            val maybeCachedValue = getCached(key)
-            if (maybeCachedValue != null) {
-                listener?.keyEvaluationSucceeded(this, null, maybeCachedValue)
-                return maybeCachedValue
+        val valueCache = valueCache
+        if (cacheScope != null && valueCache != null) {
+            // Using valueCache here as arbitrary object, that can never be a valid result
+            // This is done to support null values without having to check if valueCache contains the key first
+            val maybeCachedValue = valueCache.getOrDefault(key, valueCache)
+            if (maybeCachedValue !== valueCache) {
+                @Suppress("UNCHECKED_CAST")
+                val cachedValue = maybeCachedValue as Value
+                // Small circus to force correct receivers without large amount of fuss
+                val cacheValid:Boolean = cacheScope.run { this@Scope.isCacheValid(true, cachedValue) }
+
+                if (cacheValid) {
+                    listener?.keyEvaluationSucceeded(key, this, null, cachedValue)
+                    return cachedValue
+                }
             }
         }
 
@@ -363,13 +470,17 @@ class Scope internal constructor(
             }
 
             // Store in cache
-            if (key.cached) {
-                if (scope != null) {
-                    putCached(key, result)
-                } // else the value is default value which does not need to be cached
+            // First check if this key is cached and if it isn't default value
+            if (cacheScope != null && (scope != null || allModifiersReverse.isNotEmpty())) {
+                val cache = this.valueCache ?: run {
+                    val cache = HashMap<Key<*>, Any?>()
+                    this.valueCache = cache
+                    cache
+                }
+                cache[key] = result
             }
 
-            listener?.keyEvaluationSucceeded(scope, holderOfFoundValue, result)
+            listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result)
             return result
         }
 
@@ -401,41 +512,40 @@ class Scope internal constructor(
         return getKeyValue(this, null, true)
     }
 
-    private fun <Value> getCached(key: Key<Value>): Value? {
-        synchronized(this) {
-            val valueCache = this.valueCache ?: return null
-            @Suppress("UNCHECKED_CAST")
-            return valueCache[key] as Value
-        }
-    }
-
-    private fun <Value> putCached(key: Key<Value>, value: Value) {
-        synchronized(this) {
-            val maybeNullCache = valueCache
-            val cache: MutableMap<Key<*>, Any?>
-            if (maybeNullCache == null) {
-                cache = mutableMapOf()
-                this.valueCache = cache
-            } else {
-                cache = maybeNullCache
-            }
-
-            cache.put(key, value)
-        }
-    }
-
     /**
      * Forget cached values stored in this and descendant caches.
      *
      * @return amount of values forgotten
-     * @see Key.cached
+     * @see Key.cacheMode
      */
-    internal fun cleanCache(): Int {
-        synchronized(this) {
-            val valueCache = this.valueCache
-            this.valueCache = null
-            return (valueCache?.size ?: 0) + configurationScopeCache.values.sumBy { it.cleanCache() }
+    internal fun cleanCache(everything:Boolean): Int {
+        var sum = configurationScopeCache.values.sumBy { it.cleanCache(everything) }
+        val valueCache = valueCache
+
+        if (valueCache == null || valueCache.isEmpty()) {
+            return sum
         }
+
+        if (everything) {
+            sum += valueCache.size
+            this.valueCache = null
+        } else {
+            val iterator = valueCache.entries.iterator()
+            while (iterator.hasNext()) {
+                val (key, value) = iterator.next()
+
+                @Suppress("UNCHECKED_CAST")
+                val cacheMode: KeyCacheMode<Any?> = key.cacheMode as KeyCacheMode<Any?>
+                val cacheValid = cacheMode.run { isCacheValid(false, value) }
+
+                if (!cacheValid) {
+                    iterator.remove()
+                    sum++
+                }
+            }
+        }
+
+        return sum
     }
 
     private fun buildToString(sb: StringBuilder) {
@@ -711,11 +821,13 @@ interface WemiKeyEvaluationListener {
     /**
      * Evaluation of key on top of key evaluation stack has been successful.
      *
+     * @param key that just finished executing, same as the one from [keyEvaluationStarted]
      * @param bindingFoundInScope scope in which the binding of this key has been found, null if default value
      * @param bindingFoundInHolder holder in [bindingFoundInScope] in which the key binding has been found (null if from cache)
      * @param result that has been used, may be null if caller considers null
      */
-    fun <Value>keyEvaluationSucceeded(bindingFoundInScope:Scope?,
+    fun <Value>keyEvaluationSucceeded(key: Key<Value>,
+                                      bindingFoundInScope:Scope?,
                                       bindingFoundInHolder: BindingHolder?,
                                       result:Value)
 
@@ -738,5 +850,40 @@ interface WemiKeyEvaluationListener {
      * @param fromKey if true, the evaluation of key threw the exception, if false it was one of the modifiers
      */
     fun keyEvaluationFailedByError(exception:Throwable, fromKey:Boolean)
+}
+
+/**
+ * Controls caching of [Key]s evaluated values in [Scope]s.
+ *
+ * Cache does not last through multiple Wemi runs.
+ */
+interface KeyCacheMode<in Value> {
+    /**
+     * Check if the cached value is still valid.
+     *
+     * Called on two occasions:
+     * 1. Before deciding to use the cached value ([preEvaluation] = `true`)
+     * 2. After the top level key evaluation is complete ([preEvaluation] = `false`)
+     *
+     * @param value that is cached
+     * @return true if the cache should be used/kept, false if it should be discarded
+     */
+    fun Scope.isCacheValid(preEvaluation:Boolean, value:Value):Boolean
+}
+
+/**
+ * This cache is always valid
+ */
+val CACHE_ALWAYS = object : KeyCacheMode<Any?> {
+    override fun Scope.isCacheValid(preEvaluation: Boolean, value: Any?): Boolean = true
+}
+
+/**
+ * This cache is valid for the duration of the top-level key evaluation
+ */
+val CACHE_FOR_RUN = object : KeyCacheMode<Any?> {
+    override fun Scope.isCacheValid(preEvaluation: Boolean, value: Any?): Boolean {
+        return preEvaluation
+    }
 }
 

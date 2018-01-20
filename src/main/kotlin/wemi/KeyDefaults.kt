@@ -117,12 +117,10 @@ object KeyDefaults {
 
             for (projectDependency in projectDependencies) {
                 // Enter a different scope
-                projectDependency.project.projectScope.run {
-                    using(*projectDependency.configurations) {
-                        ExternalClasspath_LOG.debug("Resolving project dependency on {}", this)
-                        result.addAll(Keys.externalClasspath.get())
-                        result.addAll(Keys.internalClasspath.get())
-                    }
+                projectDependency.project.evaluate(*projectDependency.configurations) {
+                    ExternalClasspath_LOG.debug("Resolving project dependency on {}", this)
+                    result.addAll(Keys.externalClasspath.get())
+                    result.addAll(Keys.internalClasspath.get())
                 }
             }
         })
@@ -159,7 +157,7 @@ object KeyDefaults {
         }
 
         for ((_, project) in AllProjects) {
-            clearedCount += project.projectScope.cleanCache()
+            clearedCount += project.projectScope.cleanCache(true)
         }
 
         clearedCount

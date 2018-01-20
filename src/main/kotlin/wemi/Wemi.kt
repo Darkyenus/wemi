@@ -6,7 +6,7 @@ import java.net.URL
 import java.nio.file.Path
 
 /** Version of Wemi build system */
-val WemiVersion = "0.1-SNAPSHOT"
+const val WemiVersion = "0.1-SNAPSHOT"
 
 internal val WemiVersionIsSnapshot = WemiVersion.endsWith("-SNAPSHOT")
 
@@ -65,11 +65,10 @@ fun project(projectRoot: Path, initializer: Project.() -> Unit): ProjectDelegate
  * @param defaultValue of the key, used when no binding exists. NOTE: Default value is NOT LAZY like standard binding!
  *          This same instance will be returned on each return, in every scope, so it MUST be immutable!
  *          Recommended to be used only for keys of [Collection]s with empty immutable default.
- * @param cached true if the successful result key evaluation should be stored in the scope for future evaluations.
- *          Recommended to be used only for those keys, that will not change during
+ * @param cacheMode describes how the key's evaluation result should be cached, null if it should not be cached
  */
-fun <Value> key(description: String, defaultValue: Value, cached: Boolean = false, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
-    return KeyDelegate(description, true, defaultValue, cached, prettyPrinter)
+fun <Value> key(description: String, defaultValue: Value, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+    return KeyDelegate(description, true, defaultValue, cacheMode, prettyPrinter)
 }
 
 /**
@@ -77,8 +76,8 @@ fun <Value> key(description: String, defaultValue: Value, cached: Boolean = fals
  *
  * @see [key] with default value for exact documentation
  */
-fun <Value> key(description: String, cached: Boolean = false, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
-    return KeyDelegate(description, false, null, cached, prettyPrinter)
+fun <Value> key(description: String, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+    return KeyDelegate(description, false, null, cacheMode, prettyPrinter)
 }
 
 /**

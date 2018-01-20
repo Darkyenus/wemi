@@ -1,6 +1,8 @@
 @file:Suppress("NOTHING_TO_INLINE", "unused")
 
+import wemi.CACHE_FOR_RUN
 import wemi.Configurations
+import wemi.KeyCacheMode
 import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository
 import java.nio.file.Paths
@@ -27,8 +29,8 @@ typealias Path = java.nio.file.Path
 
 // Core Functions
 inline fun project(projectRoot: Path = path("."), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, initializer)
-inline fun <Value> key(description: String, defaultValue: Value, cached: Boolean = false) = wemi.key(description, defaultValue, cached)
-inline fun <Value> key(description: String, cached: Boolean = false) = wemi.key<Value>(description, cached)
+inline fun <Value> key(description: String, defaultValue: Value, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN) = wemi.key(description, defaultValue, cacheMode)
+inline fun <Value> key(description: String, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN) = wemi.key(description, cacheMode)
 inline fun configuration(description: String, parent: Configuration? = null, noinline initializer: Configuration.() -> Unit) = wemi.configuration(description, parent, initializer)
 inline fun dependency(group: String, name: String, version: String, preferredRepository: Repository? = null, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(group, name, version, preferredRepository, *attributes)
 inline fun dependency(groupNameVersion: String, preferredRepository: Repository? = null, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(groupNameVersion, preferredRepository, *attributes)

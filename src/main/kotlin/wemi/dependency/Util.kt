@@ -31,7 +31,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
 
     // Build nodes
     for (depId in keys) {
-        nodes.put(depId, TreeNode(NodeData(depId, StatusNormal)))
+        nodes[depId] = TreeNode(NodeData(depId, StatusNormal))
     }
 
     // Connect nodes (even with cycles)

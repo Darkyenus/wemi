@@ -1,7 +1,6 @@
 package wemi.boot
 
 import com.darkyen.tproll.TPLogger
-import com.darkyen.tproll.util.PrettyPrinter
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReader
 import org.jline.reader.LineReaderBuilder
@@ -209,64 +208,25 @@ object CLI {
 
         when (status) {
             TaskEvaluationStatus.Success -> {
-                print(formatLabel("Done "))
-                print(formatInput(task.key))
+                val out = StringBuilder()
+                out.format(Color.Green, format = Format.Bold).append("Done ")
+                        .format(format = Format.Underline).append(task.key)
+                        .format(Color.Green, format = Format.Bold).append(": ")
+                        .format()
+
+                val newlinePoint = out.length
+
                 @Suppress("UNCHECKED_CAST")
-                val prettyPrinter: ((Any?) -> CharSequence)? = key?.prettyPrinter as ((Any?) -> CharSequence)?
+                out.appendKeyResultLn(key as Key<Any?>, data)
 
-                var prettyPrinted = false
-                if (prettyPrinter != null) {
-                    val printed: CharSequence? =
-                            try {
-                                prettyPrinter(data)
-                            } catch (e: Exception) {
-                                null
-                            }
 
-                    if (printed != null) {
-                        println(formatLabel(": "))
-                        println(printed)
-                        prettyPrinted = true
-                    }
+                // Add newline at newlinePoint if key result contains newlines (other than the last one)
+                if (out.indexOf('\n', newlinePoint) != out.length - 1) {
+                    out.insert(newlinePoint, '\n')
                 }
 
-                if (!prettyPrinted) {
-                    when (data) {
-                        null, is Unit -> println()
-                        is Collection<*> -> {
-                            print(formatLabel(" ("))
-                            print(data.size)
-                            println(formatLabel("): "))
-
-                            for (item: Any? in data) {
-                                print("  ")
-                                if (item is WithDescriptiveString) {
-                                    val valueText = item.toDescriptiveAnsiString()
-                                    if (valueText.contains(ANSI_ESCAPE)) {
-                                        println(valueText)
-                                    } else {
-                                        println(formatValue(valueText))
-                                    }
-                                } else {
-                                    println(formatValue(PrettyPrinter.toString(item)))
-                                }
-                            }
-                        }
-                        else -> {
-                            print(formatLabel(": "))
-                            if (data is WithDescriptiveString) {
-                                val valueText = data.toDescriptiveAnsiString()
-                                if (valueText.contains(ANSI_ESCAPE)) {
-                                    println(valueText)
-                                } else {
-                                    println(formatValue(valueText))
-                                }
-                            } else {
-                                println(formatValue(PrettyPrinter.toString(data)))
-                            }
-                        }
-                    }
-                }
+                // Print it out
+                print(out)
             }
             TaskEvaluationStatus.NoProject -> {
                 val projectString = data as String?
@@ -365,7 +325,9 @@ object CLI {
                 printWarning("trace <task> - trace task invocation")
             } else {
                 val sb = StringBuilder()
-                val treePrintingListener = TreeBuildingKeyEvaluationListener()
+
+                val printValues = BooleanValidator(task.input.find { it.first == "values" }?.second ?: "").use({it}, {false})
+                val treePrintingListener = TreeBuildingKeyEvaluationListener(printValues)
 
                 for ((_, taskText) in tasks) {
                     useKeyEvaluationListener(treePrintingListener) {

@@ -1,8 +1,10 @@
 package wemi.util
 
+import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TerminalColor
 import com.esotericsoftware.jsonbeans.Json
 import com.esotericsoftware.jsonbeans.JsonValue
+import wemi.Key
 import java.util.*
 
 /**
@@ -532,4 +534,64 @@ enum class Color(internal val offset: Int) {
 enum class Format(internal val number: Int) {
     Bold(1), // Label or Prompt
     Underline(4), // Input
+}
+
+private fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
+    if (value is WithDescriptiveString) {
+        val valueText = value.toDescriptiveAnsiString()
+        if (valueText.contains(ANSI_ESCAPE)) {
+            this.append(valueText)
+        } else {
+            this.format(Color.Blue).append(valueText).format()
+        }
+    } else {
+        this.format(Color.Blue)
+        PrettyPrinter.append(this, value)
+        if (value is Function<*>) {
+            val javaClass = value.javaClass
+            this.format(Color.White).append(" (").append(javaClass.name).append(')')
+        }
+        this.format()
+    }
+    return this
+}
+
+/**
+ * Append the [value] formatted like the result of the [key] and newline.
+ */
+fun <Value> StringBuilder.appendKeyResultLn(key: Key<Value>, value:Value) {
+    val prettyPrinter = key.prettyPrinter
+
+    if (prettyPrinter != null) {
+        val printed: CharSequence? =
+                try {
+                    prettyPrinter(value)
+                } catch (e: Exception) {
+                    null
+                }
+
+        if (printed != null) {
+            this.append(printed)
+            return
+        }
+    }
+
+    when (value) {
+        null, Unit -> {
+            this.append('\n')
+        }
+        is Collection<*> -> {
+            for ((i, item) in value.withIndex()) {
+                this.format(Color.White).append(i+1).append(": ").format().appendPrettyValue(item).append('\n')
+            }
+        }
+        is Array<*> -> {
+            for ((i, item) in value.withIndex()) {
+                this.format(Color.White).append(i+1).append(": ").format().appendPrettyValue(item).append('\n')
+            }
+        }
+        else -> {
+            this.appendPrettyValue(value).append('\n')
+        }
+    }
 }
