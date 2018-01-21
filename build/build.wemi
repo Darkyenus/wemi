@@ -58,7 +58,7 @@ val core by project(path(".")) {
             val cpWithCompilers = ArrayList(cp)
 
             for (p in CompilerProjects) {
-                p.projectScope.apply {
+                p.evaluate {
                     cpWithCompilers.addAll(internalClasspath.get())
                 }
             }

@@ -31,13 +31,13 @@ fun <V> Map<String, V>.findCaseInsensitive(key: String): V? {
  *
  * Example output: "1 day 5 minutes 33 seconds 0 ms"
  */
-fun formatTimeDuration(ms: Long): CharSequence {
+fun StringBuilder.appendTimeDuration(ms: Long): StringBuilder {
     val Second = 1000
     val Minute = Second * 60
     val Hour = Minute * 60
     val Day = Hour * 24
 
-    val result = StringBuilder()
+    val result = this
     var remaining = ms
 
     val days = remaining / Day
@@ -493,24 +493,20 @@ fun format(text: CharSequence, foreground: Color? = null, background: Color? = n
 fun StringBuilder.format(foreground: Color? = null, background: Color? = null, format: Format? = null):StringBuilder {
     if (!TerminalColor.COLOR_SUPPORTED) return this
 
-    if (foreground == null && background == null && format == null) {
-        append("$ANSI_ESCAPE[0m")
-    } else {
-        append("$ANSI_ESCAPE[")
-        if (foreground != null) {
-            append(30 + foreground.offset)
-            append(';')
-        }
-        if (background != null) {
-            append(40 + background.offset)
-            append(';')
-        }
-        if (format != null) {
-            append(format.number)
-            append(';')
-        }
-        setCharAt(length - 1, 'm')
+    append("$ANSI_ESCAPE[0") //Reset everything first
+    if (foreground != null) {
+        append(';')
+        append(30 + foreground.offset)
     }
+    if (background != null) {
+        append(';')
+        append(40 + background.offset)
+    }
+    if (format != null) {
+        append(';')
+        append(format.number)
+    }
+    append('m')
     return this
 }
 

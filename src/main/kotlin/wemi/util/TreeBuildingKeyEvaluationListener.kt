@@ -6,12 +6,13 @@ import wemi.Scope
 import wemi.WemiKeyEvaluationListener
 import wemi.boot.CLI
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 /**
  * [WemiKeyEvaluationListener] that stores relevant information about key evaluation and then
  * produces a human readable tree report about it.
  */
-class TreeBuildingKeyEvaluationListener(val printValues:Boolean) : WemiKeyEvaluationListener {
+class TreeBuildingKeyEvaluationListener(private val printValues:Boolean) : WemiKeyEvaluationListener {
 
     private val roots = ArrayList<TreeNode<KeyData>>()
     private val stack = ArrayDeque<TreeNode<KeyData>>()
@@ -38,7 +39,7 @@ class TreeBuildingKeyEvaluationListener(val printValues:Boolean) : WemiKeyEvalua
         val keyData = stack.peekLast().value
 
         val sb = keyData.body()
-        sb.append("\n\t")
+        sb.append("\n")
                 .format(foreground = Color.Cyan)
                 .append("Modified at ")
                 .append(modifierFromScope)
@@ -56,13 +57,7 @@ class TreeBuildingKeyEvaluationListener(val printValues:Boolean) : WemiKeyEvalua
         }
     }
 
-    private fun popAndIndent():KeyData {
-        val keyData = stack.removeLast().value
-        keyData.heading.append("  ")
-        return keyData
-    }
-
-    private fun popNodeAndIndent():TreeNode<KeyData> {
+    private fun popAndIndent():TreeNode<KeyData> {
         val node = stack.removeLast()
         val keyData = node.value
         keyData.heading.append("  ")
@@ -70,7 +65,8 @@ class TreeBuildingKeyEvaluationListener(val printValues:Boolean) : WemiKeyEvalua
     }
 
     override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value) {
-        val keyData = popAndIndent()
+        val node = popAndIndent()
+        val keyData = node.value
         keyData.heading.append(CLI.ICON_SUCCESS).format(Color.White).append(" from ")
         when {
             bindingFoundInScope == null -> keyData.heading.format(foreground = Color.Magenta).append("default value").format()
@@ -100,10 +96,13 @@ class TreeBuildingKeyEvaluationListener(val printValues:Boolean) : WemiKeyEvalua
                 body.setLength(originalLength)
             }
         }
+
+        keyData.endTimeAndAppendTiming(node)
     }
 
     override fun keyEvaluationFailedByNoBinding(withAlternative: Boolean, alternativeResult: Any?) {
-        val keyData = popAndIndent()
+        val node = popAndIndent()
+        val keyData = node.value
         keyData.heading.append(CLI.ICON_FAILURE).format(Color.Yellow)
         if (withAlternative) {
             keyData.heading.append(" used alternative")
@@ -111,10 +110,11 @@ class TreeBuildingKeyEvaluationListener(val printValues:Boolean) : WemiKeyEvalua
             keyData.heading.append(" failed with KeyNotAssignedException")
         }
         keyData.heading.format()
+        keyData.endTimeAndAppendTiming(node)
     }
 
     override fun keyEvaluationFailedByError(exception: Throwable, fromKey: Boolean) {
-        val node = popNodeAndIndent()
+        val node = popAndIndent()
         val keyData = node.value
         keyData.heading.append(CLI.ICON_EXCEPTION)
         keyData.heading.format(Color.Yellow)
@@ -135,6 +135,8 @@ class TreeBuildingKeyEvaluationListener(val printValues:Boolean) : WemiKeyEvalua
             body.appendWithStackTrace(exception)
             body.format()
         }
+
+        keyData.endTimeAndAppendTiming(node)
     }
 
     fun toTree(sb:StringBuilder) {
@@ -159,6 +161,23 @@ class TreeBuildingKeyEvaluationListener(val printValues:Boolean) : WemiKeyEvalua
         var body:StringBuilder? = null
 
         var exception:Throwable? = null
+
+        private val startTime = System.nanoTime()
+
+        var durationMs:Long = -1
+
+        fun endTimeAndAppendTiming(node:TreeNode<KeyData>) {
+            durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)
+
+            var ownMs = durationMs
+            for (n in node) {
+                ownMs -= n.value.durationMs
+            }
+
+            if (ownMs >= 1) {
+                heading.append(' ').format(Color.Cyan).appendTimeDuration(ownMs).format()
+            }
+        }
 
         fun body():StringBuilder {
             var b = body

@@ -211,8 +211,7 @@ object CLI {
                 val out = StringBuilder()
                 out.format(Color.Green, format = Format.Bold).append("Done ")
                         .format(format = Format.Underline).append(task.key)
-                        .format(Color.Green, format = Format.Bold).append(": ")
-                        .format()
+                        .format(Color.Green, format = Format.Bold).append(": ").format()
 
                 val newlinePoint = out.length
 
@@ -269,7 +268,9 @@ object CLI {
         }
 
         if (duration > 100) {
-            println(format("\tin " + formatTimeDuration(duration), Color.Cyan))
+            val sb = StringBuilder()
+            sb.format(Color.Cyan).append("\tin ").appendTimeDuration(duration).format()
+            println(sb)
         }
 
         return keyEvaluationResult
@@ -326,7 +327,7 @@ object CLI {
             } else {
                 val sb = StringBuilder()
 
-                val printValues = BooleanValidator(task.input.find { it.first == "values" }?.second ?: "").use({it}, {false})
+                val printValues = BooleanValidator(task.input.find { it.first == "values" }?.second ?: "").use({it}, {true})
                 val treePrintingListener = TreeBuildingKeyEvaluationListener(printValues)
 
                 for ((_, taskText) in tasks) {
