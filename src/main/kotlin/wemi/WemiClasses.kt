@@ -260,12 +260,18 @@ class Project internal constructor(val name: String, val projectRoot: Path)
             assert(currentlyEvaluatingNestLevel >= 0)
             if (currentlyEvaluatingNestLevel == 0) {
                 // Time to cleanup the cache
+                val cleanupStartTime = System.nanoTime()
+                var purgedCount = 0
+
                 // NOTE: due to the way how scopes are added, we may end up cleaning the same scope twice,
                 // albeit indirectly. In general, it is probably faster to allow this than to try to mitigate this.
                 for (scope in currentlyEvaluatingScopeRoots) {
-                    scope.cleanCache(false)
+                    purgedCount += scope.cleanCache(false)
                 }
                 currentlyEvaluatingScopeRoots.clear()
+
+                val cleanupDuration = System.nanoTime() - cleanupStartTime
+                activeKeyEvaluationListener?.postEvaluationCleanup(purgedCount, cleanupDuration)
 
                 // Release the thread lock
                 synchronized(this@Companion) {
@@ -850,6 +856,14 @@ interface WemiKeyEvaluationListener {
      * @param fromKey if true, the evaluation of key threw the exception, if false it was one of the modifiers
      */
     fun keyEvaluationFailedByError(exception:Throwable, fromKey:Boolean)
+
+    /**
+     * [Project.evaluate] has ended and cached values were cleaned
+     *
+     * @param valuesCleaned how many items were purged from cache
+     * @param durationNs how many nanoseconds did the cleaning take
+     */
+    fun postEvaluationCleanup(valuesCleaned:Int, durationNs:Long)
 }
 
 /**
