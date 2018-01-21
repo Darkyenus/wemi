@@ -443,7 +443,7 @@ class Scope internal constructor(
 
         listener?.keyEvaluationStarted(this, key)
         currentEvaluationUsedKeys.add(key)
-        val pareEvaluationUsedKeysMark = currentEvaluationUsedKeys.size
+        val preEvaluationUsedKeysMark = currentEvaluationUsedKeys.size
 
         // Check the cache
         val cacheMode = key.cacheMode
@@ -452,7 +452,7 @@ class Scope internal constructor(
             val selfCacheEntry = getCached(key)
             if (selfCacheEntry != null) {
                 val cachedValue = selfCacheEntry.value
-                listener?.keyEvaluationSucceeded(key, this, null, cachedValue)
+                listener?.keyEvaluationSucceeded(key, this, null, cachedValue, false)
                 // And notify that we have used the keys (because technically, we sort of did, before)
                 currentEvaluationUsedKeys.addAll(selfCacheEntry.usedKeys)
                 return cachedValue
@@ -481,7 +481,7 @@ class Scope internal constructor(
 
                     // Use it!
                     val cachedValue = parentCacheEntry.value
-                    listener?.keyEvaluationSucceeded(key, parentScope, null, cachedValue)
+                    listener?.keyEvaluationSucceeded(key, parentScope, null, cachedValue, false)
                     // And notify that we have used the keys (because technically, we sort of did, before)
                     currentEvaluationUsedKeys.addAll(usedKeys)
                     return cachedValue
@@ -526,7 +526,7 @@ class Scope internal constructor(
             if (entryFromDescendants != null) {
                 // Use it!
                 val cachedValue = entryFromDescendants.value
-                listener?.keyEvaluationSucceeded(key, scopeStack.last(), null, cachedValue)
+                listener?.keyEvaluationSucceeded(key, scopeStack.last(), null, cachedValue, false)
                 // And notify that we have used the keys (because technically, we sort of did, before)
                 currentEvaluationUsedKeys.addAll(entryFromDescendants.usedKeys)
                 return cachedValue
@@ -603,6 +603,7 @@ class Scope internal constructor(
             }
 
             // Store in cache
+            var cached = false
             // First check if this key is cached and if it isn't default value
             if (cacheMode != null && !foundValueIsDefault) {
                 val cache = this.valueCache ?: run {
@@ -610,15 +611,15 @@ class Scope internal constructor(
                     this.valueCache = cache
                     cache
                 }
-                listener?.keyEvaluationCachedTo(this)
+                cached = true
 
                 val postEvaluationUsedKeysMark = currentEvaluationUsedKeys.size
                 val usedKeys: List<Key<*>>
-                if (pareEvaluationUsedKeysMark == postEvaluationUsedKeysMark) {
+                if (preEvaluationUsedKeysMark == postEvaluationUsedKeysMark) {
                     usedKeys = emptyList()
                 } else {
-                    val mutableUsedKeys = ArrayList<Key<*>>(postEvaluationUsedKeysMark - pareEvaluationUsedKeysMark)
-                    for (i in pareEvaluationUsedKeysMark until postEvaluationUsedKeysMark) {
+                    val mutableUsedKeys = ArrayList<Key<*>>(postEvaluationUsedKeysMark - preEvaluationUsedKeysMark)
+                    for (i in preEvaluationUsedKeysMark until postEvaluationUsedKeysMark) {
                         val k = currentEvaluationUsedKeys[i]
                         if (!mutableUsedKeys.contains(k)) {
                             mutableUsedKeys.add(k)
@@ -630,7 +631,7 @@ class Scope internal constructor(
                 cache[key] = CacheEntry(result, usedKeys)
             }
 
-            listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result)
+            listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, cached)
             return result
         }
 
@@ -968,11 +969,6 @@ interface WemiKeyEvaluationListener {
      */
     fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder:BindingHolder, amount:Int)
 
-    /**
-     * Can be called, even multiple times, right before [keyEvaluationSucceeded], to notify that the
-     * value will be cached in the [scope].
-     */
-    fun keyEvaluationCachedTo(scope: Scope)
 
     /**
      * Evaluation of key on top of key evaluation stack has been successful.
@@ -981,11 +977,13 @@ interface WemiKeyEvaluationListener {
      * @param bindingFoundInScope scope in which the binding of this key has been found, null if default value
      * @param bindingFoundInHolder holder in [bindingFoundInScope] in which the key binding has been found (null if from cache)
      * @param result that has been used, may be null if caller considers null
+     * @param savedToCache if the [result] has been saved to the cache in calling scope
      */
     fun <Value>keyEvaluationSucceeded(key: Key<Value>,
-                                      bindingFoundInScope:Scope?,
+                                      bindingFoundInScope: Scope?,
                                       bindingFoundInHolder: BindingHolder?,
-                                      result:Value)
+                                      result: Value,
+                                      savedToCache: Boolean)
 
     /**
      * Evaluation of key on top of key evaluation stack has failed, because the key has no binding, nor default value.

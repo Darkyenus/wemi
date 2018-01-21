@@ -16,6 +16,9 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
 
     private val roots = ArrayList<TreeNode<KeyData>>()
     private val stack = ArrayDeque<TreeNode<KeyData>>()
+    private var cacheWrites = 0
+    private var cacheReads = 0
+    private var evaluations = 0
 
     override fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {
         val keyData = KeyData()
@@ -58,15 +61,6 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         sb.format()
     }
 
-    override fun keyEvaluationCachedTo(scope: Scope) {
-        val sb = stack.peekLast().value.body()
-        sb.append("\n")
-                .format(foreground = Color.Magenta)
-                .append("Cached at ")
-                .append(scope)
-                .format()
-    }
-
     private fun popAndIndent(): TreeNode<KeyData> {
         val node = stack.removeLast()
         val keyData = node.value
@@ -74,7 +68,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         return node
     }
 
-    override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value) {
+    override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value, savedToCache: Boolean) {
         val node = popAndIndent()
         val keyData = node.value
         keyData.heading.append(CLI.ICON_SUCCESS).format(Color.White).append(" from ")
@@ -84,12 +78,19 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
                 keyData.heading.format(Color.Magenta).append("cache")
                         .format(Color.White).append(" in ")
                         .format().append(bindingFoundInScope)
+                cacheReads++
             }
             else -> {
                 keyData.heading.format().append(bindingFoundInScope)
                 if (bindingFoundInScope.scopeBindingHolders.last() !== bindingFoundInHolder) {
                     // Specify which holder only if it isn't nominal
                     keyData.heading.format(Color.White).append(" in ").format(format = Format.Underline).append(bindingFoundInHolder).format()
+                }
+                evaluations++
+
+                if (savedToCache) {
+                    keyData.heading.format(Color.White).append(" and ").format(Color.Magenta, format = Format.Bold).append("cached").format()
+                    cacheWrites++
                 }
             }
         }
@@ -168,7 +169,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         (stack.peekLast() ?: roots).add(TreeNode(value))
     }
 
-    fun toTree(sb: StringBuilder) {
+    fun appendResultTo(sb: StringBuilder) {
         printTree(roots, sb) { out ->
             out.append(this.heading)
             val body = this.body
@@ -176,11 +177,19 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
                 out.append(body)
             }
         }
+        sb.format(Color.White)
+                .append("(cache reads: ").append(cacheReads)
+                .append(", cache writes: ").append(cacheWrites)
+                .append(", key evaluations: ").append(evaluations).append(')')
+                .format()
     }
 
     fun reset() {
         roots.clear()
         stack.clear()
+        cacheWrites = 0
+        cacheReads = 0
+        evaluations = 0
     }
 
     private class KeyData {

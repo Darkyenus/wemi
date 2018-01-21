@@ -139,9 +139,9 @@ val IntValidator: Validator<Int> = { Failable.failNull(it.trim().toIntOrNull(), 
 @Suppress("unused")
 val BooleanValidator: Validator<Boolean> = {
     when (it.toLowerCase()) {
-        "true", "yes", "1", "y" ->
+        "true", "yes", "1", "y", "on" ->
             Failable.success(true)
-        "false", "no", "0", "n" ->
+        "false", "no", "0", "n", "off" ->
             Failable.success(false)
         else ->
             Failable.failure("Boolean expected")

@@ -334,7 +334,7 @@ object CLI {
                     useKeyEvaluationListener(treePrintingListener) {
                         result = evaluateLine(taskText)
                     }
-                    treePrintingListener.toTree(sb)
+                    treePrintingListener.appendResultTo(sb)
 
                     println("🐾 ${format("Trace", format = Format.Bold)}")
                     if (sb.isEmpty()) {

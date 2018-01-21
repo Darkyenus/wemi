@@ -1,8 +1,6 @@
 # Things to do next
 
-During key evaluation, remember which keys were used in the cache.
-Then the cache is valid for all scopes that don't touch that data!
-This must include that what is stored in cache.
+Naive smart caching: (cache reads: 24, cache writes: 105, key evaluations: 105)
 
 1. Update to latest kotlin
 
