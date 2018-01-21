@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
  * [WemiKeyEvaluationListener] that stores relevant information about key evaluation and then
  * produces a human readable tree report about it.
  */
-class TreeBuildingKeyEvaluationListener(private val printValues:Boolean) : WemiKeyEvaluationListener {
+class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : WemiKeyEvaluationListener {
 
     private val roots = ArrayList<TreeNode<KeyData>>()
     private val stack = ArrayDeque<TreeNode<KeyData>>()
@@ -57,7 +57,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues:Boolean) : WemiK
         }
     }
 
-    private fun popAndIndent():TreeNode<KeyData> {
+    private fun popAndIndent(): TreeNode<KeyData> {
         val node = stack.removeLast()
         val keyData = node.value
         keyData.heading.append("  ")
@@ -89,7 +89,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues:Boolean) : WemiK
             val originalLength = body.length
             body.append('\n') // Body convention
             body.appendKeyResultLn(key, result)
-            body.setLength(body.length-1) // Strip newline appended by previous statement
+            body.setLength(body.length - 1) // Strip newline appended by previous statement
 
             if (body.length == originalLength + 1) {
                 // Key result is empty, abort
@@ -158,7 +158,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues:Boolean) : WemiK
         (stack.peekLast() ?: roots).add(TreeNode(value))
     }
 
-    fun toTree(sb:StringBuilder) {
+    fun toTree(sb: StringBuilder) {
         printTree(roots, sb) { out ->
             out.append(this.heading)
             val body = this.body
@@ -177,15 +177,15 @@ class TreeBuildingKeyEvaluationListener(private val printValues:Boolean) : WemiK
 
         val heading = StringBuilder()
 
-        var body:StringBuilder? = null
+        var body: StringBuilder? = null
 
-        var exception:Throwable? = null
+        var exception: Throwable? = null
 
         private val startTime = System.nanoTime()
 
-        var durationMs:Long = -1
+        var durationMs: Long = -1
 
-        fun endTimeAndAppendTiming(node:TreeNode<KeyData>) {
+        fun endTimeAndAppendTiming(node: TreeNode<KeyData>) {
             durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)
 
             var ownMs = durationMs
@@ -198,7 +198,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues:Boolean) : WemiK
             }
         }
 
-        fun body():StringBuilder {
+        fun body(): StringBuilder {
             var b = body
             if (b == null) {
                 b = StringBuilder()
