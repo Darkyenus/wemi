@@ -42,19 +42,29 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         sb.append("\n")
                 .format(foreground = Color.Cyan)
                 .append("Modified at ")
+                .format()
                 .append(modifierFromScope)
+                .format(foreground = Color.Cyan)
                 .append(" by ")
                 .format(foreground = Color.Cyan, format = Format.Underline)
                 .append(modifierFromHolder)
-                .format()
 
         if (amount != 1) {
             sb.format(foreground = Color.White)
                     .append(' ')
                     .append(amount)
                     .append('×')
-                    .format()
         }
+        sb.format()
+    }
+
+    override fun keyEvaluationCachedTo(scope: Scope) {
+        val sb = stack.peekLast().value.body()
+        sb.append("\n")
+                .format(foreground = Color.Magenta)
+                .append("Cached at ")
+                .append(scope)
+                .format()
     }
 
     private fun popAndIndent(): TreeNode<KeyData> {

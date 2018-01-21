@@ -1,8 +1,7 @@
 package wemi.dependency
 
 import wemi.boot.CLI
-import wemi.util.TreeNode
-import wemi.util.printTree
+import wemi.util.*
 
 /**
  * Returns a pretty-printed string in which the system is displayed as a tree of dependencies.
@@ -89,7 +88,11 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
     return printTree(roots) { result ->
         val dependencyId = this.dependencyId
 
-        result.append(dependencyId.group).append(':').append(dependencyId.name).append(':').append(dependencyId.version)
+        result.format(format = Format.Bold)
+                .append(dependencyId.group).append(':')
+                .append(dependencyId.name).append(':')
+                .append(dependencyId.version).format()
+
         for ((key, value) in dependencyId.attributes) {
             result.append(' ').append(key.name).append('=').append(value)
         }
@@ -108,7 +111,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
         } else {
             val resolvedFrom = resolved?.resolvedFrom
             if (resolvedFrom != null) {
-                result.append(" from ").append(resolvedFrom)
+                result.format(Color.White).append(" from ").format().append(resolvedFrom)
             }
         }
     }

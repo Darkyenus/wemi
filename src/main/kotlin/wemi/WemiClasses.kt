@@ -412,6 +412,7 @@ class Scope internal constructor(
 
         var foundValue: Value? = key.defaultValue
         var foundValueValid = key.hasDefaultValue
+        var foundValueIsDefault = true
         var holderOfFoundValue:BindingHolder? = null
         val allModifiersReverse: ArrayList<BoundKeyValueModifier<Value>> = ArrayList()
 
@@ -450,6 +451,7 @@ class Scope internal constructor(
 
                     holderOfFoundValue = holder
                     foundValueValid = true
+                    foundValueIsDefault = false
                     break@searchForValue
                 }
             }
@@ -465,6 +467,7 @@ class Scope internal constructor(
             try {
                 for (i in allModifiersReverse.indices.reversed()) {
                     result = allModifiersReverse[i].invoke(this, result)
+                    foundValueIsDefault = false
                 }
             } catch (t:Throwable) {
                 try {
@@ -477,12 +480,13 @@ class Scope internal constructor(
 
             // Store in cache
             // First check if this key is cached and if it isn't default value
-            if (cacheScope != null && (scope != null || allModifiersReverse.isNotEmpty())) {
+            if (cacheScope != null && !foundValueIsDefault) {
                 val cache = this.valueCache ?: run {
                     val cache = HashMap<Key<*>, Any?>()
                     this.valueCache = cache
                     cache
                 }
+                listener?.keyEvaluationCachedTo(this)
                 cache[key] = result
             }
 
@@ -823,6 +827,12 @@ interface WemiKeyEvaluationListener {
      * @param amount of modifiers added from this scope-holder
      */
     fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder:BindingHolder, amount:Int)
+
+    /**
+     * Can be called, even multiple times, right before [keyEvaluationSucceeded], to notify that the
+     * value will be cached in the [scope].
+     */
+    fun keyEvaluationCachedTo(scope: Scope)
 
     /**
      * Evaluation of key on top of key evaluation stack has been successful.
