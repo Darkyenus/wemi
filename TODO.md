@@ -1,5 +1,9 @@
 # Things to do next
 
+During key evaluation, remember which keys were used in the cache.
+Then the cache is valid for all scopes that don't touch that data!
+This must include that what is stored in cache.
+
 1. Update to latest kotlin
 
 1. Source code change detection and caching
