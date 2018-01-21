@@ -1,4 +1,4 @@
-@file:Suppress("unused", "MemberVisibilityCanPrivate")
+@file:Suppress("unused", "MemberVisibilityCanPrivate", "MemberVisibilityCanBePrivate")
 
 package wemi
 
@@ -319,13 +319,16 @@ class Scope internal constructor(
         }
     }
 
-    private fun modifiesKeys(keys: Collection<Key<*>>):Boolean {
+    private fun modifiesKeys(key:Key<*>, keys: Collection<Key<*>>):Boolean {
         //TODO This may be slow
         for (holder in scopeBindingHolders) {
             val keyBindings = holder.binding
             val keyModifiers = holder.modifierBindings
-            for (key in keys) {
-                if (keyBindings.containsKey(key) || keyModifiers.containsKey(key)) {
+            if (keyBindings.containsKey(key) || keyModifiers.containsKey(key)) {
+                return true
+            }
+            for (k in keys) {
+                if (keyBindings.containsKey(k) || keyModifiers.containsKey(k)) {
                     return true
                 }
             }
@@ -452,13 +455,13 @@ class Scope internal constructor(
             val selfCacheEntry = getCached(key)
             if (selfCacheEntry != null) {
                 val cachedValue = selfCacheEntry.value
-                listener?.keyEvaluationSucceeded(key, this, null, cachedValue, false)
+                listener?.keyEvaluationSucceeded(key, this, null, cachedValue, null)
                 // And notify that we have used the keys (because technically, we sort of did, before)
                 currentEvaluationUsedKeys.addAll(selfCacheEntry.usedKeys)
                 return cachedValue
             }
 
-            // Still not found, search parent scopes
+            // Search parent scopes
             var parentScope:Scope? = this.scopeParent
             searchParents@
             while (parentScope != null) {
@@ -466,13 +469,13 @@ class Scope internal constructor(
                 val parentCacheEntry = parentScope.getCached(key)
                 if (parentCacheEntry != null) {
                     // It does, check if we can use it
-                    // That is, check all scopes, from this one to one above parenScope
+                    // That is, check all scopes, from this one to one above parentScope
                     // and verify that they don't touch any usedKeys
                     val usedKeys = parentCacheEntry.usedKeys
 
                     var checkedScope:Scope = this
                     do {
-                        if (checkedScope.modifiesKeys(usedKeys)) {
+                        if (checkedScope.modifiesKeys(key, usedKeys)) {
                             // We cannot use that, so we can't use any cache from any parent
                             break@searchParents
                         }
@@ -481,55 +484,13 @@ class Scope internal constructor(
 
                     // Use it!
                     val cachedValue = parentCacheEntry.value
-                    listener?.keyEvaluationSucceeded(key, parentScope, null, cachedValue, false)
+                    listener?.keyEvaluationSucceeded(key, parentScope, null, cachedValue, null)
                     // And notify that we have used the keys (because technically, we sort of did, before)
                     currentEvaluationUsedKeys.addAll(usedKeys)
                     return cachedValue
                 }
 
                 parentScope = parentScope.scopeParent
-            }
-
-            // Search descendant scopes
-            fun <Value>findDescendantScopeWithValidCache(inScope:Scope, key: Key<Value>, scopeStack:ArrayList<Scope>):CacheEntry<Value>? {
-                val descendantScopes = inScope.configurationScopeCache.values
-                if (descendantScopes.isEmpty()) {
-                    // Early exit
-                    return null
-                }
-                for (descScope in descendantScopes) {
-                    scopeStack.add(descScope)
-                    // Check entry
-                    val entry = descScope.getCached(key)
-                    if (entry != null) {
-                        if (!scopeStack.any { it.modifiesKeys(entry.usedKeys) }) {
-                            // We can use this entry, because it is from descendant, and no descendants define
-                            // any keys that are modified in any of the descendants
-                            return entry
-                        }
-                    }
-                    // Check descendants
-                    val entryFromCache = findDescendantScopeWithValidCache(descScope, key, scopeStack)
-                    if (entryFromCache != null) {
-                        return entryFromCache
-                    }
-
-                    // Nothing, unroll
-                    scopeStack.removeAt(scopeStack.lastIndex)
-                }
-                return null
-            }
-
-            val scopeStack = ArrayList<Scope>()
-            val entryFromDescendants = findDescendantScopeWithValidCache(this, key, scopeStack)
-
-            if (entryFromDescendants != null) {
-                // Use it!
-                val cachedValue = entryFromDescendants.value
-                listener?.keyEvaluationSucceeded(key, scopeStack.last(), null, cachedValue, false)
-                // And notify that we have used the keys (because technically, we sort of did, before)
-                currentEvaluationUsedKeys.addAll(entryFromDescendants.usedKeys)
-                return cachedValue
             }
         }
 
@@ -603,16 +564,10 @@ class Scope internal constructor(
             }
 
             // Store in cache
-            var cached = false
+            var cachedIn:Scope? = null
             // First check if this key is cached and if it isn't default value
             if (cacheMode != null && !foundValueIsDefault) {
-                val cache = this.valueCache ?: run {
-                    val cache = HashMap<Key<*>, CacheEntry<*>>()
-                    this.valueCache = cache
-                    cache
-                }
-                cached = true
-
+                // Figure out used keys
                 val postEvaluationUsedKeysMark = currentEvaluationUsedKeys.size
                 val usedKeys: List<Key<*>>
                 if (preEvaluationUsedKeysMark == postEvaluationUsedKeysMark) {
@@ -628,10 +583,27 @@ class Scope internal constructor(
                     usedKeys = mutableUsedKeys
                 }
 
+                // Figure out optimal scope for caching
+                // Optimal scope is the first parent scope that modifies the result of this evaluation.
+                // i.e. if this scope inherits all meaningful values for this key from parent scope,
+                // it makes more sense to cache it there
+                var optimalScope = this
+                while (!optimalScope.modifiesKeys(key, usedKeys)) {
+                    optimalScope = optimalScope.scopeParent ?: break
+                }
+
+                cachedIn = optimalScope
+
+                val cache = optimalScope.valueCache ?: run {
+                    val cache = HashMap<Key<*>, CacheEntry<*>>()
+                    optimalScope.valueCache = cache
+                    cache
+                }
+
                 cache[key] = CacheEntry(result, usedKeys)
             }
 
-            listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, cached)
+            listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, cachedIn)
             return result
         }
 
@@ -977,13 +949,13 @@ interface WemiKeyEvaluationListener {
      * @param bindingFoundInScope scope in which the binding of this key has been found, null if default value
      * @param bindingFoundInHolder holder in [bindingFoundInScope] in which the key binding has been found (null if from cache)
      * @param result that has been used, may be null if caller considers null
-     * @param savedToCache if the [result] has been saved to the cache in calling scope
+     * @param cachedIn scope to which the [result] has been saved to, if any
      */
     fun <Value>keyEvaluationSucceeded(key: Key<Value>,
                                       bindingFoundInScope: Scope?,
                                       bindingFoundInHolder: BindingHolder?,
                                       result: Value,
-                                      savedToCache: Boolean)
+                                      cachedIn: Scope?)
 
     /**
      * Evaluation of key on top of key evaluation stack has failed, because the key has no binding, nor default value.

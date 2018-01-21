@@ -1,7 +1,5 @@
 # Things to do next
 
-Naive smart caching: (cache reads: 24, cache writes: 105, key evaluations: 105)
-
 1. Update to latest kotlin
 
 1. Source code change detection and caching
