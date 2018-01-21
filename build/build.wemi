@@ -26,14 +26,14 @@ val core by project(path(".")) {
     projectGroup set { "com.darkyen" }
     projectVersion set { "0.1-SNAPSHOT" }
 
-    kotlinVersion set { KotlinCompilerVersion.Version1_1_4_3 }
+    kotlinVersion set { KotlinCompilerVersion.Version1_2_20 }
 
     mainClass set { "wemi.boot.MainKt" }
 
     repositories add { repository("jitpack", "https://jitpack.io") }
 
     libraryDependencies set { listOf(
-            dependency("org.jetbrains.kotlin", "kotlin-stdlib", "1.1.4-3"),
+            dependency("org.jetbrains.kotlin", "kotlin-stdlib", "1.2.20"),
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
             dependency("com.github.Darkyenus", "tproll", "v1.2.5"),
             dependency("com.github.Darkyenus", "DaveWebb", "v1.2"),
