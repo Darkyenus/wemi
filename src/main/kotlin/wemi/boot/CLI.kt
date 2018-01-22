@@ -26,7 +26,29 @@ object CLI {
     /**
      * Terminal used by [CLI]
      */
-    private val Terminal: Terminal by lazy { TerminalBuilder.terminal() }
+    private val Terminal: Terminal by lazy {
+        val terminal = TerminalBuilder.terminal()
+
+        // Show main thread stack-trace on Ctrl-T
+        // NOTE: SIGINFO is supported only on some Unixes, such as OSX
+        terminal.handle(org.jline.terminal.Terminal.Signal.INFO) {
+            val stackTrace = MainThread.stackTrace
+            val state = MainThread.state
+            val sb = StringBuilder()
+            sb.format(Color.Yellow)
+            print(sb)
+            println("\nMain thread: $state")
+            for (element in stackTrace) {
+                print(" at ")
+                println(element)
+            }
+            sb.setLength(0)
+            print(sb.format())
+            println()
+        }
+
+        terminal
+    }
 
     /**
      * Line reader used when awaiting tasks.

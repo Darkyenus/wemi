@@ -519,7 +519,7 @@ enum class Color(internal val offset: Int) {
     Green(2), // Label
     Yellow(3), // Suggestion
     Blue(4), // Value
-    Magenta(5),
+    Magenta(5), // (Cache)
     Cyan(6), // Time
     White(7)
 }

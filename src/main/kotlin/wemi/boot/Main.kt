@@ -49,6 +49,8 @@ internal var WemiRunningInInteractiveMode = false
 internal var WemiBuildScript: BuildScript? = null
     private set
 
+internal val MainThread = Thread.currentThread()
+
 /**
  * Entry point for the WEMI build tool
  */
