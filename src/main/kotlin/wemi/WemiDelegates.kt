@@ -3,7 +3,6 @@
 package wemi
 
 import org.slf4j.LoggerFactory
-import wemi.KeyDefaults.applyDefaults
 import wemi.boot.WemiBuildScript
 import wemi.util.exists
 import java.nio.file.Files
@@ -11,6 +10,7 @@ import java.nio.file.Path
 import java.util.*
 import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
+import kotlin.reflect.KProperty0
 
 private val LOG = LoggerFactory.getLogger("Wemi")
 
@@ -28,13 +28,14 @@ internal object BuildScriptData {
  */
 class ProjectDelegate internal constructor(
         private val projectRoot: Path,
+        private val archetypes: Array<out Archetype>,
         private val initializer: Project.() -> Unit
 ) : ReadOnlyProperty<Any?, Project> {
 
     private lateinit var project: Project
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): ProjectDelegate {
-        this.project = createProject(property.name, projectRoot, true, initializer)
+        this.project = createProject(property.name, projectRoot, *archetypes, checkRootUnique = true, initializer = initializer)
         return this
     }
 
@@ -49,16 +50,38 @@ class ProjectDelegate internal constructor(
  *
  * @param name of the project, must be unique
  * @param root of the project
+ * @param archetypes to apply, primary first
  * @param checkRootUnique if true, check if no other project is in the [root] and warn if so
  * @param initializer to populate the project's [BindingHolder] with bindings
  */
-fun createProject(name:String, root:Path, checkRootUnique:Boolean = true, initializer: Project.() -> Unit):Project {
+fun createProject(name:String, root:Path, vararg archetypes:Archetype, checkRootUnique:Boolean = true, initializer: Project.() -> Unit):Project {
     val usedRoot = root.toAbsolutePath()
     if (!usedRoot.exists()) {
         Files.createDirectories(usedRoot)
     }
 
-    val project = Project(name, usedRoot)
+    if (archetypes.isEmpty()) {
+        LOG.warn("Project {} is being created without any archetype. Such project won't have any functionality.", name)
+    } else {
+        var baseArchetypeCount = 0
+        for (a in archetypes) {
+            var archetype = a
+            while (true) {
+                if (archetype === Archetypes._Base_) {
+                    baseArchetypeCount++
+                }
+                archetype = archetype.parent ?: break
+            }
+        }
+
+        if (baseArchetypeCount == 0) {
+            LOG.warn("Project {} is being created without any primary archetype.", name)
+        } else if (baseArchetypeCount > 1) {
+            LOG.warn("Project {} is being created with {} primary archetypes, there should be only one.", name, baseArchetypeCount)
+        }
+    }
+
+    val project = Project(name, usedRoot, archetypes)
     synchronized(BuildScriptData.AllProjects) {
         for ((_, otherProject) in BuildScriptData.AllProjects) {
             if (otherProject.name == name) {
@@ -73,8 +96,6 @@ fun createProject(name:String, root:Path, checkRootUnique:Boolean = true, initia
     project.apply {
         Keys.projectName set { name }
         Keys.projectRoot set { usedRoot }
-
-        applyDefaults()
 
         // Setup Keys.buildScript
         val buildScript = WemiBuildScript
@@ -155,4 +176,27 @@ fun createConfiguration(name:String, description: String, parent: Configuration?
     configuration.locked = true
 
     return configuration
+}
+
+/**
+ * Delegate used when creating new [Project] [Archetype].
+ */
+class ArchetypeDelegate internal constructor(
+        private val parent: KProperty0<Archetype>?,
+        private val initializer: Archetype.() -> Unit
+) : ReadOnlyProperty<Any?, Archetype> {
+
+    private var archetype:Archetype? = null
+
+    override fun getValue(thisRef: Any?, property: KProperty<*>): Archetype {
+        var archetype: Archetype? = archetype
+        if (archetype != null) {
+            return archetype
+        }
+
+        archetype = Archetype(property.name, parent?.get())
+        archetype.initializer()
+        this.archetype = archetype
+        return archetype
+    }
 }

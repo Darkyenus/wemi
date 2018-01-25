@@ -4,6 +4,7 @@ import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
 import java.net.URL
 import java.nio.file.Path
+import kotlin.reflect.KProperty0
 
 /** Version of Wemi build system */
 const val WemiVersion = "0.1-SNAPSHOT"
@@ -46,8 +47,8 @@ typealias BoundKeyValueModifier<Value> = Scope.(Value) -> Value
  * @param projectRoot path from which all other paths in the project are derived from
  * @param initializer function which creates key value bindings for the [Project]
  */
-fun project(projectRoot: Path, initializer: Project.() -> Unit): ProjectDelegate {
-    return ProjectDelegate(projectRoot, initializer)
+fun project(projectRoot: Path, vararg archetypes: Archetype, initializer: Project.() -> Unit): ProjectDelegate {
+    return ProjectDelegate(projectRoot, archetypes, initializer)
 }
 
 /**
@@ -89,7 +90,7 @@ fun <Value> key(description: String, cacheMode: KeyCacheMode<Value>? = CACHE_FOR
  *      libraryDependencies add { dependency("com.example:library:1.0") }
  * }
  * ```
- * These variables must be declared in the file-level scope of the build script.
+ * These variables must be declared in the file-level scope of the build script!
  * Creating configurations elsewhere will lead to an undefined behavior.
  *
  * Two configurations must not share the same name. Configuration name is derived from the name of the variable this
@@ -107,6 +108,26 @@ fun configuration(description: String, parent: Configuration? = null, initialize
  * Creates [Dependency] with default exclusions. */
 fun dependency(group: String, name: String, version: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>): Dependency {
     return Dependency(DependencyId(group, name, version, preferredRepository, attributes = mapOf(*attributes)))
+}
+
+/**
+ * Create a new [Archetype].
+ * To be used as a variable delegate target, example:
+ * ```
+ * val myArchetype by archetype {
+ *      // Set what the archetype will set
+ *      compile set { /* Custom compile process, for example. */ }
+ * }
+ * ```
+ *
+ * Two archetypes should not share the same name. Archetype name is derived from the name of the variable this
+ * archetype delegate is created by. (Archetype in example would be called `myArchetype`.)
+ *
+ * @param parent property which holds the parent archetype from which this one inherits its keys, similar to configuration (This is a property instead of [Archetype] directly, because of the need for lazy evaluation).
+ * @param initializer function which creates key value bindings for the [Archetype]. Executed lazily.
+ */
+fun archetype(parent: KProperty0<Archetype>? = null, initializer: Archetype.() -> Unit):ArchetypeDelegate {
+        return ArchetypeDelegate(parent, initializer)
 }
 
 /** Convenience Dependency creator.

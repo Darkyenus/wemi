@@ -9,7 +9,6 @@ import wemi.dependency.Repository.M2.Companion.M2ClassifierAttribute
 import wemi.test.JUnitPlatformLauncher
 import wemi.util.LocatedFile
 import wemi.util.div
-import javax.tools.ToolProvider
 
 /**
  * All default configurations
@@ -64,7 +63,6 @@ object Configurations {
     val compilingJava by configuration("Configuration layer used when compiling Java sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { JavaSourceFileExtensions }
-        Keys.javaCompiler set { ToolProvider.getSystemJavaCompiler() }
         Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
         Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
         Keys.compilerOptions[JavaCompilerFlags.targetVersion] = JavaVersion.V1_8

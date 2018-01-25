@@ -11,12 +11,12 @@ import wemi.assembly.AssemblySource
 import wemi.assembly.FileRecognition
 import wemi.assembly.MergeStrategy
 import wemi.boot.WemiBuildScript
-import wemi.boot.WemiRunningInInteractiveMode
-import wemi.compile.CompilerFlags
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
-import wemi.dependency.*
-import wemi.run.javaExecutable
+import wemi.dependency.DependencyId
+import wemi.dependency.DependencyResolver
+import wemi.dependency.ResolvedDependency
+import wemi.dependency.prettyPrint
 import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
 import wemi.test.TestReport
@@ -40,12 +40,6 @@ import kotlin.collections.LinkedHashSet
  * This includes implementations of most tasks.
  */
 object KeyDefaults {
-
-    val BuildDirectory: BoundKeyValue<Path> = { Keys.projectRoot.get() / "build" }
-
-    val SourceBase: BoundKeyValue<Collection<Path>> = {
-        listOf(Keys.projectRoot.get() / "src/main")
-    }
 
     val SourceRootsJavaKotlin: BoundKeyValue<Collection<Path>> = {
         val bases = Keys.sourceBases.get()
@@ -168,7 +162,90 @@ object KeyDefaults {
     }
 
     private val CompileLOG = LoggerFactory.getLogger("Compile")
-    val Compile: BoundKeyValue<Path> = {
+
+    val CompileJava: BoundKeyValue<Path> = {
+        using(Configurations.compiling) {
+            val output = Keys.outputClassesDirectory.get()
+            Files.createDirectories(output)
+
+            val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
+            val javaSourceRoots = mutableSetOf<Path>()
+            for ((file, _, root) in javaSources) {
+                javaSourceRoots.add((root ?: file).toAbsolutePath())
+            }
+
+            val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
+
+            // Compile Java
+            if (javaSources.isNotEmpty()) {
+                val compiler = using(compilingJava) { Keys.javaCompiler.get() }
+                val fileManager = compiler.getStandardFileManager(null, Locale.getDefault(), StandardCharsets.UTF_8)
+                val writerSb = StringBuilder()
+                val writer = StringBuilderWriter(writerSb)
+                val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
+
+                val sourcesOut = using(compilingJava) { Keys.outputSourcesDirectory.get() }
+                Files.createDirectories(sourcesOut)
+                val headersOut = using(compilingJava) { Keys.outputHeadersDirectory.get() }
+                Files.createDirectories(headersOut)
+
+                val pathSeparator = System.getProperty("path.separator", ":")
+                val compilerOptions = ArrayList<String>()
+                compilerFlags.use(JavaCompilerFlags.customFlags) {
+                    compilerOptions.addAll(it)
+                }
+                compilerFlags.use(JavaCompilerFlags.sourceVersion) {
+                    compilerOptions.add("-source")
+                    compilerOptions.add(it.version)
+                }
+                compilerFlags.use(JavaCompilerFlags.targetVersion) {
+                    compilerOptions.add("-target")
+                    compilerOptions.add(it.version)
+                }
+                compilerOptions.add("-classpath")
+                val classpathString = externalClasspath.joinToString(pathSeparator) { it.absolutePath }
+                compilerOptions.add(classpathString)
+                compilerOptions.add("-sourcepath")
+                compilerOptions.add(javaSourceRoots.joinToString(pathSeparator) { it.absolutePath })
+                compilerOptions.add("-d")
+                compilerOptions.add(output.absolutePath)
+                compilerOptions.add("-s")
+                compilerOptions.add(sourcesOut.absolutePath)
+                compilerOptions.add("-h")
+                compilerOptions.add(headersOut.absolutePath)
+
+                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.file.toFile() })
+
+                val success = compiler.getTask(
+                        writer,
+                        fileManager,
+                        null,
+                        compilerOptions,
+                        null,
+                        javaFiles
+                ).call()
+
+                if (!writerSb.isBlank()) {
+                    val format = if (writerSb.contains('\n')) "\n{}" else "{}"
+                    if (success) {
+                        CompileLOG.info(format, writerSb)
+                    } else {
+                        CompileLOG.warn(format, writerSb)
+                    }
+                }
+
+                if (!success) {
+                    throw WemiException("Java compilation failed", showStacktrace = false)
+                }
+
+                compilerFlags.warnAboutUnusedFlags("Java compiler")
+            }
+
+            output
+        }
+    }
+
+    val CompileJavaKotlin: BoundKeyValue<Path> = {
         using(Configurations.compiling) {
             val output = Keys.outputClassesDirectory.get()
             Files.createDirectories(output)
@@ -656,46 +733,5 @@ object KeyDefaults {
 
             outputFile
         }
-    }
-
-    fun Project.applyDefaults() {
-        Keys.input set { InputBase(WemiRunningInInteractiveMode) }
-
-        Keys.buildDirectory set BuildDirectory
-        Keys.sourceBases set SourceBase
-        Keys.sourceFiles set SourceFiles
-        Keys.resourceRoots set ResourceRoots
-        Keys.resourceFiles set ResourceFiles
-
-        Keys.repositories set { DefaultRepositories }
-        Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
-        Keys.libraryDependencies set { listOf(kotlinDependency("stdlib")) }
-        Keys.resolvedLibraryDependencies set ResolvedLibraryDependencies
-        Keys.internalClasspath set InternalClasspath
-        Keys.externalClasspath set ExternalClasspath
-
-        Keys.clean set Clean
-
-        Keys.javaHome set { wemi.run.JavaHome }
-        Keys.javaExecutable set { javaExecutable(Keys.javaHome.get()) }
-        Keys.outputClassesDirectory set outputClassesDirectory("classes")
-        Keys.outputSourcesDirectory set outputClassesDirectory("sources")
-        Keys.outputHeadersDirectory set outputClassesDirectory("headers")
-        Keys.compilerOptions set { CompilerFlags() }
-        Keys.compile set Compile
-
-        //Keys.mainClass TODO Detect main class?
-        Keys.runDirectory set { Keys.projectRoot.get() }
-        Keys.runOptions set RunOptions
-        Keys.run set Run
-        Keys.runMain set RunMain
-
-        Keys.testParameters set TestParameters
-        Keys.test set Test
-
-        Keys.assemblyMergeStrategy set AssemblyMergeStrategy
-        Keys.assemblyRenameFunction set AssemblyRenameFunction
-        Keys.assemblyOutputFile set { Keys.buildDirectory.get() / (Keys.projectName.get() + "-" + Keys.projectVersion.get() + "-assembly.jar") }
-        Keys.assembly set Assembly
     }
 }

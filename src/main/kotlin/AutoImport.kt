@@ -1,5 +1,6 @@
 @file:Suppress("NOTHING_TO_INLINE", "unused")
 
+import wemi.Archetypes
 import wemi.CACHE_FOR_RUN
 import wemi.Configurations
 import wemi.KeyCacheMode
@@ -17,6 +18,7 @@ import wemi.test.JUnitEngine as _JUnitEngine
 
 // Types
 typealias Key<Value> = wemi.Key<Value>
+typealias Archetype = wemi.Archetype
 typealias Configuration = wemi.Configuration
 typealias Project = wemi.Project
 typealias Scope = wemi.Scope
@@ -28,7 +30,7 @@ typealias ProjectExclusion = wemi.dependency.DependencyExclusion
 typealias Path = java.nio.file.Path
 
 // Core Functions
-inline fun project(projectRoot: Path = path("."), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, initializer)
+inline fun project(projectRoot: Path = path("."), vararg archetypes: Archetype = arrayOf(Archetypes.JavaKotlinProject), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, *archetypes, initializer = initializer)
 inline fun <Value> key(description: String, defaultValue: Value, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN) = wemi.key(description, defaultValue, cacheMode)
 inline fun <Value> key(description: String, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN) = wemi.key(description, cacheMode)
 inline fun configuration(description: String, parent: Configuration? = null, noinline initializer: Configuration.() -> Unit) = wemi.configuration(description, parent, initializer)

@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory
 import wemi.boot.MachineWritable
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
+import wemi.util.Color
 import wemi.util.Format
 import wemi.util.WithDescriptiveString
 import wemi.util.format
@@ -155,7 +156,7 @@ class ConfigurationExtension internal constructor(
  * @param projectRoot at which this [Project] is located at in the filesystem
  * @see BindingHolder for info about how the values are bound
  */
-class Project internal constructor(val name: String, val projectRoot: Path)
+class Project internal constructor(val name: String, val projectRoot: Path, archetypes:Array<out Archetype>)
     : BindingHolder(), WithDescriptiveString, MachineWritable {
 
     /**
@@ -177,7 +178,23 @@ class Project internal constructor(val name: String, val projectRoot: Path)
      *
      * @see evaluate to use this
      */
-    internal val projectScope: Scope = Scope(name, listOf(this), null)
+    internal val projectScope: Scope = run {
+        val holders = ArrayList<BindingHolder>(1 + archetypes.size * 2)
+        holders.add(this)
+
+        // Iterate through archetypes, most important first
+        var i = archetypes.lastIndex
+        while (i >= 0) {
+            var archetype = archetypes[i--]
+
+            while (true) {
+                holders.add(archetype)
+                archetype = archetype.parent ?: break
+            }
+        }
+
+        Scope(name, holders, null)
+    }
 
     /**
      * Evaluate the [action] in the scope of this [Project].
@@ -291,6 +308,20 @@ class Project internal constructor(val name: String, val projectRoot: Path)
             }
         }
     }
+}
+
+/**
+ * Contains a collection of default key settings, that are common for all [Project]s of this archetype.
+ *
+ * Archetype usually specifies which languages can be used and what the compile output is.
+ *
+ * @param name used mostly for debugging
+ */
+class Archetype internal constructor(val name: String, val parent:Archetype?) : BindingHolder(), WithDescriptiveString {
+
+    override fun toDescriptiveAnsiString(): String = format("$name Archetype", Color.White).toString()
+
+    override fun toString(): String = "$name Archetype"
 }
 
 /**

@@ -53,7 +53,7 @@ object Keys {
     val externalClasspath by key<Collection<LocatedFile>>("Classpath of the project, elements from external sources, i.e. library and project dependencies")
     val internalClasspath by key<Collection<LocatedFile>>("Classpath of the project, created internally, i.e. compiled sources and resources")
 
-    val clean by key<Int>("Clean compile directories and internal cache, returns approximate amount of items cleaned")
+    val clean by key<Int>("Clean compile directories and internal cache, returns approximate amount of items cleaned", cacheMode = null)
 
     val javaHome by key<Path>("Java home to use for compilation/running etc.")
     val javaExecutable by key<Path>("Java executable, used for running the project")
@@ -70,8 +70,8 @@ object Keys {
     val runDirectory by key<Path>("Initial working directory of the project launched by 'run'")
     val runOptions by key<Collection<String>>("Options given to 'java' when running the project")
     val runArguments by key<Collection<String>>("Options given to the application when running the project", defaultValue = emptyList())
-    val run by key<Int>("Compile and run the project, return exit code")
-    val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code")
+    val run by key<Int>("Compile and run the project, return exit code", cacheMode = null)
+    val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code", cacheMode = null)
 
     val testParameters by key<TestParameters>("Parameters for the test key. By default discovers all tests in the test sources.")
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it.prettyPrint() })
