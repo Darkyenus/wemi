@@ -2,6 +2,8 @@ package wemi.boot
 
 import org.slf4j.LoggerFactory
 import wemi.WemiKotlinVersion
+import wemi.WemiVersion
+import wemi.WemiVersionIsSnapshot
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags
@@ -53,7 +55,7 @@ internal fun findBuildScriptSources(buildFolder: Path): List<Path> {
  *
  * Tries to use existing files before compiling.
  */
-internal fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScript? {
+internal fun getBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScript? {
     val cacheFolder = buildFolder / "cache"
     if (cacheFolder.exists() && !cacheFolder.isDirectory()) {
         LOG.error("Build directory {} exists and is not a directory", cacheFolder)
@@ -71,7 +73,7 @@ internal fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildSc
 
     val resultJar = cacheFolder / (combinedBuildFileName + "-cache.jar")
     val classpathFile = cacheFolder / (combinedBuildFileName + ".classpath")
-    val classpath = mutableListOf<Path>()
+    val classpath = ArrayList<Path>()
 
     var recompileReason = ""
 
@@ -95,26 +97,33 @@ internal fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildSc
         recompileReason = "Updated launcher"
         LOG.debug("Rebuilding build scripts: Launcher updated ({})", WemiLauncherFile)
         true
-    } else recompile@ {
+    } else {
         // All seems good, try to load the result classpath
         classpathFile.forEachLine { line ->
             if (line.isNotBlank()) {
                 classpath.add(Paths.get(line))
             }
         }
-        // Compiler bug workaround
-        var result = false
+        var recompile = false
         for (file in classpath) {
             if (!file.exists()) {
                 recompileReason = "Corrupted cache metadata"
                 LOG.debug("Rebuilding build scripts: Classpath cache corrupted ({} does not exist)", file)
                 classpath.clear()
-                result = true
+                recompile = true
                 break
-                //return@recompile true
             }
         }
-        result
+        if (!recompile) {
+            if (classpath.isEmpty()) {
+                recompileReason = "Cache is missing launcher"
+                recompile = true
+            } else if (!Files.isSameFile(WemiLauncherFile, classpath[0])) {
+                recompileReason = "First classpath item does not point to a Wemi launcher file"
+                recompile = true
+            }
+        }
+        recompile
     }
 
     val buildFlags = CompilerFlags()
@@ -131,33 +140,77 @@ internal fun getCompiledBuildScript(rootFolder: Path, buildFolder: Path, buildSc
         LOG.info("Compiling build script: {}", recompileReason)
         resultJar.deleteRecursively()
 
-        val wemiLauncherJar = wemiLauncherFileWithJarExtension(cacheFolder)
-
         // Wemi also contains Kotlin runtime
-        classpath.add(wemiLauncherJar)
+        classpath.add(wemiLauncherFileWithJarExtension(cacheFolder)) // This must be first in classpath
         val resolved = HashMap<DependencyId, ResolvedDependency>()
         val resolutionOk = DependencyResolver.resolve(resolved, classpathConfiguration.dependencies, classpathConfiguration.repositoryChain)
         if (!resolutionOk) {
-            LOG.warn("Failed to retrieve all build file dependencies for {}:\n{}", buildScriptSources, resolved.prettyPrint(classpathConfiguration.dependencies.map { it.dependencyId }))
+            LOG.warn("Failed to retrieve all build file dependencies for {}:\n{}", sources, resolved.prettyPrint(classpathConfiguration.dependencies.map { it.dependencyId }))
             return null
         }
         classpath.addAll(resolved.artifacts())
 
-        LOG.debug("Compiling sources: {} classpath: {} resultJar: {} buildFlags: {}", sources, classpath, resultJar, buildFlags)
-
-        val status = WemiKotlinVersion.compilerInstance().compile(sources, classpath, resultJar, buildFlags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
-        if (status != KotlinCompiler.CompileExitStatus.OK) {
-            LOG.warn("Compilation failed for {}: {}", buildScriptSources, status)
-            return null
-        }
-
         classpathFile.writeText(classpath.joinToString(separator = "\n") { file -> file.absolutePath })
+
+        // Compilation is handled lazily later, in BuildScript.ready()
     }
 
-    // Figure out the init class
-    return BuildScript(rootFolder, resultJar, buildFolder, cacheFolder,
-            classpath, buildScriptSources.map { transformFileNameToKotlinClassName(it.name.pathWithoutExtension()) },
-            classpathConfiguration, sources, buildFlags)
+    return BuildScript(
+            rootFolder, resultJar, buildFolder, cacheFolder,
+            classpath,
+            // Figure out the init class
+            buildScriptSources.map { transformFileNameToKotlinClassName(it.name.pathWithoutExtension()) },
+            classpathConfiguration, sources,
+            buildFlags, !recompile)
+}
+
+private fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
+    val wemiLauncherFile = WemiLauncherFile
+    if (wemiLauncherFile.name.endsWith(".jar", ignoreCase = true) || wemiLauncherFile.isDirectory()) {
+        LOG.debug("WemiLauncherFileWithJar is unchanged {}", wemiLauncherFile)
+        return wemiLauncherFile
+    }
+    // We have create a link to/copy of the launcher file somewhere and name it with .jar
+
+    val name = if (WemiVersionIsSnapshot) {
+        val digest = wemiLauncherFile.hash("MD5")
+        val sb = StringBuilder()
+        sb.append(WemiVersion)
+        sb.append('.')
+        sb.append(toHexString(digest))
+        sb.append(".jar")
+        sb.toString()
+    } else {
+        "wemi-$WemiVersion.jar"
+    }
+
+    val wemiLauncherLinksDirectory = cacheFolder / "wemi-launcher-links"
+    Files.createDirectories(wemiLauncherLinksDirectory)
+    val linked = wemiLauncherLinksDirectory / name
+
+    if (Files.exists(linked) && Files.getLastModifiedTime(wemiLauncherFile) < Files.getLastModifiedTime(linked)) {
+        // Already exists and is fresh
+        LOG.debug("WemiLauncherFileWithJar is existing {}", linked)
+        return linked
+    }
+
+    Files.deleteIfExists(linked)
+    try {
+        val result = Files.createSymbolicLink(linked, wemiLauncherFile)
+        LOG.debug("WemiLauncherFileWithJar is just linked {}", result)
+        return result
+    } catch (e: Exception) {
+        LOG.warn("Failed to link {} to {}, copying", wemiLauncherFile, linked, e)
+
+        try {
+            Files.copy(wemiLauncherFile, linked)
+            LOG.debug("WemiLauncherFileWithJar is just copied {}", linked)
+            return linked
+        } catch (e: Exception) {
+            LOG.warn("Failed to copy {} to {}, returning non-jar file", wemiLauncherFile, linked, e)
+            return wemiLauncherFile
+        }
+    }
 }
 
 /**
@@ -302,4 +355,26 @@ data class BuildScript(val wemiRoot: Path,
                        val buildFolder: Path, val cacheFolder: Path,
                        val classpath: List<Path>, val initClasses: List<String>,
                        val buildScriptClasspathConfiguration: BuildScriptClasspathConfiguration,
-                       val sources: List<LocatedFile>, val buildFlags: CompilerFlags)
+                       val sources: List<LocatedFile>, val buildFlags: CompilerFlags,
+                       private var ready:Boolean) {
+
+    val wemiLauncherJar:Path
+        get() = classpath.first()
+
+    fun ready():Boolean {
+        if (ready) {
+            return true
+        }
+
+        LOG.debug("Compiling sources: {} classpath: {} resultJar: {} buildFlags: {}", sources, classpath, scriptJar, buildFlags)
+
+        val status = WemiKotlinVersion.compilerInstance().compileJVM(sources, classpath, scriptJar, buildFlags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
+        if (status != KotlinCompiler.CompileExitStatus.OK) {
+            LOG.warn("Compilation failed for {}: {}", sources, status)
+            return false
+        }
+
+        ready = true
+        return true
+    }
+}

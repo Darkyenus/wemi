@@ -270,7 +270,7 @@ object KeyDefaults {
                 val compiler = using(compilingKotlin) { Keys.kotlinCompiler.get() }
                 val compilerFlags = using(compilingKotlin) { Keys.compilerOptions.get() }
 
-                val compileResult = compiler.compile(javaSources + kotlinSources, externalClasspath, output, compilerFlags, CompileLOG, null)
+                val compileResult = compiler.compileJVM(javaSources + kotlinSources, externalClasspath, output, compilerFlags, CompileLOG, null)
                 if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
                     throw WemiException("Kotlin compilation failed: " + compileResult, showStacktrace = false)
                 }
@@ -415,7 +415,7 @@ object KeyDefaults {
 
             val externalClasspath = Keys.externalClasspath.get().map { it.classpathEntry }.distinct()
             val internalClasspath = Keys.internalClasspath.get().map { it.classpathEntry }.distinct()
-            val wemiClasspathEntry = wemiLauncherFileWithJarExtension(WemiBuildScript!!.cacheFolder)
+            val wemiClasspathEntry = WemiBuildScript!!.wemiLauncherJar
 
             val classpathEntries = ArrayList<Path>(internalClasspath.size + externalClasspath.size + 1)
             classpathEntries.addAll(internalClasspath)

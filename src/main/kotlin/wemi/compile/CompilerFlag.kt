@@ -19,8 +19,6 @@ class CompilerFlag<Type>(val name: String, val description: String) : MachineWri
     override fun toString(): String {
         return "$name - $description"
     }
-
-
 }
 
 private val LOG = LoggerFactory.getLogger("CompilerFlag")

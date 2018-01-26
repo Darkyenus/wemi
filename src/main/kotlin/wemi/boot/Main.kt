@@ -46,7 +46,7 @@ const val EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND = 56
 internal var WemiRunningInInteractiveMode = false
     private set
 
-internal var WemiBuildScript: BuildScript? = null
+var WemiBuildScript: BuildScript? = null
     private set
 
 internal val MainThread = Thread.currentThread()
@@ -198,16 +198,27 @@ fun main(args: Array<String>) {
                 exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
             }
         } else {
-            val compiledBuildScript = getCompiledBuildScript(root, buildFolder, buildScriptSources, cleanBuild)
+            val compiledBuildScript = getBuildScript(root, buildFolder, buildScriptSources, cleanBuild)
             if (compiledBuildScript == null) {
-                LOG.warn("Build script failed to compile")
+                LOG.warn("Failed to prepare build script")
                 if (allowBrokenBuildScripts) {
                     null
                 } else {
                     exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
                 }
             } else {
-                compiledBuildScript
+                // WemiBuildScript must be initialized before compilation, because compiler may depend on it
+                WemiBuildScript = compiledBuildScript
+                if (compiledBuildScript.ready()) {
+                    compiledBuildScript
+                } else {
+                    LOG.warn("Build script failed to compile")
+                    if (allowBrokenBuildScripts) {
+                        null
+                    } else {
+                        exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+                    }
+                }
             }
 
         }
@@ -215,7 +226,6 @@ fun main(args: Array<String>) {
 
     // Load build files now
     if (buildScript != null) {
-        WemiBuildScript = buildScript
         PrettyPrinter.setApplicationRootDirectory(buildScript.wemiRoot)
 
         val urls = arrayOfNulls<URL>(1 + buildScript.classpath.size)
