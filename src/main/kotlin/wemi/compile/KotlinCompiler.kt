@@ -68,6 +68,11 @@ enum class KotlinCompilerVersion (
             "wemi.compile.impl.KotlinCompilerImpl1_2_20",
             listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.20")))
     ),
+    Version1_2_21(
+            "1.2.21",
+            "wemi.compile.impl.KotlinCompilerImpl1_2_21",
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.21")))
+    ),
     ;
 
     private var compilerCache:KotlinCompiler? = null
@@ -118,7 +123,7 @@ object KotlinCompilerFlags {
 
     /* Descriptions and most names taken from the Kotlin at https://github.com/JetBrains/kotlin under Apache 2 license */
 
-    val moduleName = CompilerFlag<String>("moduleName", "Module name")
+    val moduleName = CompilerFlag<String>("moduleName", "Kotlin module name")
 
     val languageVersion = CompilerFlag<String>("languageVersion", "Provide source compatibility with specified language version")
     val apiVersion = CompilerFlag<String>("apiVersion", "Allow to use declarations only from the specified version of bundled libraries")
