@@ -166,7 +166,7 @@ object KeyDefaults {
     val CompileJava: BoundKeyValue<Path> = {
         using(Configurations.compiling) {
             val output = Keys.outputClassesDirectory.get()
-            Files.createDirectories(output)
+            output.ensureEmptyDirectory()
 
             val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
             val javaSourceRoots = mutableSetOf<Path>()
@@ -185,9 +185,9 @@ object KeyDefaults {
                 val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
 
                 val sourcesOut = using(compilingJava) { Keys.outputSourcesDirectory.get() }
-                Files.createDirectories(sourcesOut)
+                sourcesOut.ensureEmptyDirectory()
                 val headersOut = using(compilingJava) { Keys.outputHeadersDirectory.get() }
-                Files.createDirectories(headersOut)
+                headersOut.ensureEmptyDirectory()
 
                 val pathSeparator = System.getProperty("path.separator", ":")
                 val compilerOptions = ArrayList<String>()
@@ -248,7 +248,7 @@ object KeyDefaults {
     val CompileJavaKotlin: BoundKeyValue<Path> = {
         using(Configurations.compiling) {
             val output = Keys.outputClassesDirectory.get()
-            Files.createDirectories(output)
+            output.ensureEmptyDirectory()
 
             val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
             val javaSourceRoots = mutableSetOf<Path>()
@@ -287,9 +287,9 @@ object KeyDefaults {
                 val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
 
                 val sourcesOut = using(compilingJava) { Keys.outputSourcesDirectory.get() }
-                Files.createDirectories(sourcesOut)
+                sourcesOut.ensureEmptyDirectory()
                 val headersOut = using(compilingJava) { Keys.outputHeadersDirectory.get() }
-                Files.createDirectories(headersOut)
+                headersOut.ensureEmptyDirectory()
 
                 val pathSeparator = System.getProperty("path.separator", ":")
                 val compilerOptions = ArrayList<String>()

@@ -276,3 +276,24 @@ fun Path.deleteRecursively() {
         Files.delete(this)
     }
 }
+
+/**
+ * If this file does not exist, create it as a directory.
+ *
+ * If this file exists and is a directory, deletes all children.
+ *
+ * If this file exists and is not a directory, throws [IOException].
+ */
+fun Path.ensureEmptyDirectory() {
+    if (!Files.exists(this)) {
+        Files.createDirectories(this)
+    } else if (Files.isDirectory(this)) {
+        Files.newDirectoryStream(this).use {
+            for (path in it) {
+                path.deleteRecursively()
+            }
+        }
+    } else {
+        throw IOException("$this can't be made into directory")
+    }
+}
