@@ -129,7 +129,7 @@ internal fun getBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSour
     val buildFlags = CompilerFlags()
     buildFlags[KotlinJVMCompilerFlags.compilingWemiBuildFiles] = true
     buildFlags[KotlinCompilerFlags.moduleName] = combinedBuildFileName
-    buildFlags[KotlinJVMCompilerFlags.jvmTarget] = KotlinJVMCompilerFlags.BytecodeTarget.JAVA_1_8
+    buildFlags[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
 
     val sources = buildScriptSources.map { LocatedFile(it) }
 

@@ -77,7 +77,7 @@ object Configurations {
                 set(KotlinCompilerFlags.moduleName, Keys.projectName.get())
             }
         }
-        Keys.compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = KotlinJVMCompilerFlags.BytecodeTarget.JAVA_1_8
+        Keys.compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
     }
 
     val wemiBuildScript by configuration("Setup with information about the build script " +

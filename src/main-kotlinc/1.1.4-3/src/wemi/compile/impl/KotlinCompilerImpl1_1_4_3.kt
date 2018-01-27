@@ -108,7 +108,7 @@ internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
             args.moduleName = it
         }
         flags.use(KotlinJVMCompilerFlags.jvmTarget) {
-            args.jvmTarget = it.string
+            args.jvmTarget = it
         }
 
         flags.use(KotlinCompilerFlags.languageVersion) {

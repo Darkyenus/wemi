@@ -133,12 +133,7 @@ object KotlinCompilerFlags {
 object KotlinJVMCompilerFlags {
     val jdkHome = CompilerFlag<String>("jdkHome", "Path to JDK home directory to include into classpath, if differs from default JAVA_HOME")
 
-    enum class BytecodeTarget(val string: String) {
-        JAVA_1_6("1.6"),
-        JAVA_1_8("1.8")
-    }
-
-    val jvmTarget = CompilerFlag<BytecodeTarget>("jvmTarget", "Target version of the generated JVM bytecode")
+    val jvmTarget = CompilerFlag<String>("jvmTarget", "Target version of the generated JVM bytecode (1.6, 1.8)")
 
     /** Used to allow compiling of .wemi files by Kotlin compiler */
     val compilingWemiBuildFiles = CompilerFlag<Boolean>("compilingWemiBuildFiles", "Internal flag to allow compiling .wemi files as .kt files")
