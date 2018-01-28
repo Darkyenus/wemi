@@ -64,6 +64,7 @@ fun main(args: Array<String>) {
 
     val taskArguments = ArrayList<String>()
     var interactive = false
+    var exitIfNoTasks = false
     var machineReadableOutput = false
     var allowBrokenBuildScripts = false
     var root = Paths.get(".").toAbsolutePath()
@@ -110,8 +111,9 @@ fun main(args: Array<String>) {
                     allowBrokenBuildScripts = true
                 } else if (arg == "-v" || arg == "-version") {
                     println("Wemi $WemiVersion with Kotlin $WemiKotlinVersion")
+                    exitIfNoTasks = false
                 } else if (arg == "-?" || arg == "-h" || arg == "-help") {
-                    println("Wemi")
+                    println("Wemi $WemiVersion")
                     println("  -clean")
                     println("      Rebuild build files")
                     println("  -log=<trace|debug|info|warn|error>")
@@ -137,6 +139,10 @@ fun main(args: Array<String>) {
         } else {
             taskArguments.add(arg)
         }
+    }
+
+    if (exitIfNoTasks && taskArguments.isEmpty()) {
+        exitProcess(EXIT_CODE_SUCCESS)
     }
 
     val machineOutput: PrintStream?
