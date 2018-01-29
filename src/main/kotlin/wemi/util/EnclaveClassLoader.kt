@@ -47,29 +47,23 @@ class EnclaveClassLoader(urls: Array<URL>,
         /*
         Follows the default implementation closely, but tries to load the class in itself first
          */
-        try {
-            synchronized(getClassLoadingLock(name)) {
-                val c = findLoadedClass(name)
-                        ?: if (entryPoints.any { pattern -> name == pattern || (name.startsWith(pattern) && name[pattern.length] == '$') }) {
-                            // This class is an entry point
-                            forceLoadClass(name).apply { println("$name force loaded") }
-                        } else {
-                            try {
-                                findClass(name).apply { println("$name found in self") }
-                            } catch (ex: ClassNotFoundException) {
-                                myParent.loadClass(name).apply { println("$name found in parent") }
-                            }
+        synchronized(getClassLoadingLock(name)) {
+            val c = findLoadedClass(name)
+                    ?: if (entryPoints.any { pattern -> name == pattern || (name.startsWith(pattern) && name[pattern.length] == '$') }) {
+                        // This class is an entry point
+                        forceLoadClass(name)
+                    } else {
+                        try {
+                            findClass(name)
+                        } catch (ex: ClassNotFoundException) {
+                            myParent.loadClass(name)
                         }
+                    }
 
-                if (resolve) {
-                    resolveClass(c)
-                }
-                return c
+            if (resolve) {
+                resolveClass(c)
             }
-        }catch (e:Throwable) {
-            println("$name BAD")
-            e.printStackTrace(System.out)
-            throw e
+            return c
         }
     }
 
