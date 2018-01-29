@@ -243,7 +243,7 @@ internal object MavenDependencyResolver {
                 if (expectedChecksum == null) {
                     LOG.warn("Checksum of '{}' in {} is malformed ('{}'), continuing without checksum", path, repository, expectedChecksumString)
                 } else if (Arrays.equals(expectedChecksum, computedChecksum)) {
-                    LOG.debug("Checksum of '{}' in {} is valid", path, repository)
+                    LOG.trace("Checksum of '{}' in {} is valid", path, repository)
                 } else {
                     LOG.warn("Checksum of '{}' in {} is wrong! Expected {}, got {}", path, repository, computedChecksumString, toHexString(expectedChecksum))
                     return Pair(null, null)
@@ -275,7 +275,7 @@ internal object MavenDependencyResolver {
 
                 if (fileIsEqual) {
                     retrievedFile = dataFile
-                    LOG.debug("Not saving '{}' from {} into cache at {} - file '{}' already exists", path, repository, cache, dataFile)
+                    LOG.trace("Not saving '{}' from {} into cache at {} - file '{}' already exists", path, repository, cache, dataFile)
                 } else {
                     LOG.warn("Not saving '{}' from {} into cache at {} - file '{}' already exists and is different!", path, repository, cache, dataFile)
                 }
@@ -337,7 +337,7 @@ internal object MavenDependencyResolver {
     private fun doRetrieveUntranslatedPom(pomPath: String, dependencyId: DependencyId, repository: Repository.M2, chain: RepositoryChain): ResolvedDependency {
         // Create path to pom
         val pomUrl = repository.url / pomPath
-        LOG.debug("Retrieving pom at '{}' in {} for {}", pomPath, repository, dependencyId)
+        LOG.trace("Retrieving pom at '{}' in {} for {}", pomPath, repository, dependencyId)
         val (pomData, pomFile) = retrieveFile(pomPath, repository)
         if (pomData == null) {
             return ResolvedDependency(dependencyId, emptyList(), repository, true).apply {
@@ -356,7 +356,7 @@ internal object MavenDependencyResolver {
         try {
             reader.parse(InputSource(ByteArrayInputStream(pomData)))
         } catch (se: SAXException) {
-            LOG.warn("fatal error during parsing {}", pomUrl, se)
+            LOG.warn("Error during parsing {}", pomUrl, se)
             return ResolvedDependency(dependencyId, emptyList(), repository, true, "Malformed xml").apply {
                 if (pomFile != null) {
                     putKey(PomFile, pomFile)
@@ -377,12 +377,12 @@ internal object MavenDependencyResolver {
             if (pomBuilder.parentRelativePath.isNotBlank()) {
                 // Create new pom-path
                 val parentPomPath = (pomPath.dropLastWhile { c -> c != '/' } / pomBuilder.parentRelativePath).toString()
-                LOG.debug("Retrieving parent pom of '{}' from relative '{}'", pomPath, parentPomPath)
+                LOG.trace("Retrieving parent pom of '{}' from relative '{}'", pomPath, parentPomPath)
                 parent = doRetrieveUntranslatedPom(parentPomPath, parentPomId, repository, chain)
             }
 
             if (parent == null || parent.hasError) {
-                LOG.debug("Retrieving parent pom of '{}' by coordinates '{}'", pomPath, parentPomId)
+                LOG.trace("Retrieving parent pom of '{}' by coordinates '{}'", pomPath, parentPomId)
                 parent = DependencyResolver.resolveSingleDependency(Dependency(parentPomId), chain)
             }
 
@@ -529,7 +529,7 @@ internal object MavenDependencyResolver {
                 val propertyName = elementStack.last()
                 val propertyContent = elementCharacters.toString()
 
-                pom.properties.put(propertyName, propertyContent)
+                pom.properties[propertyName] = propertyContent
             }
 
             // Repositories

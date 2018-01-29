@@ -7,7 +7,7 @@ import java.nio.file.Path
 import kotlin.reflect.KProperty0
 
 /** Version of Wemi build system */
-const val WemiVersion = "0.1-SNAPSHOT"
+const val WemiVersion = "0.1"
 
 internal val WemiVersionIsSnapshot = WemiVersion.endsWith("-SNAPSHOT")
 

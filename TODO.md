@@ -2,6 +2,8 @@
 
 1. Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
 
+1. Bundle Wemi sources for IDE
+
 1. New project wizard (IDE)
 
 1. Kotlin Multiplatform

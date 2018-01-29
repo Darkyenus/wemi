@@ -111,7 +111,7 @@ fun main(args: Array<String>) {
                     allowBrokenBuildScripts = true
                 } else if (arg == "-v" || arg == "-version") {
                     println("Wemi $WemiVersion with Kotlin $WemiKotlinVersion")
-                    exitIfNoTasks = false
+                    exitIfNoTasks = true
                 } else if (arg == "-?" || arg == "-h" || arg == "-help") {
                     println("Wemi $WemiVersion")
                     println("  -clean")

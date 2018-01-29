@@ -6,10 +6,13 @@ import org.slf4j.LoggerFactory
 import org.slf4j.Marker
 import wemi.boot.MachineWritable
 import wemi.dependency.*
-import wemi.util.ForceClassLoader
+import wemi.util.EnclaveClassLoader
 import wemi.util.LocatedFile
 import wemi.util.WemiDefaultClassLoader
+import java.net.URLClassLoader
 import java.nio.file.Path
+
+private val LOG = LoggerFactory.getLogger("KotlinCompiler")
 
 /**
  * Interface implemented by a Kotlin compiler bridge.
@@ -90,10 +93,21 @@ enum class KotlinCompilerVersion (
                 val artifacts = DependencyResolver.resolveArtifacts(compilerDependency, repositoryChain)
                         ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
+                LOG.trace("Classpath for {} compiler: {}", string, artifacts)
+
                 val implementationClassName = implementationClassName
-                val loader = ForceClassLoader(artifacts.map { file -> file.toUri().toURL() }.toTypedArray(),
-                        WemiDefaultClassLoader, implementationClassName)
-                val clazz = Class.forName(implementationClassName, true, loader)
+                val artifactURLs = artifacts.map { it.toUri().toURL() }
+                /** Loads dependencies of the compiler, such as standard library or reflection library.
+                 * This mostly just completes the [WemiDefaultClassLoader] if anything is missing.
+                 * (Therefore, items here should be compatible with what Wemi uses.) */
+                val dependencyClassLoader = URLClassLoader(artifactURLs.drop(1).toTypedArray(), WemiDefaultClassLoader)
+                /** Loads compiler jar into own enclave, with custom Reflection and own versions of all classes.
+                 * This is done because different Kotlin compiler versions are not compatible*/
+                val compilerClassLoader = EnclaveClassLoader(artifactURLs.take(1).toTypedArray(), dependencyClassLoader,
+                        implementationClassName // Own entry point
+                        , "kotlin.jvm.internal.Reflection") // Force loading of second Reflection, this time with full reflection library
+
+                val clazz = Class.forName(implementationClassName, true, compilerClassLoader)
 
                 kotlinCompiler = clazz.newInstance() as KotlinCompiler
 

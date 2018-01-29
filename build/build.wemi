@@ -4,7 +4,6 @@ import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.compile.KotlinCompilerVersion
 import wemi.compile.KotlinJVMCompilerFlags
-import wemi.compile.KotlinJVMCompilerFlags.BytecodeTarget
 import wemi.createProject
 import wemi.util.div
 import wemi.util.executable
@@ -13,6 +12,7 @@ import java.nio.file.Files
 import core
 import createKotlinCompilerProject
 import CompilerProjects
+import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags.skipRuntimeVersionCheck
 
 val CompilerProjects = listOf(
@@ -25,7 +25,7 @@ val CompilerProjects = listOf(
 val core by project(path(".")) {
     projectName set { "wemi" }
     projectGroup set { "com.darkyen" }
-    projectVersion set { "0.1-SNAPSHOT" }
+    projectVersion set { "0.1" }
 
     kotlinVersion set { KotlinCompilerVersion.Version1_2_20 }
 
@@ -34,7 +34,7 @@ val core by project(path(".")) {
     repositories add { repository("jitpack", "https://jitpack.io") }
 
     libraryDependencies set { listOf(
-            dependency("org.jetbrains.kotlin", "kotlin-stdlib", "1.2.20"),
+            kotlinDependency("stdlib"),
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
             dependency("com.github.Darkyenus", "tproll", "v1.2.5"),
             dependency("com.github.Darkyenus", "DaveWebb", "v1.2"),
@@ -95,7 +95,7 @@ fun createKotlinCompilerProject(version:String):Project {
         }
     }
 
-    return createProject(projectName.toString(), path("src/main-kotlinc/$version")) {
+    return createProject(projectName.toString(), path("src/main-kotlinc/$version")/*, Archetypes.JavaKotlinProject*/) {
 
         extendMultiple(compilingJava, compilingKotlin) {
             sourceRoots set { listOf(projectRoot / "src") }
@@ -103,6 +103,7 @@ fun createKotlinCompilerProject(version:String):Project {
 
         extend(compilingKotlin) {
             compilerOptions[skipRuntimeVersionCheck] = true
+            //compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
         }
 
         projectDependencies set {
