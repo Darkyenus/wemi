@@ -5,10 +5,7 @@ import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
 import com.darkyen.wemi.intellij.util.digestToHexString
 import com.darkyen.wemi.intellij.util.update
-import com.esotericsoftware.jsonbeans.Json
 import com.esotericsoftware.jsonbeans.JsonValue
-import com.esotericsoftware.jsonbeans.JsonWriter
-import com.esotericsoftware.jsonbeans.OutputType
 import com.intellij.externalSystem.JavaProjectData
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.externalSystem.model.DataNode
@@ -23,7 +20,6 @@ import com.intellij.openapi.externalSystem.service.project.ExternalSystemProject
 import com.intellij.openapi.module.StdModuleTypes
 import com.intellij.openapi.roots.DependencyScope
 import java.io.File
-import java.io.StringWriter
 
 /**
  * May be run in a different process from the rest of the IDE!
@@ -87,33 +83,12 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             return resolveProjectInfo(id, session, projectPath, settings, listener)
         } catch (se:WemiSessionException) {
             LOG.warn("WemiSessionException encountered while resolving", se)
-            val sw = StringWriter()
-            val outputType = OutputType.json
-            val jsonWriter = JsonWriter(sw)
-            jsonWriter.setOutputType(outputType)
-            val json = Json()
-            json.setWriter(jsonWriter)
-
-            json.writeObjectStart()
-            json.writeValue("status", se.result.status.name, String::class.java)
-            // Hackity hack to append JsonValue directly into the output
-            val resultData = se.result.data
-            if (resultData != null) {
-                val printSettings = JsonValue.PrettyPrintSettings()
-                printSettings.outputType = outputType
-                printSettings.singleLineColumns = Int.MAX_VALUE
-                printSettings.wrapNumericArrays = false
-
-                sw.append(',').append(outputType.quoteName("name")).append(':')
-                sw.append(resultData.prettyPrint(printSettings))
+            throw ExternalSystemException(se.result.output).apply {
+                // Real exception is added as suppressed instead of cause,
+                // because IDE would show its message to the user, but we want to show only se.result.output
+                addSuppressed(se)
+                beingThrown = this
             }
-            json.writeValue("output", se.result.output, String::class.java)
-            if (se.expectedType != null) {
-                json.writeValue("expected", se.expectedType.name, String::class.java)
-            }
-            json.writeObjectEnd()
-
-            throw ExternalSystemException(sw.toString()).apply { beingThrown = this }
         } catch (e:ThreadDeath) {
             LOG.debug("Thread stopped", e)
             return null
@@ -159,7 +134,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving project "+project.name))
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, project.moduleData(projectPath))
             moduleNode.createChild(ProjectKeys.CONTENT_ROOT, project.contentRoot())
-            projectModules.put(project.name, moduleNode)
+            projectModules[project.name] = moduleNode
 
             // Collect dependencies
             val compileDependencies = createWemiProjectCombinedDependencies(session, project.name, "compiling", settings.downloadDocs, settings.downloadSources)
@@ -373,7 +348,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     sources[artifactId]?.map { it.artifact } ?: emptyList(),
                     docs[artifactId]?.map { it.artifact } ?: emptyList()
             )
-            combined.put(dep.hash, dep)
+            combined[dep.hash] = dep
         }
 
         return combined
@@ -601,6 +576,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
     }
 
+    @Suppress("CanBeParameter")
     private class WemiSessionException(val result:WemiLauncherSession.Companion.Result,
                                        val expectedType:JsonValue.ValueType?):Exception(
             "Got $result but expected $expectedType"
