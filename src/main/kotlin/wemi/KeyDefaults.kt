@@ -442,7 +442,8 @@ object KeyDefaults {
                 assemblyOperation.assembly(Keys.assemblyMergeStrategy.get(),
                         Keys.assemblyRenameFunction.get(),
                         outputFile,
-                        Keys.assemblyPrependData.get())
+                        Keys.assemblyPrependData.get(),
+                        compress = true)
 
                 outputFile
             }

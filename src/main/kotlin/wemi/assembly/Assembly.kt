@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.jar.JarOutputStream
+import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 
@@ -121,7 +122,7 @@ class AssemblyOperation : Closeable {
      *
      * @throws WemiException on failure
      */
-    fun assembly(mergeStrategy: MergeStrategyChooser, renameFunction: RenameFunction, outputFile: Path, prependData:ByteArray) {
+    fun assembly(mergeStrategy: MergeStrategyChooser, renameFunction: RenameFunction, outputFile: Path, prependData:ByteArray, compress:Boolean) {
         // Trim duplicates
         val assemblySources = LinkedHashMap<String, Pair<AssemblySource?, ByteArray>>()
 
@@ -294,12 +295,24 @@ class AssemblyOperation : Closeable {
 
             val jarOut = JarOutputStream(out)
 
+            val crc: CRC32? = if (compress) null else CRC32()
+
             for ((path, value) in assemblySources) {
                 val (source, data) = value
 
                 val entry = ZipEntry(path)
-                entry.method = ZipEntry.DEFLATED
-                entry.size = data.size.toLong()
+                if (compress) {
+                    entry.method = ZipEntry.DEFLATED
+                    entry.size = data.size.toLong()
+                    // compressed size and crc unknown
+                } else {
+                    entry.method = ZipEntry.STORED
+                    entry.size = data.size.toLong()
+                    entry.compressedSize = entry.size
+                    crc!!.update(data)
+                    entry.crc = crc.value
+                    crc.reset()
+                }
                 if (source != null) {
                     if (source.zipEntry != null && source.zipEntry.time != -1L) {
                         entry.time = source.zipEntry.time

@@ -13,7 +13,14 @@ import core
 import createKotlinCompilerProject
 import CompilerProjects
 import wemi.Archetypes
+import wemi.Keys
+import wemi.assembly.AssemblyOperation
+import wemi.assembly.DefaultRenameFunction
+import wemi.assembly.MergeStrategy
+import wemi.boot.WemiBuildScript
 import wemi.compile.KotlinCompilerFlags
+import wemi.util.LocatedFile
+import java.util.zip.ZipEntry
 
 val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.4-3"),
@@ -55,6 +62,7 @@ val core by project(path(".")) {
     }
 
     extend(assembling) {
+        // Add all compiler frontends to the internal classpath
         internalClasspath modify { cp ->
             val cpWithCompilers = ArrayList(cp)
 
@@ -65,6 +73,24 @@ val core by project(path(".")) {
             }
 
             cpWithCompilers
+        }
+
+        // Add .jar with sources to resource files
+        resourceFiles add {
+            AssemblyOperation().use { asOp ->
+                val sourcePath = WemiBuildScript!!.cacheFolder / "source.zip"
+
+                for (file in using(compilingJava) { Keys.sourceFiles.get() }) {
+                    asOp.addSource(file, true, false)
+                }
+                for (file in using(compilingKotlin) { Keys.sourceFiles.get() }) {
+                    asOp.addSource(file, true, false)
+                }
+
+                asOp.assembly({ MergeStrategy.Deduplicate }, DefaultRenameFunction, sourcePath, byteArrayOf(), false)
+
+                LocatedFile(sourcePath)
+            }
         }
     }
 
