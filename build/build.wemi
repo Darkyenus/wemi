@@ -12,8 +12,8 @@ import java.nio.file.Files
 import core
 import createKotlinCompilerProject
 import CompilerProjects
+import wemi.Archetypes
 import wemi.compile.KotlinCompilerFlags
-import wemi.compile.KotlinJVMCompilerFlags.skipRuntimeVersionCheck
 
 val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.4-3"),
@@ -27,7 +27,7 @@ val core by project(path(".")) {
     projectGroup set { "com.darkyen" }
     projectVersion set { "0.1" }
 
-    kotlinVersion set { KotlinCompilerVersion.Version1_2_20 }
+    kotlinVersion set { KotlinCompilerVersion.Version1_2_21 }
 
     mainClass set { "wemi.boot.MainKt" }
 
@@ -95,15 +95,14 @@ fun createKotlinCompilerProject(version:String):Project {
         }
     }
 
-    return createProject(projectName.toString(), path("src/main-kotlinc/$version")/*, Archetypes.JavaKotlinProject*/) {
+    return createProject(projectName.toString(), path("src/main-kotlinc/$version"), Archetypes.JavaKotlinProject) {
 
         extendMultiple(compilingJava, compilingKotlin) {
             sourceRoots set { listOf(projectRoot / "src") }
         }
 
         extend(compilingKotlin) {
-            compilerOptions[skipRuntimeVersionCheck] = true
-            //compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
+            compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
         }
 
         projectDependencies set {
