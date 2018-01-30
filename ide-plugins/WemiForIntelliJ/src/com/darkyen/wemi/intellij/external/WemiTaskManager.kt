@@ -7,7 +7,9 @@ import com.darkyen.wemi.intellij.util.LineReadingOutputStream
 import com.intellij.openapi.externalSystem.model.ExternalSystemException
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
+import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunConfiguration.RUN_INPUT_KEY
 import com.intellij.openapi.externalSystem.task.ExternalSystemTaskManager
+import java.io.InputStream
 import java.util.regex.Pattern
 
 /**
@@ -44,7 +46,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
 
             val launcher = settings!!.launcher
 
-            var env = settings.env.toMutableMap()
+            val env = settings.env.toMutableMap()
 
             val deferDebug = settings.deferDebugToWemi
             if (deferDebug == null) {
@@ -100,7 +102,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
             session.readOutputInteractive(
                     stdout,
                     stderr,
-                    System.`in`
+                    settings.getUserData(RUN_INPUT_KEY) as InputStream
             )
             stdout.close()
             stderr.close()
