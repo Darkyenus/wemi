@@ -2,6 +2,8 @@
 
 package wemi
 
+import wemi.assembly.DefaultRenameFunction
+import wemi.assembly.JarMergeStrategyChooser
 import wemi.boot.WemiRunningInInteractiveMode
 import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
@@ -73,8 +75,12 @@ object Archetypes {
         Keys.testParameters set KeyDefaults.TestParameters
         Keys.test set KeyDefaults.Test
 
-        Keys.assemblyMergeStrategy set KeyDefaults.AssemblyMergeStrategy
-        Keys.assemblyRenameFunction set KeyDefaults.AssemblyRenameFunction
+        Keys.assemblyMergeStrategy set {
+            JarMergeStrategyChooser
+        }
+        Keys.assemblyRenameFunction set {
+            DefaultRenameFunction
+        }
         Keys.assemblyOutputFile set { Keys.buildDirectory.get() / (Keys.projectName.get() + "-" + Keys.projectVersion.get() + "-assembly.jar") }
         Keys.assembly set KeyDefaults.Assembly
     }
