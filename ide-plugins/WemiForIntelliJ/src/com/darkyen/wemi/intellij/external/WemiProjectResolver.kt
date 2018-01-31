@@ -20,6 +20,9 @@ import com.intellij.openapi.externalSystem.service.project.ExternalSystemProject
 import com.intellij.openapi.module.StdModuleTypes
 import com.intellij.openapi.roots.DependencyScope
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.util.zip.ZipFile
 
 /**
  * May be run in a different process from the rest of the IDE!
@@ -80,7 +83,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             LOG.info("Wemi version is "+wemiVersion)
             //TODO Version check, disallow too old versions
 
-            return resolveProjectInfo(id, session, projectPath, settings, listener)
+            return resolveProjectInfo(id, session, projectPath, settings, listener, wemiVersion)
         } catch (se:WemiSessionException) {
             LOG.warn("WemiSessionException encountered while resolving", se)
             throw ExternalSystemException(se.result.output).apply {
@@ -111,7 +114,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                                    session: WemiLauncherSession,
                                    projectPath: String,
                                    settings: WemiExecutionSettings,
-                                   listener: ExternalSystemTaskNotificationListener): DataNode<ProjectData> {
+                                   listener: ExternalSystemTaskNotificationListener,
+                                   wemiVersion:String): DataNode<ProjectData> {
         listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving project list"))
         val projects = session.stringArray(project = null, task = "#projects", includeUserConfigurations = false).let {
             projectNames ->
@@ -212,7 +216,12 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             // Retrieve info
             val buildFolder = buildScript.getString("buildFolder")
             val projectsUnderBuildScript:Collection<String> = projects.keys
-            val name = projectsUnderBuildScript.joinToString("-", postfix = "-build")
+            val name: String
+            if (projectsUnderBuildScript.isEmpty() || projectsUnderBuildScript.size > 2) {
+                name = "wemi-projects-build"
+            } else {
+                name = projectsUnderBuildScript.joinToString("-", postfix = "-build")
+            }
             val classpath = buildScript.get("classpath").asStringArray().map { File(it) }
             val scriptJar = buildScript.getString("scriptJar")
 
@@ -236,10 +245,13 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             // Dependencies
             val unresolved = classpath.any { !it.exists() }
             val libraryData = LibraryData(WemiProjectSystemId, name+" Classpath", unresolved)
+            // Classpath
             for (artifact in classpath) {
                 libraryData.addPath(LibraryPathType.BINARY, artifact.path)
             }
+            // Sources and docs
             if (projectsUnderBuildScript.isNotEmpty()) {
+                // We can download sources and docs only through other projects
                 //TODO This is slightly ugly
                 val projectToUseToDownloadSources = projectsUnderBuildScript.iterator().next()
 
@@ -258,6 +270,43 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     }
                 }
             }
+            // Wemi Sources (included in the jar)
+            try {
+                val wemiLauncherFile = File(settings.wemiLauncher)
+                ZipFile(wemiLauncherFile).use { file ->
+                    val sourceEntry = file.getEntry("source.zip")
+                    if (sourceEntry != null) {
+                        val sb = StringBuilder()
+                        sb.append("wemi-extracted-sources-").append(wemiVersion)
+                        if (wemiVersion.endsWith("-SNAPSHOT")) {
+                            sb.append('-').append(wemiLauncherFile.lastModified())
+                        }
+                        sb.append(".zip")
+
+                        val sourcesZip = Paths.get(scriptJar).parent.resolve(sb.toString())
+                        if (!Files.exists(sourcesZip)) {
+                            Files.newOutputStream(sourcesZip).use { out ->
+                                file.getInputStream(sourceEntry).use { ins ->
+                                    val buffer = ByteArray(Math.min(4096L, sourceEntry.size).toInt())
+                                    while (true) {
+                                        val read = ins.read(buffer)
+                                        if (read == -1) {
+                                            break
+                                        }
+                                        out.write(buffer, 0, read)
+                                    }
+                                }
+                            }
+                        }
+
+                        libraryData.addPath(LibraryPathType.SOURCE, sourcesZip.toAbsolutePath().toString())
+                    }
+                }
+            } catch (e:Exception) {
+                LOG.warn("Failed to retrieve Wemi sources", e)
+            }
+
+
             moduleNode.createChild(ProjectKeys.LIBRARY, libraryData)
 
             val libraryDependencyData = LibraryDependencyData(moduleData, libraryData, LibraryLevel.MODULE)
