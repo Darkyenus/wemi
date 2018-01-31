@@ -4,8 +4,8 @@
 - Strive for simplicity
 - Be explicit, do not hide things
 - Have speed and low overhead in mind at all times
-- Do not introduce dependencies unless necessary, prefer to (down)load them at runtime, when needed
-- Do not be afraid of breaking changes of code, at least during development
+- Don't introduce dependencies unless necessary, prefer to (down)load them at runtime, when needed
+- Don't be afraid of breaking changes, at least during development
 
 ## Directory layout
 Project backed by Wemi will usually have following directory structure:
@@ -113,7 +113,7 @@ val calculator by project {
 ```
 Like the key, project and configuration (see below) is also declared using a `by` syntax.
 Above example declares a project named `calculator`, which is for later reference in code stored
-in the `calculator` variable. Rest of the example shows how the keys are bound:
+in the `calculator` variable. Rest of the example shows how the keys are bound.
 
 When in the project or configuration initializer, write `<key> set { <value> }`. This works only in the scope of
 project or configuration and the braces around value are mandatory and intentional - they signify that the `<value>` is not
@@ -137,6 +137,14 @@ with the verb in *present participle*, that is, ending with *-ing*. If the confi
 any descriptive name is fine.
 
 Standard configurations are defined in `wemi.Configurations` object.
+
+#### Archetypes
+Each project, even when it is not specified explicitly, has an *Archetype*. Archetype is essentially a *configuration*,
+that is applied *before* Project's own key bindings. Archetype usually defines default values for keys,
+and which programming languages project can use. It can be specified when defining a new project.
+Default archetype declares support for Java and Kotlin languages.
+
+Standard archetypes are defined in `wemi.Archetypes` object.
 
 ### Scopes
 Scopes are the heart of the *value querying* mechanism. They are not declared, but created at runtime, on demand.
@@ -413,6 +421,9 @@ character, except for `\` and `"` itself, so it is still possible to use escapes
 
 Initial query passed to Wemi through process arguments is parsed very similarly, but whitespace is not treated as
 a separator and argument boundaries are used instead. That way it is possible to leverage shell's own quoting rules.
+
+### Debugging tools
+To see which keys does some key depend on, prefix its invocation with `trace `, for example `./wemi trace run`.
 
 ## Distribution and installation
 WEMI is distributed as a runnable .jar file called `wemi`, which is also a valid `.sh` file.
