@@ -30,12 +30,17 @@ typealias ProjectExclusion = wemi.dependency.DependencyExclusion
 typealias Path = java.nio.file.Path
 
 // Core Functions
-inline fun project(projectRoot: Path = path("."), vararg archetypes: Archetype = arrayOf(Archetypes.JavaKotlinProject), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, *archetypes, initializer = initializer)
+inline fun project(vararg archetypes: Archetype = arrayOf(Archetypes.DefaultArchetype), noinline initializer: Project.() -> Unit) = wemi.project(path("."), archetypes = *archetypes, initializer = initializer)
+inline fun project(projectRoot: Path? = path("."), vararg archetypes: Archetype = arrayOf(Archetypes.DefaultArchetype), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, *archetypes, initializer = initializer)
+
 inline fun <Value> key(description: String, defaultValue: Value, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN) = wemi.key(description, defaultValue, cacheMode)
 inline fun <Value> key(description: String, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN) = wemi.key(description, cacheMode)
+
 inline fun configuration(description: String, parent: Configuration? = null, noinline initializer: Configuration.() -> Unit) = wemi.configuration(description, parent, initializer)
-inline fun dependency(group: String, name: String, version: String, preferredRepository: Repository? = null, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(group, name, version, preferredRepository, *attributes)
-inline fun dependency(groupNameVersion: String, preferredRepository: Repository? = null, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(groupNameVersion, preferredRepository, *attributes)
+
+inline fun dependency(group: String, name: String, version: String, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(group, name, version, null, *attributes)
+inline fun dependency(groupNameVersion: String, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(groupNameVersion, null, *attributes)
+
 inline fun repository(name: String, url: String, checksum: Repository.M2.Checksum = Repository.M2.Checksum.SHA1) = wemi.repository(name, url, checksum)
 
 // Helper functions

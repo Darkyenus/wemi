@@ -45,14 +45,14 @@ sealed class Repository(val name: String) : MachineWritable {
              * Various variants of the same dependency.
              * Examples: jdk15, sources, javadoc, linux
              */
-            val M2ClassifierAttribute = DependencyAttribute("m2-classifier", true)
+            val Classifier = DependencyAttribute("m2-classifier", true)
             /**
              * Corresponds to the packaging of the dependency (and overrides it).
              * Determines what sort of artifact is retrieved.
              *
              * Examples: jar (default), pom (returns pom.xml, used internally)
              */
-            val M2TypeAttribute = DependencyAttribute("m2-type", true, "jar")
+            val Type = DependencyAttribute("m2-type", true, "jar")
             /**
              * Scope of the dependency.
              *
@@ -61,11 +61,11 @@ sealed class Repository(val name: String) : MachineWritable {
              *
              * In Wemi used only when filtering.
              */
-            val M2ScopeAttribute = DependencyAttribute("m2-scope", false, "compile")
+            val Scope = DependencyAttribute("m2-scope", false, "compile")
             /**
              * Optional dependencies are skipped by default by Wemi.
              */
-            val M2OptionalAttribute = DependencyAttribute("m2-optional", false, "false")
+            val Optional = DependencyAttribute("m2-optional", false, "false")
         }
 
         /**
@@ -174,10 +174,6 @@ val LocalM2Repository = Repository.M2("local", URL("file", "localhost", System.g
  * Cached by [LocalM2Repository].
  */
 val MavenCentral = Repository.M2("central", URL("https://repo1.maven.org/maven2/"), LocalM2Repository)
-
-// TODO Remove by 2018-02-01
-@Deprecated("Renamed", replaceWith = ReplaceWith("MavenCentral", "wemi.dependency.MavenCentral"))
-val CentralM2Repository = MavenCentral
 
 /**
  * Repositories to use by default.

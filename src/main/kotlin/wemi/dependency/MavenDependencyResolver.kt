@@ -32,7 +32,7 @@ internal object MavenDependencyResolver {
         val (dependencyId, exclusions) = dependency
 
         // Just retrieving raw pom file
-        if (dependency.dependencyId.attribute(Repository.M2.M2TypeAttribute) == "pom") {
+        if (dependency.dependencyId.attribute(Repository.M2.Type) == "pom") {
             return retrievePom(dependencyId, repository, chain)
         }
 
@@ -58,7 +58,7 @@ internal object MavenDependencyResolver {
             }
         }
 
-        val packaging = dependencyId.attribute(Repository.M2.M2TypeAttribute) ?: pom.packaging
+        val packaging = dependencyId.attribute(Repository.M2.Type) ?: pom.packaging
 
         when (packaging) {
             "pom" -> {
@@ -372,7 +372,7 @@ internal object MavenDependencyResolver {
                     pomBuilder.parentArtifactId,
                     pomBuilder.parentVersion,
                     preferredRepository = repository,
-                    attributes = mapOf(Repository.M2.M2TypeAttribute to "pom"))
+                    attributes = mapOf(Repository.M2.Type to "pom"))
 
             if (pomBuilder.parentRelativePath.isNotBlank()) {
                 // Create new pom-path
@@ -489,13 +489,13 @@ internal object MavenDependencyResolver {
             } else if (atElement(DependencyVersion)) {
                 lastDependencyVersion = characters()
             } else if (atElement(DependencyClassifier)) {
-                lastDependencyAttributes[Repository.M2.M2ClassifierAttribute] = characters()
+                lastDependencyAttributes[Repository.M2.Classifier] = characters()
             } else if (atElement(DependencyOptional)) {
-                lastDependencyAttributes[Repository.M2.M2OptionalAttribute] = characters()
+                lastDependencyAttributes[Repository.M2.Optional] = characters()
             } else if (atElement(DependencyScope)) {
-                lastDependencyAttributes[Repository.M2.M2ScopeAttribute] = characters()
+                lastDependencyAttributes[Repository.M2.Scope] = characters()
             } else if (atElement(DependencyType)) {
-                lastDependencyAttributes[Repository.M2.M2TypeAttribute] = characters()
+                lastDependencyAttributes[Repository.M2.Type] = characters()
             } else if (atElement(Dependency)) {
                 val projectId = DependencyId(lastDependencyGroupId, lastDependencyArtifactId, lastDependencyVersion, attributes = lastDependencyAttributes)
                 lastDependencyGroupId = ""
@@ -617,7 +617,7 @@ internal object MavenDependencyResolver {
     private fun DependencyId.artifactPath(extension: String): String {
         val fileName = StringBuilder()
         fileName.append(name).append('-').append(version)
-        val classifier = attribute(Repository.M2.M2ClassifierAttribute)
+        val classifier = attribute(Repository.M2.Classifier)
         if (classifier != null) {
             fileName.append('-').append(classifier)
         }

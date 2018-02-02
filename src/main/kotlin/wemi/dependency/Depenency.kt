@@ -96,10 +96,10 @@ data class DependencyId(val group: String,
  *                      i.e. if [DependencyId]s differ in this attribute and makesUnique is true, they are not considered equal, otherwise they are
  * @param defaultValue when [DependencyId] does not have this attribute set explicitly, treat it as having this value, if not null
  *
- * @see Repository.M2.M2TypeAttribute
- * @see Repository.M2.M2ScopeAttribute
- * @see Repository.M2.M2ClassifierAttribute
- * @see Repository.M2.M2OptionalAttribute
+ * @see Repository.M2.Type
+ * @see Repository.M2.Scope
+ * @see Repository.M2.Classifier
+ * @see Repository.M2.Optional
  */
 data class DependencyAttribute(val name: String, val makesUnique: Boolean, val defaultValue: String? = null) : MachineWritable {
     override fun toString(): String = name
@@ -153,16 +153,16 @@ data class DependencyExclusion(val group: String, val name: String, val version:
  */
 val DefaultExclusions = listOf(
         DependencyExclusion("*", "*", "*", mapOf(
-                Repository.M2.M2OptionalAttribute to "true"
+                Repository.M2.Optional to "true"
         )),
         DependencyExclusion("*", "*", "*", mapOf(
-                Repository.M2.M2ScopeAttribute to "provided"
+                Repository.M2.Scope to "provided"
         )),
         DependencyExclusion("*", "*", "*", mapOf(
-                Repository.M2.M2ScopeAttribute to "test"
+                Repository.M2.Scope to "test"
         )),
         DependencyExclusion("*", "*", "*", mapOf(
-                Repository.M2.M2ScopeAttribute to "system"
+                Repository.M2.Scope to "system"
         ))
 )
 

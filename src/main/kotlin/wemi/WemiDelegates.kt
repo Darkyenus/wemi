@@ -27,7 +27,7 @@ internal object BuildScriptData {
  * Mostly boilerplate, but takes care of creating, initializing and registering the [Project].
  */
 class ProjectDelegate internal constructor(
-        private val projectRoot: Path,
+        private val projectRoot: Path?,
         private val archetypes: Array<out Archetype>,
         private val initializer: Project.() -> Unit
 ) : ReadOnlyProperty<Any?, Project> {
@@ -54,9 +54,9 @@ class ProjectDelegate internal constructor(
  * @param checkRootUnique if true, check if no other project is in the [root] and warn if so
  * @param initializer to populate the project's [BindingHolder] with bindings
  */
-fun createProject(name:String, root:Path, vararg archetypes:Archetype, checkRootUnique:Boolean = true, initializer: Project.() -> Unit):Project {
-    val usedRoot = root.toAbsolutePath()
-    if (!usedRoot.exists()) {
+fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRootUnique:Boolean = true, initializer: Project.() -> Unit):Project {
+    val usedRoot = root?.toAbsolutePath()
+    if (usedRoot != null && !usedRoot.exists()) {
         Files.createDirectories(usedRoot)
     }
 
@@ -85,9 +85,13 @@ fun createProject(name:String, root:Path, vararg archetypes:Archetype, checkRoot
     synchronized(BuildScriptData.AllProjects) {
         for ((_, otherProject) in BuildScriptData.AllProjects) {
             if (otherProject.name == name) {
-                throw WemiException("Project named '$name' already exists (at ${otherProject.projectRoot})")
+                if (otherProject.projectRoot == null) {
+                    throw WemiException("Project named '$name' already exists (without root)")
+                } else {
+                    throw WemiException("Project named '$name' already exists (at ${otherProject.projectRoot})")
+                }
             }
-            if (checkRootUnique && Files.isSameFile(otherProject.projectRoot, usedRoot)) {
+            if (checkRootUnique && otherProject.projectRoot != null && Files.isSameFile(otherProject.projectRoot, usedRoot)) {
                 LOG.warn("Project $name is at the same location as project ${otherProject.name}")
             }
         }
@@ -95,7 +99,9 @@ fun createProject(name:String, root:Path, vararg archetypes:Archetype, checkRoot
     }
     project.apply {
         Keys.projectName set { name }
-        Keys.projectRoot set { usedRoot }
+        if (usedRoot != null) {
+            Keys.projectRoot set { usedRoot }
+        }
 
         // Setup Keys.buildScript
         val buildScript = WemiBuildScript

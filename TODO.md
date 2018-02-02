@@ -1,5 +1,13 @@
 # Things to do next
 
+1. Synchronize Kotlin compiler settings Wemi -> IDEA
+
+1. Support .kt alongside .wemi
+
+1. Maven repository locking
+
+1. Maven parallel repository resolution
+
 1. Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
 
 1. New project wizard (IDE)

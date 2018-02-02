@@ -5,7 +5,7 @@ package wemi
 import configuration
 import wemi.compile.*
 import wemi.dependency.Dependency
-import wemi.dependency.Repository.M2.Companion.M2ClassifierAttribute
+import wemi.dependency.Repository.M2.Companion.Classifier
 import wemi.test.JUnitPlatformLauncher
 import wemi.util.LocatedFile
 import wemi.util.div
@@ -38,7 +38,7 @@ object Configurations {
     val retrievingSources by configuration("Used to retrieve sources") {
         Keys.libraryDependencyProjectMapper set {
             { (projectId, exclusions): Dependency ->
-                val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (M2ClassifierAttribute to "sources"))
+                val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (Classifier to "sources"))
                 Dependency(sourcesProjectId, exclusions)
             }
         }
@@ -47,7 +47,7 @@ object Configurations {
     val retrievingDocs by configuration("Used to retrieve docs") {
         Keys.libraryDependencyProjectMapper set {
             { (projectId, exclusions): Dependency ->
-                val javadocProjectId = projectId.copy(attributes = projectId.attributes + (M2ClassifierAttribute to "javadoc"))
+                val javadocProjectId = projectId.copy(attributes = projectId.attributes + (Classifier to "javadoc"))
                 Dependency(javadocProjectId, exclusions)
             }
         }

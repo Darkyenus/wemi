@@ -44,10 +44,10 @@ typealias BoundKeyValueModifier<Value> = Scope.(Value) -> Value
  * These variables must be declared in the file-level scope of the build script.
  * Creating projects elsewhere will lead to an undefined behavior.
  *
- * @param projectRoot path from which all other paths in the project are derived from
+ * @param projectRoot path from which all other paths in the project are derived from (null = not set)
  * @param initializer function which creates key value bindings for the [Project]
  */
-fun project(projectRoot: Path, vararg archetypes: Archetype, initializer: Project.() -> Unit): ProjectDelegate {
+fun project(projectRoot: Path?, vararg archetypes: Archetype, initializer: Project.() -> Unit): ProjectDelegate {
     return ProjectDelegate(projectRoot, archetypes, initializer)
 }
 

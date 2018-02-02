@@ -106,8 +106,9 @@ object CLI {
             else -> {
                 var closest: Project? = null
                 var closestDist = -1
-                for (project in allProjects.values) {
+                projects@for (project in allProjects.values) {
                     when {
+                        project.projectRoot == null -> continue@projects
                         project.projectRoot == root -> return project
                         closest == null -> closest = project
                         else -> // Compare how close they are!

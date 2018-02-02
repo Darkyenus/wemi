@@ -156,7 +156,7 @@ class ConfigurationExtension internal constructor(
  * @param projectRoot at which this [Project] is located at in the filesystem
  * @see BindingHolder for info about how the values are bound
  */
-class Project internal constructor(val name: String, val projectRoot: Path, archetypes:Array<out Archetype>)
+class Project internal constructor(val name: String, internal val projectRoot: Path?, archetypes:Array<out Archetype>)
     : BindingHolder(), WithDescriptiveString, MachineWritable {
 
     /**
@@ -167,7 +167,13 @@ class Project internal constructor(val name: String, val projectRoot: Path, arch
     /**
      * @return [name] at [projectRoot]
      */
-    override fun toDescriptiveAnsiString(): String = "${format(name, format = Format.Bold)} at $projectRoot"
+    override fun toDescriptiveAnsiString(): String {
+        if (projectRoot == null) {
+            return "${format(name, format = Format.Bold)} without root"
+        } else {
+            return "${format(name, format = Format.Bold)} at $projectRoot"
+        }
+    }
 
     override fun writeMachine(json: Json) {
         json.writeValue(name as Any, String::class.java)
@@ -832,6 +838,18 @@ sealed class BindingHolder {
     }
 
     /**
+     * Add a modifier that will add elements of the result of [additionalValues] to the resulting collection.
+     *
+     * @see modify
+     */
+    inline infix fun <Value> Key<Collection<Value>>.addAll(crossinline additionalValues: BoundKeyValue<Iterable<Value>>) {
+        this.modify { collection: Collection<Value> ->
+            //TODO Optimize?
+            collection + additionalValues()
+        }
+    }
+
+    /**
      * Add a modifier that will remove the result of [valueToRemove] from the resulting collection.
      *
      * @see modify
@@ -839,6 +857,17 @@ sealed class BindingHolder {
     inline infix fun <Value> Key<Collection<Value>>.remove(crossinline valueToRemove: BoundKeyValue<Value>) {
         this.modify { collection: Collection<Value> ->
             collection - valueToRemove()
+        }
+    }
+
+    /**
+     * Add a modifier that will remove elements of the result of [valuesToRemove] from the resulting collection.
+     *
+     * @see modify
+     */
+    inline infix fun <Value> Key<Collection<Value>>.removeAll(crossinline valuesToRemove: BoundKeyValue<Iterable<Value>>) {
+        this.modify { collection: Collection<Value> ->
+            collection - valuesToRemove()
         }
     }
     //endregion

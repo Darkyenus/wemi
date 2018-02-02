@@ -87,6 +87,24 @@ object Archetypes {
 
     //region Primary Archetypes
 
+    @PublishedApi
+    internal val DefaultArchetype
+        get() = JavaKotlinProject
+
+    /**
+     * Archetype for projects that serve only as an aggregation of dependencies and do not have any own sources.
+     */
+    val DependenciesOnly by archetype(::_JVMBase_) {
+        Keys.internalClasspath set { emptyList() }
+
+        Keys.sourceBases set { emptyList() }
+        Keys.sourceFiles set { emptyList() }
+        Keys.sourceRoots set { emptyList() }
+
+        Keys.resourceRoots set { emptyList() }
+        Keys.resourceFiles set { emptyList() }
+    }
+
     /**
      * Primary archetype for projects that use pure Java.
      */
@@ -98,7 +116,7 @@ object Archetypes {
      * Primary archetype for projects that use Java and Kotlin.
      */
     val JavaKotlinProject by archetype(::_JVMBase_) {
-        Keys.libraryDependencies set { listOf(kotlinDependency("stdlib")) }
+        Keys.libraryDependencies add { kotlinDependency("stdlib") }
         Keys.compile set KeyDefaults.CompileJavaKotlin
     }
 
