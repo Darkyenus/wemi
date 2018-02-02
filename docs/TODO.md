@@ -1,7 +1,5 @@
 # Things to do next
 
-1. Rewrite WemiProjectResolutionListener
-
 1. Maven repository locking
 
 1. Maven parallel repository resolution
