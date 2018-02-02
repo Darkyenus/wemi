@@ -91,7 +91,8 @@
                 implementation="com.darkyen.wemi.intellij.importing.WemiProjectResolutionListener"/>
 
         <!-- File -->
-        <fileTypeFactory implementation="com.darkyen.wemi.intellij.file.WemiFileTypeFactory"/>
+        <fileIconProvider id="wemi-script-file" order="first" implementation="com.darkyen.wemi.intellij.file.ScriptIconProvider"/>
+        <iconProvider id="wemi-script-file" order="first" implementation="com.darkyen.wemi.intellij.file.ScriptIconProvider"/>
     </extensions>
 
 </idea-plugin>
