@@ -1,6 +1,7 @@
+![WEMI Build System](logo_doc.svg)  
 # General Design
 
-## Tenets, sort of
+## Tenets
 - Strive for simplicity
 - Be explicit, do not hide things
 - Have speed and low overhead in mind at all times

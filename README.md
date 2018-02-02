@@ -1,4 +1,4 @@
-# WEMI Build System
+![WEMI Build System](docs/logo_doc.svg)  
 *Wonders Expeditiously, Mundane Instantly*
 
 ## Why‽
@@ -39,7 +39,7 @@ val myProject by project {
 ```
 All `.wemi` files are like Kotlin `.kt` files, just different extension.
 Things like `projectGroup` or `mainClass` above, are keys. Setting any of them is optional, most of them have
-sensible default values. There is more to them, check the [design documentation](DESIGN.md).
+sensible default values. There is more to them, check the [design documentation](docs/DESIGN.md).
 4. Now you have a build script that can compile and run Java and Kotlin projects. Add your sources to 
 `<your-project-root>/src/main/java` and/or `<your-project-root>/src/main/kotlin`.
 Dependency on Kotlin's standard library is added by default (if you do not want that, add line 
@@ -52,7 +52,7 @@ Running `./wemi` by itself will start an interactive session for your tasks. Thi
 at least when developing, because the compile times are often much shorter.
 
 And that is it. If you are interested, look at the examples in [test repositories](test%20repositories) and
-the [design document](DESIGN.md) with detailed documentation of Wemi's inner workings.
+the [design document](docs/DESIGN.md) with detailed documentation of Wemi's inner workings.
 
 ## Contributing & License
 The code is not yet under any license, but you can still read it.
