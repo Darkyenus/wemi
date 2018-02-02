@@ -1,8 +1,8 @@
 # Things to do next
 
-1. Synchronize Kotlin compiler settings Wemi -> IDEA
+1. Rewrite WemiProjectResolutionListener
 
-1. Support .kt alongside .wemi
+1. Synchronize Kotlin compiler settings Wemi -> IDEA
 
 1. Maven repository locking
 

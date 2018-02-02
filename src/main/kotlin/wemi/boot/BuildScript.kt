@@ -23,7 +23,7 @@ private val LOG = LoggerFactory.getLogger("BuildFiles")
  * Extensions that a valid Wemi build script file have.
  * Without leading dot.
  */
-val WemiBuildFileExtensions = listOf("wemi", "wemi.kt")
+val WemiBuildFileExtensions = listOf("wemi", "kt")
 
 /**
  * Build file is a file with [WemiBuildFileExtensions], in [buildFolder].

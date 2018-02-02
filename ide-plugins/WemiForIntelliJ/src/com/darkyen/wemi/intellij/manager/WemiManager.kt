@@ -1,9 +1,11 @@
 package com.darkyen.wemi.intellij.manager
 
+import com.darkyen.wemi.intellij.WemiBuildFileExtensions
 import com.darkyen.wemi.intellij.WemiLauncherFileName
 import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.external.WemiProjectResolver
 import com.darkyen.wemi.intellij.external.WemiTaskManager
+import com.darkyen.wemi.intellij.file.pathHasExtension
 import com.darkyen.wemi.intellij.findWemiLauncher
 import com.darkyen.wemi.intellij.settings.*
 import com.esotericsoftware.jsonbeans.JsonReader
@@ -159,7 +161,7 @@ class WemiManager : ExternalSystemUiAware,
      * @param changedFileOrDirPath path to the changed file, sometimes relative, sometimes absolute
      */
     override fun getAffectedExternalProjectPath(changedFileOrDirPath: String, project: Project): String? {
-        if (changedFileOrDirPath.endsWith(".wemi", ignoreCase = true)) {
+        if (changedFileOrDirPath.pathHasExtension(WemiBuildFileExtensions)) {
             val start = changedFileOrDirPath.lastIndexOf('/')
             // Ignore hidden files
             if (start != -1 && start + 1 != changedFileOrDirPath.length

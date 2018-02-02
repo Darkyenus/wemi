@@ -1,17 +1,13 @@
 package com.darkyen.wemi.intellij.manager
 
+import com.darkyen.wemi.intellij.WemiLauncherFileName
 import com.darkyen.wemi.intellij.WemiProjectSystemId
-import com.intellij.ide.impl.ProjectUtil
+import com.darkyen.wemi.intellij.file.isWemiScriptSource
 import com.intellij.openapi.externalSystem.model.ProjectSystemId
 import com.intellij.openapi.externalSystem.service.settings.ExternalSystemConfigLocator
 import com.intellij.openapi.externalSystem.settings.ExternalProjectSettings
-import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
-import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
-import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.openapi.vfs.VirtualFileSystem
-import java.io.File
 
 /**
  * Specifies which files are taken into consideration when configuring a Wemi project.
@@ -19,11 +15,6 @@ import java.io.File
 class WemiConfigLocator : ExternalSystemConfigLocator {
 
     override fun getTargetExternalSystemId(): ProjectSystemId = WemiProjectSystemId
-
-    private fun VirtualFile.isWemiScriptFile():Boolean {
-        val name = this.name
-        return !name.startsWith(".") && name.endsWith(".wemi", ignoreCase = true)
-    }
 
     override fun findAll(externalProjectSettings: ExternalProjectSettings): MutableList<VirtualFile> {
         val result = mutableListOf<VirtualFile>()
@@ -39,7 +30,7 @@ class WemiConfigLocator : ExternalSystemConfigLocator {
 
         val build = projectRoot.findChild("build") ?: return result
         for (child in build.children) {
-            if (child.isWemiScriptFile()) {
+            if (child.isWemiScriptSource()) {
                 result.add(child)
             }
         }
@@ -51,11 +42,11 @@ class WemiConfigLocator : ExternalSystemConfigLocator {
         val build = configPath.findChild("build")
         if (build != null) {
             for (child in build.children) {
-                if (child.isWemiScriptFile()) {
+                if (child.isWemiScriptSource()) {
                     return child
                 }
             }
         }
-        return configPath.findChild("wemi")
+        return configPath.findChild(WemiLauncherFileName)
     }
 }

@@ -15,7 +15,7 @@ Project backed by Wemi will usually have following directory structure:
 /src/main/kotlin/
 /src/main/resources/
 /src/test/java/         <- Production/Test Java/Kotlin sources (Maven convention)
-/build/build.wemi       <- Build script file (All files named *.wemi in this folder will be used)
+/build/build.wemi       <- Build script file (All files named *.wemi or *.kt in this folder will be used)
 /build/logs/            <- Folder with logs of Wemi runs
 /build/cache/           <- Folder with internal Wemi cache and compiled classes of source files
 /build/artifacts/       <- Folder with assembled artifacts, such as fat-jars, or anything else that you wish to produce
@@ -30,7 +30,7 @@ By default, Wemi is configured to use `test` and `main` build type and looks for
 Resources are looked for in `resources`-kind folder.
 
 The `build` folder is where all Wemi-related things are stored. Build script files, that is any files directly under
-`build/` with `.wemi` extension (and not beginning with a `.`), are automatically detected as such and compiled together.
+`build/` with `.wemi` or `.kt` extension (and not beginning with a `.`), are automatically detected as such and compiled together.
 Compiled scripts are kept, along with other internal cache items in the `cache` directory. This is also where Wemi
 stores what compilers produce for the main sources, as configured by the `outputClassesDirectory` key.
 When the Wemi is run, all of its output is kept in the `logs` directory (this is usually, but not always, very similar
@@ -262,7 +262,7 @@ querying deeper scope. To do that, use method `modify` - the previous value will
 
 ## Build script
 All of the build definitions are inside a build script. Build script is a file, typically in a root directory of a project,
-with `.wemi` or `.wemi.kt` (discouraged) extension. The conventional name is `build.wemi`, but that is not enforced.
+with `.wemi` or `.kt` extension. The usual name is `build.wemi`.
 Build script is written entirely in [Kotlin](http://kotlinlang.org) and is also compiled as such,
 no pre-processing is done to modify its text. Anything that is a valid Kotlin is allowed.
 

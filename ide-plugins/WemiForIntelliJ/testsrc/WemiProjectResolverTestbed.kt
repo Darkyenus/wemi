@@ -1,5 +1,6 @@
 @file:Suppress("ConstantConditionIf")
 
+import com.darkyen.wemi.intellij.WemiLauncherFileName
 import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.external.WemiProjectResolver
 import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
@@ -23,10 +24,10 @@ fun main(args: Array<String>) {
 
     val settings: WemiExecutionSettings
     if (DEBUG_WEMI_LAUNCHER) {
-        settings = WemiExecutionSettings(File(projectRoot, "wemi").absolutePath, "/usr/bin/java", true, true, "", null)
+        settings = WemiExecutionSettings(File(projectRoot, WemiLauncherFileName).absolutePath, "/usr/bin/java", true, true, "", null)
         settings.withVmOption("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005")
     } else {
-        settings = WemiExecutionSettings(File(projectRoot, "wemi").absolutePath, "java", true, true, "", null)
+        settings = WemiExecutionSettings(File(projectRoot, WemiLauncherFileName).absolutePath, "java", true, true, "", null)
     }
 
     val externalSystemTaskNotificationListener = object : ExternalSystemTaskNotificationListener {

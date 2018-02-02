@@ -138,7 +138,7 @@ class KeyDelegate<Value> internal constructor(
         synchronized(BuildScriptData.AllKeys) {
             val existing = BuildScriptData.AllKeys[this.key.name]
             if (existing != null) {
-                throw WemiException("wemi.Key ${key.name} already exists (desc: '${existing.description}')")
+                throw WemiException("Key ${key.name} already exists (desc: '${existing.description}')")
             }
             BuildScriptData.AllKeys.put(key.name, key as Key<Any>)
         }
@@ -173,7 +173,7 @@ fun createConfiguration(name:String, description: String, parent: Configuration?
     synchronized(BuildScriptData.AllConfigurations) {
         val existing = BuildScriptData.AllConfigurations[configuration.name]
         if (existing != null) {
-            throw WemiException("wemi.Configuration ${configuration.name} already exists (desc: '${existing.description}')")
+            throw WemiException("Configuration ${configuration.name} already exists (desc: '${existing.description}')")
         }
 
         BuildScriptData.AllConfigurations.put(configuration.name, configuration)

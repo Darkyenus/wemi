@@ -10,7 +10,7 @@ import com.intellij.openapi.project.Project
 import java.io.*
 import java.util.concurrent.TimeUnit
 
-val WemiBuildFileExtensions = arrayOf("wemi")
+val WemiBuildFileExtensions = listOf("wemi", "kt")
 
 val WemiProjectSystemId = ProjectSystemId("WEMI", "Wemi")
 

@@ -15,7 +15,7 @@ import com.intellij.openapi.util.registry.Registry
 class WemiApplicationComponent : ApplicationComponent {
 
     override fun initComponent() {
-        FileTypeManager.getInstance().associate(WemiLauncherFileType, ExactFileNameMatcher("wemi", false))
+        FileTypeManager.getInstance().associate(WemiLauncherFileType, ExactFileNameMatcher(WemiLauncherFileName, false))
 
         // Do not launch our WemiProjectResolver and WemiTaskManager in external process,
         // because it just adds delays and is messy
