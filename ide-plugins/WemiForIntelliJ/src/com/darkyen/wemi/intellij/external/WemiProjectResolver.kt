@@ -2,6 +2,8 @@ package com.darkyen.wemi.intellij.external
 
 import com.darkyen.wemi.intellij.WemiLauncherSession
 import com.darkyen.wemi.intellij.WemiProjectSystemId
+import com.darkyen.wemi.intellij.importing.KotlinCompilerSettingsData
+import com.darkyen.wemi.intellij.importing.WEMI_KOTLIN_COMPILER_SETTINGS_KEY
 import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
 import com.darkyen.wemi.intellij.util.digestToHexString
 import com.darkyen.wemi.intellij.util.update
@@ -81,7 +83,6 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Loading Wemi build scripts"))
             val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
             LOG.info("Wemi version is "+wemiVersion)
-            //TODO Version check, disallow too old versions
 
             return resolveProjectInfo(id, session, projectPath, settings, listener, wemiVersion)
         } catch (se:WemiSessionException) {
@@ -127,49 +128,58 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
         val defaultProject = projects[session.string(null, task = "#defaultProject", includeUserConfigurations = false)]!!
 
-        val projectDataNode = DataNode(ProjectKeys.PROJECT, ProjectData(WemiProjectSystemId, defaultProject.name, projectPath, projectPath), null)
+        val projectDataNode = DataNode(ProjectKeys.PROJECT, ProjectData(WemiProjectSystemId, defaultProject.projectName, projectPath, projectPath), null)
+        // Java data
         projectDataNode.createChild(JavaProjectData.KEY, defaultProject.javaProjectData())
+        // Kotlin data
+        val kotlinCompilerData = HashMap<String, String>()
+        session.jsonArray(defaultProject.projectName, task = "compilerOptions", configurations = *arrayOf("compilingKotlin")).forEach {
+            val key = it.getString("key")
+            val value = it.getString("value")
+            kotlinCompilerData[key] = value
+        }
+        projectDataNode.createChild(WEMI_KOTLIN_COMPILER_SETTINGS_KEY, KotlinCompilerSettingsData(kotlinCompilerData))
 
         val projectModules = mutableMapOf<String, DataNode<ModuleData>>()
 
         val libraryBank = WemiLibraryDependencyBank()
 
         for (project in projects.values) {
-            listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving project "+project.name))
+            listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving project "+project.projectName))
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, project.moduleData(projectPath))
             moduleNode.createChild(ProjectKeys.CONTENT_ROOT, project.contentRoot())
-            projectModules[project.name] = moduleNode
+            projectModules[project.projectName] = moduleNode
 
             // Collect dependencies
-            val compileDependencies = createWemiProjectCombinedDependencies(session, project.name, "compiling", settings.downloadDocs, settings.downloadSources)
-            val runtimeDependencies = createWemiProjectCombinedDependencies(session, project.name, "running", settings.downloadDocs, settings.downloadSources)
-            val testDependencies = createWemiProjectCombinedDependencies(session, project.name, "testing", settings.downloadDocs, settings.downloadSources)
+            val compileDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "compiling", settings.downloadDocs, settings.downloadSources)
+            val runtimeDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "running", settings.downloadDocs, settings.downloadSources)
+            val testDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "testing", settings.downloadDocs, settings.downloadSources)
 
             for ((hash, dep) in compileDependencies) {
                 val inRuntime = runtimeDependencies.remove(hash) != null
                 val inTest = testDependencies.remove(hash) != null
 
-                libraryBank.projectUsesLibrary(project.name, dep, true, inRuntime, inTest)
+                libraryBank.projectUsesLibrary(project.projectName, dep, true, inRuntime, inTest)
             }
 
             for ((hash, dep) in runtimeDependencies) {
                 val inTest = testDependencies.remove(hash) != null
-                libraryBank.projectUsesLibrary(project.name, dep, false, true, inTest)
+                libraryBank.projectUsesLibrary(project.projectName, dep, false, true, inTest)
             }
 
             for ((_, dep) in testDependencies) {
-                libraryBank.projectUsesLibrary(project.name, dep, false, false, true)
+                libraryBank.projectUsesLibrary(project.projectName, dep, false, false, true)
             }
         }
 
         // Inter-project dependencies
         for (project in projects.values) {
             // We currently only process projects and ignore configurations because there is no way to map that
-            val compiling = session.task(project.name, "compiling", task = "projectDependencies")
+            val compiling = session.task(project.projectName, "compiling", task = "projectDependencies")
                     .data(JsonValue.ValueType.array).map { it.getString("project") }
-            val running = session.task(project.name, "running", task = "projectDependencies")
+            val running = session.task(project.projectName, "running", task = "projectDependencies")
                     .data(JsonValue.ValueType.array).map { it.getString("project") }
-            val testing = session.task(project.name, "testing", task = "projectDependencies")
+            val testing = session.task(project.projectName, "testing", task = "projectDependencies")
                     .data(JsonValue.ValueType.array).map { it.getString("project") }
 
             val all = LinkedHashSet<String>(compiling)
@@ -178,7 +188,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
             var order = 0
             for (depProjectName in all) {
-                if (depProjectName == project.name) {
+                if (depProjectName == project.projectName) {
                     continue
                 }
                 val inCompiling = compiling.contains(depProjectName)
@@ -186,7 +196,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 val inTesting = testing.contains(depProjectName)
 
                 val scope = toDependencyScope(inCompiling, inRunning, inTesting, depProjectName)
-                val myModule = projectModules[project.name]!!
+                val myModule = projectModules[project.projectName]!!
                 val moduleDependencyData = ModuleDependencyData(
                         myModule.data,
                         projectModules[depProjectName]!!.data
@@ -473,7 +483,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
     }
 
     private class WemiProjectData(
-            val name:String,
+            val projectName:String,
             val artifactName:String,
             val artifactGroup:String?,
             val artifactVersion:String?,
@@ -495,7 +505,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
 
         fun moduleData(projectPath: String):ModuleData {
-            val data = ModuleData(name, WemiProjectSystemId, StdModuleTypes.JAVA.id, name, rootPath, projectPath)
+            val data = ModuleData(projectName, WemiProjectSystemId, StdModuleTypes.JAVA.id, projectName, rootPath, projectPath)
             data.isInheritProjectCompileOutputPath = false
             data.setCompileOutputPath(ExternalSystemSourceType.SOURCE, classOutput)
             data.setCompileOutputPath(ExternalSystemSourceType.TEST, classOutputTesting)

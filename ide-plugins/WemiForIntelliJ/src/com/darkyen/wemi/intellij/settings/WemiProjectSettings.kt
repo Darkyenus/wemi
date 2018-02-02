@@ -12,8 +12,6 @@ class WemiProjectSettings(var downloadDocs: Boolean = true,
                           var downloadSources: Boolean = true,
                           var prefixConfigurations: String = "") : ExternalProjectSettings() {
 
-
-
     override fun clone(): WemiProjectSettings {
         val clone = WemiProjectSettings()
         copyTo(clone)

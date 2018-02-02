@@ -66,6 +66,7 @@
         <postStartupActivity implementation="com.darkyen.wemi.intellij.importing.OfferImportStartupActivity"/>
         <projectImportProvider implementation="com.darkyen.wemi.intellij.importing.WemiProjectImportProvider"/>
         <projectImportBuilder implementation="com.darkyen.wemi.intellij.importing.ImportFromWemiControlBuilder"/>
+        <externalProjectDataService implementation="com.darkyen.wemi.intellij.importing.KotlinCompilerSettingsDataService"/>
 
         <!-- Settings -->
         <projectService serviceImplementation="com.darkyen.wemi.intellij.settings.WemiSystemSettings"/>

@@ -2,8 +2,6 @@
 
 1. Rewrite WemiProjectResolutionListener
 
-1. Synchronize Kotlin compiler settings Wemi -> IDEA
-
 1. Maven repository locking
 
 1. Maven parallel repository resolution

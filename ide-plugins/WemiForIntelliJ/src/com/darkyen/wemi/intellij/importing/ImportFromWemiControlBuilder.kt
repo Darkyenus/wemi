@@ -10,8 +10,6 @@ import com.intellij.openapi.externalSystem.service.project.wizard.AbstractExtern
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.*
-import com.intellij.openapi.roots.LanguageLevelProjectExtension
-import com.intellij.openapi.roots.ProjectRootManager
 import icons.WemiIcons
 import java.io.File
 
@@ -28,28 +26,25 @@ class ImportFromWemiControlBuilder
     /**
      * Called before "Import module from Wemi" wizard window is shown
      */
-    override fun doPrepare(context: WizardContext) {
-
-    }
+    override fun doPrepare(context: WizardContext) {}
 
     /**
-     * Called after the (preview?) sync is done and project will be updated with data from [com.darkyen.wemi.intellij.external.WemiProjectResolver]
+     * Called after the preview sync was done and project will be refreshed in non-preview mode
      *
-     * @param dataNode from project resolver
+     * @param dataNode from project resolver in preview mode
      * @param project that is being created
      */
     override fun beforeCommit(dataNode: DataNode<ProjectData>, project: Project) {
-        // Setup language level to what is reported by the resolved data
-        val javaProjectData = ExternalSystemApiUtil.find(dataNode, JavaProjectData.KEY)?.data ?: return
-        val languageLevelExtension = LanguageLevelProjectExtension.getInstance(project)
-        languageLevelExtension.languageLevel = javaProjectData.languageLevel
-
-        val projectRootManager = ProjectRootManager.getInstance(project)
-        ExternalSystemApiUtil.doWriteAction {
-            projectRootManager.projectSdk = findJdk(javaProjectData.jdkVersion)
-        }
+        // See com.darkyen.wemi.intellij.external.Extra -> createFinalImportCallback
     }
 
+    /**
+     * Applies external system-specific settings like project files location etc to the given context.
+     *
+     * Called after preview refresh.
+     *
+     * @param context  storage for the project/module settings.
+     */
     override fun applyExtraSettings(context: WizardContext) {
         val node = externalProjectNode ?: return
 
