@@ -14,7 +14,7 @@ object WemiLauncherFileType : FileType {
         return ""
     }
 
-    override fun getIcon(): Icon? = WemiIcons.WEMI
+    override fun getIcon(): Icon? = WemiIcons.LAUNCHER
 
     override fun getCharset(file: VirtualFile, content: ByteArray): String? {
         return null

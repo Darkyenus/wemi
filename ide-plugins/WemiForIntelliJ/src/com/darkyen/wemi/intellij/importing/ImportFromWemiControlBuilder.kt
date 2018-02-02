@@ -21,7 +21,7 @@ import java.io.File
 class ImportFromWemiControlBuilder
     : AbstractExternalProjectImportBuilder<ImportFromWemiControl>(ProjectDataManager.getInstance(), ImportFromWemiControl(), WemiProjectSystemId) {
 
-    override fun getIcon() = WemiIcons.WEMI
+    override fun getIcon() = WemiIcons.ACTION
 
     override fun getName() = "Wemi"
 

@@ -18,7 +18,7 @@ import org.jetbrains.kotlin.idea.refactoring.psiElement
  */
 class ReloadProjectAction : AnAction("Reload Wemi Project",
         "Re-import Wemi project in the project's root into the IDE",
-        WemiIcons.WEMI) {
+        WemiIcons.ACTION) {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project

@@ -16,7 +16,8 @@ import java.io.File
  *
  * This is usually the first point at which user meets this plugin.
  */
-class ImportProjectAction : AnAction("Import Wemi Project", "Import an unlinked Wemi project in the project's root into the IDE", WemiIcons.WEMI) {
+class ImportProjectAction : AnAction("Import Wemi Project",
+        "Import an unlinked Wemi project in the project's root into the IDE", WemiIcons.ACTION) {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project

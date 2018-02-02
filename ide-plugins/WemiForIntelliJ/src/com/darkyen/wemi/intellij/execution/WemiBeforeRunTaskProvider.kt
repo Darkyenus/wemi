@@ -23,7 +23,7 @@ import javax.swing.JComponent
 class WemiBeforeRunTaskProvider(private val project: Project) : ExternalSystemBeforeRunTaskProvider(WemiProjectSystemId, project, ID) {
 
     /** Icon used in the "Before launch" window in "Run/Debug Configurations" */
-    override fun getIcon() = WemiIcons.WEMI
+    override fun getIcon() = WemiIcons.ACTION
 
     /**
      * NOTE: We allow to create BeforeRunTask even for Wemi configurations. This is intentional, user might want to

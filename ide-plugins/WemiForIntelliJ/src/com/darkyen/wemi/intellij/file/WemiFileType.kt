@@ -12,7 +12,7 @@ import javax.swing.Icon
 object WemiFileType : LanguageFileType(KotlinLanguage.INSTANCE) {
 
     override fun getIcon(): Icon? {
-        return WemiIcons.WEMI
+        return WemiIcons.SCRIPT
     }
 
     override fun getName(): String {

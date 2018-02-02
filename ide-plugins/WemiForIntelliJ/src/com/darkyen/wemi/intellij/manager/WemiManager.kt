@@ -197,9 +197,9 @@ class WemiManager : ExternalSystemUiAware,
                 .withShowHiddenFiles(false)
     }
 
-    override fun getProjectIcon() = WemiIcons.WEMI
+    override fun getProjectIcon() = WemiIcons.ACTION
 
-    override fun getTaskIcon() = WemiIcons.WEMI
+    override fun getTaskIcon() = WemiIcons.ACTION
 
     //endregion
 }

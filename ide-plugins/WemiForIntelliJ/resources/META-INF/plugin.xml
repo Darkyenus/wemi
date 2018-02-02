@@ -41,7 +41,7 @@
                 class="com.darkyen.wemi.intellij.importing.ImportProjectAction"
                 text="Import Wemi Project"
                 description="Import an unlinked Wemi project in the project's root into the IDE"
-                icon="WemiIcons.WEMI">
+                icon="WemiIcons.ACTION">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
 
@@ -49,7 +49,7 @@
                 class="com.darkyen.wemi.intellij.importing.ReloadProjectAction"
                 text="Reload Wemi Project"
                 description="Re-import Wemi project in the project's root into the IDE"
-                icon="WemiIcons.WEMI">
+                icon="WemiIcons.ACTION">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <add-to-group group-id="ProjectViewPopupMenuRunGroup" anchor="last"/>
         </action>
