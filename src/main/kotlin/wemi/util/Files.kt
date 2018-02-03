@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package wemi.util
 
 import org.slf4j.Logger
@@ -6,10 +8,14 @@ import java.io.IOException
 import java.io.OutputStreamWriter
 import java.net.URL
 import java.net.URLDecoder
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import java.nio.file.attribute.PosixFilePermission
+import java.util.*
+import java.util.concurrent.Semaphore
 
 /**
  * Creates an URL with given path appended.
@@ -72,7 +78,7 @@ fun URL.toPath(): Path? {
 /** Append given path to the file. It is safe to use '/' slashes for directories
  * (this is preferred to chaining [div] calls). Do not use '\' backslash. */
 @Suppress("NOTHING_TO_INLINE")
-operator inline fun Path.div(path: String): Path = this.resolve(path)
+inline operator fun Path.div(path: String): Path = this.resolve(path)
 
 /** @see [Files.isDirectory] */
 @Suppress("NOTHING_TO_INLINE")
@@ -216,6 +222,15 @@ var Path.executable: Boolean
     }
 
 /**
+ * @return [BasicFileAttributes.fileKey] for this path, or null if not possible
+ */
+fun Path.fileKey(): Any? = try {
+    Files.readAttributes(this, BasicFileAttributes::class.java).fileKey()
+} catch (ignored: Exception) {
+    null
+}
+
+/**
  * Write given text into this path.
  *
  * File will be overwritten.
@@ -295,5 +310,125 @@ fun Path.ensureEmptyDirectory() {
         }
     } else {
         throw IOException("$this can't be made into directory")
+    }
+}
+
+private val FILE_SYNCHRONIZED_OPEN_OPTIONS = setOf<OpenOption>(
+        StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
+private val LOCKED_PATHS = WeakHashMap<Path, Semaphore>()
+
+/**
+ * Works like [synchronized], but the synchronization is done on a [directory] and is coordinated with other processes
+ * as well.
+ */
+fun <Result> directorySynchronized(directory: Path, action:() -> Result):Result {
+    // Implementation of this is not trivial as all OSes have own quirks and differences
+
+    val lockedPath = directory.toRealPath()
+
+    if (!Files.isDirectory(lockedPath)) {
+        throw IllegalArgumentException("$lockedPath is not a directory")
+    }
+
+    // Semaphore for path locking for this process
+    val semaphore =
+            synchronized(LOCKED_PATHS) {
+                LOCKED_PATHS.getOrPut(lockedPath) { Semaphore(1) }
+            }
+
+    val lockPath = lockedPath.resolve(".wemi-lock")
+
+    // Coordinate with other threads
+    semaphore.acquire()
+    try {
+        // Coordinate with other processes
+
+        // Create FileChannel and lock it
+        var channel:FileChannel
+        while (true) {
+
+            // Construct FileChannel
+            var creationAttempt = 0
+            while (true) {// Thanks Lucy for helping with this
+                try {
+                    // Windows sometimes crashes here, but it usually fixes itself in <10 attempts
+                    channel = FileChannel.open(lockPath, FILE_SYNCHRONIZED_OPEN_OPTIONS)
+                    break
+                } catch (e:IOException) {
+                    when {
+                        creationAttempt < 10 -> Thread.yield()
+                        creationAttempt < 1000 -> Thread.sleep(1)
+                        else -> throw e
+                    }
+                    creationAttempt++
+                }
+            }
+
+            // Remember the fileKey before the lock is acquired
+            val preLockKey = lockPath.fileKey()
+            // Lock, this may take some time
+            channel.lock()
+
+            // Check, that channel points to the actual file in the filesystem, visible to other processes
+            // It may happen, that it points to removed inode
+            if (Files.exists(lockPath) && preLockKey == lockPath.fileKey()) {
+                if (preLockKey != null) {
+                    // If file keys are supported on this filesystem, we can be pretty sure that the file is correct.
+                    break
+                    // On Windows (for example) we have to continue
+                }
+
+                // Again check that we already have this file locked by resizing it to random size and observing if
+                // the file in the filesystem behaves accordingly
+                val expectedSize = 1L + Random().nextInt(1_000)
+                channel.position(expectedSize-1L)
+                channel.write(ByteBuffer.allocate(1))
+                channel.force(false) // Flush changes
+                val filesystemSize = Files.size(lockPath)
+                channel.truncate(0) // Reset the size
+
+                if (filesystemSize == expectedSize) {
+                    // File passed the check, we have the file locked!
+                    // Break the loop and use this channel
+                    break
+                }
+            }
+
+            // Close the channel and try again
+            try {
+                channel.close()
+            } catch (ignored:IOException) {}
+        }
+
+        // Do the action
+        try {
+            return action()
+        } finally {
+            // Cleanup the lock
+            // OS may allow us to delete the file while it is still open, which would be great
+            var deleted = false
+            try {
+                Files.delete(lockPath)
+                deleted = true
+            } catch (ignored:IOException) {}
+
+            // Close the channel, releasing the lock
+            try {
+                channel.close()
+            } catch (ignored:IOException) {}
+
+            if (!deleted) {
+                // We now need to delete the lock file. Different process may have already locked on it,
+                // so it may fail, which we don't care about, if it is still visible to others
+                try {
+                    Files.delete(lockPath)
+                } catch (ignored:IOException) { }
+            }
+        }
+    } finally {
+        // Allow other threads to work with this directory
+        semaphore.release()
+
+        //TODO LOCKED_PATHS may leak memory here
     }
 }
