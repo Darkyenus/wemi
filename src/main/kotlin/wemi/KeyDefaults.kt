@@ -33,9 +33,9 @@ import kotlin.collections.LinkedHashSet
  */
 object KeyDefaults {
 
-    val SourceRootsJavaKotlin: BoundKeyValue<Collection<Path>> = {
+    val SourceRootsJavaKotlin: BoundKeyValue<WSet<Path>> = {
         val bases = Keys.sourceBases.get()
-        val roots = ArrayList<Path>()
+        val roots = WMutableSet<Path>()
         for (base in bases) {
             roots.add(base / "kotlin")
             roots.add(base / "java")
@@ -43,19 +43,19 @@ object KeyDefaults {
         roots
     }
 
-    val ResourceRoots: BoundKeyValue<Collection<Path>> = {
+    val ResourceRoots: BoundKeyValue<WSet<Path>> = {
         val bases = Keys.sourceBases.get()
-        val roots = ArrayList<Path>()
+        val roots = WMutableSet<Path>()
         for (base in bases) {
             roots.add(base / "resources")
         }
         roots
     }
 
-    val SourceFiles: BoundKeyValue<Collection<LocatedFile>> = {
+    val SourceFiles: BoundKeyValue<WList<LocatedFile>> = {
         val roots = Keys.sourceRoots.get()
         val extensions = Keys.sourceExtensions.get()
-        val result = ArrayList<LocatedFile>()
+        val result = WMutableList<LocatedFile>()
 
         for (root in roots) {
             constructLocatedFiles(root, result) { it.name.pathHasExtension(extensions) }
@@ -64,9 +64,9 @@ object KeyDefaults {
         result
     }
 
-    val ResourceFiles: BoundKeyValue<Collection<LocatedFile>> = {
+    val ResourceFiles: BoundKeyValue<WList<LocatedFile>> = {
         val roots = Keys.resourceRoots.get()
-        val result = ArrayList<LocatedFile>()
+        val result = WMutableList<LocatedFile>()
 
         for (root in roots) {
             constructLocatedFiles(root, result)
@@ -84,8 +84,8 @@ object KeyDefaults {
 
     private val ExternalClasspath_LOG = LoggerFactory.getLogger("ProjectDependencyResolution")
     private val ExternalClasspath_CircularDependencyProtection = CycleChecker<Scope>()
-    val ExternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
-        val result = ArrayList<LocatedFile>()
+    val ExternalClasspath: BoundKeyValue<WList<LocatedFile>> = {
+        val result = WMutableList<LocatedFile>()
 
         val resolved = Keys.resolvedLibraryDependencies.get()
         if (!resolved.complete) {
@@ -117,11 +117,11 @@ object KeyDefaults {
         result
     }
 
-    val InternalClasspath: BoundKeyValue<Collection<LocatedFile>> = {
+    val InternalClasspath: BoundKeyValue<WList<LocatedFile>> = {
         val compiled = Keys.compile.get()
         val resources = Keys.resourceFiles.get()
 
-        val classpath = ArrayList<LocatedFile>(resources.size + 128)
+        val classpath = WMutableList<LocatedFile>(resources.size + 128)
         constructLocatedFiles(compiled, classpath)
         classpath.addAll(resources)
 
@@ -343,8 +343,8 @@ object KeyDefaults {
         }
     }
 
-    val RunOptions: BoundKeyValue<Collection<String>> = {
-        val options = mutableListOf<String>()
+    val RunOptions: BoundKeyValue<WList<String>> = {
+        val options = WMutableList<String>()
         options.add("-ea")
         val debugPort = System.getenv("WEMI_RUN_DEBUG_PORT")?.toIntOrNull()
         if (debugPort != null) {

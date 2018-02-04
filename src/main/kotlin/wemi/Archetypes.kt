@@ -9,7 +9,7 @@ import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
 import wemi.dependency.createRepositoryChain
 import wemi.run.javaExecutable
-import wemi.util.div
+import wemi.util.*
 import javax.tools.ToolProvider
 
 /**
@@ -36,7 +36,7 @@ object Archetypes {
         Keys.input set { InputBase(WemiRunningInInteractiveMode) }
 
         Keys.buildDirectory set { Keys.projectRoot.get() / "build" }
-        Keys.sourceBases set { listOf(Keys.projectRoot.get() / "src/main") }
+        Keys.sourceBases set { wMutableSetOf(Keys.projectRoot.get() / "src/main") }
         Keys.sourceFiles set KeyDefaults.SourceFiles
         Keys.resourceRoots set KeyDefaults.ResourceRoots
         Keys.resourceFiles set KeyDefaults.ResourceFiles
@@ -95,14 +95,14 @@ object Archetypes {
      * Archetype for projects that serve only as an aggregation of dependencies and do not have any own sources.
      */
     val DependenciesOnly by archetype(::_JVMBase_) {
-        Keys.internalClasspath set { emptyList() }
+        Keys.internalClasspath set { wEmptyList() }
 
-        Keys.sourceBases set { emptyList() }
-        Keys.sourceFiles set { emptyList() }
-        Keys.sourceRoots set { emptyList() }
+        Keys.sourceBases set { wEmptySet() }
+        Keys.sourceFiles set { wEmptyList() }
+        Keys.sourceRoots set { wEmptySet() }
 
-        Keys.resourceRoots set { emptyList() }
-        Keys.resourceFiles set { emptyList() }
+        Keys.resourceRoots set { wEmptySet() }
+        Keys.resourceFiles set { wEmptyList() }
     }
 
     /**

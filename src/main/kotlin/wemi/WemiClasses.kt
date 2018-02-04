@@ -8,10 +8,7 @@ import org.slf4j.LoggerFactory
 import wemi.boot.MachineWritable
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
-import wemi.util.Color
-import wemi.util.Format
-import wemi.util.WithDescriptiveString
-import wemi.util.format
+import wemi.util.*
 import java.nio.file.Path
 
 /** 
@@ -830,10 +827,12 @@ sealed class BindingHolder {
      *
      * @see modify
      */
-    inline infix fun <Value> Key<Collection<Value>>.add(crossinline additionalValue: BoundKeyValue<Value>) {
-        this.modify { collection: Collection<Value> ->
-            //TODO Optimize?
-            collection + additionalValue()
+    inline infix fun <Value, Collection : WCollection<Value>> Key<Collection>.add(crossinline additionalValue: BoundKeyValue<Value>) {
+        this.modify { collection ->
+            val mutable = collection.toMutable()
+            mutable.add(additionalValue())
+            @Suppress("UNCHECKED_CAST")
+            mutable as Collection
         }
     }
 
@@ -842,21 +841,28 @@ sealed class BindingHolder {
      *
      * @see modify
      */
-    inline infix fun <Value> Key<Collection<Value>>.addAll(crossinline additionalValues: BoundKeyValue<Iterable<Value>>) {
-        this.modify { collection: Collection<Value> ->
-            //TODO Optimize?
-            collection + additionalValues()
+    inline infix fun <Value, Collection : WCollection<Value>> Key<Collection>.addAll(crossinline additionalValues: BoundKeyValue<Iterable<Value>>) {
+        this.modify { collection ->
+            val mutable = collection.toMutable()
+            mutable.addAll(additionalValues())
+            @Suppress("UNCHECKED_CAST")
+            mutable as Collection
         }
     }
 
     /**
      * Add a modifier that will remove the result of [valueToRemove] from the resulting collection.
      *
+     * Defined on [WSet] only, because operating on [WList] may have undesired effect of removing
+     * only one occurrence of [valueToRemove].
+     *
      * @see modify
      */
-    inline infix fun <Value> Key<Collection<Value>>.remove(crossinline valueToRemove: BoundKeyValue<Value>) {
-        this.modify { collection: Collection<Value> ->
-            collection - valueToRemove()
+    inline infix fun <Value> Key<WSet<Value>>.remove(crossinline valueToRemove: BoundKeyValue<Value>) {
+        this.modify { collection: WSet<Value> ->
+            val mutable = collection.toMutable()
+            mutable.remove(valueToRemove())
+            mutable
         }
     }
 
@@ -865,9 +871,12 @@ sealed class BindingHolder {
      *
      * @see modify
      */
-    inline infix fun <Value> Key<Collection<Value>>.removeAll(crossinline valuesToRemove: BoundKeyValue<Iterable<Value>>) {
-        this.modify { collection: Collection<Value> ->
-            collection - valuesToRemove()
+    inline infix fun <Value, Collection : WCollection<Value>> Key<Collection>.removeAll(crossinline valuesToRemove: BoundKeyValue<Iterable<Value>>) {
+        this.modify { collection: WCollection<Value> ->
+            val mutable = collection.toMutable()
+            mutable.removeAll(valuesToRemove())
+            @Suppress("UNCHECKED_CAST")
+            mutable as Collection
         }
     }
     //endregion

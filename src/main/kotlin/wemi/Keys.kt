@@ -10,8 +10,7 @@ import wemi.dependency.*
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.prettyPrint
-import wemi.util.LocatedFile
-import wemi.util.Partial
+import wemi.util.*
 import java.nio.file.Path
 import javax.tools.JavaCompiler
 
@@ -33,25 +32,25 @@ object Keys {
 
     val input by key<Input>("Provides access to user input, that can be programmatically pre-set")
 
-    val sourceBases by key<Collection<Path>>("Directory in which all source directories can be found (example: '/src/main')")
-    val sourceRoots by key<Collection<Path>>("Directories which are source roots for the project (example: '/src/main/java')")
-    val sourceExtensions by key<Collection<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)")
-    val sourceFiles by key<Collection<LocatedFile>>("Files to be compiled. Usually derived from sourceRoots and sourceFilter. Maps source root -> source files")
-    val resourceRoots by key<Collection<Path>>("Directories which are resource roots for the project (example: '/src/main/resources')")
-    val resourceFiles by key<Collection<LocatedFile>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files")
+    val sourceBases by key<WSet<Path>>("Directory in which all source directories can be found (example: '/src/main')", defaultValue = wEmptySet())
+    val sourceRoots by key<WSet<Path>>("Directories which are source roots for the project (example: '/src/main/java')", defaultValue = wEmptySet())
+    val sourceExtensions by key<WSet<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)", defaultValue = wEmptySet())
+    val sourceFiles by key<WList<LocatedFile>>("Files to be compiled. Usually derived from sourceRoots and sourceFilter. Maps source root -> source files", defaultValue = wEmptyList())
+    val resourceRoots by key<WSet<Path>>("Directories which are resource roots for the project (example: '/src/main/resources')", defaultValue = wEmptySet())
+    val resourceFiles by key<WList<LocatedFile>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files", defaultValue = wEmptyList())
 
-    val repositories by key<Collection<Repository>>("Repositories to be used when resolving dependencies")
+    val repositories by key<WSet<Repository>>("Repositories to be used when resolving dependencies", defaultValue = wEmptySet())
     val repositoryChain by key<RepositoryChain>("ADVANCED - Resolved repository chain from 'repositories'")
-    val libraryDependencies by key<Collection<Dependency>>("Libraries that the project depends on", defaultValue = emptyList())
+    val libraryDependencies by key<WSet<Dependency>>("Libraries that the project depends on", defaultValue = wEmptySet())
     val libraryDependencyProjectMapper by key<(Dependency) -> Dependency>("Function applied to ProjectDependencies encountered while resolving. Used for example when retrieving sources.", defaultValue = { it })
     val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved ->
         resolved.value.prettyPrint(null)
     }, cacheMode = CACHE_ALWAYS)
-    val unmanagedDependencies by key<Collection<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = emptyList())
-    val projectDependencies by key<Collection<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = emptyList())
+    val unmanagedDependencies by key<WList<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = wEmptyList())
+    val projectDependencies by key<WSet<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = wEmptySet())
 
-    val externalClasspath by key<Collection<LocatedFile>>("Classpath of the project, elements from external sources, i.e. library and project dependencies")
-    val internalClasspath by key<Collection<LocatedFile>>("Classpath of the project, created internally, i.e. compiled sources and resources")
+    val externalClasspath by key<WList<LocatedFile>>("Classpath of the project, elements from external sources, i.e. library and project dependencies", defaultValue = wEmptyList())
+    val internalClasspath by key<WList<LocatedFile>>("Classpath of the project, created internally, i.e. compiled sources and resources", defaultValue = wEmptyList())
 
     val clean by key<Int>("Clean compile directories and internal cache, returns approximate amount of items cleaned", cacheMode = null)
 
@@ -68,8 +67,8 @@ object Keys {
 
     val mainClass by key<String>("Main class of the project")
     val runDirectory by key<Path>("Initial working directory of the project launched by 'run'")
-    val runOptions by key<Collection<String>>("Options given to 'java' when running the project")
-    val runArguments by key<Collection<String>>("Options given to the application when running the project", defaultValue = emptyList())
+    val runOptions by key<WList<String>>("Options given to 'java' when running the project", defaultValue = wEmptyList())
+    val runArguments by key<WList<String>>("Options given to the application when running the project", defaultValue = wEmptyList())
     val run by key<Int>("Compile and run the project, return exit code", cacheMode = null)
     val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code", cacheMode = null)
 

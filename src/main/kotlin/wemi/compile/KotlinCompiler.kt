@@ -9,6 +9,7 @@ import wemi.dependency.*
 import wemi.util.EnclaveClassLoader
 import wemi.util.LocatedFile
 import wemi.util.WemiDefaultClassLoader
+import wemi.util.wSetOf
 import java.net.URLClassLoader
 import java.nio.file.Path
 
@@ -127,7 +128,7 @@ enum class KotlinCompilerVersion (
 /**
  * Valid Kotlin source file extensions.
  */
-val KotlinSourceFileExtensions = listOf("kt", "kts")
+val KotlinSourceFileExtensions = wSetOf("kt", "kts")
 
 /**
  * General Kotlin compiler flags.

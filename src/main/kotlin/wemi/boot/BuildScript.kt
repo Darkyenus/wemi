@@ -73,7 +73,7 @@ internal fun getBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSour
 
     val resultJar = cacheFolder / (combinedBuildFileName + "-cache.jar")
     val classpathFile = cacheFolder / (combinedBuildFileName + ".classpath")
-    val classpath = ArrayList<Path>()
+    val classpath = WMutableList<Path>()
 
     var recompileReason = ""
 
@@ -131,7 +131,7 @@ internal fun getBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSour
     buildFlags[KotlinCompilerFlags.moduleName] = combinedBuildFileName
     buildFlags[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
 
-    val sources = buildScriptSources.map { LocatedFile(it) }
+    val sources = buildScriptSources.map { LocatedFile(it) }.toWList()
 
     val classpathConfiguration = BuildScriptClasspathConfiguration(buildScriptSources)
 
@@ -159,7 +159,7 @@ internal fun getBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSour
             rootFolder, resultJar, buildFolder, cacheFolder,
             classpath,
             // Figure out the init class
-            buildScriptSources.map { transformFileNameToKotlinClassName(it.name.pathWithoutExtension()) },
+            buildScriptSources.map { transformFileNameToKotlinClassName(it.name.pathWithoutExtension()) }.toWList(),
             classpathConfiguration, sources,
             buildFlags, !recompile)
 }
@@ -260,14 +260,14 @@ private val LibraryDirectiveRegex = "(\\S+)\\s*:\\s*(\\S+)\\s*:\\s*(\\S+)".toReg
  * Configuration of classpath for a build script.
  */
 class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Path>) {
-    private var _repositories: List<Repository>? = null
+    private var _repositories: WSet<Repository>? = null
     private var _repositoryChain: RepositoryChain? = null
-    private var _dependencies: List<Dependency>? = null
+    private var _dependencies: WSet<Dependency>? = null
 
     private fun resolve() {
-        val repositories = mutableListOf<Repository>()
+        val repositories = WMutableSet<Repository>()
         repositories.addAll(DefaultRepositories)
-        val buildDependencyLibraries = ArrayList<Dependency>()
+        val buildDependencyLibraries = WMutableSet<Dependency>()
 
         for (source in buildScriptSources) {
             var lineNumber = 0
@@ -311,7 +311,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
     /**
      * Repositories used when resolving dependencies for the build scripts
      */
-    val repositories: List<Repository>
+    val repositories: WSet<Repository>
         get() {
             if (_repositories == null) {
                 resolve()
@@ -333,7 +333,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
     /**
      * Dependencies of the build script
      */
-    val dependencies: List<Dependency>
+    val dependencies: WSet<Dependency>
         get() {
             if (_dependencies == null) {
                 resolve()
@@ -353,9 +353,9 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
 data class BuildScript(val wemiRoot: Path,
                        val scriptJar: Path,
                        val buildFolder: Path, val cacheFolder: Path,
-                       val classpath: List<Path>, val initClasses: List<String>,
+                       val classpath: WList<Path>, val initClasses: WList<String>,
                        val buildScriptClasspathConfiguration: BuildScriptClasspathConfiguration,
-                       val sources: List<LocatedFile>, val buildFlags: CompilerFlags,
+                       val sources: WList<LocatedFile>, val buildFlags: CompilerFlags,
                        private var ready:Boolean) {
 
     val wemiLauncherJar:Path

@@ -9,6 +9,8 @@ import wemi.dependency.Repository.M2.Companion.Classifier
 import wemi.test.JUnitPlatformLauncher
 import wemi.util.LocatedFile
 import wemi.util.div
+import wemi.util.toWList
+import wemi.util.wEmptyList
 
 /**
  * All default configurations
@@ -85,10 +87,10 @@ object Configurations {
         Keys.repositories set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositories }
         Keys.repositoryChain set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositoryChain }
         Keys.libraryDependencies set { Keys.buildScript.get().buildScriptClasspathConfiguration.dependencies }
-        Keys.externalClasspath set { Keys.buildScript.get().classpath.map { LocatedFile(it) } }
+        Keys.externalClasspath set { Keys.buildScript.get().classpath.map { LocatedFile(it) }.toWList() }
         Keys.compilerOptions set { Keys.buildScript.get().buildFlags }
         Keys.compile set { Keys.buildScript.get().scriptJar }
-        Keys.resourceFiles set { emptyList() }
+        Keys.resourceFiles set { wEmptyList() }
         Keys.sourceFiles set { Keys.buildScript.get().sources }
     }
 }

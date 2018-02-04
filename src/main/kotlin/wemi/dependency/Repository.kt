@@ -2,6 +2,8 @@ package wemi.dependency
 
 import com.esotericsoftware.jsonbeans.Json
 import wemi.boot.MachineWritable
+import wemi.util.WSet
+import wemi.util.wSetOf
 import java.net.URL
 import java.nio.file.*
 import java.security.MessageDigest
@@ -193,7 +195,7 @@ val MavenCentral = Repository.M2("central", URL("https://repo1.maven.org/maven2/
  * @see LocalM2Repository
  * @see MavenCentral
  */
-val DefaultRepositories: List<Repository> = listOf(
+val DefaultRepositories: WSet<Repository> = wSetOf(
         /* It would seem that local is added twice here (2nd as a cache of local),
          but that is semantically correct, because LocalM2Repository is not only a cache. */
         LocalM2Repository,
