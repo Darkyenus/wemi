@@ -58,6 +58,9 @@ object Archetypes {
         Keys.compilerOptions set { CompilerFlags() }
 
         Keys.runDirectory set { Keys.projectRoot.get() }
+
+        Keys.archiveOutputFile set { Keys.buildDirectory.get() / "${Keys.projectName.get()}-${Keys.projectVersion.get()}.zip" }
+        Keys.archive set KeyDefaults.Archive
     }
 
     /**
@@ -74,6 +77,8 @@ object Archetypes {
 
         Keys.testParameters set KeyDefaults.TestParameters
         Keys.test set KeyDefaults.Test
+
+        Keys.archiveOutputFile set { Keys.buildDirectory.get() / "${Keys.projectName.get()}-${Keys.projectVersion.get()}.jar" }
 
         Keys.assemblyMergeStrategy set {
             JarMergeStrategyChooser

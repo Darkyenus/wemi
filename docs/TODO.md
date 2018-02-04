@@ -1,18 +1,20 @@
 # Things to do next
 
-1. Maven parallel repository resolution
+- Modify sourceFiles so that when not in compilingJava/Kotlin, all source files are added
 
-1. Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
+- Maven parallel repository resolution
 
-1. New project wizard (IDE)
+- Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
 
-1. Kotlin Multiplatform
-	1. Kotlin JS
+- New project wizard (IDE)
 
-1. Hotswapping jvm code
+- Kotlin Multiplatform
+	- Kotlin JS
 
-1. Android/MOE/RoboVM/TeaVM plugins
+- Hotswapping jvm code
 
-1. Source code change detection and caching (Check if worth it)
+- Android/MOE/RoboVM/TeaVM plugins
 
-1. Kotlin Native
+- Source code change detection and caching (Check if worth it)
+
+- Kotlin Native

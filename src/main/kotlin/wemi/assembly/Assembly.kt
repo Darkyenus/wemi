@@ -49,6 +49,11 @@ val JarMergeStrategyChooser:MergeStrategyChooser = { name ->
 }
 
 /**
+ * [MergeStrategyChooser] that assumes that no file should have multiple variants.
+ */
+val NoConflictStrategyChooser:MergeStrategyChooser = { MergeStrategy.Deduplicate }
+
+/**
  * First argument is the source of the data, second is the path inside the root. Returns new path or null to discard.
  */
 typealias RenameFunction = (AssemblySource, String) -> String?
@@ -60,7 +65,7 @@ val DefaultRenameFunction:RenameFunction = { root, name ->
     if (root.own) {
         name
     } else {
-        val injectedName = root.file.name.pathWithoutExtension()
+        val injectedName = root.file?.name?.pathWithoutExtension() ?: "(unknown)"
         val extensionSeparator = name.lastIndexOf('.')
         if (extensionSeparator == -1) {
             name + '_' + injectedName
@@ -69,6 +74,13 @@ val DefaultRenameFunction:RenameFunction = { root, name ->
         }
     }
 }
+
+/**
+ * Prepend data to use, when no data should be prepended.
+ *
+ * @see AssemblyOperation.assembly prependData parameter
+ */
+val NoPrependData = ByteArray(0)
 
 /**
  * Represents a packing operation. Contains internal list of sources, to which elements can be added via
@@ -111,6 +123,15 @@ class AssemblyOperation : Closeable {
                 override val debugName: String = locatedFile.toString()
             })
         }
+    }
+
+    fun addSource(path:String, data:ByteArray, own: Boolean) {
+        loadedSources.getOrPut(normalizeZipPath(path)) { ArrayList() }.add(object : AssemblySource(null, null, null, own) {
+            override fun load(): ByteArray = data
+
+            override val debugName: String
+                get() = "(custom $path)"
+        })
     }
 
     /**
@@ -259,7 +280,6 @@ class AssemblyOperation : Closeable {
                 var debugIndex = 1
 
                 for (source in dataList) {
-                    val root = source.root
                     val renamedPath = normalizeZipPath(renameFunction(source, path) ?: "")
                     if (renamedPath.isEmpty()) {
                         if (LOG.isDebugEnabled) {
@@ -269,7 +289,7 @@ class AssemblyOperation : Closeable {
                         val alreadyPresent = assemblySources.containsKey(renamedPath)
 
                         if (alreadyPresent) {
-                            LOG.error("Can't rename {} from {} to {}, this path is already occupied", path, root, renamedPath)
+                            LOG.error("Can't rename {} from {} to {}, this path is already occupied", path, source.root, renamedPath)
                             hasError = true
                         } else {
                             if (LOG.isDebugEnabled) {
@@ -316,7 +336,7 @@ class AssemblyOperation : Closeable {
                 if (source != null) {
                     if (source.zipEntry != null && source.zipEntry.time != -1L) {
                         entry.time = source.zipEntry.time
-                    } else {
+                    } else if (source.file != null) {
                         entry.time = source.file.lastModified.toMillis()
                     }
                 }

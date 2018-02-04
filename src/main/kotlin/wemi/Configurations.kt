@@ -3,14 +3,16 @@
 package wemi
 
 import configuration
+import wemi.assembly.AssemblyOperation
+import wemi.assembly.DefaultRenameFunction
+import wemi.assembly.NoConflictStrategyChooser
+import wemi.assembly.NoPrependData
 import wemi.compile.*
 import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.Classifier
 import wemi.test.JUnitPlatformLauncher
-import wemi.util.LocatedFile
-import wemi.util.div
-import wemi.util.toWList
-import wemi.util.wEmptyList
+import wemi.util.*
+import java.time.ZonedDateTime
 
 /**
  * All default configurations
@@ -25,43 +27,7 @@ object Configurations {
     val assembling by configuration("Configuration used when assembling Jar with dependencies") {}
     //endregion
 
-    //region Testing configuration
-    val testing by configuration("Used when testing") {
-        Keys.sourceBases add { Keys.projectRoot.get() / "src/test" }
-        Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
-        Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
-        Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
-
-        Keys.libraryDependencies add { Dependency(JUnitPlatformLauncher) }
-    }
-    //endregion
-
-    //region IDE configurations
-    val retrievingSources by configuration("Used to retrieve sources") {
-        Keys.libraryDependencyProjectMapper set {
-            { (projectId, exclusions): Dependency ->
-                val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (Classifier to "sources"))
-                Dependency(sourcesProjectId, exclusions)
-            }
-        }
-    }
-
-    val retrievingDocs by configuration("Used to retrieve docs") {
-        Keys.libraryDependencyProjectMapper set {
-            { (projectId, exclusions): Dependency ->
-                val javadocProjectId = projectId.copy(attributes = projectId.attributes + (Classifier to "javadoc"))
-                Dependency(javadocProjectId, exclusions)
-            }
-        }
-    }
-    //endregion
-
-    val offline by configuration("Disables non-local repositories from the repository chain for offline use") {
-        Keys.repositoryChain modify { oldChain ->
-            oldChain.filter { it.local }
-        }
-    }
-
+    //region Compiling
     val compilingJava by configuration("Configuration layer used when compiling Java sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { JavaSourceFileExtensions }
@@ -80,6 +46,135 @@ object Configurations {
             }
         }
         Keys.compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
+    }
+    //endregion
+
+    //region Testing configuration
+    /**
+     * Used by [Keys.test]
+     */
+    val testing by configuration("Used when testing") {
+        Keys.sourceBases add { Keys.projectRoot.get() / "src/test" }
+        Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
+        Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
+        Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
+
+        Keys.libraryDependencies add { Dependency(JUnitPlatformLauncher) }
+    }
+    //endregion
+
+    //region Archiving
+    /**
+     * Used by [Keys.archive]
+     */
+    val archiving by configuration("Used when archiving") {}
+
+    val archivingSources by configuration("Used when archiving sources") {
+        Keys.archiveOutputFile modify { original ->
+            val originalName = original.name
+            val withoutExtension = originalName.pathWithoutExtension()
+            val extension = originalName.pathExtension()
+            original.resolveSibling("$withoutExtension-sources.$extension")
+        }
+        Keys.archive set KeyDefaults.ArchiveSources
+    }
+
+    val archivingDocs by configuration("Used when archiving documentation") {
+        Keys.archiveOutputFile modify { original ->
+            val originalName = original.name
+            val withoutExtension = originalName.pathWithoutExtension()
+            val extension = originalName.pathExtension()
+            original.resolveSibling("$withoutExtension-docs.$extension")
+        }
+        // Dummy archival
+        Keys.archive set {
+            using(archiving) {
+                AssemblyOperation().use { assemblyOperation ->
+
+                    /*
+                    # No documentation available
+
+                    |Group        | Name | Version |
+                    |:-----------:|:----:|:-------:|
+                    |com.whatever | Haha | 1.3     |
+
+                    *Built by Wemi 1.2*
+                    *Current date*
+                     */
+
+                    val groupHeading = "Group"
+                    val projectGroup = Keys.projectGroup.getOrElse("-")
+                    val groupWidth = Math.max(groupHeading.length, projectGroup.length) + 2
+
+                    val nameHeading = "Name"
+                    val projectName = Keys.projectName.getOrElse("-")
+                    val nameWidth = Math.max(nameHeading.length, projectName.length) + 2
+
+                    val versionHeading = "Version"
+                    val projectVersion = Keys.projectVersion.getOrElse("-")
+                    val versionWidth = Math.max(versionHeading.length, projectVersion.length) + 2
+
+                    val md = StringBuilder()
+                    md.append("# No documentation available\n\n")
+                    md.append('|').appendCentered(groupHeading, groupWidth, ' ')
+                            .append('|').appendCentered(nameHeading, nameWidth, ' ')
+                            .append('|').appendCentered(versionHeading, versionWidth, ' ').append("|\n")
+
+                    md.append("|:").append('-', groupWidth - 2)
+                            .append(":|:").append('-', nameWidth - 2)
+                            .append(":|:").append('-', versionWidth - 2).append(":|\n")
+
+                    md.append('|').appendCentered(projectGroup, groupWidth, ' ')
+                            .append('|').appendCentered(projectName, nameWidth, ' ')
+                            .append('|').appendCentered(projectVersion, versionWidth, ' ').append("|\n")
+
+                    md.append("\n*Built by Wemi ").append(WemiVersion).append("*\n")
+                    md.append("*").append(ZonedDateTime.now()).append("*\n")
+
+                    assemblyOperation.addSource(
+                            "DOCUMENTATION.MD",
+                            md.toString().toByteArray(Charsets.UTF_8),
+                            true)
+
+                    val outputFile = Keys.archiveOutputFile.get()
+                    assemblyOperation.assembly(
+                            NoConflictStrategyChooser,
+                            DefaultRenameFunction,
+                            outputFile,
+                            NoPrependData,
+                            compress = true)
+
+                    outputFile
+                }
+            }
+        }
+    }
+    //endregion
+
+    //region IDE configurations
+    val retrievingSources by configuration("Used to retrieve sources") {
+        Keys.libraryDependencyProjectMapper set {
+            { (projectId, exclusions): Dependency ->
+                val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (Classifier to "sources"))
+                Dependency(sourcesProjectId, exclusions)
+            }
+        }
+    }
+
+    val retrievingDocs by configuration("Used to retrieve documentation") {
+        Keys.libraryDependencyProjectMapper set {
+            { (projectId, exclusions): Dependency ->
+                val javadocProjectId = projectId.copy(attributes = projectId.attributes + (Classifier to "javadoc"))
+                Dependency(javadocProjectId, exclusions)
+            }
+        }
+    }
+    //endregion
+
+    val offline by configuration("Disables non-local repositories from the repository chain for offline use") {
+        Keys.repositoryChain modify { oldChain ->
+            oldChain.filter { it.local }
+        }
     }
 
     val wemiBuildScript by configuration("Setup with information about the build script " +

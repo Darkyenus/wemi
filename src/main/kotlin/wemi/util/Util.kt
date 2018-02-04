@@ -78,6 +78,34 @@ fun StringBuilder.appendTimeDuration(ms: Long): StringBuilder {
 }
 
 /**
+ * Append given [character] multiple [times]
+ */
+fun StringBuilder.append(character:Char, times:Int):StringBuilder {
+    if (times <= 0) {
+        return this
+    }
+    ensureCapacity(times)
+    for (i in 0 until times) {
+        append(character)
+    }
+    return this
+}
+
+/**
+ * Append given [text] centered in [width], padded by [padding]
+ */
+fun StringBuilder.appendCentered(text:String, width:Int, padding:Char):StringBuilder {
+    val padAmount = text.length - width
+    if (padAmount <= 0) {
+        return append(text)
+    }
+
+    val leftPad = padAmount / 2
+    val rightPadding = padAmount - leftPad
+    return append(padding, leftPad).append(text).append(padding, rightPadding)
+}
+
+/**
  * Represents index into the [CharSequence].
  */
 typealias Index = Int

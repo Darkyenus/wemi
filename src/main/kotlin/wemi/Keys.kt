@@ -75,6 +75,9 @@ object Keys {
     val testParameters by key<TestParameters>("Parameters for the test key. By default discovers all tests in the test sources.")
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it.prettyPrint() })
 
+    val archiveOutputFile by key<Path>("File to which archive should be saved to")
+    val archive by key<Path>("Archive project's output and return path to the created file")
+
     val assemblyMergeStrategy by key<MergeStrategyChooser>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
     val assemblyRenameFunction by key<RenameFunction>("Function for renaming assembled duplicate files for which merge strategy is Rename. Paths after rename must not conflict, rules are not recursive.")
     val assemblyPrependData by key<ByteArray>("Data to prepend to the jar created by assembly task", defaultValue = ByteArray(0))

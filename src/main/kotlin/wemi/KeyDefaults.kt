@@ -4,6 +4,7 @@ package wemi
 
 import com.darkyen.tproll.util.StringBuilderWriter
 import org.slf4j.LoggerFactory
+import wemi.Configurations.archiving
 import wemi.Configurations.assembling
 import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
@@ -424,6 +425,51 @@ object KeyDefaults {
                     ?: throw WemiException("Test execution failed, see logs for more information", showStacktrace = false)
 
             report
+        }
+    }
+
+    val Archive: BoundKeyValue<Path> = {
+        using(archiving) {
+            AssemblyOperation().use { assemblyOperation ->
+                // Load data
+                for (file in Keys.internalClasspath.get()) {
+                    assemblyOperation.addSource(file, true)
+                }
+
+                val outputFile = Keys.archiveOutputFile.get()
+                assemblyOperation.assembly(
+                        NoConflictStrategyChooser,
+                        DefaultRenameFunction,
+                        outputFile,
+                        NoPrependData,
+                        compress = true)
+
+                outputFile
+            }
+        }
+    }
+
+    val ArchiveSources: BoundKeyValue<Path> = {
+        using(archiving) {
+            AssemblyOperation().use { assemblyOperation ->
+                // Load data
+                for (file in using(compilingJava) { Keys.sourceFiles.get() }) {
+                    assemblyOperation.addSource(file, true)
+                }
+                for (file in using(compilingKotlin) { Keys.sourceFiles.get() }) {
+                    assemblyOperation.addSource(file, true)
+                }
+
+                val outputFile = Keys.archiveOutputFile.get()
+                assemblyOperation.assembly(
+                        NoConflictStrategyChooser,
+                        DefaultRenameFunction,
+                        outputFile,
+                        NoPrependData,
+                        compress = true)
+
+                outputFile
+            }
         }
     }
 
