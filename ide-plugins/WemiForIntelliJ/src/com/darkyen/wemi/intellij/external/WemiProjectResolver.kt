@@ -492,11 +492,17 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             val javaTargetVersion:String,
             val classOutput:String,
             val classOutputTesting:String,
-            val sourceRoots:Array<String>,
-            val resourceRoots:Array<String>,
-            val sourceRootsTesting:Array<String>,
-            val resourceRootsTesting:Array<String>
+            sourceRoots:Array<String>,
+            resourceRoots:Array<String>,
+            sourceRootsTesting:Array<String>,
+            resourceRootsTesting:Array<String>
     ) {
+
+        val sourceRoots:Set<String> = sourceRoots.toSet()
+        val resourceRoots:Set<String> = resourceRoots.toSet()
+        val sourceRootsTesting:Set<String> = sourceRootsTesting.toMutableSet().apply { removeAll(sourceRoots) }
+        val resourceRootsTesting:Set<String> = resourceRootsTesting.toMutableSet().apply { removeAll(resourceRoots) }
+
         fun javaProjectData():JavaProjectData {
             val data = JavaProjectData(WemiProjectSystemId, classOutput)
             data.setLanguageLevel(javaSourceVersion)
@@ -529,10 +535,10 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
         fun contentRoot():ContentRootData {
             val contentRoot = ContentRootData(WemiProjectSystemId, rootPath)
-            contentRoot.add(ExternalSystemSourceType.SOURCE, sourceRoots)
-            contentRoot.add(ExternalSystemSourceType.RESOURCE, resourceRoots)
-            contentRoot.add(ExternalSystemSourceType.TEST, sourceRootsTesting)
-            contentRoot.add(ExternalSystemSourceType.TEST_RESOURCE, resourceRootsTesting)
+            contentRoot.add(ExternalSystemSourceType.SOURCE, sourceRoots.toTypedArray())
+            contentRoot.add(ExternalSystemSourceType.RESOURCE, resourceRoots.toTypedArray())
+            contentRoot.add(ExternalSystemSourceType.TEST, sourceRootsTesting.toTypedArray())
+            contentRoot.add(ExternalSystemSourceType.TEST_RESOURCE, resourceRootsTesting.toTypedArray())
             return contentRoot
         }
     }
