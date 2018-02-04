@@ -183,11 +183,19 @@ fun createRepositoryChain(repositories: Collection<Repository>): RepositoryChain
  */
 val LocalM2Repository = Repository.M2("local", URL("file", "localhost", System.getProperty("user.home") + "/.m2/repository/"), null)
 /**
- * Maven Central repository: https://maven.org
+ * Maven Central repository at [maven.org](https://maven.org)
  *
  * Cached by [LocalM2Repository].
  */
 val MavenCentral = Repository.M2("central", URL("https://repo1.maven.org/maven2/"), LocalM2Repository)
+
+/**
+ * Jitpack repository at [jitpack.io](https://jitpack.io)
+ *
+ * Cached by [LocalM2Repository].
+ */
+@Suppress("unused")
+val Jitpack = Repository.M2("jitpack", URL("https://jitpack.io/"))
 
 /**
  * Repositories to use by default.
