@@ -2,8 +2,6 @@
 
 1. Test source folders are being duplicated when added to IDE
 
-1. Maven repository locking
-
 1. Maven parallel repository resolution
 
 1. Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin

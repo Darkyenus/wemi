@@ -204,29 +204,32 @@ fun main(args: Array<String>) {
                 exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
             }
         } else {
-            val compiledBuildScript = getBuildScript(root, buildFolder, buildScriptSources, cleanBuild)
-            if (compiledBuildScript == null) {
-                LOG.warn("Failed to prepare build script")
-                if (allowBrokenBuildScripts) {
-                    null
-                } else {
-                    exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
-                }
-            } else {
-                // WemiBuildScript must be initialized before compilation, because compiler may depend on it
-                WemiBuildScript = compiledBuildScript
-                if (compiledBuildScript.ready()) {
-                    compiledBuildScript
-                } else {
-                    LOG.warn("Build script failed to compile")
+            directorySynchronized(buildFolder, {
+                LOG.info("Waiting for lock on {}", buildFolder)
+            }) {
+                val compiledBuildScript = getBuildScript(root, buildFolder, buildScriptSources, cleanBuild)
+                if (compiledBuildScript == null) {
+                    LOG.warn("Failed to prepare build script")
                     if (allowBrokenBuildScripts) {
                         null
                     } else {
                         exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
                     }
+                } else {
+                    // WemiBuildScript must be initialized before compilation, because compiler may depend on it
+                    WemiBuildScript = compiledBuildScript
+                    if (compiledBuildScript.ready()) {
+                        compiledBuildScript
+                    } else {
+                        LOG.warn("Build script failed to compile")
+                        if (allowBrokenBuildScripts) {
+                            null
+                        } else {
+                            exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+                        }
+                    }
                 }
             }
-
         }
     }
 
