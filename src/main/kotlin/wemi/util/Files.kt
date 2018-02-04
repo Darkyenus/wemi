@@ -320,8 +320,10 @@ private val LOCKED_PATHS = WeakHashMap<Path, Semaphore>()
 /**
  * Works like [synchronized], but the synchronization is done on a [directory] and is coordinated with other processes
  * as well.
+ *
+ * @param onWait optional callback that will be called once it is determined that waiting for the
  */
-fun <Result> directorySynchronized(directory: Path, action:() -> Result):Result {
+fun <Result> directorySynchronized(directory: Path, onWait:(()->Unit)? = null, action:() -> Result):Result {
     // Implementation of this is not trivial as all OSes have own quirks and differences
 
     val lockedPath = directory.toRealPath()
@@ -338,8 +340,17 @@ fun <Result> directorySynchronized(directory: Path, action:() -> Result):Result 
 
     val lockPath = lockedPath.resolve(".wemi-lock")
 
+    var onWaitCalled = false
+
     // Coordinate with other threads
-    semaphore.acquire()
+    if (!semaphore.tryAcquire()) {
+        if (!onWaitCalled) {
+            onWait?.invoke()
+            onWaitCalled = true
+        }
+        semaphore.acquire()
+    }
+
     try {
         // Coordinate with other processes
 
@@ -367,7 +378,13 @@ fun <Result> directorySynchronized(directory: Path, action:() -> Result):Result 
             // Remember the fileKey before the lock is acquired
             val preLockKey = lockPath.fileKey()
             // Lock, this may take some time
-            channel.lock()
+            if (channel.tryLock() == null) {
+                if (!onWaitCalled) {
+                    onWait?.invoke()
+                    onWaitCalled = true
+                }
+                channel.lock()
+            }
 
             // Check, that channel points to the actual file in the filesystem, visible to other processes
             // It may happen, that it points to removed inode

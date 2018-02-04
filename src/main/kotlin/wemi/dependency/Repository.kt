@@ -3,6 +3,7 @@ package wemi.dependency
 import com.esotericsoftware.jsonbeans.Json
 import wemi.boot.MachineWritable
 import java.net.URL
+import java.nio.file.*
 import java.security.MessageDigest
 
 /**
@@ -23,7 +24,12 @@ sealed class Repository(val name: String) : MachineWritable {
      * @param dependency to resolve
      * @param chain of repositories which may be queried for looking up dependencies
      */
-    abstract fun resolveInRepository(dependency: Dependency, chain: RepositoryChain): ResolvedDependency
+    internal abstract fun resolveInRepository(dependency: Dependency, chain: RepositoryChain): ResolvedDependency
+
+    /**
+     * @return directory to lock on while resolving from this repository
+     */
+    internal abstract fun directoryToLock(): Path?
 
     /** Maven repository.
      *
@@ -33,11 +39,21 @@ sealed class Repository(val name: String) : MachineWritable {
      * @param checksum to use when retrieving artifacts from here
      */
     class M2(name: String, val url: URL, override val cache: M2? = null, val checksum: Checksum = M2.Checksum.SHA1) : Repository(name) {
+
         override val local: Boolean
             get() = cache == null
 
         override fun resolveInRepository(dependency: Dependency, chain: RepositoryChain): ResolvedDependency {
             return MavenDependencyResolver.resolveInM2Repository(dependency, this, chain)
+        }
+
+        override fun directoryToLock(): Path? {
+            try {
+                if ("file".equals(url.protocol, ignoreCase = true)) {
+                    return FileSystems.getDefault().getPath(url.path)
+                }
+            } catch (ignored:Exception) { }
+            return null
         }
 
         companion object {
@@ -151,14 +167,10 @@ fun createRepositoryChain(repositories: Collection<Repository>): RepositoryChain
     })
 
     // Remove duplicates
-    var lastRepository: Repository? = null
+    val seen = HashSet<Repository>()
     list.removeAll { repository ->
-        if (repository == lastRepository) {
-            true
-        } else {
-            lastRepository = repository
-            false
-        }
+        val justAdded = seen.add(repository)
+        !justAdded
     }
     return list
 }

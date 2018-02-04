@@ -240,13 +240,15 @@ internal object MavenDependencyResolver {
                 val expectedChecksumString = expectedChecksumData.takeWhile { !it.isWhitespace() }
                 val expectedChecksum = fromHexString(expectedChecksumString)
 
-                if (expectedChecksum == null) {
-                    LOG.warn("Checksum of '{}' in {} is malformed ('{}'), continuing without checksum", path, repository, expectedChecksumString)
-                } else if (Arrays.equals(expectedChecksum, computedChecksum)) {
-                    LOG.trace("Checksum of '{}' in {} is valid", path, repository)
-                } else {
-                    LOG.warn("Checksum of '{}' in {} is wrong! Expected {}, got {}", path, repository, computedChecksumString, toHexString(expectedChecksum))
-                    return Pair(null, null)
+                when {
+                    expectedChecksum == null ->
+                        LOG.warn("Checksum of '{}' in {} is malformed ('{}'), continuing without checksum", path, repository, expectedChecksumString)
+                    Arrays.equals(expectedChecksum, computedChecksum) ->
+                        LOG.trace("Checksum of '{}' in {} is valid", path, repository)
+                    else -> {
+                        LOG.warn("Checksum of '{}' in {} is wrong! Expected {}, got {}", path, repository, computedChecksumString, toHexString(expectedChecksum))
+                        return Pair(null, null)
+                    }
                 }
             } catch (e: WebbException) {
                 LOG.warn("Failed to retrieve {} checksum '{}' from {}, continuing without checksum", checksum, path, repository, e)
@@ -569,7 +571,7 @@ internal object MavenDependencyResolver {
 
         companion object {
             val ModelVersion = arrayOf("project", "modelVersion")
-            val SupportedModelVersion = "4.0.0"
+            const val SupportedModelVersion = "4.0.0"
 
             val GroupId = arrayOf("project", "groupId")
             val ArtifactId = arrayOf("project", "artifactId")

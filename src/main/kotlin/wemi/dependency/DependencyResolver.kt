@@ -1,6 +1,7 @@
 package wemi.dependency
 
 import org.slf4j.LoggerFactory
+import wemi.util.directorySynchronized
 import java.nio.file.Path
 
 /**
@@ -17,7 +18,7 @@ object DependencyResolver {
      * Does not resolve transitively.
      * When resolution fails, returns ResolvedDependency with [ResolvedDependency.hasError] = true.
      */
-    fun resolveSingleDependency(dependency: Dependency, repositories: RepositoryChain): ResolvedDependency {
+    internal fun resolveSingleDependency(dependency: Dependency, repositories: RepositoryChain): ResolvedDependency {
         var log: StringBuilder? = null
 
         LOG.debug("Resolving {}", dependency)
@@ -89,7 +90,7 @@ object DependencyResolver {
         }
 
         val resolvedProject = resolveSingleDependency(mapper(dependency), repositories)
-        resolved.put(dependency.dependencyId, resolvedProject)
+        resolved[dependency.dependencyId] = resolvedProject
 
         var ok = !resolvedProject.hasError
         for (transitiveDependency in resolvedProject.dependencies) {
@@ -129,18 +130,36 @@ object DependencyResolver {
      * Resolution is done using [repositories] and using [DependencyId.preferredRepository] and its cache, if any.
      * Actually resolved dependencies can be at any point modified with [mapper].
      *
+     * This is the entry point to dependency resolution.
+     *
      * @return true if all [dependencies] resolve correctly without error
      */
     fun resolve(resolved: MutableMap<DependencyId, ResolvedDependency>, dependencies: Collection<Dependency>, repositories: RepositoryChain, mapper: ((Dependency) -> Dependency) = { it }): Boolean {
-        var ok = true
+        val directoriesToLock = repositories.mapNotNull { it.cache?.directoryToLock() }.distinct()
 
-        for (project in dependencies) {
-            if (!doResolveArtifacts(resolved, project, repositories, mapper)) {
-                ok = false
+        fun <Result> locked(level:Int, action:()->Result):Result {
+            if (level == directoriesToLock.size) {
+                return action()
+            } else {
+                val directory = directoriesToLock[level]
+                return directorySynchronized(directory, {
+                    // On wait
+                    LOG.info("Waiting for lock on {}", directory)
+                }) {
+                    locked(level + 1, action)
+                }
             }
         }
 
-        return ok
+        return locked(0) {
+            var ok = true
+            for (project in dependencies) {
+                if (!doResolveArtifacts(resolved, project, repositories, mapper)) {
+                    ok = false
+                }
+            }
+            ok
+        }
     }
 
 }
