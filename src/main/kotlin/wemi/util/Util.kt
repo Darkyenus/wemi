@@ -5,6 +5,8 @@ import com.darkyen.tproll.util.TerminalColor
 import com.esotericsoftware.jsonbeans.Json
 import com.esotericsoftware.jsonbeans.JsonValue
 import wemi.Key
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.*
 
 /**
@@ -78,6 +80,61 @@ fun StringBuilder.appendTimeDuration(ms: Long): StringBuilder {
 }
 
 /**
+ * Format given [bytes] amount as a human readable duration string.
+ * Uses SI units. Only two most significant units are used, rest is truncated.
+ *
+ * Example output: "1 day 5 minutes 33 seconds 0 ms"
+ */
+fun StringBuilder.appendByteSize(bytes: Long): StringBuilder {
+    val Kilo = 1000L
+    val Mega = 1000_000L
+    val Giga = 1000_000_000L
+    val Tera = 1000_000_000_000L
+
+    var remaining = bytes
+
+    val tera = remaining / Tera
+    remaining %= Tera
+    val giga = remaining / Giga
+    remaining %= Giga
+    val mega = remaining / Mega
+    remaining %= Mega
+    val kilo = remaining / Kilo
+    remaining %= Kilo
+
+    val R = 2
+    var relevant = R
+
+    if ((tera > 1L || relevant < R) && relevant > 0) {
+        append(tera).append(" TB ")
+        relevant--
+    }
+
+    if ((giga > 1L || relevant < R) && relevant > 0) {
+        append(giga).append(" GB ")
+        relevant--
+    }
+
+    if ((mega > 1L || relevant < R) && relevant > 0) {
+        append(mega).append(" MB ")
+        relevant--
+    }
+
+    if ((kilo > 1L || relevant < R) && relevant > 0) {
+        append(kilo).append(" kB ")
+        relevant--
+    }
+
+    if (relevant < R && relevant > 0) {
+        append(remaining).append(" B ")
+    }
+
+    setLength(length-1)//Truncate trailing space
+
+    return this
+}
+
+/**
  * Append given [character] multiple [times]
  */
 fun StringBuilder.append(character:Char, times:Int):StringBuilder {
@@ -95,7 +152,7 @@ fun StringBuilder.append(character:Char, times:Int):StringBuilder {
  * Append given [text] centered in [width], padded by [padding]
  */
 fun StringBuilder.appendCentered(text:String, width:Int, padding:Char):StringBuilder {
-    val padAmount = text.length - width
+    val padAmount = width - text.length
     if (padAmount <= 0) {
         return append(text)
     }
@@ -170,8 +227,7 @@ fun CodePoint.isCodePointSafeInFileName(): Boolean = when {
  *
  * @see isCodePointSafeInFileName
  */
-fun CharSequence.toSafeFileName(replacement: Char = '_'): CharSequence {
-
+fun CharSequence.toSafeFileName(replacement: Char): CharSequence {
     val sb = StringBuilder(length)
     var anyReplacements = false
 
@@ -181,30 +237,6 @@ fun CharSequence.toSafeFileName(replacement: Char = '_'): CharSequence {
         } else {
             sb.append(replacement)
             anyReplacements = true
-        }
-    }
-
-    return if (anyReplacements) {
-        sb
-    } else {
-        this
-    }
-}
-
-/**
- * Converts this [CharSequence], by converting each [CodePoint] with [mapper] and omitting those
- */
-fun CharSequence.mapNotZero(mapper:(CodePoint) -> CodePoint):CharSequence {
-    val sb = StringBuilder(length)
-    var anyReplacements = false
-
-    forCodePoints { cp ->
-        val newCp = mapper(cp)
-        if (newCp != cp) {
-            anyReplacements = true
-        }
-        if (newCp != 0) {
-            sb.appendCodePoint(newCp)
         }
     }
 
@@ -231,168 +263,6 @@ fun String.isValidIdentifier(): Boolean {
         }
     }
     return true
-}
-
-/**
- * Return a new array of type Array<[T]> that contains [size] elements that are [with].
- */
-@Suppress("UNCHECKED_CAST")
-fun <T> arrayFilledWith(size: Int, with: T): Array<T> {
-    val memoArray: Array<T> = java.lang.reflect.Array.newInstance((with as Any)::class.java, size) as Array<T>
-    Arrays.fill(memoArray, with)
-    return memoArray
-}
-
-typealias Mark = Int
-
-class Tokens<T, Memo>(val data: List<T>, private val limit: Int = data.size, defaultMemo: Memo? = null) {
-
-    @Suppress("UNCHECKED_CAST")
-    val memos: Array<Memo>? = if (defaultMemo == null) {
-        null
-    } else {
-        arrayFilledWith(data.size, defaultMemo)
-    }
-
-    private var next = 0
-    private var lazyErrors: ArrayList<Pair<Int, String>>? = null
-
-    val errors: List<Pair<Int, String>>
-        get() = lazyErrors ?: emptyList()
-
-    fun formattedErrors(colored: Boolean): Iterator<String> = object : Iterator<String> {
-        val parent = errors.iterator()
-
-        override fun hasNext(): Boolean {
-            return parent.hasNext()
-        }
-
-        override fun next(): String {
-            val (word, message) = parent.next()
-
-            val sb = StringBuilder()
-            if (word - 3 in data.indices) {
-                sb.append("... ")
-            }
-            if (word - 2 in data.indices) {
-                sb.append(data[word - 2]).append(' ')
-            }
-            if (word - 1 in data.indices) {
-                sb.append(data[word - 1]).append(' ')
-            }
-            if (word in data.indices) {
-                sb.append('>')
-                if (colored) {
-                    sb.append(format(data[word].toString(), format = Format.Underline))
-                } else {
-                    sb.append(data[word])
-                }
-                sb.append('<')
-
-                sb.append(' ')
-            }
-            if (word + 1 in data.indices) {
-                sb.append(data[word + 1]).append(' ')
-            }
-            if (word + 2 in data.indices) {
-                sb.append(data[word + 2]).append(' ')
-            }
-            if (word + 3 in data.indices) {
-                sb.append("... ")
-            }
-
-            if (sb.isEmpty()) {
-                sb.append("(At word ").append(word).append('/').append(data.size).append(")")
-            } else {
-                // Strip leading space
-                sb.setLength(sb.length - 1)
-            }
-            sb.append('\n').append('⤷').append(' ')
-            if (colored) {
-                sb.append(format(message, Color.Red))
-            } else {
-                sb.append(message)
-            }
-
-            return sb.toString()
-        }
-    }
-
-    fun mark(): Mark = next
-
-    fun Mark.rollback() {
-        next = this
-    }
-
-    fun Mark.errorAndRollback(error: String) {
-        error(error)
-        next = this
-    }
-
-    fun error(message: String) {
-        if (lazyErrors == null) {
-            lazyErrors = ArrayList()
-        }
-        lazyErrors!!.add(next to message)
-    }
-
-    fun hasNext(memo: Memo? = null): Boolean {
-        if (next < data.size && memos != null && memo != null) {
-            memos[next] = memo
-        }
-
-        return next < limit
-    }
-
-    fun next(memo: Memo? = null): T? {
-        if (next < data.size && memos != null && memo != null) {
-            memos[next] = memo
-        }
-
-        return if (next < limit) {
-            data[next++]
-        } else {
-            null
-        }
-    }
-
-    fun peek(skip: Int = 0): T? {
-        return data.getOrNull(next + skip)
-    }
-
-    fun match(memo: Memo? = null, matcher: (T) -> Boolean): Boolean {
-        return if (next < limit && matcher(data[next])) {
-            if (memos != null && memo != null) {
-                memos[next] = memo
-            }
-            next++
-            true
-        } else {
-            false
-        }
-    }
-
-    fun matches(skip: Int = 0, matcher: (T) -> Boolean): Boolean {
-        val index = next + skip
-        return index in (0 until limit) && matcher(data[index])
-    }
-
-    fun match(value: T, memo: Memo? = null): Boolean {
-        return if (next < limit && value == data[next]) {
-            if (memos != null && memo != null) {
-                memos[next] = memo
-            }
-            next++
-            true
-        } else {
-            false
-        }
-    }
-
-    fun matches(skip: Int = 0, value: T): Boolean {
-        val index = next + skip
-        return index in (0 until limit) && value == data[index]
-    }
 }
 
 fun JsonValue?.putArrayStrings(into: MutableCollection<String>) {
@@ -574,6 +444,11 @@ private fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
         if (value is Function<*>) {
             val javaClass = value.javaClass
             this.format(Color.White).append(" (").append(javaClass.name).append(')')
+        } else if (value is Path) {
+            try {
+                val size = Files.size(value)
+                this.format(Color.White).append(" (").appendByteSize(size).append(')')
+            } catch (ignored:Exception) {}
         }
         this.format()
     }

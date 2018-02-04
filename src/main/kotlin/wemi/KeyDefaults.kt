@@ -151,7 +151,7 @@ object KeyDefaults {
     }
 
     fun outputClassesDirectory(tag: String): BoundKeyValue<Path> = {
-        Keys.buildDirectory.get() / "cache/$tag-${Keys.projectName.get().toSafeFileName()}"
+        Keys.buildDirectory.get() / "cache/$tag-${Keys.projectName.get().toSafeFileName('_')}"
     }
 
     private val CompileLOG = LoggerFactory.getLogger("Compile")

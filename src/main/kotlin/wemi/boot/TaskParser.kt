@@ -2,10 +2,8 @@ package wemi.boot
 
 import org.jline.reader.ParsedLine
 import org.jline.reader.Parser
-import wemi.util.Tokens
-import wemi.util.forCodePoints
-import wemi.util.forCodePointsIndexed
-import wemi.util.isValidIdentifier
+import wemi.util.*
+import java.util.*
 
 /**
  * Parses task lines.
@@ -154,7 +152,7 @@ object TaskParser : Parser {
             error("Key is not a valid identifier")
             return null
         }
-        next(TokenType.Key)
+        next(TokenType.Key) // Consume the token as key
 
         val input = ArrayList<Pair<String?, String>>()
 
@@ -371,4 +369,145 @@ object TaskParser : Parser {
         return words
     }
 
+}
+
+class Tokens<T, Memo>(val data: List<T>, private val limit: Int = data.size, defaultMemo: Memo? = null) {
+
+    @Suppress("UNCHECKED_CAST")
+    val memos: Array<Memo>? = if (defaultMemo == null) {
+        null
+    } else {
+        val memoArray: Array<Memo> = java.lang.reflect.Array.newInstance((defaultMemo as Any)::class.java, data.size) as Array<Memo>
+        Arrays.fill(memoArray, defaultMemo)
+        memoArray
+    }
+
+    private var next = 0
+    private var lazyErrors: ArrayList<Pair<Int, String>>? = null
+
+    val errors: List<Pair<Int, String>>
+        get() = lazyErrors ?: emptyList()
+
+    fun formattedErrors(colored: Boolean): Iterator<String> = object : Iterator<String> {
+        val parent = errors.iterator()
+
+        override fun hasNext(): Boolean {
+            return parent.hasNext()
+        }
+
+        override fun next(): String {
+            val (word, message) = parent.next()
+
+            val sb = StringBuilder()
+            if (word - 3 in data.indices) {
+                sb.append("... ")
+            }
+            if (word - 2 in data.indices) {
+                sb.append(data[word - 2]).append(' ')
+            }
+            if (word - 1 in data.indices) {
+                sb.append(data[word - 1]).append(' ')
+            }
+            if (word in data.indices) {
+                sb.append('>')
+                if (colored) {
+                    sb.append(format(data[word].toString(), format = Format.Underline))
+                } else {
+                    sb.append(data[word])
+                }
+                sb.append('<')
+
+                sb.append(' ')
+            }
+            if (word + 1 in data.indices) {
+                sb.append(data[word + 1]).append(' ')
+            }
+            if (word + 2 in data.indices) {
+                sb.append(data[word + 2]).append(' ')
+            }
+            if (word + 3 in data.indices) {
+                sb.append("... ")
+            }
+
+            if (sb.isEmpty()) {
+                sb.append("(At word ").append(word).append('/').append(data.size).append(")")
+            } else {
+                // Strip leading space
+                sb.setLength(sb.length - 1)
+            }
+            sb.append('\n').append('⤷').append(' ')
+            if (colored) {
+                sb.append(format(message, Color.Red))
+            } else {
+                sb.append(message)
+            }
+
+            return sb.toString()
+        }
+    }
+
+    fun error(message: String) {
+        if (lazyErrors == null) {
+            lazyErrors = ArrayList()
+        }
+        lazyErrors!!.add(next to message)
+    }
+
+    fun hasNext(memo: Memo? = null): Boolean {
+        if (next < data.size && memos != null && memo != null) {
+            memos[next] = memo
+        }
+
+        return next < limit
+    }
+
+    fun next(memo: Memo? = null): T? {
+        if (next < data.size && memos != null && memo != null) {
+            memos[next] = memo
+        }
+
+        return if (next < limit) {
+            data[next++]
+        } else {
+            null
+        }
+    }
+
+    fun peek(skip: Int = 0): T? {
+        return data.getOrNull(next + skip)
+    }
+
+    fun match(memo: Memo? = null, matcher: (T) -> Boolean): Boolean {
+        return if (next < limit && matcher(data[next])) {
+            if (memos != null && memo != null) {
+                memos[next] = memo
+            }
+            next++
+            true
+        } else {
+            false
+        }
+    }
+
+    fun matches(skip: Int = 0, matcher: (T) -> Boolean): Boolean {
+        val index = next + skip
+        return index in (0 until limit) && matcher(data[index])
+    }
+
+    fun match(value: T, memo: Memo? = null): Boolean {
+        return if (next < limit && value == data[next]) {
+            if (memos != null && memo != null) {
+                memos[next] = memo
+            }
+            next++
+            true
+        } else {
+            false
+        }
+    }
+
+    fun matches(skip: Int = 0, value: T): Boolean {
+        val index = next + skip
+        return index in (0 until limit) && value == data[index]
+    }
 }
