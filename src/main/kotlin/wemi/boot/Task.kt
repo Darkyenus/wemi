@@ -82,26 +82,24 @@ class Task(
 
         return try {
             val result = project.evaluate(configurations) {
-                using(configurations) {
-                    // Attach input, if any
-                    if (this@Task.input.isEmpty()) {
-                        this
-                    } else {
-                        val freeInput = ArrayList<String>()
-                        val boundInput = HashMap<String, String>()
+                // Attach input, if any
+                if (this@Task.input.isEmpty()) {
+                    this
+                } else {
+                    val freeInput = ArrayList<String>()
+                    val boundInput = HashMap<String, String>()
 
-                        for ((k, v) in this@Task.input) {
-                            if (k == null) {
-                                freeInput.add(v)
-                            } else {
-                                boundInput[k] = v
-                            }
+                    for ((k, v) in this@Task.input) {
+                        if (k == null) {
+                            freeInput.add(v)
+                        } else {
+                            boundInput[k] = v
                         }
-
-                        withMixedInput(freeInput.toTypedArray(), boundInput) { this }
-                    }.run {
-                        key.get()
                     }
+
+                    withMixedInput(freeInput.toTypedArray(), boundInput) { this }
+                }.run {
+                    key.get()
                 }
             }
 
