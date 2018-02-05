@@ -59,13 +59,13 @@ internal object TaskCompleter : Completer {
             return
         }
 
-        val tokenTypes = line.parsed.tokenTypes
-        val wordIndex = line.parsed.positionWord
+        val tokenTypes = line.tokenTypes
+        val wordIndex = line.positionWord
         val type = tokenTypes.getOrNull(wordIndex)
 
-        if ((type == Input || type == Other) && tokenTypes.getOrNull(wordIndex - 2) == InputKey) {
+        if ((type == Input || type == null) && tokenTypes.getOrNull(wordIndex - 2) == InputKey) {
             // Fill in from history for this key
-            val inputKey = line.parsed.tokens[wordIndex - 2]
+            val inputKey = line.words[wordIndex - 2]
             val history = SimpleHistory.getExistingHistory("input.$inputKey")
             if (history != null) {
                 for (item in history.items) {

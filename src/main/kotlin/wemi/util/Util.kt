@@ -177,21 +177,22 @@ typealias CodePoint = Int
  *
  * @param action function that takes index at which the codepoint starts and the codepoint itself
  */
-inline fun CharSequence.forCodePointsIndexed(action: (Index, CodePoint) -> Unit) {
+inline fun CharSequence.forCodePointsIndexed(action: (index:Index, cp:CodePoint) -> Unit) {
     val length = this.length
     var i = 0
 
     while (i < length) {
+        val baseIndex = i
         val c1 = get(i++)
         if (!Character.isHighSurrogate(c1) || i >= length) {
-            action(i, c1.toInt())
+            action(baseIndex, c1.toInt())
         } else {
             val c2 = get(i)
             if (Character.isLowSurrogate(c2)) {
                 i++
-                action(i, Character.toCodePoint(c1, c2))
+                action(baseIndex, Character.toCodePoint(c1, c2))
             } else {
-                action(i, c1.toInt())
+                action(baseIndex, c1.toInt())
             }
         }
     }
@@ -200,7 +201,7 @@ inline fun CharSequence.forCodePointsIndexed(action: (Index, CodePoint) -> Unit)
 /**
  * @see [forCodePointsIndexed] but ignores the index
  */
-inline fun CharSequence.forCodePoints(action: (CodePoint) -> Unit) {
+inline fun CharSequence.forCodePoints(action: (cp:CodePoint) -> Unit) {
     forCodePointsIndexed { _, cp ->
         action(cp)
     }

@@ -417,11 +417,10 @@ object CLI {
             return null
         }
 
-        val parsedTokens = TaskParser.parseTokens(command, 0)
-        val tokens = TaskParser.createTokens(parsedTokens.tokens)
-        val tasks = TaskParser.parseTasks(tokens)
+        val parsed = TaskParser.PartitionedLine(listOf(command), true, false)
+        val tasks = parsed.tasks
 
-        val errors = tokens.formattedErrors(true)
+        val errors = parsed.formattedErrors(true)
         if (errors.hasNext()) {
             do {
                 println(errors.next())

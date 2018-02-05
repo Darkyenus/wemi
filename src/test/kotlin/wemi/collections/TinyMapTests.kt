@@ -1,6 +1,7 @@
 package wemi.collections
 
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.util.*
 
@@ -59,7 +60,7 @@ class TinyMapTests {
         }
     }
 
-    fun measureMemory(instances:Int = 100_000, generator:()->Any):Double {
+    private fun measureMemory(instances:Int = 100_000, generator:()->Any):Double {
         val runtime = Runtime.getRuntime()
         val usedMemoryStart = runtime.totalMemory() - runtime.freeMemory()
 
@@ -85,6 +86,7 @@ class TinyMapTests {
         return (usedMemoryEnd - usedMemoryStart).toDouble() / instances
     }
 
+    @Disabled("Development only")
     @Test
     fun memory() {
         val baseline = measureMemory { Object() }
@@ -240,22 +242,6 @@ class TinyMapTests {
 
         fun pContainsValue(v:V):Boolean {
             return super.containsValue(v)
-        }
-    }
-
-    //TODO Configure proper tests
-    companion object {
-        @JvmStatic
-        fun main(args: Array<String>) {
-            val tests = TinyMapTests()
-
-            tests.basics()
-
-            tests.stress()
-
-            println("TESTS OK\n\n")
-
-            tests.memory()
         }
     }
 }

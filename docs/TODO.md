@@ -1,6 +1,10 @@
 # Things to do next
 
+- Resolve all tasks before launching
+
 - Modify sourceFiles so that when not in compilingJava/Kotlin, all source files are added
+
+- Fix TaskCompleter, as it is probably broken after last TaskParser rewrite
 
 - Maven parallel repository resolution
 

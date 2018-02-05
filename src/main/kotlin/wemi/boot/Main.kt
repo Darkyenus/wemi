@@ -260,14 +260,13 @@ fun main(args: Array<String>) {
     // ------------------------------------
 
     var exitCode = EXIT_CODE_SUCCESS
-    val taskTokens = TaskParser.createTokens(TaskParser.parseTokens(taskArguments))
-    val tasks = TaskParser.parseTasks(taskTokens, machineReadableOutput)
+    val parsedArgs = TaskParser.PartitionedLine(taskArguments, false, machineReadableOutput)
 
     if (machineReadableOutput) {
-        taskTokens.machineReadableCheckErrors()
+        parsedArgs.machineReadableCheckErrors()
 
         val out = machineOutput!!
-        for (task in tasks) {
+        for (task in parsedArgs.tasks) {
             machineReadableEvaluateAndPrint(out, task)
         }
 
@@ -276,13 +275,10 @@ fun main(args: Array<String>) {
             while (true) {
                 val line = reader.readLine() ?: break
 
-                val parsedTokens = TaskParser.parseTokens(line, 0)
-                val lineTaskTokens = TaskParser.createTokens(parsedTokens.tokens)
-                val lineTasks = TaskParser.parseTasks(lineTaskTokens, true)
+                val parsed = TaskParser.PartitionedLine(listOf(line), true, true)
+                parsed.machineReadableCheckErrors()
 
-                lineTaskTokens.machineReadableCheckErrors()
-
-                for (task in lineTasks) {
+                for (task in parsed.tasks) {
                     machineReadableEvaluateAndPrint(out, task)
                 }
             }
@@ -292,14 +288,14 @@ fun main(args: Array<String>) {
 
         var lastTaskResult: TaskEvaluationResult? = null
 
-        val formattedErrors = taskTokens.formattedErrors(true)
+        val formattedErrors = parsedArgs.formattedErrors(true)
         if (formattedErrors.hasNext()) {
             println(format("Errors in task input:", Color.Red))
             do {
                 println(formattedErrors.next())
             } while (formattedErrors.hasNext())
         } else {
-            for (task in tasks) {
+            for (task in parsedArgs.tasks) {
                 lastTaskResult = CLI.evaluateAndPrint(task)
             }
         }
@@ -311,13 +307,13 @@ fun main(args: Array<String>) {
                 val data = lastTaskResult.data
                 if (data is WithExitCode) {
                     exitCode = data.processExitCode()
-                    LOG.debug("WithExitCode - using the exit code of '{}': {}", tasks.last(), exitCode)
+                    LOG.debug("WithExitCode - using the exit code of '{}': {}", parsedArgs.tasks.last(), exitCode)
                 } else {
-                    LOG.debug("WithExitCode - {} does not provide exit code", tasks.last())
+                    LOG.debug("WithExitCode - {} does not provide exit code", parsedArgs.tasks.last())
                 }
             } else {
                 exitCode = EXIT_CODE_TASK_ERROR
-                LOG.debug("WithExitCode - {} evaluation failed", tasks.last())
+                LOG.debug("WithExitCode - {} evaluation failed", parsedArgs.tasks.last())
             }
         }
     }
@@ -326,10 +322,10 @@ fun main(args: Array<String>) {
 }
 
 /**
- * Checks if [Tokens] contain errors after parsing.
+ * Checks if [TaskParser.PartitionedLine] contain errors after parsing.
  * If there are any, print them and exit process.
  */
-private fun Tokens<String, TaskParser.TokenType>.machineReadableCheckErrors() {
+private fun TaskParser.PartitionedLine.machineReadableCheckErrors() {
     val formattedErrors = formattedErrors(false)
     if (formattedErrors.hasNext()) {
         LOG.error("Errors in task input:")

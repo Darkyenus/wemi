@@ -9,11 +9,8 @@ import org.junit.jupiter.api.Test
 class TaskParserTests {
 
     private fun assertEquals(line:String, vararg tasks:Task) {
-        val lines = TaskParser.parseTokens(line, 0)
-        val tokens = TaskParser.createTokens(lines.tokens)
-        val parsedTasks = TaskParser.parseTasks(tokens).toTypedArray()
-
-        assertArrayEquals(tasks, parsedTasks)
+        val parsed = TaskParser.PartitionedLine(listOf(line), true, false)
+        assertArrayEquals(tasks, parsed.tasks.toTypedArray())
     }
 
     private fun assertEqualsMulti(line: String, vararg tasks: Task) {
