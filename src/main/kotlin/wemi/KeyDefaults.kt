@@ -8,19 +8,25 @@ import wemi.Configurations.archiving
 import wemi.Configurations.assembling
 import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
-import wemi.assembly.*
+import wemi.Configurations.publishing
+import wemi.assembly.AssemblyOperation
+import wemi.assembly.DefaultRenameFunction
+import wemi.assembly.NoConflictStrategyChooser
+import wemi.assembly.NoPrependData
 import wemi.boot.WemiBuildScript
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
-import wemi.dependency.DependencyId
-import wemi.dependency.DependencyResolver
-import wemi.dependency.ResolvedDependency
-import wemi.dependency.prettyPrint
+import wemi.dependency.*
+import wemi.dependency.Repository.M2.Companion.JavadocClassifier
+import wemi.dependency.Repository.M2.Companion.SourcesClassifier
+import wemi.dependency.Repository.M2.Companion.joinClassifiers
+import wemi.publish.InfoNode
 import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
 import wemi.util.*
+import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.*
@@ -75,6 +81,17 @@ object KeyDefaults {
 
         result
     }
+
+    /**
+     * Create value for [Keys.libraryDependencyProjectMapper] that appends given classifier to sources.
+     */
+    fun classifierAppendingLibraryDependencyProjectMapper(appendClassifier:String):(Dependency) -> Dependency = {
+        (projectId, exclusions): Dependency ->
+            val classifier = joinClassifiers(projectId.attribute(Repository.M2.Classifier), appendClassifier)!!
+            val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (Repository.M2.Classifier to classifier))
+            Dependency(sourcesProjectId, exclusions)
+        }
+
 
     val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<DependencyId, ResolvedDependency>>> = {
         val repositories = Keys.repositoryChain.get()
@@ -470,6 +487,203 @@ object KeyDefaults {
 
                 outputFile
             }
+        }
+    }
+
+    private val PUBLISH_MODEL_LOG = LoggerFactory.getLogger("PublishModelM2")
+    /**
+     * Creates Maven2 compatible pom.xml-like [InfoNode].
+     * 
+     * [Configurations.publishing] scope is applied at [Keys.publish], so this does not handle it.
+     */
+    val PublishModelM2: BoundKeyValue<InfoNode> = {
+        /*
+        Commented out code is intended as example when customizing own publishMetadata pom.xml.
+        
+        Full pom.xml specification can be obtained here:
+        https://maven.apache.org/ref/3.5.2/maven-model/maven.html
+        
+        Mandatory fields are described here:
+        https://maven.apache.org/project-faq.html
+        */
+        InfoNode("project") {
+            newChild("modelVersion", "4.0.0")
+            attribute("xmlns", "http://maven.apache.org/POM/4.0.0")
+            attribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
+            attribute("xsi:schemaLocation", "http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd")
+
+            newChild("groupId", Keys.projectGroup.get()) // MANDATORY
+            newChild("artifactId", Keys.projectName.get()) // MANDATORY
+            newChild("version", Keys.projectVersion.get()) // MANDATORY
+
+            newChild("packaging", "jar") // MANDATORY (defaults to jar)
+
+            newChild("name") // MANDATORY, filled by user
+            newChild("description") // MANDATORY, filled by user
+            newChild("url") // MANDATORY, filled by user
+            newChild("inceptionYear", Keys.startYear.get().toString())
+
+            /* Example
+            newChild("organization") {
+                newChild("name", "ACME Codes Inc.")
+                newChild("url", "https://acme.codes.example.com")
+            }
+            */
+
+            newChild("licenses") // Mandatory, filled by user
+            /*{ Example
+                newChild("license") {
+                    newChild("name", "MyLicense")
+                    newChild("url", "https://my.license.example.com")
+                    newChild("distribution", "repo") // or manual, if user has to download this *dependency* manually
+                    newChild("comments") // Optional comments
+                }
+            }*/
+
+            /* Example
+            newChild("developers") { // People directly developing the project
+                newChild("developer") {
+                    newChild("id", "Darkyenus") // SCM handle (for example Github login)
+                    newChild("name", "Jan Polák") // Full name
+                    newChild("email", "darkyenus@example.com")
+                    newChild("url", "https://example.com")
+                    newChild("organization", "ACME Codes Inc.")
+                    newChild("organizationUrl", "https://acme.codes.example.com")
+                    newChild("roles") {
+                        newChild("role", "Developer")
+                        newChild("role", "Creator of Wemi")
+                    }
+                    newChild("timezone", "Europe/Prague") // Or number, such as +1 or -14
+                    newChild("properties") {
+                        newChild("IRC", "Darkyenus") // Any key-value pairs
+                    }
+                }
+            }
+            newChild("contributors") { // People contributing to the project, but without SCM access
+                newChild("contributor") {
+                    // Same as "developer", but without "id"
+                }
+            }
+            */
+
+            /* Example
+            newChild("scm") {
+                // See https://maven.apache.org/scm/scms-overview.html
+                newChild("connection", "scm:git:https://github.com/Darkyenus/WEMI")
+                newChild("developerConnection", "scm:git:https://github.com/Darkyenus/WEMI")
+                newChild("tag", "HEAD")
+                newChild("url", "https://github.com/Darkyenus/WEMI")
+            }
+            */
+
+            /* Example
+            newChild("issueManagement") {
+                newChild("system", "GitHub Issues")
+                newChild("url", "https://github.com/Darkyenus/WEMI/issues")
+            }
+            */
+
+            newChild("dependencies") {
+                for (dependency in Keys.libraryDependencies.get()) {
+                    newChild("dependency") {
+                        newChild("groupId", dependency.dependencyId.group)
+                        newChild("artifactId", dependency.dependencyId.name)
+                        newChild("version", dependency.dependencyId.version)
+                        dependency.dependencyId.attribute(Repository.M2.Type)?.let {
+                            newChild("type", it)
+                        }
+                        dependency.dependencyId.attribute(Repository.M2.Classifier)?.let {
+                            newChild("classifier", it)
+                        }
+                        dependency.dependencyId.attribute(Repository.M2.Scope)?.let {
+                            newChild("scope", it)
+                        }
+                        newChild("exclusions") {
+                            for (exclusion in dependency.exclusions) {
+                                if (exclusion in DefaultExclusions) {
+                                    continue
+                                }
+                                // Check if Maven compatible (only group and name is set)
+                                val mavenCompatible = exclusion.group != "*"
+                                        && exclusion.name != "*"
+                                        && exclusion.version == "*"
+                                        && exclusion.attributes.isEmpty()
+
+                                if (mavenCompatible) {
+                                    newChild("exclusion") {
+                                        newChild("artifactId", exclusion.name)
+                                        newChild("groupId", exclusion.group)
+                                    }
+                                } else {
+                                    PUBLISH_MODEL_LOG.warn("Exclusion {} on {} is not supported by pom.xml and will be omitted", exclusion, dependency.dependencyId)
+                                }
+                            }
+                        }
+                        dependency.dependencyId.attribute(Repository.M2.Optional)?.let {
+                            newChild("optional", it)
+                        }
+                    }
+                }
+            }
+
+            newChild("repositories") {
+                for (repository in Keys.repositories.get()) {
+                    if (repository == MavenCentral) {
+                        // Added by default
+                        continue
+                    }
+                    if (repository !is Repository.M2) {
+                        PUBLISH_MODEL_LOG.warn("Omitting repository {}, only M2 repositories are supported", repository)
+                        continue
+                    }
+                    if (repository.local) {
+                        PUBLISH_MODEL_LOG.warn("Omitting repository {}, it is local")
+                        continue
+                    }
+
+                    newChild("repository") {
+                        /* Extra info we don't collect
+                        newChild("releases") {
+                            newChild("enabled", "true") // Use for downloading releases?
+                            newChild("updatePolicy") // always, daily (default), interval:<minutes>, never
+                            newChild("checksumPolicy") // ignore, fail, warn (default)
+                        }
+                        newChild("snapshots") {
+                            // Like "releases"
+                        }
+                        */
+                        newChild("id", repository.name)
+                        //newChild("name", "Human readable name")
+                        newChild("url", repository.url.toString())
+                    }
+                }
+            }
+        }
+    }
+
+    val PublishM2: BoundKeyValue<URI> = {
+        using(publishing) {
+            val repository = Keys.publishRepository.get()
+
+            val artifact = Keys.archive.get()
+            val sourceArtifact = using(Configurations.archivingSources) { Keys.archive.get() }
+            val docsArtifact = using(Configurations.archivingDocs) { Keys.archive.get() }
+
+            val metadata = Keys.publishMetadata.get()
+            val classifier = Keys.publishClassifier.get()
+
+            val artifacts = ArrayList<Pair<Path, String?>>()
+            if (artifact != null) {
+                artifacts.add(artifact to classifier)
+            }
+            if (sourceArtifact != null) {
+                artifacts.add(sourceArtifact to joinClassifiers(classifier, SourcesClassifier))
+            }
+            if (docsArtifact != null) {
+                artifacts.add(docsArtifact to joinClassifiers(classifier, JavadocClassifier))
+            }
+
+            repository.publish(metadata, artifacts)
         }
     }
 

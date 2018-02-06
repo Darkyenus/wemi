@@ -137,7 +137,7 @@ fun StringBuilder.appendByteSize(bytes: Long): StringBuilder {
 /**
  * Append given [character] multiple [times]
  */
-fun StringBuilder.append(character:Char, times:Int):StringBuilder {
+fun StringBuilder.appendTimes(character:Char, times:Int):StringBuilder {
     if (times <= 0) {
         return this
     }
@@ -159,7 +159,7 @@ fun StringBuilder.appendCentered(text:String, width:Int, padding:Char):StringBui
 
     val leftPad = padAmount / 2
     val rightPadding = padAmount - leftPad
-    return append(padding, leftPad).append(text).append(padding, rightPadding)
+    return appendTimes(padding, leftPad).append(text).appendTimes(padding, rightPadding)
 }
 
 /**

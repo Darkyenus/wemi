@@ -1,8 +1,16 @@
 # Things to do next
 
-- Resolve all tasks before launching
-
 - Modify sourceFiles so that when not in compilingJava/Kotlin, all source files are added
+
+- Maven publishing
+
+- Javadoc archiving
+
+- KDoc archiving
+
+- PGP signatures
+
+- Deprecate and remove Keys.inceptionYear
 
 - Fix TaskCompleter, as it is probably broken after last TaskParser rewrite
 

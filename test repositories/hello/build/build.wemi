@@ -44,6 +44,15 @@ val hello by project {
 
     mainClass set { "hello.HelloWemiKt" }
 
+    publishMetadata modify { metadata ->
+        metadata.child("name").text = "Wemi Hello World Project"
+        metadata.child("description").text = "Demonstrates usage of Wemi"
+        metadata.removeChild("url")
+        metadata.removeChild("licenses")
+
+        metadata
+    }
+
 
     foxColor set { "Red" }
 }
@@ -62,4 +71,13 @@ val wonderland by configuration("When in wonderland") {
 
 val heaven by configuration("Like wonderland, but better", wonderland) {
     foxColor set { "Octarine" }
+}
+
+/**
+ * Running this project should produce the same result as running [hello], after it was published.
+ */
+val helloFromRepository by project(archetypes = wemi.Archetypes.DependenciesOnly) {
+    libraryDependencies add { dependency("com.darkyen:hello:1.0-SNAPSHOT") }
+
+    mainClass set { "hello.HelloWemiKt" }
 }

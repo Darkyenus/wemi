@@ -3,13 +3,15 @@
 package wemi
 
 import configuration
+import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.assembly.AssemblyOperation
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
 import wemi.compile.*
 import wemi.dependency.Dependency
-import wemi.dependency.Repository.M2.Companion.Classifier
+import wemi.dependency.Repository.M2.Companion.JavadocClassifier
+import wemi.dependency.Repository.M2.Companion.SourcesClassifier
 import wemi.test.JUnitPlatformLauncher
 import wemi.util.*
 import java.time.ZonedDateTime
@@ -120,9 +122,9 @@ object Configurations {
                             .append('|').appendCentered(nameHeading, nameWidth, ' ')
                             .append('|').appendCentered(versionHeading, versionWidth, ' ').append("|\n")
 
-                    md.append("|:").append('-', groupWidth - 2)
-                            .append(":|:").append('-', nameWidth - 2)
-                            .append(":|:").append('-', versionWidth - 2).append(":|\n")
+                    md.append("|:").appendTimes('-', groupWidth - 2)
+                            .append(":|:").appendTimes('-', nameWidth - 2)
+                            .append(":|:").appendTimes('-', versionWidth - 2).append(":|\n")
 
                     md.append('|').appendCentered(projectGroup, groupWidth, ' ')
                             .append('|').appendCentered(projectName, nameWidth, ' ')
@@ -151,23 +153,19 @@ object Configurations {
     }
     //endregion
 
+    //region Publishing
+    val publishing by configuration("Used when publishing archived outputs") {}
+    //endregion
+
     //region IDE configurations
     val retrievingSources by configuration("Used to retrieve sources") {
-        Keys.libraryDependencyProjectMapper set {
-            { (projectId, exclusions): Dependency ->
-                val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (Classifier to "sources"))
-                Dependency(sourcesProjectId, exclusions)
-            }
-        }
+        val mapper = classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier)
+        Keys.libraryDependencyProjectMapper set { mapper }
     }
 
     val retrievingDocs by configuration("Used to retrieve documentation") {
-        Keys.libraryDependencyProjectMapper set {
-            { (projectId, exclusions): Dependency ->
-                val javadocProjectId = projectId.copy(attributes = projectId.attributes + (Classifier to "javadoc"))
-                Dependency(javadocProjectId, exclusions)
-            }
-        }
+        val mapper = classifierAppendingLibraryDependencyProjectMapper(JavadocClassifier)
+        Keys.libraryDependencyProjectMapper set { mapper }
     }
     //endregion
 

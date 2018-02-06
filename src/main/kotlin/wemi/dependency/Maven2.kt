@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory
 import org.xml.sax.*
 import org.xml.sax.helpers.DefaultHandler
 import org.xml.sax.helpers.XMLReaderFactory
-import wemi.dependency.MavenDependencyResolver.PomBuildingXMLHandler.Companion.SupportedModelVersion
+import wemi.dependency.Maven2.PomBuildingXMLHandler.Companion.SupportedModelVersion
 import wemi.util.*
 import java.io.ByteArrayInputStream
 import java.net.URL
@@ -19,9 +19,9 @@ import kotlin.collections.HashMap
 /**
  * Manages resolution of dependencies through [Repository.M2] Maven repository.
  */
-internal object MavenDependencyResolver {
+internal object Maven2 {
 
-    private val LOG = LoggerFactory.getLogger(MavenDependencyResolver::class.java)
+    private val LOG = LoggerFactory.getLogger(Maven2::class.java)
 
     private val PomFile = ArtifactKey<Path>("pomFile", true)
     private val PomData = ArtifactKey<ByteArray>("pomData", false)
@@ -611,15 +611,23 @@ internal object MavenDependencyResolver {
     }
 
     private fun DependencyId.pomPath(): String {
+        return Maven2.pomPath(group, name, version)
+    }
+
+    private fun DependencyId.artifactPath(extension: String): String {
+        val classifier = attribute(Repository.M2.Classifier)
+        return Maven2.artifactPath(group, name, version, classifier, extension)
+    }
+
+    fun pomPath(group:String, name:String, version:String):String {
         val sb = group.replace('.', '/') / name / version
         sb.append('/').append(name).append('-').append(version).append(".pom")
         return sb.toString()
     }
 
-    private fun DependencyId.artifactPath(extension: String): String {
+    fun artifactPath(group:String, name:String, version:String, classifier:String?, extension: String):String {
         val fileName = StringBuilder()
         fileName.append(name).append('-').append(version)
-        val classifier = attribute(Repository.M2.Classifier)
         if (classifier != null) {
             fileName.append('-').append(classifier)
         }

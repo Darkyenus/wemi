@@ -7,10 +7,12 @@ import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
+import wemi.publish.InfoNode
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.prettyPrint
 import wemi.util.*
+import java.net.URI
 import java.nio.file.Path
 import javax.tools.JavaCompiler
 
@@ -20,6 +22,10 @@ import javax.tools.JavaCompiler
 @Suppress("RemoveExplicitTypeArguments")
 object Keys {
 
+    /**
+     * See http://central.sonatype.org/pages/choosing-your-coordinates.html for information
+     * about how to determine correct groupId.
+     */
     val projectGroup by key<String>("Project group (aka groupId)")
     val projectName by key<String>("Project name (aka artifactId)")
     val projectVersion by key<String>("Project version (aka revision)")
@@ -76,7 +82,12 @@ object Keys {
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it.prettyPrint() })
 
     val archiveOutputFile by key<Path>("File to which archive should be saved to")
-    val archive by key<Path>("Archive project's output and return path to the created file")
+    val archive by key<Path?>("Archive project's output and return path to the created file, if any")
+
+    val publishMetadata by key<InfoNode>("Meta information that should be published together with archives by 'publish'")
+    val publishRepository by key<Repository>("Repository to which the archives are published")
+    val publishClassifier by key<String?>("Classifier that is being published, for repositories that support such notion", defaultValue = null)
+    val publish by key<URI>("Publish archives to 'publishRepository' and return the URI to where it was published")
 
     val assemblyMergeStrategy by key<MergeStrategyChooser>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
     val assemblyRenameFunction by key<RenameFunction>("Function for renaming assembled duplicate files for which merge strategy is Rename. Paths after rename must not conflict, rules are not recursive.")

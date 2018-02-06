@@ -1,9 +1,11 @@
 package wemi.dependency
 
 import com.esotericsoftware.jsonbeans.Json
+import org.slf4j.LoggerFactory
 import wemi.boot.MachineWritable
-import wemi.util.WSet
-import wemi.util.wSetOf
+import wemi.publish.InfoNode
+import wemi.util.*
+import java.net.URI
 import java.net.URL
 import java.nio.file.*
 import java.security.MessageDigest
@@ -33,6 +35,14 @@ sealed class Repository(val name: String) : MachineWritable {
      */
     internal abstract fun directoryToLock(): Path?
 
+    /**
+     * Publish [artifacts]s to this repository, under given [metadata]
+     * and return the general location to where it was published.
+     *
+     * @param artifacts list of artifacts and their classifiers if any
+     */
+    internal abstract fun publish(metadata: InfoNode, artifacts: List<Pair<Path, String?>>):URI
+
     /** Maven repository.
      *
      * @param name of this repository, arbitrary
@@ -43,22 +53,82 @@ sealed class Repository(val name: String) : MachineWritable {
     class M2(name: String, val url: URL, override val cache: M2? = null, val checksum: Checksum = M2.Checksum.SHA1) : Repository(name) {
 
         override val local: Boolean
-            get() = cache == null
+            get() = "file".equals(url.protocol, ignoreCase = true)
 
         override fun resolveInRepository(dependency: Dependency, chain: RepositoryChain): ResolvedDependency {
-            return MavenDependencyResolver.resolveInM2Repository(dependency, this, chain)
+            return Maven2.resolveInM2Repository(dependency, this, chain)
         }
 
         override fun directoryToLock(): Path? {
+            return directoryPath()
+        }
+
+        /**
+         * @return Path to the directory root, if on this filesystem
+         */
+        private fun directoryPath(): Path? {
             try {
-                if ("file".equals(url.protocol, ignoreCase = true)) {
+                if (local) {
                     return FileSystems.getDefault().getPath(url.path)
                 }
             } catch (ignored:Exception) { }
             return null
         }
 
+        override fun publish(metadata: InfoNode, artifacts: List<Pair<Path, String?>>): URI {
+            val lock = directoryToLock()
+
+            if (lock != null) {
+                return directorySynchronized(lock) {
+                    publishLocked(metadata, artifacts)
+                }
+            } else {
+                return publishLocked(metadata, artifacts)
+            }
+        }
+
+        private fun Path.checkValidForPublish(snapshot:Boolean) {
+            if (Files.exists(this)) {
+                if (snapshot) {
+                    LOG.info("Overwriting {}", this)
+                } else {
+                    throw UnsupportedOperationException("Can't overwrite published non-snapshot file $this")
+                }
+            } else {
+                Files.createDirectories(this.parent)
+            }
+        }
+
+        private fun publishLocked(metadata: InfoNode, artifacts: List<Pair<Path, String?>>):URI {
+            val path = directoryPath() ?: throw UnsupportedOperationException("Can't publish to non-local repository")
+
+            val groupId = metadata.findChild("groupId")?.text ?: throw IllegalArgumentException("Metadata is missing a groupId:\n"+metadata)
+            val artifactId = metadata.findChild("artifactId")?.text ?: throw IllegalArgumentException("Metadata is missing a artifactId:\n"+metadata)
+            val version = metadata.findChild("version")?.text ?: throw IllegalArgumentException("Metadata is missing a version:\n"+metadata)
+
+            val snapshot = version.endsWith("-SNAPSHOT")
+
+            val pomPath = path / Maven2.pomPath(groupId, artifactId, version)
+            LOG.debug("Publishing metadata to {}", pomPath)
+            pomPath.checkValidForPublish(snapshot)
+            Files.newBufferedWriter(pomPath, Charsets.UTF_8).use {
+                it.append(metadata.toXML())
+            }
+
+            for ((artifact, classifier) in artifacts) {
+                val publishedArtifact = path / Maven2.artifactPath(groupId, artifactId, version, classifier, artifact.name.pathExtension())
+                LOG.debug("Publishing {} to {}", artifact, publishedArtifact)
+                publishedArtifact.checkValidForPublish(snapshot)
+
+                Files.copy(artifact, publishedArtifact, StandardCopyOption.REPLACE_EXISTING)
+            }
+
+            return pomPath.parent.toUri()
+        }
+
         companion object {
+            private val LOG = LoggerFactory.getLogger(M2::class.java)
+
             /**
              * Various variants of the same dependency.
              * Examples: jdk15, sources, javadoc, linux
@@ -84,6 +154,26 @@ sealed class Repository(val name: String) : MachineWritable {
              * Optional dependencies are skipped by default by Wemi.
              */
             val Optional = DependencyAttribute("m2-optional", false, "false")
+
+            /**
+             * Concatenate two classifiers.
+             */
+            internal fun joinClassifiers(first:String?, second:String?):String? {
+                when {
+                    first == null -> return second
+                    second == null -> return first
+                    else -> return "$first-$second"
+                }
+            }
+
+            /**
+             * Classifier appended to artifacts with sources
+             */
+            const val SourcesClassifier = "sources"
+            /**
+             * Classifier appended to artifacts with Javadoc
+             */
+            const val JavadocClassifier = "javadoc"
         }
 
         /**
@@ -152,9 +242,7 @@ fun createRepositoryChain(repositories: Collection<Repository>): RepositoryChain
 
     // Inline cache into the list
     for (repository in repositories) {
-        if (!list.contains(repository.cache ?: continue)) {
-            list.add(repository)
-        }
+        list.add(repository.cache ?: continue)
     }
 
     // Sort to search local/cache first
@@ -200,12 +288,7 @@ val Jitpack = Repository.M2("jitpack", URL("https://jitpack.io/"))
 /**
  * Repositories to use by default.
  *
- * @see LocalM2Repository
  * @see MavenCentral
+ * @see LocalM2Repository (included as cache of [MavenCentral])
  */
-val DefaultRepositories: WSet<Repository> = wSetOf(
-        /* It would seem that local is added twice here (2nd as a cache of local),
-         but that is semantically correct, because LocalM2Repository is not only a cache. */
-        LocalM2Repository,
-        MavenCentral
-)
+val DefaultRepositories: WSet<Repository> = wSetOf(MavenCentral)

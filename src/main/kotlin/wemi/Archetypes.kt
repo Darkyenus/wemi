@@ -7,6 +7,7 @@ import wemi.assembly.JarMergeStrategyChooser
 import wemi.boot.WemiRunningInInteractiveMode
 import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
+import wemi.dependency.LocalM2Repository
 import wemi.dependency.createRepositoryChain
 import wemi.run.javaExecutable
 import wemi.util.*
@@ -41,7 +42,6 @@ object Archetypes {
         Keys.resourceRoots set KeyDefaults.ResourceRoots
         Keys.resourceFiles set KeyDefaults.ResourceFiles
 
-        Keys.repositories set { DefaultRepositories }
         Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
         Keys.internalClasspath set KeyDefaults.InternalClasspath
@@ -49,9 +49,6 @@ object Archetypes {
 
         Keys.clean set KeyDefaults.Clean
 
-        Keys.javaHome set { wemi.run.JavaHome }
-        Keys.javaExecutable set { javaExecutable(Keys.javaHome.get()) }
-        Keys.javaCompiler set { ToolProvider.getSystemJavaCompiler() }
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources")
         Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers")
@@ -70,6 +67,12 @@ object Archetypes {
      * Implements basic key implementations for JVM that don't usually change.
      */
     val _JVMBase_ by archetype(::_Base_) {
+        Keys.repositories set { DefaultRepositories }
+
+        Keys.javaHome set { wemi.run.JavaHome }
+        Keys.javaExecutable set { javaExecutable(Keys.javaHome.get()) }
+        Keys.javaCompiler set { ToolProvider.getSystemJavaCompiler() }
+
         //Keys.mainClass TODO Detect main class?
         Keys.runOptions set KeyDefaults.RunOptions
         Keys.run set KeyDefaults.Run
@@ -79,6 +82,10 @@ object Archetypes {
         Keys.test set KeyDefaults.Test
 
         Keys.archiveOutputFile set { Keys.buildDirectory.get() / "${Keys.projectName.get()}-${Keys.projectVersion.get()}.jar" }
+
+        Keys.publishMetadata set KeyDefaults.PublishModelM2
+        Keys.publishRepository set { LocalM2Repository }
+        Keys.publish set KeyDefaults.PublishM2
 
         Keys.assemblyMergeStrategy set {
             JarMergeStrategyChooser
@@ -100,6 +107,7 @@ object Archetypes {
      * Archetype for projects that serve only as an aggregation of dependencies and do not have any own sources.
      */
     val DependenciesOnly by archetype(::_JVMBase_) {
+        //TODO IDE still detects some sources here
         Keys.internalClasspath set { wEmptyList() }
 
         Keys.sourceBases set { wEmptySet() }
