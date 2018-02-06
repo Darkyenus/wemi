@@ -76,7 +76,7 @@ val heaven by configuration("Like wonderland, but better", wonderland) {
 /**
  * Running this project should produce the same result as running [hello], after it was published.
  */
-val helloFromRepository by project(archetypes = wemi.Archetypes.DependenciesOnly) {
+val helloFromRepository by project(wemi.Archetypes.DependenciesOnly) {
     libraryDependencies add { dependency("com.darkyen:hello:1.0-SNAPSHOT") }
 
     mainClass set { "hello.HelloWemiKt" }

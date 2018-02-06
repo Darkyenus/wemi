@@ -111,9 +111,24 @@ sealed class Repository(val name: String) : MachineWritable {
             val pomPath = path / Maven2.pomPath(groupId, artifactId, version)
             LOG.debug("Publishing metadata to {}", pomPath)
             pomPath.checkValidForPublish(snapshot)
+            val pomXML = metadata.toXML()
             Files.newBufferedWriter(pomPath, Charsets.UTF_8).use {
-                it.append(metadata.toXML())
+                it.append(pomXML)
             }
+            // Create pom.xml hashes
+            run {
+                val pomXMLBytes = pomXML.toString().toByteArray(Charsets.UTF_8)
+                for (checksum in PublishChecksums) {
+                    val digest = checksum.digest()!!.digest(pomXMLBytes)
+
+                    val publishedName = pomPath.name
+                    val checksumFile = pomPath.parent.resolve("$publishedName${checksum.suffix}")
+                    checksumFile.checkValidForPublish(snapshot)
+
+                    checksumFile.writeText(createHashSum(digest, publishedName))
+                }
+            }
+
 
             for ((artifact, classifier) in artifacts) {
                 val publishedArtifact = path / Maven2.artifactPath(groupId, artifactId, version, classifier, artifact.name.pathExtension())
@@ -121,6 +136,31 @@ sealed class Repository(val name: String) : MachineWritable {
                 publishedArtifact.checkValidForPublish(snapshot)
 
                 Files.copy(artifact, publishedArtifact, StandardCopyOption.REPLACE_EXISTING)
+                // Create hashes
+                val checksums = PublishChecksums
+                val digests = Array(checksums.size) { checksums[it].digest()!! }
+
+                Files.newInputStream(artifact).use { input ->
+                    val buffer = ByteArray(4096)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read == -1) {
+                            break
+                        }
+                        for (digest in digests) {
+                            digest.update(buffer, 0, read)
+                        }
+                    }
+                }
+                for (i in checksums.indices) {
+                    val digest = digests[i].digest()
+
+                    val publishedName = publishedArtifact.name
+                    val checksumFile = publishedArtifact.parent.resolve("$publishedName${checksums[i].suffix}")
+                    checksumFile.checkValidForPublish(snapshot)
+
+                    checksumFile.writeText(createHashSum(digest, publishedName))
+                }
             }
 
             return pomPath.parent.toUri()
@@ -174,12 +214,17 @@ sealed class Repository(val name: String) : MachineWritable {
              * Classifier appended to artifacts with Javadoc
              */
             const val JavadocClassifier = "javadoc"
+
+            /**
+             * [Checksum]s to generate when publishing an artifact.
+             */
+            val PublishChecksums = arrayOf(Checksum.MD5, Checksum.SHA1)
         }
 
         /**
          * Types of checksum in Maven repositories.
          *
-         * @param suffix of files with this checksum
+         * @param suffix of files with this checksum (extension with dot)
          * @param algo Java digest algorithm name to use when computing this checksum
          */
         enum class Checksum(val suffix: String, private val algo: String) {
@@ -189,17 +234,32 @@ sealed class Repository(val name: String) : MachineWritable {
              * Not recommended for general use - use only in extreme cases.
              */
             None(".no-checksum", "no-op"),
+            // https://en.wikipedia.org/wiki/File_verification
+            /**
+             * Standard SHA1 algorithm with .md5 suffix.
+             */
+            MD5(".md5", "MD5"),
             /**
              * Standard SHA1 algorithm with .sha1 suffix.
              */
             SHA1(".sha1", "SHA-1");
 
-            fun checksum(data: ByteArray): ByteArray {
+            /**
+             * Creates a [MessageDigest] for this [Checksum].
+             * @return null if [None]
+             * @throws java.security.NoSuchAlgorithmException if not installed
+             */
+            fun digest():MessageDigest? {
                 if (this == None) {
-                    return kotlin.ByteArray(0)
+                    return null
                 }
                 val digest = MessageDigest.getInstance(algo)
                 digest.reset()
+                return digest
+            }
+
+            fun checksum(data: ByteArray): ByteArray {
+                val digest = digest() ?: return ByteArray(0)
                 digest.update(data)
                 return digest.digest()
             }

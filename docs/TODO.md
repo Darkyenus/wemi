@@ -1,8 +1,10 @@
 # Things to do next
 
-- Modify sourceFiles so that when not in compilingJava/Kotlin, all source files are added
+- "./wemi helloFromRepository/run" causes havoc when entered into Wemi console
 
-- Maven publishing
+- When archiving (for publication?) include dependent projects
+
+- Modify sourceFiles so that when not in compilingJava/Kotlin, all source files are added
 
 - Javadoc archiving
 

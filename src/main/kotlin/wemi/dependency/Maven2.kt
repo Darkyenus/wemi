@@ -10,6 +10,7 @@ import org.xml.sax.helpers.XMLReaderFactory
 import wemi.dependency.Maven2.PomBuildingXMLHandler.Companion.SupportedModelVersion
 import wemi.util.*
 import java.io.ByteArrayInputStream
+import java.io.FileNotFoundException
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
@@ -18,6 +19,9 @@ import kotlin.collections.HashMap
 
 /**
  * Manages resolution of dependencies through [Repository.M2] Maven repository.
+ *
+ * Maven repository layout is described here:
+ * https://cwiki.apache.org/confluence/display/MAVENOLD/Repository+Layout+-+Final
  */
 internal object Maven2 {
 
@@ -195,7 +199,7 @@ internal object Maven2 {
             }
             for ((property, value) in parent.properties) {
                 if (!properties.contains(property)) {
-                    properties.put(property, value)
+                    properties[property] = value
                 }
             }
         }
@@ -215,7 +219,11 @@ internal object Maven2 {
         try {
             response = webb.get(url.toExternalForm()).executeBytes()
         } catch (e: WebbException) {
-            LOG.debug("Failed to retrieve '{}' from {}", path, repository, e)
+            if (e.cause is FileNotFoundException) {
+                LOG.debug("Failed to retrieve '{}' from {}, file does not exist", path, repository)
+            } else {
+                LOG.debug("Failed to retrieve '{}' from {}", path, repository, e)
+            }
             return Pair(null, null)
         }
 
@@ -225,33 +233,33 @@ internal object Maven2 {
         }
 
         // Checksum
-        var computedChecksumString: String? = null
-
         val checksum = repository.checksum
+        var computedChecksum:ByteArray? = null
         if (checksum != Repository.M2.Checksum.None) {
             // Compute checksum
-            val computedChecksum = checksum.checksum(response.body)
-            computedChecksumString = toHexString(computedChecksum)
+            computedChecksum = checksum.checksum(response.body)
 
             try {
                 // Retrieve checksum
                 val expectedChecksumData = webb.get((repository.url / (path + checksum.suffix)).toExternalForm()).executeString().body
-                // Checksum files sometimes also contain filename after hash, separated by whitespace
-                val expectedChecksumString = expectedChecksumData.takeWhile { !it.isWhitespace() }
-                val expectedChecksum = fromHexString(expectedChecksumString)
+                val expectedChecksum = parseHashSum(expectedChecksumData)
 
                 when {
-                    expectedChecksum == null ->
-                        LOG.warn("Checksum of '{}' in {} is malformed ('{}'), continuing without checksum", path, repository, expectedChecksumString)
-                    Arrays.equals(expectedChecksum, computedChecksum) ->
+                    expectedChecksum.isEmpty() ->
+                        LOG.warn("Checksum of '{}' in {} is malformed ('{}'), continuing without checksum", path, repository, expectedChecksumData)
+                    hashMatches(expectedChecksum, computedChecksum, path.takeLastWhile { it != '/' }) ->
                         LOG.trace("Checksum of '{}' in {} is valid", path, repository)
                     else -> {
-                        LOG.warn("Checksum of '{}' in {} is wrong! Expected {}, got {}", path, repository, computedChecksumString, toHexString(expectedChecksum))
+                        LOG.warn("Checksum of '{}' in {} is wrong! Expected {}, got {}", path, repository, computedChecksum, expectedChecksumData)
                         return Pair(null, null)
                     }
                 }
             } catch (e: WebbException) {
-                LOG.warn("Failed to retrieve {} checksum '{}' from {}, continuing without checksum", checksum, path, repository, e)
+                if (e.cause is FileNotFoundException) {
+                    LOG.warn("Failed to retrieve {} checksum '{}' from {}, file does not exist, continuing without checksum", checksum, path, repository)
+                } else {
+                    LOG.warn("Failed to retrieve {} checksum '{}' from {}, continuing without checksum", checksum, path, repository, e)
+                }
             } catch (e: Exception) {
                 LOG.warn("Failed to verify checksum of '{}' in {}, continuing without checksum", path, repository, e)
             }
@@ -297,15 +305,12 @@ internal object Maven2 {
 
                 if (dataFileWritten && cache.checksum != Repository.M2.Checksum.None) {
                     val checksumFile: Path = (cache.url / (path + cache.checksum.suffix)).toPath()!!
-                    var checksumString: String? = null
-                    if (repository.checksum == cache.checksum) {
-                        checksumString = computedChecksumString
+                    if (computedChecksum == null) {
+                        computedChecksum = cache.checksum.checksum(response.body)
                     }
-                    if (checksumString == null) {
-                        checksumString = toHexString(cache.checksum.checksum(response.body))
-                    }
+
                     try {
-                        checksumFile.writeText(checksumString)
+                        checksumFile.writeText(createHashSum(computedChecksum, path.takeLastWhile { it != '/' }))
                         LOG.debug("Checksum of file '{}' from {} cached successfully", path, repository)
                     } catch (e: Exception) {
                         LOG.warn("Error trying to save checksum of '{}' from {} into cache at {} - file '{}'", path, repository, cache, checksumFile, e)
