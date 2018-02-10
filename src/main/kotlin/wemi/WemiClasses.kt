@@ -723,6 +723,26 @@ class Scope internal constructor(
         buildToString(sb)
         return sb.toString()
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as Scope
+
+        if (name != other.name) return false
+        if (scopeBindingHolders != other.scopeBindingHolders) return false
+        if (scopeParent != other.scopeParent) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = name.hashCode()
+        result = 31 * result + scopeBindingHolders.hashCode()
+        result = 31 * result + (scopeParent?.hashCode() ?: 0)
+        return result
+    }
 }
 
 private val LOG: Logger = LoggerFactory.getLogger("BindingHolder")

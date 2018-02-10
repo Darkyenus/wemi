@@ -56,6 +56,7 @@ object Keys {
     }, cacheMode = CACHE_ALWAYS)
     val unmanagedDependencies by key<WList<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = wEmptyList())
     val projectDependencies by key<WSet<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = wEmptySet())
+    val resolvedProjectDependencies by key<WList<LocatedFile>>("Classpath contribution of projectDependencies into externalClasspath")
 
     val externalClasspath by key<WList<LocatedFile>>("Classpath of the project, elements from external sources, i.e. library and project dependencies", defaultValue = wEmptyList())
     val internalClasspath by key<WList<LocatedFile>>("Classpath of the project, created internally, i.e. compiled sources and resources", defaultValue = wEmptyList())

@@ -1,7 +1,5 @@
 # Things to do next
 
-- When archiving (for publication?) include dependent projects
-
 - Modify sourceFiles so that when not in compilingJava/Kotlin, all source files are added
 
 - Javadoc archiving

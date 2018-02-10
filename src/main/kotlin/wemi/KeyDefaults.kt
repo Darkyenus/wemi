@@ -100,8 +100,28 @@ object KeyDefaults {
         Partial(resolved, complete)
     }
 
+    private val ResolvedProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
+    val ResolvedProjectDependencies: BoundKeyValue<WList<LocatedFile>> = {
+        ResolvedProjectDependencies_CircularDependencyProtection.block(this, failure = {
+            //TODO Show cycle
+            throw WemiException("Cyclic dependencies in projectDependencies are not allowed", showStacktrace = false)
+        }, action = {
+            val result = WMutableList<LocatedFile>()
+            val projectDependencies = Keys.projectDependencies.get()
+
+            for (projectDependency in projectDependencies) {
+                // Enter a different scope
+                projectDependency.project.evaluate(*projectDependency.configurations) {
+                    ExternalClasspath_LOG.debug("Resolving project dependency on {}", this)
+                    result.addAll(Keys.externalClasspath.get())
+                    result.addAll(Keys.internalClasspath.get())
+                }
+            }
+            result
+        })
+    }
+
     private val ExternalClasspath_LOG = LoggerFactory.getLogger("ProjectDependencyResolution")
-    private val ExternalClasspath_CircularDependencyProtection = CycleChecker<Scope>()
     val ExternalClasspath: BoundKeyValue<WList<LocatedFile>> = {
         val result = WMutableList<LocatedFile>()
 
@@ -113,21 +133,8 @@ object KeyDefaults {
             result.add(LocatedFile(resolvedDependency.artifact ?: continue))
         }
 
-        ExternalClasspath_CircularDependencyProtection.block(this, failure = {
-            //TODO Show cycle
-            throw WemiException("Cyclic dependencies in projectDependencies are not allowed", showStacktrace = false)
-        }, action = {
-            val projectDependencies = Keys.projectDependencies.get()
-
-            for (projectDependency in projectDependencies) {
-                // Enter a different scope
-                projectDependency.project.evaluate(*projectDependency.configurations) {
-                    ExternalClasspath_LOG.debug("Resolving project dependency on {}", this)
-                    result.addAll(Keys.externalClasspath.get())
-                    result.addAll(Keys.internalClasspath.get())
-                }
-            }
-        })
+        val projectDependencies = Keys.resolvedProjectDependencies.get()
+        result.addAll(projectDependencies)
 
         val unmanaged = Keys.unmanagedDependencies.get()
         result.addAll(unmanaged)
@@ -466,6 +473,34 @@ object KeyDefaults {
         }
     }
 
+    /**
+     * Special version of [Archive] that includes classpath contributions from [Keys.projectDependencies].
+     */
+    val ArchivePublishing: BoundKeyValue<Path> = {
+        using(archiving) {
+            AssemblyOperation().use { assemblyOperation ->
+                // Load data
+                for (file in Keys.internalClasspath.get()) {
+                    assemblyOperation.addSource(file, true)
+                }
+
+                for (file in Keys.resolvedProjectDependencies.get()) {
+                    assemblyOperation.addSource(file, false)
+                }
+
+                val outputFile = Keys.archiveOutputFile.get()
+                assemblyOperation.assembly(
+                        NoConflictStrategyChooser,
+                        DefaultRenameFunction,
+                        outputFile,
+                        NoPrependData,
+                        compress = true)
+
+                outputFile
+            }
+        }
+    }
+
     val ArchiveSources: BoundKeyValue<Path> = {
         using(archiving) {
             AssemblyOperation().use { assemblyOperation ->
@@ -521,6 +556,7 @@ object KeyDefaults {
             newChild("name") // MANDATORY, filled by user
             newChild("description") // MANDATORY, filled by user
             newChild("url") // MANDATORY, filled by user
+            @Suppress("DEPRECATION")
             newChild("inceptionYear", Keys.startYear.get().toString())
 
             /* Example
