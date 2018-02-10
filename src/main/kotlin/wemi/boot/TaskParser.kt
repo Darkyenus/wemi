@@ -276,13 +276,12 @@ object TaskParser : Parser {
                         continue
                     }
                     if (w == 0) {
-                        sb.append('>')
                         if (colored) {
                             sb.format(format = Format.Underline).append(parts[w].text).format()
                         } else {
+                            sb.append('➤')
                             sb.append(parts[w].text)
                         }
-                        sb.append('<')
                     } else {
                         sb.append(parts[w].text)
                     }
