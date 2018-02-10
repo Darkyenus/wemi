@@ -6,11 +6,11 @@
 
 - Javadoc archiving
 
-- Deprecate and remove Keys.inceptionYear
-
 - KDoc archiving
 
-###### Release
+###### Release 0.2
+
+- Remove Keys.startYear
 
 - PGP signatures
 

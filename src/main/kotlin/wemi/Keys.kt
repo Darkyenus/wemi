@@ -30,6 +30,8 @@ object Keys {
     val projectName by key<String>("Project name (aka artifactId)")
     val projectVersion by key<String>("Project version (aka revision)")
 
+    @Deprecated("Set manually in publishMetadata")
+    //TODO Remove in 0.3
     val startYear by key<Int>("Year of project's inception")
 
     val projectRoot by key<Path>("Root directory of the project")
