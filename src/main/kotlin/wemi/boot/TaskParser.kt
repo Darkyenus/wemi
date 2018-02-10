@@ -477,10 +477,7 @@ object TaskParser : Parser {
             val tasks = ArrayList<Task>()
 
             while (hasNextPart()) {
-                val task = matchTask(machineReadable)
-                if (task != null) {
-                    tasks.add(task)
-                }
+                tasks.add(matchTask(machineReadable) ?: break)
             }
 
             return tasks

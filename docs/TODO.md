@@ -1,18 +1,18 @@
 # Things to do next
 
-- "./wemi helloFromRepository/run" causes havoc when entered into Wemi console
-
 - When archiving (for publication?) include dependent projects
 
 - Modify sourceFiles so that when not in compilingJava/Kotlin, all source files are added
 
 - Javadoc archiving
 
+- Deprecate and remove Keys.inceptionYear
+
 - KDoc archiving
 
-- PGP signatures
+###### Release
 
-- Deprecate and remove Keys.inceptionYear
+- PGP signatures
 
 - Fix TaskCompleter, as it is probably broken after last TaskParser rewrite
 
