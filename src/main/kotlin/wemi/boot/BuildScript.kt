@@ -2,8 +2,6 @@ package wemi.boot
 
 import org.slf4j.LoggerFactory
 import wemi.WemiKotlinVersion
-import wemi.WemiVersion
-import wemi.WemiVersionIsSnapshot
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags
@@ -165,49 +163,45 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
 private fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
     val wemiLauncherFile = WemiLauncherFile
     if (wemiLauncherFile.name.endsWith(".jar", ignoreCase = true) || wemiLauncherFile.isDirectory()) {
-        LOG.debug("WemiLauncherFileWithJar is unchanged {}", wemiLauncherFile)
+        LOG.debug("wemiLauncherFileWithJarExtension used unchanged {}", wemiLauncherFile)
         return wemiLauncherFile
     }
     // We have create a link to/copy of the launcher file somewhere and name it with .jar
+    val linked = cacheFolder / "wemi-launcher-link.jar"
 
-    val name = if (WemiVersionIsSnapshot) {
-        val digest = wemiLauncherFile.hash("MD5")
-        val sb = StringBuilder()
-        sb.append(WemiVersion)
-        sb.append('.')
-        sb.append(toHexString(digest))
-        sb.append(".jar")
-        sb.toString()
-    } else {
-        "wemi-$WemiVersion.jar"
-    }
-
-    val wemiLauncherLinksDirectory = cacheFolder / "wemi-launcher-links"
-    Files.createDirectories(wemiLauncherLinksDirectory)
-    val linked = wemiLauncherLinksDirectory / name
-
-    if (Files.exists(linked) && Files.getLastModifiedTime(wemiLauncherFile) < Files.getLastModifiedTime(linked)) {
+    if (Files.exists(linked) && Files.exists(wemiLauncherFile.toRealPath())
+            && (Files.isSameFile(linked, wemiLauncherFile) // If link
+            || Files.getLastModifiedTime(wemiLauncherFile) < Files.getLastModifiedTime(linked) // If copy
+                    )) {
         // Already exists and is fresh
-        LOG.debug("WemiLauncherFileWithJar is existing {}", linked)
+        LOG.debug("wemiLauncherFileWithJarExtension is existing {}", linked)
         return linked
     }
 
     Files.deleteIfExists(linked)
+
     try {
         val result = Files.createSymbolicLink(linked, wemiLauncherFile)
-        LOG.debug("WemiLauncherFileWithJar is just linked {}", result)
+        LOG.debug("wemiLauncherFileWithJarExtension is soft-linked {}", result)
         return result
     } catch (e: Exception) {
-        LOG.warn("Failed to link {} to {}, copying", wemiLauncherFile, linked, e)
+        LOG.debug("Failed to soft-link {} to {}", wemiLauncherFile, linked, e)
+    }
+    try {
+        val result = Files.createLink(linked, wemiLauncherFile)
+        LOG.debug("wemiLauncherFileWithJarExtension is hard-linked {}", result)
+        return result
+    } catch (e: Exception) {
+        LOG.debug("Failed to hard-link {} to {}", wemiLauncherFile, linked, e)
+    }
 
-        try {
-            Files.copy(wemiLauncherFile, linked)
-            LOG.debug("WemiLauncherFileWithJar is just copied {}", linked)
-            return linked
-        } catch (e: Exception) {
-            LOG.warn("Failed to copy {} to {}, returning non-jar file", wemiLauncherFile, linked, e)
-            return wemiLauncherFile
-        }
+    try {
+        Files.copy(wemiLauncherFile, linked)
+        LOG.debug("WemiLauncherFileWithJar is copied {}", linked)
+        return linked
+    } catch (e: Exception) {
+        LOG.warn("Failed to link or copy {} to {}, operations requiring Wemi launcher as jar will probably fail", wemiLauncherFile, linked, e)
+        return wemiLauncherFile
     }
 }
 

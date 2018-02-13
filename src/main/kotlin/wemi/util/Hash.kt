@@ -1,9 +1,5 @@
 package wemi.util
 
-import java.nio.file.Files
-import java.nio.file.Path
-import java.security.DigestInputStream
-import java.security.MessageDigest
 import java.util.*
 import kotlin.collections.ArrayList
 
@@ -57,22 +53,6 @@ fun fromHexString(data: CharSequence): ByteArray? {
     } else {
         Arrays.copyOf(bytes, byteI)
     }
-}
-
-/**
- * Hash the contents of this file using [algorithm] and return the result.
- *
- * Default algorithm is MD5, which is fast but not secure against attacks.
- */
-fun Path.hash(algorithm: String = "MD5"): ByteArray {
-    val md = MessageDigest.getInstance(algorithm)
-    DigestInputStream(Files.newInputStream(this), md).use {
-        val buf = ByteArray(1024)
-        while (it.read(buf) != -1) {
-        }
-        it.close()
-    }
-    return md.digest()
 }
 
 /**
