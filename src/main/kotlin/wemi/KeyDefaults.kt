@@ -506,10 +506,7 @@ object KeyDefaults {
         using(archiving) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
-                for (file in using(compilingJava) { Keys.sourceFiles.get() }) {
-                    assemblyOperation.addSource(file, true)
-                }
-                for (file in using(compilingKotlin) { Keys.sourceFiles.get() }) {
+                for (file in Keys.sourceFiles.get()) {
                     assemblyOperation.addSource(file, true)
                 }
 

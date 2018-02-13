@@ -26,7 +26,7 @@ object Keys {
      * See http://central.sonatype.org/pages/choosing-your-coordinates.html for information
      * about how to determine correct groupId.
      */
-    val projectGroup by key<String>("Project group (aka groupId)")
+    val projectGroup by key<String>("Project group (a.k.a. groupId)")
     val projectName by key<String>("Project name (aka artifactId)")
     val projectVersion by key<String>("Project version (aka revision)")
 
@@ -44,6 +44,11 @@ object Keys {
     val sourceBases by key<WSet<Path>>("Directory in which all source directories can be found (example: '/src/main')", defaultValue = wEmptySet())
     val sourceRoots by key<WSet<Path>>("Directories which are source roots for the project (example: '/src/main/java')", defaultValue = wEmptySet())
     val sourceExtensions by key<WSet<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)", defaultValue = wEmptySet())
+    /**
+     * By default returns all source files. To retrieve only those files that belong to one particular language,
+     * use language configuration, for example [wemi.Configurations.compilingJava].
+     * Under [wemi.Configurations.testing] contains test sources as well (in addition to normal sources).
+     */
     val sourceFiles by key<WList<LocatedFile>>("Files to be compiled. Usually derived from sourceRoots and sourceFilter. Maps source root -> source files", defaultValue = wEmptyList())
     val resourceRoots by key<WSet<Path>>("Directories which are resource roots for the project (example: '/src/main/resources')", defaultValue = wEmptySet())
     val resourceFiles by key<WList<LocatedFile>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files", defaultValue = wEmptyList())

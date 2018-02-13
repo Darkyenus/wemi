@@ -33,6 +33,8 @@ object Configurations {
     val compilingJava by configuration("Configuration layer used when compiling Java sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { JavaSourceFileExtensions }
+        Keys.sourceFiles set KeyDefaults.SourceFiles
+
         Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
         Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
         Keys.compilerOptions[JavaCompilerFlags.targetVersion] = JavaVersion.V1_8
@@ -41,6 +43,8 @@ object Configurations {
     val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
         Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
         Keys.sourceExtensions set { KotlinSourceFileExtensions }
+        Keys.sourceFiles set KeyDefaults.SourceFiles
+
         Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance() }
         Keys.compilerOptions modify {
             it.apply {

@@ -12,10 +12,8 @@ import wemi.dependency.DefaultRepositories
 import wemi.dependency.LocalM2Repository
 import wemi.dependency.createRepositoryChain
 import wemi.run.javaExecutable
-import wemi.util.div
-import wemi.util.wEmptyList
-import wemi.util.wEmptySet
-import wemi.util.wMutableSetOf
+import wemi.util.*
+import java.nio.file.Path
 import javax.tools.ToolProvider
 
 /**
@@ -44,7 +42,8 @@ object Archetypes {
         Keys.buildDirectory set { WemiBuildFolder }
         Keys.cacheDirectory set { WemiCacheFolder }
         Keys.sourceBases set { wMutableSetOf(Keys.projectRoot.get() / "src/main") }
-        Keys.sourceFiles set KeyDefaults.SourceFiles
+        // Source files and roots are set elsewhere
+
         Keys.resourceRoots set KeyDefaults.ResourceRoots
         Keys.resourceFiles set KeyDefaults.ResourceFiles
 
@@ -122,8 +121,8 @@ object Archetypes {
         Keys.internalClasspath set { wEmptyList() }
 
         Keys.sourceBases set { wEmptySet() }
-        Keys.sourceFiles set { wEmptyList() }
         Keys.sourceRoots set { wEmptySet() }
+        Keys.sourceFiles set { wEmptyList() }
 
         Keys.resourceRoots set { wEmptySet() }
         Keys.resourceFiles set { wEmptyList() }
@@ -133,7 +132,10 @@ object Archetypes {
      * Primary archetype for projects that use pure Java.
      */
     val JavaProject by archetype(::_JVMBase_) {
+        Keys.sourceRoots set { using(Configurations.compilingJava) { Keys.sourceRoots.get() } }
+        Keys.sourceFiles set { using(Configurations.compilingJava) { Keys.sourceFiles.get() } }
         Keys.compile set KeyDefaults.CompileJava
+
         extend(Configurations.archivingDocs) {
             Keys.archiveJavadocOptions set KeyDefaults.ArchiveJavadocOptions
             Keys.archive set KeyDefaults.ArchiveJavadoc
@@ -144,6 +146,22 @@ object Archetypes {
      * Primary archetype for projects that use Java and Kotlin.
      */
     val JavaKotlinProject by archetype(::_JVMBase_) {
+        Keys.sourceRoots set {
+            val java = using(Configurations.compilingJava) { Keys.sourceRoots.get() }
+            val kotlin = using(Configurations.compilingKotlin) { Keys.sourceRoots.get() }
+            val files = WMutableSet<Path>(java.size + kotlin.size)
+            files.addAll(java)
+            files.addAll(kotlin)
+            files
+        }
+        Keys.sourceFiles set {
+            val java = using(Configurations.compilingJava) { Keys.sourceFiles.get() }
+            val kotlin = using(Configurations.compilingKotlin) { Keys.sourceFiles.get() }
+            val files = WMutableList<LocatedFile>(java.size + kotlin.size)
+            files.addAll(java)
+            files.addAll(kotlin)
+            files
+        }
         Keys.libraryDependencies add { kotlinDependency("stdlib") }
         Keys.compile set KeyDefaults.CompileJavaKotlin
     }

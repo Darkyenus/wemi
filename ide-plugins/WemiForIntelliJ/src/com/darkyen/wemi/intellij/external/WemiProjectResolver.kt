@@ -334,28 +334,24 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
     }
 
     private fun createWemiProjectData(session: WemiLauncherSession, projectName:String):WemiProjectData {
-        val compilerOptions = session.jsonArray(projectName, task = "compilerOptions", configurations = *arrayOf("compilingJava"))
+        val javacOptions = session.jsonArray(projectName, task = "compilerOptions", configurations = *arrayOf("compilingJava"))
         return WemiProjectData(
                 projectName,
                 session.string(projectName, task = "projectName"),
                 session.stringOrNull(projectName, task = "projectGroup?"),
                 session.stringOrNull(projectName, task = "projectVersion?"),
                 session.string(projectName, task = "projectRoot"),
-                compilerOptions.let {
+                javacOptions.let {
                     it.mapGet("sourceVersion")?.asString() ?: ""
                 },
-                compilerOptions.let {
+                javacOptions.let {
                     it.mapGet("targetVersion")?.asString() ?: ""
                 },
                 session.string(projectName, task = "outputClassesDirectory"),
                 session.string(projectName, configurations = *arrayOf("testing"), task = "outputClassesDirectory"),
-                session.stringArray(projectName, configurations = *arrayOf("compilingJava"), task = "sourceRoots")
-                        .union(session.stringArray(projectName, configurations = *arrayOf("compilingKotlin"), task = "sourceRoots").asIterable())
-                        .toTypedArray(),
+                session.stringArray(projectName, task = "sourceRoots"),
                 session.stringArray(projectName, task = "resourceRoots"),
-                session.stringArray(projectName, "testing", "compilingJava", task = "sourceRoots")
-                        .union(session.stringArray(projectName, "testing", "compilingKotlin", task = "sourceRoots").asIterable())
-                        .toTypedArray(),
+                session.stringArray(projectName, "testing", task = "sourceRoots"),
                 session.stringArray(projectName, "testing", task = "resourceRoots")
                 )
     }
