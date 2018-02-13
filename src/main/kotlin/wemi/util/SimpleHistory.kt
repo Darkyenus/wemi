@@ -3,7 +3,7 @@ package wemi.util
 import org.jline.reader.History
 import org.jline.reader.LineReader
 import org.slf4j.LoggerFactory
-import wemi.boot.WemiBuildScript
+import wemi.boot.WemiCacheFolder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -263,8 +263,7 @@ internal class SimpleHistory(private val path: Path?) : History {
          */
         @JvmStatic
         private fun getHistoryFile(name: String): Path? {
-            val buildScript = WemiBuildScript ?: return null
-            val historiesFolder = buildScript.buildFolder.resolve("cache/history/")
+            val historiesFolder = WemiCacheFolder.resolve("history")
             Files.createDirectories(historiesFolder)
             val fileName = StringBuilder()
             for (c in name) {

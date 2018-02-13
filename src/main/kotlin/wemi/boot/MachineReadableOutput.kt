@@ -66,7 +66,8 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
                         } else {
                             json.writeObjectStart()
 
-                            json.writeValue("buildFolder", buildFile.buildFolder)
+                            json.writeValue("buildFolder", WemiBuildFolder)
+                            json.writeValue("cacheFolder", WemiCacheFolder)
                             json.writeValue("sources", buildFile.sources)
                             json.writeValue("scriptJar", buildFile.scriptJar)
                             json.writeValue("classpath", buildFile.classpath)

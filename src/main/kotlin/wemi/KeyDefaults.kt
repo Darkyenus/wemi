@@ -575,7 +575,7 @@ object KeyDefaults {
             val sourceFiles = using(compilingJava){ Keys.sourceFiles.get() }
 
             val diagnosticListener:DiagnosticListener<JavaFileObject> = DiagnosticListener { diagnostic ->
-                ARCHIVE_JAVADOC_LOG.info("{}", diagnostic)//TODO Make debug
+                ARCHIVE_JAVADOC_LOG.debug("{}", diagnostic)
             }
 
             val documentationTool = ToolProvider.getSystemDocumentationTool()!!

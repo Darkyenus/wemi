@@ -55,8 +55,7 @@ internal fun findBuildScriptSources(buildFolder: Path): List<Path> {
  *
  * Tries to use existing files before compiling.
  */
-internal fun getBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScript? {
-    val cacheFolder = buildFolder / "cache"
+internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScript? {
     if (cacheFolder.exists() && !cacheFolder.isDirectory()) {
         LOG.error("Build directory {} exists and is not a directory", cacheFolder)
         return null
@@ -155,8 +154,7 @@ internal fun getBuildScript(rootFolder: Path, buildFolder: Path, buildScriptSour
         // Compilation is handled lazily later, in BuildScript.ready()
     }
 
-    return BuildScript(
-            rootFolder, resultJar, buildFolder, cacheFolder,
+    return BuildScript(resultJar,
             classpath,
             // Figure out the init class
             buildScriptSources.map { transformFileNameToKotlinClassName(it.name.pathWithoutExtension()) }.toWList(),
@@ -343,16 +341,11 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
 }
 
 /**
- * @property wemiRoot directory in which wemi executable is (./)
  * @property scriptJar jar to which the build script has been compiled
- * @property buildFolder ./build folder
- * @property cacheFolder ./build/cache folder
  * @property classpath used to compile and to run the scriptJar
  * @property initClasses main classes of the [scriptJar]
  */
-data class BuildScript(val wemiRoot: Path,
-                       val scriptJar: Path,
-                       val buildFolder: Path, val cacheFolder: Path,
+data class BuildScript(val scriptJar: Path,
                        val classpath: WList<Path>, val initClasses: WList<String>,
                        val buildScriptClasspathConfiguration: BuildScriptClasspathConfiguration,
                        val sources: WList<LocatedFile>, val buildFlags: CompilerFlags,

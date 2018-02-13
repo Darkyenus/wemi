@@ -4,14 +4,18 @@ package wemi
 
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.JarMergeStrategyChooser
-import wemi.boot.WemiBuildScript
+import wemi.boot.WemiBuildFolder
+import wemi.boot.WemiCacheFolder
 import wemi.boot.WemiRunningInInteractiveMode
 import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
 import wemi.dependency.LocalM2Repository
 import wemi.dependency.createRepositoryChain
 import wemi.run.javaExecutable
-import wemi.util.*
+import wemi.util.div
+import wemi.util.wEmptyList
+import wemi.util.wEmptySet
+import wemi.util.wMutableSetOf
 import javax.tools.ToolProvider
 
 /**
@@ -37,8 +41,8 @@ object Archetypes {
     val _Base_ by archetype {
         Keys.input set { InputBase(WemiRunningInInteractiveMode) }
 
-        Keys.buildDirectory set { WemiBuildScript?.buildFolder ?: Keys.projectRoot.get() / "build" }
-        Keys.cacheDirectory set { WemiBuildScript?.cacheFolder ?: Keys.projectRoot.get() / "build/cache" }
+        Keys.buildDirectory set { WemiBuildFolder }
+        Keys.cacheDirectory set { WemiCacheFolder }
         Keys.sourceBases set { wMutableSetOf(Keys.projectRoot.get() / "src/main") }
         Keys.sourceFiles set KeyDefaults.SourceFiles
         Keys.resourceRoots set KeyDefaults.ResourceRoots

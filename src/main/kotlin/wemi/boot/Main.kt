@@ -14,6 +14,7 @@ import wemi.util.*
 import java.io.*
 import java.net.URL
 import java.net.URLClassLoader
+import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
 import kotlin.system.exitProcess
@@ -46,6 +47,36 @@ const val EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND = 56
 internal var WemiRunningInInteractiveMode = false
     private set
 
+/**
+ * Directory in which wemi executable is (./)
+ */
+var WemiRootFolder: Path = Paths.get(".").toAbsolutePath()
+    private set(value) {
+        if (field == value) {
+            return
+        }
+        field = value
+        WemiBuildFolder = value / "build"
+    }
+
+/**
+ * ./build folder
+ */
+var WemiBuildFolder: Path = WemiRootFolder / "build"
+    private set(value) {
+        if (field == value) {
+            return
+        }
+        field = value
+        WemiCacheFolder = value / "cache"
+    }
+
+/**
+ * ./build/cache folder
+ */
+var WemiCacheFolder: Path = WemiBuildFolder / "cache"
+    private set
+
 var WemiBuildScript: BuildScript? = null
     private set
 
@@ -67,7 +98,6 @@ fun main(args: Array<String>) {
     var exitIfNoTasks = false
     var machineReadableOutput = false
     var allowBrokenBuildScripts = false
-    var root = Paths.get(".").toAbsolutePath()
 
     var parsingOptions = true
 
@@ -94,7 +124,7 @@ fun main(args: Array<String>) {
                 } else if (arg.startsWith(ROOT_PREFIX, ignoreCase = true)) {
                     val newRoot = Paths.get(arg.substring(ROOT_PREFIX.length)).toAbsolutePath()
                     if (newRoot.isDirectory()) {
-                        root = newRoot
+                        WemiRootFolder = newRoot
                     } else {
                         errors++
                         if (newRoot.exists()) {
@@ -166,9 +196,8 @@ fun main(args: Array<String>) {
 
     WemiRunningInInteractiveMode = interactive
 
-    LOG.trace("Starting Wemi from root: {}", root)
-    val buildFolder = root / "build"
-    val buildScriptSources = findBuildScriptSources(buildFolder)
+    LOG.trace("Starting Wemi from root: {}", WemiRootFolder)
+    val buildScriptSources = findBuildScriptSources(WemiBuildFolder)
 
     // Setup logging
     val consoleLogger = ConsoleLogFunction(null, null)
@@ -182,7 +211,7 @@ fun main(args: Array<String>) {
         TPLogger.setLogFunction(LogFunctionMultiplexer(
                 FileLogFunction(TimeFormatter.AbsoluteTimeFormatter(),
                         LogFileHandler(
-                                (buildFolder / "logs").toFile(),
+                                (WemiBuildFolder / "logs").toFile(),
                                 DateTimeFileCreationStrategy(
                                         DateTimeFileCreationStrategy.DEFAULT_DATE_TIME_FILE_NAME_FORMATTER,
                                         false,
@@ -200,14 +229,14 @@ fun main(args: Array<String>) {
             if (allowBrokenBuildScripts) {
                 null
             } else {
-                LOG.warn("No build script sources found in {}", buildFolder)
+                LOG.warn("No build script sources found in {}", WemiBuildFolder)
                 exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
             }
         } else {
-            directorySynchronized(buildFolder, {
-                LOG.info("Waiting for lock on {}", buildFolder)
+            directorySynchronized(WemiBuildFolder, {
+                LOG.info("Waiting for lock on {}", WemiBuildFolder)
             }) {
-                val compiledBuildScript = getBuildScript(root, buildFolder, buildScriptSources, cleanBuild)
+                val compiledBuildScript = getBuildScript(WemiCacheFolder, buildScriptSources, cleanBuild)
                 if (compiledBuildScript == null) {
                     LOG.warn("Failed to prepare build script")
                     if (allowBrokenBuildScripts) {
@@ -235,7 +264,7 @@ fun main(args: Array<String>) {
 
     // Load build files now
     if (buildScript != null) {
-        PrettyPrinter.setApplicationRootDirectory(buildScript.wemiRoot)
+        PrettyPrinter.setApplicationRootDirectory(WemiRootFolder)
 
         val urls = arrayOfNulls<URL>(1 + buildScript.classpath.size)
         urls[0] = buildScript.scriptJar.toUri().toURL()
@@ -284,7 +313,7 @@ fun main(args: Array<String>) {
             }
         }
     } else {
-        CLI.init(root)
+        CLI.init(WemiRootFolder)
 
         var lastTaskResult: TaskEvaluationResult? = null
 

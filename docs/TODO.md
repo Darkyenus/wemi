@@ -1,6 +1,6 @@
 # Things to do next
 
-- Make buildFolder and buildCache static, do not take them from WemiBuildScript
+- Simplify creating wemi.jar link
 
 - Modify sourceFiles so that when not in compilingJava/Kotlin, all source files are added
 
