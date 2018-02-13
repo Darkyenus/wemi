@@ -444,22 +444,26 @@ object CLI {
         val prompt = format("> ", format = Format.Bold).toString()
 
         while (true) {
+            val line:String?
             try {
-                val line = lineReader.readLine(prompt)
+                line = lineReader.readLine(prompt)
                 if (line.isNullOrBlank()) {
                     continue
                 }
-
-                evaluateLine(line)
             } catch (interrupt: UserInterruptException) {
                 // User wants to delete written line or exit
                 if (interrupt.partialLine.isNullOrEmpty()) {
                     break
                 }
+                continue
             } catch (_: EndOfFileException) {
                 break
             } catch (_: IOException) {
                 break
+            }
+
+            try {
+                evaluateLine(line)
             } catch (e: Exception) {
                 LOG.error("Error in interactive loop", e)
             }

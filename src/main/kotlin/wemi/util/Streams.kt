@@ -2,6 +2,7 @@ package wemi.util
 
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.Writer
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.Charset
@@ -112,6 +113,78 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
      */
     override fun close() {
         decode(true)
+        flushLine()
+    }
+}
+
+/**
+ * [Writer] that buffers characters until the text forms a valid line, ended with '\n'.
+ * Then it takes the line and calls [onLineRead] with it, without the line end.
+ *
+ * [close] to obtain the last line without ending '\n'.
+ */
+open class LineReadingWriter(private val onLineRead: (CharSequence) -> Unit) : Writer() {
+
+    private val outputSB = StringBuilder()
+
+    private fun flushLine() {
+        onLineRead(outputSB)
+        outputSB.setLength(0)
+    }
+
+    override fun append(csq: CharSequence?): Writer {
+        return append(csq, 0, csq?.length ?: 0)
+    }
+
+    override fun append(csq: CharSequence?, start: Int, end: Int): Writer {
+        if (csq == null) {
+            outputSB.append(null as String?)
+        } else {
+            for (i in start until end) {
+                append(csq[i])
+            }
+        }
+        return this
+    }
+
+    override fun append(c: Char): Writer {
+        if (c == '\n') {
+            onLineRead(outputSB)
+            outputSB.setLength(0)
+        } else {
+            outputSB.append(c)
+        }
+        return this
+    }
+
+    override fun write(c: Int) {
+        append(c.toChar())
+    }
+
+    override fun write(cbuf: CharArray, off: Int, len: Int) {
+        for (i in off until (off + len)) {
+            append(cbuf[i])
+        }
+    }
+
+    override fun write(str: String, off: Int, len: Int) {
+        append(str, off, off+len)
+    }
+
+    /**
+     * No-op.
+     */
+    override fun flush() {}
+
+    /**
+     * Flushes the pending, unfinished line.
+     * Writing further bytes into the stream after closing it leads to an undefined behavior.
+     */
+    override fun close() {
+        if (outputSB.isNotEmpty()) {
+            onLineRead(outputSB)
+            outputSB.setLength(0)
+        }
         flushLine()
     }
 }

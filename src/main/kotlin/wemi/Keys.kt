@@ -35,7 +35,8 @@ object Keys {
     val startYear by key<Int>("Year of project's inception")
 
     val projectRoot by key<Path>("Root directory of the project")
-    val buildDirectory by key<Path>("Directory in which Wemi stores cache and processed data")
+    val buildDirectory by key<Path>("Directory with Wemi build scripts, directories with logs, cache, etc.")
+    val cacheDirectory by key<Path>("Directory in which Wemi stores cache and processed data")
     val buildScript by key<BuildScript>("Build script used to load this project")
 
     val input by key<Input>("Provides access to user input, that can be programmatically pre-set")
@@ -85,6 +86,7 @@ object Keys {
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it.prettyPrint() })
 
     val archiveOutputFile by key<Path>("File to which archive should be saved to")
+    val archiveJavadocOptions by key<WList<String>>("Options when archiving javadoc")
     val archive by key<Path?>("Archive project's output and return path to the created file, if any")
 
     val publishMetadata by key<InfoNode>("Meta information that should be published together with archives by 'publish'")

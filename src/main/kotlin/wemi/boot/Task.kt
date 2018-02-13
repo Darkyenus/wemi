@@ -108,6 +108,8 @@ class Task(
             TaskEvaluationResult(key, e, TaskEvaluationStatus.NotAssigned)
         } catch (e: WemiException) {
             TaskEvaluationResult(key, e, TaskEvaluationStatus.Exception)
+        } catch (e: Exception) {
+            TaskEvaluationResult(key, WemiException("Unhandled exception", e), TaskEvaluationStatus.Exception)
         }
     }
 

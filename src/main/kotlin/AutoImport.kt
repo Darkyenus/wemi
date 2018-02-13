@@ -71,6 +71,7 @@ val projectName
 val projectVersion
     inline get() = wemi.Keys.projectVersion
 
+@Suppress("DEPRECATION")
 val startYear
     inline get() = wemi.Keys.startYear
 

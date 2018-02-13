@@ -36,31 +36,12 @@ class LocatedFile private constructor(val file: Path, val root: Path, val path: 
         assert(!root.isDirectory()) { "LocatedFile.root must be a directory: " + this }
     }
 
-    operator inline fun component1(): Path = file
-    operator inline fun component2(): String? = path
-    operator inline fun component3(): Path? = root
+    inline operator fun component1(): Path = file
+    inline operator fun component2(): String? = path
+    inline operator fun component3(): Path? = root
 
     val classpathEntry: Path
         get() = if (simple) file else root
-
-    val packageName: String
-        get() {
-            val fileNameStart = path.lastIndexOf('/')
-            if (fileNameStart <= 0) {
-                return ""
-            }
-
-            val chars = CharArray(fileNameStart)
-            for (i in chars.indices) {
-                val c = path[i]
-                chars[i] = if (c == '/') {
-                    '.'
-                } else {
-                    c
-                }
-            }
-            return String(chars)
-        }
 
     override fun toString(): String {
         return root.absolutePath + "//" + path

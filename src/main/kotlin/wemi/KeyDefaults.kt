@@ -30,6 +30,7 @@ import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.*
+import javax.tools.*
 import kotlin.collections.ArrayList
 import kotlin.collections.LinkedHashSet
 
@@ -510,6 +511,114 @@ object KeyDefaults {
                 }
                 for (file in using(compilingKotlin) { Keys.sourceFiles.get() }) {
                     assemblyOperation.addSource(file, true)
+                }
+
+                val outputFile = Keys.archiveOutputFile.get()
+                assemblyOperation.assembly(
+                        NoConflictStrategyChooser,
+                        DefaultRenameFunction,
+                        outputFile,
+                        NoPrependData,
+                        compress = true)
+
+                outputFile
+            }
+        }
+    }
+
+    val ArchiveJavadocOptions: BoundKeyValue<WList<String>> = {
+        using(archiving) {
+            val options = WMutableList<String>()
+
+            val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
+            var version = ""
+            compilerFlags.use(JavaCompilerFlags.sourceVersion) {
+                options.add("-source")
+                options.add(it.version)
+                version = it.version
+            }
+
+            val linkURL = when (version) {
+                "1.1", "1", //These versions don't have API uploaded, so fall back to 1.5
+                "1.2", "2",
+                "1.3", "3",
+                "1.4", "4",
+                "1.5", "5" ->
+                        "https://docs.oracle.com/javase/1.5.0/docs/api/"
+                "1.6", "6" ->
+                        "https://docs.oracle.com/javase/6/docs/api/"
+                "1.7", "7" ->
+                    "https://docs.oracle.com/javase/7/docs/api/"
+                "1.8", "8" ->
+                    "https://docs.oracle.com/javase/8/docs/api/"
+                "1.9", "9" ->
+                    "https://docs.oracle.com/javase/9/docs/api/"
+                else ->
+                    // Default is 9 because that is newest
+                    "https://docs.oracle.com/javase/9/docs/api/"
+            }
+            options.add("-link")
+            options.add(linkURL)
+
+            val pathSeparator = System.getProperty("path.separator", ":")
+            options.add("-classpath")
+            val classpathString = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry }).joinToString(pathSeparator) { it.absolutePath }
+            options.add(classpathString)
+
+            options
+        }
+    }
+
+    private val ARCHIVE_JAVADOC_LOG = LoggerFactory.getLogger("ArchiveJavadoc")
+    val ArchiveJavadoc: BoundKeyValue<Path> = {
+        using(archiving) {
+            val sourceFiles = using(compilingJava){ Keys.sourceFiles.get() }
+
+            val diagnosticListener:DiagnosticListener<JavaFileObject> = DiagnosticListener { diagnostic ->
+                ARCHIVE_JAVADOC_LOG.info("{}", diagnostic)//TODO Make debug
+            }
+
+            val documentationTool = ToolProvider.getSystemDocumentationTool()!!
+            val fileManager = documentationTool.getStandardFileManager(diagnosticListener, Locale.ROOT, Charsets.UTF_8)
+            fileManager.setLocation(StandardLocation.SOURCE_PATH, using(Configurations.compilingJava) { Keys.sourceRoots.get() }.map { it.toFile() })
+            val javadocOutput = Keys.cacheDirectory.get() / "javadoc-${Keys.projectName.get().toSafeFileName('_')}"
+            javadocOutput.ensureEmptyDirectory()
+            fileManager.setLocation(DocumentationTool.Location.DOCUMENTATION_OUTPUT, listOf(javadocOutput.toFile()))
+
+            // Try to specify doclet path explicitly
+            // This is because when java is run from "jre" part of JDK install, "tools.jar" is not in the classpath
+            val javaHome = Keys.javaHome.get()
+            val toolsJar = javaHome.resolve("lib/tools.jar").takeIf { it.exists() }
+                ?: (if (javaHome.name == "jre") javaHome.resolve("../lib/tools.jar").takeIf { it.exists() } else null)
+
+            if (toolsJar != null) {
+                fileManager.setLocation(DocumentationTool.Location.DOCLET_PATH, listOf(toolsJar.toFile()))
+            }
+
+            val options = Keys.archiveJavadocOptions.get()
+
+            val docTask = documentationTool.getTask(LineReadingWriter { line ->
+                ARCHIVE_JAVADOC_LOG.warn("{}", line)
+            }, fileManager,
+                    diagnosticListener,
+                    null,
+                    options,
+                    fileManager.getJavaFileObjectsFromFiles(sourceFiles.map { it.file.toFile() }))
+
+            docTask.setLocale(Locale.ROOT)
+            val result = docTask.call()
+
+            if (!result) {
+                throw WemiException("Failed to package javadoc", showStacktrace = false)
+            }
+
+            val locatedFiles = ArrayList<LocatedFile>()
+            constructLocatedFiles(javadocOutput, locatedFiles)
+
+            AssemblyOperation().use { assemblyOperation ->
+                // Load data
+                for (file in locatedFiles) {
+                    assemblyOperation.addSource(file, true, false)
                 }
 
                 val outputFile = Keys.archiveOutputFile.get()
