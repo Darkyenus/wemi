@@ -1,10 +1,5 @@
 # Things to do next
 
-- Add JCenter
-	<id>jcenter</id>
-    <name>JCenter</name>
-    <url>https://jcenter.bintray.com/</url>
-
 - Make buildFolder and buildCache static, do not take them from WemiBuildScript
 
 - Modify sourceFiles so that when not in compilingJava/Kotlin, all source files are added

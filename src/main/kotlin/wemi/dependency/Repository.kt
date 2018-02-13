@@ -338,12 +338,18 @@ val LocalM2Repository = Repository.M2("local", URL("file", "localhost", System.g
 val MavenCentral = Repository.M2("central", URL("https://repo1.maven.org/maven2/"), LocalM2Repository)
 
 /**
+ * JCenter repository at [bintray.com](https://bintray.com/bintray/jcenter)
+ *
+ * Cached by [LocalM2Repository].
+ */
+val JCenter = Repository.M2("jcenter", URL("https://jcenter.bintray.com/"), LocalM2Repository)
+/**
  * Jitpack repository at [jitpack.io](https://jitpack.io)
  *
  * Cached by [LocalM2Repository].
  */
 @Suppress("unused")
-val Jitpack = Repository.M2("jitpack", URL("https://jitpack.io/"))
+val Jitpack = Repository.M2("jitpack", URL("https://jitpack.io/"), LocalM2Repository)
 
 /**
  * Repositories to use by default.
