@@ -132,10 +132,10 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         // Java data
         projectDataNode.createChild(JavaProjectData.KEY, defaultProject.javaProjectData())
         // Kotlin data
-        val kotlinCompilerData = HashMap<String, String>()
+        val kotlinCompilerData = HashMap<String, JsonValue>()
         session.jsonArray(defaultProject.projectName, task = "compilerOptions", configurations = *arrayOf("compilingKotlin")).forEach {
             val key = it.getString("key")
-            val value = it.getString("value")
+            val value = it.get("value")
             kotlinCompilerData[key] = value
         }
         projectDataNode.createChild(WEMI_KOTLIN_COMPILER_SETTINGS_KEY, KotlinCompilerSettingsData(kotlinCompilerData))

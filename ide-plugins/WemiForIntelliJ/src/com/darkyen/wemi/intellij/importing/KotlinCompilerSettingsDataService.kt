@@ -1,6 +1,7 @@
 package com.darkyen.wemi.intellij.importing
 
 import com.darkyen.wemi.intellij.WemiProjectSystemId
+import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.openapi.externalSystem.model.DataNode
 import com.intellij.openapi.externalSystem.model.Key
 import com.intellij.openapi.externalSystem.model.project.AbstractExternalEntityData
@@ -46,20 +47,20 @@ class KotlinCompilerSettingsDataService : AbstractProjectDataService<KotlinCompi
                 // Common
                     "languageVersion" -> {
                         commonSettings = settings(commonHolder, commonSettings)
-                        commonSettings.languageVersion = v
+                        commonSettings.languageVersion = v.asString()
                     }
                     "apiVersion" -> {
                         commonSettings = settings(commonHolder, commonSettings)
-                        commonSettings.apiVersion = v
+                        commonSettings.apiVersion = v.asString()
                     }
                 // JVM
                     "jdkHome" -> {
                         jvmSettings = settings(jvmHolder, jvmSettings)
-                        jvmSettings.jdkHome = v
+                        jvmSettings.jdkHome = v.asString()
                     }
                     "jvmTarget" -> {
                         jvmSettings = settings(jvmHolder, jvmSettings)
-                        jvmSettings.jvmTarget = v
+                        jvmSettings.jvmTarget = v.asString()
                     }
                 }
             }
@@ -79,4 +80,4 @@ class KotlinCompilerSettingsDataService : AbstractProjectDataService<KotlinCompi
  */
 val WEMI_KOTLIN_COMPILER_SETTINGS_KEY = Key.create(KotlinCompilerSettingsData::class.java, 1000)
 
-class KotlinCompilerSettingsData(val items:Map<String, String>) : AbstractExternalEntityData(WemiProjectSystemId)
+class KotlinCompilerSettingsData(val items:Map<String, JsonValue>) : AbstractExternalEntityData(WemiProjectSystemId)

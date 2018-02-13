@@ -2,8 +2,6 @@
 
 - KDoc archiving
 
-- Fix DependenciesOnly archetype
-
 ###### Release 0.2
 
 - Remove Keys.startYear

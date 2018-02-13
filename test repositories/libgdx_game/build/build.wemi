@@ -21,7 +21,7 @@ val lwjgl3 by project(path("lwjgl3")) {
     projectVersion set {"1.0"}
 
     libraryDependencies add { dependency("com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion") }
-    libraryDependencies add { dependency("com.badlogicgames.gdx:gdx-platform:$gdxVersion", attributes = Repository.M2.M2ClassifierAttribute to "natives-desktop") }
+    libraryDependencies add { dependency("com.badlogicgames.gdx:gdx-platform:$gdxVersion", attributes = Repository.M2.Classifier to "natives-desktop") }
 
     projectDependencies add { core.dependency() }
 
@@ -53,7 +53,7 @@ val lwjgl2 by project(path("./lwjgl2/")) {
     //repositories set { listOf(CentralM2Repository, LocalM2Repository) }
 
     libraryDependencies add { dependency("com.badlogicgames.gdx:gdx-backend-lwjgl:$gdxVersion") }
-    libraryDependencies add { dependency("com.badlogicgames.gdx:gdx-platform:$gdxVersion", attributes = Repository.M2.M2ClassifierAttribute to "natives-desktop") }
+    libraryDependencies add { dependency("com.badlogicgames.gdx:gdx-platform:$gdxVersion", attributes = Repository.M2.Classifier to "natives-desktop") }
 
     projectDependencies add { core.dependency() }
 
