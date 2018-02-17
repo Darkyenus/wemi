@@ -15,6 +15,9 @@ import java.util.*
  * Common prefixes of names of those classes should be passed in [entryPoints].
  *
  * This is useful for injecting dynamically loaded libraries which are compiled in as "provided".
+ *
+ * @param entryPoints patterns that either specifies a class and its inner classes (e.g. `java.lang.String`)
+ *                  or pattern that specifies all classes in package (and its subpackages) (e.g. `java.lang.`)
  */
 class EnclaveClassLoader(urls: Array<URL>,
                          private val myParent: ClassLoader,
@@ -49,7 +52,9 @@ class EnclaveClassLoader(urls: Array<URL>,
          */
         synchronized(getClassLoadingLock(name)) {
             val c = findLoadedClass(name)
-                    ?: if (entryPoints.any { pattern -> name == pattern || (name.startsWith(pattern) && name[pattern.length] == '$') }) {
+                    ?: if (entryPoints.any { pattern ->
+                                name == pattern
+                                        || (name.startsWith(pattern) && (name[pattern.length] == '$' || pattern.last() == '.')) }) {
                         // This class is an entry point
                         forceLoadClass(name)
                     } else {

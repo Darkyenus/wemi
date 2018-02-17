@@ -3,18 +3,14 @@
 package wemi
 
 import configuration
+import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
-import wemi.assembly.AssemblyOperation
-import wemi.assembly.DefaultRenameFunction
-import wemi.assembly.NoConflictStrategyChooser
-import wemi.assembly.NoPrependData
 import wemi.compile.*
 import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.JavadocClassifier
 import wemi.dependency.Repository.M2.Companion.SourcesClassifier
 import wemi.test.JUnitPlatformLauncher
 import wemi.util.*
-import java.time.ZonedDateTime
 
 /**
  * All default configurations
@@ -93,67 +89,7 @@ object Configurations {
             original.resolveSibling("$withoutExtension-docs.$extension")
         }
         // Dummy archival
-        Keys.archive set {
-            using(archiving) {
-                AssemblyOperation().use { assemblyOperation ->
-
-                    /*
-                    # No documentation available
-
-                    |Group        | Name | Version |
-                    |:-----------:|:----:|:-------:|
-                    |com.whatever | Haha | 1.3     |
-
-                    *Built by Wemi 1.2*
-                    *Current date*
-                     */
-
-                    val groupHeading = "Group"
-                    val projectGroup = Keys.projectGroup.getOrElse("-")
-                    val groupWidth = Math.max(groupHeading.length, projectGroup.length) + 2
-
-                    val nameHeading = "Name"
-                    val projectName = Keys.projectName.getOrElse("-")
-                    val nameWidth = Math.max(nameHeading.length, projectName.length) + 2
-
-                    val versionHeading = "Version"
-                    val projectVersion = Keys.projectVersion.getOrElse("-")
-                    val versionWidth = Math.max(versionHeading.length, projectVersion.length) + 2
-
-                    val md = StringBuilder()
-                    md.append("# No documentation available\n\n")
-                    md.append('|').appendCentered(groupHeading, groupWidth, ' ')
-                            .append('|').appendCentered(nameHeading, nameWidth, ' ')
-                            .append('|').appendCentered(versionHeading, versionWidth, ' ').append("|\n")
-
-                    md.append("|:").appendTimes('-', groupWidth - 2)
-                            .append(":|:").appendTimes('-', nameWidth - 2)
-                            .append(":|:").appendTimes('-', versionWidth - 2).append(":|\n")
-
-                    md.append('|').appendCentered(projectGroup, groupWidth, ' ')
-                            .append('|').appendCentered(projectName, nameWidth, ' ')
-                            .append('|').appendCentered(projectVersion, versionWidth, ' ').append("|\n")
-
-                    md.append("\n*Built by Wemi ").append(WemiVersion).append("*\n")
-                    md.append("*").append(ZonedDateTime.now()).append("*\n")
-
-                    assemblyOperation.addSource(
-                            "DOCUMENTATION.MD",
-                            md.toString().toByteArray(Charsets.UTF_8),
-                            true)
-
-                    val outputFile = Keys.archiveOutputFile.get()
-                    assemblyOperation.assembly(
-                            NoConflictStrategyChooser,
-                            DefaultRenameFunction,
-                            outputFile,
-                            NoPrependData,
-                            compress = true)
-
-                    outputFile
-                }
-            }
-        }
+        Keys.archive set ArchiveDummyDocumentation
     }
     //endregion
 

@@ -260,7 +260,6 @@ open class TinyMap<K, V> {
     }
 
     private companion object {
-        @JvmStatic
         private val EMPTY_ARRAY = emptyArray<Any?>()
     }
 }

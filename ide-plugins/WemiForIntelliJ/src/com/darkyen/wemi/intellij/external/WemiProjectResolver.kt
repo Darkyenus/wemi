@@ -203,7 +203,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 )
                 moduleDependencyData.scope = scope
                 moduleDependencyData.order = order++
-                moduleDependencyData.isExported = true
+                moduleDependencyData.isExported = scope.exported
 
                 myModule.createChild(ProjectKeys.MODULE_DEPENDENCY, moduleDependencyData)
             }
@@ -471,7 +471,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     val projectModule = modules[projectName]!!
                     val libraryDependencyData = LibraryDependencyData(projectModule.data, libraryData, LibraryLevel.PROJECT)
                     libraryDependencyData.scope = dependencyScope
-                    libraryDependencyData.isExported = true
+                    libraryDependencyData.isExported = dependencyScope.exported
                     projectModule.createChild(ProjectKeys.LIBRARY_DEPENDENCY, libraryDependencyData)
                 }
             }
@@ -635,6 +635,9 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 return DependencyScope.TEST
             }
         }
+
+        private val DependencyScope.exported:Boolean
+            get() = DependencyScope.COMPILE == this
     }
 
     @Suppress("CanBeParameter")

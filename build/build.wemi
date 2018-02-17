@@ -19,7 +19,10 @@ import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.MergeStrategy
 import wemi.boot.WemiBuildScript
 import wemi.compile.KotlinCompilerFlags
+import wemi.dependency.LocalM2Repository
+import wemi.dependency.Repository
 import wemi.util.LocatedFile
+import java.net.URL
 import java.util.zip.ZipEntry
 
 val CompilerProjects = listOf(
@@ -49,10 +52,19 @@ val core by project(path(".")) {
             dependency("org.jline", "jline", "3.3.0")
         ) }
 
+    // Compile-only (provided) libraries
     extend(compiling) {
         libraryDependencies add {
             /* Used ONLY in wemi.test.forked.TestLauncher */
             dependency("org.junit.platform", "junit-platform-launcher", "1.0.2")
+        }
+
+        libraryDependencies add {
+            // TODO Replace with definition in Wemi after update
+            val  JCenter = Repository.M2("jcenter", URL("https://jcenter.bintray.com/"), LocalM2Repository)
+
+            /* Used only in wemi.document.DokkaInterface */
+            dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", JCenter)
         }
     }
 

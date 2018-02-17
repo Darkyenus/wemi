@@ -16,10 +16,14 @@ import wemi.assembly.NoPrependData
 import wemi.boot.WemiBuildScript
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
+import wemi.compile.KotlinCompilerFlags
+import wemi.compile.KotlinJVMCompilerFlags
 import wemi.dependency.*
 import wemi.dependency.Repository.M2.Companion.JavadocClassifier
 import wemi.dependency.Repository.M2.Companion.SourcesClassifier
 import wemi.dependency.Repository.M2.Companion.joinClassifiers
+import wemi.documentation.DokkaInterface
+import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
 import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
@@ -27,8 +31,10 @@ import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
 import wemi.util.*
 import java.net.URI
+import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
+import java.time.ZonedDateTime
 import java.util.*
 import javax.tools.*
 import kotlin.collections.ArrayList
@@ -523,6 +529,71 @@ object KeyDefaults {
         }
     }
 
+    /**
+     * Binding for [Keys.archive] to use when archiving documentation and no documentation is available.
+     */
+    val ArchiveDummyDocumentation: BoundKeyValue<Path> = {
+        using(Configurations.archiving) {
+            AssemblyOperation().use { assemblyOperation ->
+
+                /*
+                # No documentation available
+
+                |Group        | Name | Version |
+                |:-----------:|:----:|:-------:|
+                |com.whatever | Haha | 1.3     |
+
+                *Built by Wemi 1.2*
+                *Current date*
+                 */
+
+                val groupHeading = "Group"
+                val projectGroup = Keys.projectGroup.getOrElse("-")
+                val groupWidth = Math.max(groupHeading.length, projectGroup.length) + 2
+
+                val nameHeading = "Name"
+                val projectName = Keys.projectName.getOrElse("-")
+                val nameWidth = Math.max(nameHeading.length, projectName.length) + 2
+
+                val versionHeading = "Version"
+                val projectVersion = Keys.projectVersion.getOrElse("-")
+                val versionWidth = Math.max(versionHeading.length, projectVersion.length) + 2
+
+                val md = StringBuilder()
+                md.append("# No documentation available\n\n")
+                md.append('|').appendCentered(groupHeading, groupWidth, ' ')
+                        .append('|').appendCentered(nameHeading, nameWidth, ' ')
+                        .append('|').appendCentered(versionHeading, versionWidth, ' ').append("|\n")
+
+                md.append("|:").appendTimes('-', groupWidth - 2)
+                        .append(":|:").appendTimes('-', nameWidth - 2)
+                        .append(":|:").appendTimes('-', versionWidth - 2).append(":|\n")
+
+                md.append('|').appendCentered(projectGroup, groupWidth, ' ')
+                        .append('|').appendCentered(projectName, nameWidth, ' ')
+                        .append('|').appendCentered(projectVersion, versionWidth, ' ').append("|\n")
+
+                md.append("\n*Built by Wemi ").append(WemiVersion).append("*\n")
+                md.append("*").append(ZonedDateTime.now()).append("*\n")
+
+                assemblyOperation.addSource(
+                        "DOCUMENTATION.MD",
+                        md.toString().toByteArray(Charsets.UTF_8),
+                        true)
+
+                val outputFile = Keys.archiveOutputFile.get()
+                assemblyOperation.assembly(
+                        NoConflictStrategyChooser,
+                        DefaultRenameFunction,
+                        outputFile,
+                        NoPrependData,
+                        compress = true)
+
+                outputFile
+            }
+        }
+    }
+
     val ArchiveJavadocOptions: BoundKeyValue<WList<String>> = {
         using(archiving) {
             val options = WMutableList<String>()
@@ -535,25 +606,17 @@ object KeyDefaults {
                 version = it.version
             }
 
-            val linkURL = when (version) {
-                "1.1", "1", //These versions don't have API uploaded, so fall back to 1.5
-                "1.2", "2",
-                "1.3", "3",
-                "1.4", "4",
-                "1.5", "5" ->
+            val javaVersion = parseJavaVersion(version)
+
+            val linkURL =
+                    if (javaVersion != null && javaVersion <= 5) {
+                        //These versions don't have API uploaded, so fall back to 1.5
+                        // (Version 5 is the first one uploaded, but under non-typical URL)
                         "https://docs.oracle.com/javase/1.5.0/docs/api/"
-                "1.6", "6" ->
-                        "https://docs.oracle.com/javase/6/docs/api/"
-                "1.7", "7" ->
-                    "https://docs.oracle.com/javase/7/docs/api/"
-                "1.8", "8" ->
-                    "https://docs.oracle.com/javase/8/docs/api/"
-                "1.9", "9" ->
-                    "https://docs.oracle.com/javase/9/docs/api/"
-                else ->
-                    // Default is 9 because that is newest
-                    "https://docs.oracle.com/javase/9/docs/api/"
-            }
+                    } else {
+                        // Default is 9 because that is newest
+                        "https://docs.oracle.com/javase/${javaVersion ?: 9}/docs/api/"
+                    }
             options.add("-link")
             options.add(linkURL)
 
@@ -570,6 +633,11 @@ object KeyDefaults {
     val ArchiveJavadoc: BoundKeyValue<Path> = {
         using(archiving) {
             val sourceFiles = using(compilingJava){ Keys.sourceFiles.get() }
+
+            if (sourceFiles.isEmpty()) {
+                ARCHIVE_JAVADOC_LOG.info("No source files for Javadoc, creating dummy documentation instead")
+                return@using ArchiveDummyDocumentation()
+            }
 
             val diagnosticListener:DiagnosticListener<JavaFileObject> = DiagnosticListener { diagnostic ->
                 ARCHIVE_JAVADOC_LOG.debug("{}", diagnostic)
@@ -628,6 +696,87 @@ object KeyDefaults {
 
                 outputFile
             }
+        }
+    }
+
+    val ArchiveDokkaOptions: BoundKeyValue<DokkaOptions> = {
+        val kotlinOptions = using(compilingKotlin) { Keys.compilerOptions.get() }
+        val javaOptions = using(compilingJava) { Keys.compilerOptions.get() }
+
+        val options = DokkaOptions()
+
+        options.moduleName = kotlinOptions[KotlinCompilerFlags.moduleName] ?: Keys.projectName.get()
+        options.jdkVersion = parseJavaVersion(
+                javaOptions[JavaCompilerFlags.sourceVersion]?.version
+                ?: javaOptions[JavaCompilerFlags.targetVersion]?.version
+                ?: kotlinOptions[KotlinJVMCompilerFlags.jvmTarget]) ?: 6
+
+        options
+    }
+
+    private val DokkaFatJar = listOf(dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", JCenter))
+    private val Dokka:DokkaInterface by lazy {
+        val artifacts = DependencyResolver.resolveArtifacts(DokkaFatJar, emptyList())
+                ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
+
+        ARCHIVE_DOKKA_LOG.trace("Classpath for Dokka: {}", artifacts)
+
+        val implementationClassName = "wemi.documentation.impl.DokkaInterfaceImpl"
+        /** Loads artifacts normally. */
+        val dependencyClassLoader = URLClassLoader(artifacts.map { it.toUri().toURL() }.toTypedArray(), WemiDefaultClassLoader)
+        /** Makes sure that the implementation class is loaded in a class loader that has artifacts available. */
+        val forceClassLoader = EnclaveClassLoader(emptyArray(), dependencyClassLoader,
+                implementationClassName, // Own entry point
+                "org.jetbrains.dokka.", // Force loading all of Dokka in here, because it must be here to load the Reflection below...
+                "kotlin.jvm.internal.Reflection") // Force loading of second Reflection, this time with full reflection library
+
+        val clazz = Class.forName(implementationClassName, true, forceClassLoader)
+
+        clazz.newInstance() as DokkaInterface
+    }
+
+    private val ARCHIVE_DOKKA_LOG = LoggerFactory.getLogger("ArchiveDokka")
+    val ArchiveDokka: BoundKeyValue<Path> = {
+        using(archiving) {
+            val sourceFiles = Keys.sourceFiles.get()
+
+            if (sourceFiles.isEmpty()) {
+                ARCHIVE_DOKKA_LOG.info("No source files for Dokka, creating dummy documentation instead")
+                return@using ArchiveDummyDocumentation()
+            }
+
+            val cacheDirectory = Keys.cacheDirectory.get()
+            val dokkaOutput = cacheDirectory / "dokka-${Keys.projectName.get().toSafeFileName('_')}"
+            dokkaOutput.ensureEmptyDirectory()
+
+            val packageListCacheFolder = cacheDirectory / "dokka-package-list-cache"
+
+            val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
+
+            val options = Keys.archiveDokkaOptions.get()
+
+            Dokka.execute(sourceFiles, externalClasspath, dokkaOutput, packageListCacheFolder, options, ARCHIVE_DOKKA_LOG)
+
+            val locatedFiles = ArrayList<LocatedFile>()
+            constructLocatedFiles(dokkaOutput, locatedFiles)
+
+            AssemblyOperation().use { assemblyOperation ->
+                // Load data
+                for (file in locatedFiles) {
+                    assemblyOperation.addSource(file, true, false)
+                }
+
+                val outputFile = Keys.archiveOutputFile.get()
+                assemblyOperation.assembly(
+                        NoConflictStrategyChooser,
+                        DefaultRenameFunction,
+                        outputFile,
+                        NoPrependData,
+                        compress = true)
+
+                outputFile
+            }
+
         }
     }
 

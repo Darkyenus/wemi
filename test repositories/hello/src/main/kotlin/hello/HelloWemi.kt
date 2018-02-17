@@ -1,11 +1,13 @@
 package hello
 
 /**
- *
+ * [java.lang.Random] instance. Used from [hello.Greeter]!
  */
-
 val Random = java.util.Random()
 
+/**
+ * Main. Greets the user of this computer with random personalized greeting.
+ */
 fun main(args: Array<String>) {
     println("Hello from compiled Wemi file!")
 

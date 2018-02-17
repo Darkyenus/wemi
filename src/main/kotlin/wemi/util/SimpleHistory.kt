@@ -243,7 +243,6 @@ internal class SimpleHistory(private val path: Path?) : History {
 
     companion object {
 
-        @JvmStatic
         private val LOG = LoggerFactory.getLogger(SimpleHistory::class.java)
 
         /**
@@ -255,13 +254,11 @@ internal class SimpleHistory(private val path: Path?) : History {
          *
          * @see [getHistory]
          */
-        @JvmStatic
         private val histories = HashMap<String, SimpleHistory>()
 
         /**
          * Construct history file for given names.
          */
-        @JvmStatic
         private fun getHistoryFile(name: String): Path? {
             val historiesFolder = WemiCacheFolder.resolve("history")
             Files.createDirectories(historiesFolder)
@@ -282,7 +279,6 @@ internal class SimpleHistory(private val path: Path?) : History {
          *
          * @see histories
          */
-        @JvmStatic
         internal fun getHistory(name: String): SimpleHistory {
             return histories.getOrPut(name) {
                 SimpleHistory(getHistoryFile(name))
@@ -292,7 +288,6 @@ internal class SimpleHistory(private val path: Path?) : History {
         /**
          * Retrieves the history, but only if it exists, either in cache or in filesystem.
          */
-        @JvmStatic
         internal fun getExistingHistory(name: String): SimpleHistory? {
             val existing = histories[name]
             if (existing != null) {
@@ -305,14 +300,13 @@ internal class SimpleHistory(private val path: Path?) : History {
             }
 
             val history = SimpleHistory(historyFile)
-            histories.put(name, history)
+            histories[name] = history
             return history
         }
 
         /**
          * History when no history is needed
          */
-        @JvmStatic
         val NoHistory = SimpleHistory(null)
 
         init {

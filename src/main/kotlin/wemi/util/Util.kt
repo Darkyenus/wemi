@@ -495,3 +495,12 @@ fun <Value> StringBuilder.appendKeyResultLn(key: Key<Value>, value:Value) {
         }
     }
 }
+
+/**
+ * Parse Java version in form of N or 1.N where N is a number.
+ *
+ * @return N or null if invalid
+ */
+fun parseJavaVersion(version:String?):Int? {
+    return version?.removePrefix("1.")?.toIntOrNull()
+}

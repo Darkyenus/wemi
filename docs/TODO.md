@@ -1,14 +1,12 @@
 # Things to do next
 
-- KDoc archiving
+- Fix TaskCompleter, as it is probably broken after last TaskParser rewrite
 
 ###### Release 0.2
 
 - Remove Keys.startYear
 
 - PGP signatures
-
-- Fix TaskCompleter, as it is probably broken after last TaskParser rewrite
 
 - Maven parallel repository resolution
 

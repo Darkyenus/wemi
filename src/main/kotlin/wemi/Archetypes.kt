@@ -164,6 +164,11 @@ object Archetypes {
         }
         Keys.libraryDependencies add { kotlinDependency("stdlib") }
         Keys.compile set KeyDefaults.CompileJavaKotlin
+
+        extend(Configurations.archivingDocs) {
+            Keys.archiveDokkaOptions set KeyDefaults.ArchiveDokkaOptions
+            Keys.archive set KeyDefaults.ArchiveDokka
+        }
     }
 
     //endregion

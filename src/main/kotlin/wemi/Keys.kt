@@ -7,6 +7,7 @@ import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
+import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
 import wemi.test.TestParameters
 import wemi.test.TestReport
@@ -91,7 +92,8 @@ object Keys {
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it.prettyPrint() })
 
     val archiveOutputFile by key<Path>("File to which archive should be saved to")
-    val archiveJavadocOptions by key<WList<String>>("Options when archiving javadoc")
+    val archiveJavadocOptions by key<WList<String>>("Options when archiving Javadoc")
+    val archiveDokkaOptions by key<DokkaOptions>("Options when archiving Dokka")
     val archive by key<Path?>("Archive project's output and return path to the created file, if any")
 
     val publishMetadata by key<InfoNode>("Meta information that should be published together with archives by 'publish'")
