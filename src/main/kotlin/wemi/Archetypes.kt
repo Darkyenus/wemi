@@ -136,8 +136,9 @@ object Archetypes {
         Keys.sourceFiles set { using(Configurations.compilingJava) { Keys.sourceFiles.get() } }
         Keys.compile set KeyDefaults.CompileJava
 
+        Keys.archiveJavadocOptions set KeyDefaults.ArchiveJavadocOptions
+
         extend(Configurations.archivingDocs) {
-            Keys.archiveJavadocOptions set KeyDefaults.ArchiveJavadocOptions
             Keys.archive set KeyDefaults.ArchiveJavadoc
         }
     }
@@ -165,9 +166,10 @@ object Archetypes {
         Keys.libraryDependencies add { kotlinDependency("stdlib") }
         Keys.compile set KeyDefaults.CompileJavaKotlin
 
+        Keys.archiveDokkaOptions set KeyDefaults.ArchiveDokkaOptions
+        Keys.archiveDokkaInterface set KeyDefaults.ArchiveDokkaInterface
+
         extend(Configurations.archivingDocs) {
-            Keys.archiveDokkaOptions set KeyDefaults.ArchiveDokkaOptions
-            Keys.archiveDokkaInterface set KeyDefaults.ArchiveDokkaInterface
             Keys.archive set KeyDefaults.ArchiveDokka
         }
     }

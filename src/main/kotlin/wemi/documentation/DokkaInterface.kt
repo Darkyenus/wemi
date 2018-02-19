@@ -3,7 +3,6 @@ package wemi.documentation
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
-import wemi.util.LocatedFile
 import java.nio.file.Path
 
 /**
@@ -12,8 +11,7 @@ import java.nio.file.Path
 interface DokkaInterface {
 
     /**
-     * @param sources to generate documentation from
-     * @param classpath used when compiling [sources]
+     * @param classpath used when compiling sources
      * @param outputDirectory to put the result in
      * @param packageListCache "Use default or set to custom path to cache directory to enable package-list caching.
      * When set to default, caches stored in $USER_HOME/.cache/dokka
@@ -21,11 +19,10 @@ interface DokkaInterface {
      * @param logger to log info to
      * @param loggerMarker to use when logging with [logger]
      */
-    fun execute(sources: Collection<LocatedFile>,
-                classpath: Collection<Path>,
+    fun execute(classpath: Collection<Path>,
                 outputDirectory: Path,
-                packageListCache:Path?,
-                options:DokkaOptions,
+                packageListCache: Path?,
+                options: DokkaOptions,
                 logger: Logger = LoggerFactory.getLogger("Dokka"),
                 loggerMarker: Marker? = null)
 }

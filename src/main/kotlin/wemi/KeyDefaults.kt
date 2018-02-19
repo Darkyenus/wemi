@@ -720,6 +720,12 @@ object KeyDefaults {
 
         val options = DokkaOptions()
 
+        for (sourceRoot in Keys.sourceRoots.get()) {
+            if (sourceRoot.exists()) {
+                options.sourceRoots.add(DokkaOptions.SourceRoot(sourceRoot))
+            }
+        }
+
         options.moduleName = kotlinOptions[KotlinCompilerFlags.moduleName] ?: Keys.projectName.get()
         val javaVersion = parseJavaVersion(
                 javaOptions[JavaCompilerFlags.sourceVersion]?.version
@@ -729,6 +735,8 @@ object KeyDefaults {
             options.jdkVersion = javaVersion
         }
         options.externalDocumentationLinks.add(DokkaOptions.ExternalDocumentation(javadocUrl(javaVersion)))
+
+        options.impliedPlatforms.add("JVM")
 
         options
     }
@@ -760,9 +768,9 @@ object KeyDefaults {
     private val ARCHIVE_DOKKA_LOG = LoggerFactory.getLogger("ArchiveDokka")
     val ArchiveDokka: BoundKeyValue<Path> = {
         using(archiving) {
-            val sourceFiles = Keys.sourceFiles.get()
+            val options = Keys.archiveDokkaOptions.get()
 
-            if (sourceFiles.isEmpty()) {
+            if (options.sourceRoots.isEmpty()) {
                 ARCHIVE_DOKKA_LOG.info("No source files for Dokka, creating dummy documentation instead")
                 return@using ArchiveDummyDocumentation()
             }
@@ -775,11 +783,9 @@ object KeyDefaults {
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
 
-            val options = Keys.archiveDokkaOptions.get()
-
             val dokka = Keys.archiveDokkaInterface.get()
 
-            dokka.execute(sourceFiles, externalClasspath, dokkaOutput, packageListCacheFolder, options, ARCHIVE_DOKKA_LOG)
+            dokka.execute(externalClasspath, dokkaOutput, packageListCacheFolder, options, ARCHIVE_DOKKA_LOG)
 
             val locatedFiles = ArrayList<LocatedFile>()
             constructLocatedFiles(dokkaOutput, locatedFiles)

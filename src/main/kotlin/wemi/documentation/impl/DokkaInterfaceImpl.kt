@@ -8,7 +8,6 @@ import org.slf4j.Logger
 import org.slf4j.Marker
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
-import wemi.util.LocatedFile
 import wemi.util.absolutePath
 import java.net.URL
 import java.nio.file.Path
@@ -19,18 +18,12 @@ import java.nio.file.Path
 @Suppress("unused")
 internal class DokkaInterfaceImpl : DokkaInterface {
 
-    override fun execute(sources: Collection<LocatedFile>,
-                         classpath: Collection<Path>,
-                         outputDirectory:Path,
-                         packageListCache:Path?,
-                         options:DokkaOptions,
+    override fun execute(classpath: Collection<Path>,
+                         outputDirectory: Path,
+                         packageListCache: Path?,
+                         options: DokkaOptions,
                          logger: Logger,
                          loggerMarker: Marker?) {
-
-        val sourceRoots = HashSet<Path>()
-        for (source in sources) {
-            sourceRoots.add(source.root)
-        }
 
         val gen = DokkaGenerator(object : DokkaLogger {
 
@@ -47,13 +40,13 @@ internal class DokkaInterfaceImpl : DokkaInterface {
             }
         },
                 classpath.map { it.absolutePath },
-                sourceRoots.map { root ->
-                    val rootPath = root.absolutePath
+                options.sourceRoots.map { sourceRoot ->
+                    val rootPath = sourceRoot.dir.absolutePath
                     object : DokkaConfiguration.SourceRoot {
                         override val path: String
                             get() = rootPath
                         override val platforms: List<String>
-                            get() = emptyList()
+                            get() = sourceRoot.platforms
 
                     }
                 },
