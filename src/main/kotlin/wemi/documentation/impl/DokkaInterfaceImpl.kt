@@ -14,7 +14,7 @@ import java.net.URL
 import java.nio.file.Path
 
 /**
- * [DokkaInterface] implementation, DO NOT TOUCH FROM ELSEWHERE THAN [wemi.KeyDefaults.Dokka]!!!
+ * [DokkaInterface] implementation, DO NOT TOUCH FROM ELSEWHERE THAN [wemi.KeyDefaults.ArchiveDokkaInterface]!!!
  */
 @Suppress("unused")
 internal class DokkaInterfaceImpl : DokkaInterface {

@@ -9,7 +9,7 @@ import java.nio.file.Path
 /**
  * Provides access to Dokka, Kotlin documentation tool.
  */
-internal interface DokkaInterface {
+interface DokkaInterface {
 
     /**
      * @param sources to generate documentation from

@@ -167,6 +167,7 @@ object Archetypes {
 
         extend(Configurations.archivingDocs) {
             Keys.archiveDokkaOptions set KeyDefaults.ArchiveDokkaOptions
+            Keys.archiveDokkaInterface set KeyDefaults.ArchiveDokkaInterface
             Keys.archive set KeyDefaults.ArchiveDokka
         }
     }

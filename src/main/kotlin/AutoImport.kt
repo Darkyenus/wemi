@@ -60,8 +60,20 @@ val running
     inline get() = Configurations.running
 val assembling
     inline get() = Configurations.assembling
+val compilingJava
+    inline get() = Configurations.compilingJava
+val compilingKotlin
+    inline get() = Configurations.compilingKotlin
 val testing
     inline get() = Configurations.testing
+val archiving
+    inline get() = Configurations.archiving
+val archivingDocs
+    inline get() = Configurations.archivingDocs
+val archivingSources
+    inline get() = Configurations.archivingSources
+val publishing
+    inline get() = Configurations.publishing
 
 // Keys
 val projectGroup
@@ -112,6 +124,8 @@ val unmanagedDependencies
     inline get() = wemi.Keys.unmanagedDependencies
 val projectDependencies
     inline get() = wemi.Keys.projectDependencies
+val resolvedProjectDependencies
+    inline get() = wemi.Keys.resolvedProjectDependencies
 
 val externalClasspath
     inline get() = wemi.Keys.externalClasspath
@@ -162,6 +176,12 @@ val test
 
 val archiveOutputFile
     inline get() = wemi.Keys.archiveOutputFile
+val archiveJavadocOptions
+    inline get() = wemi.Keys.archiveJavadocOptions
+val archiveDokkaOptions
+    inline get() = wemi.Keys.archiveDokkaOptions
+val archiveDokkaInterface
+    inline get() = wemi.Keys.archiveDokkaInterface
 val archive
     inline get() = wemi.Keys.archive
 

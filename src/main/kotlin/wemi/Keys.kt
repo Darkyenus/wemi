@@ -7,6 +7,7 @@ import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
+import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
 import wemi.test.TestParameters
@@ -94,6 +95,7 @@ object Keys {
     val archiveOutputFile by key<Path>("File to which archive should be saved to")
     val archiveJavadocOptions by key<WList<String>>("Options when archiving Javadoc")
     val archiveDokkaOptions by key<DokkaOptions>("Options when archiving Dokka")
+    val archiveDokkaInterface by key<DokkaInterface>("Dokka instance used when creating documentation", cacheMode = CACHE_ALWAYS)
     val archive by key<Path?>("Archive project's output and return path to the created file, if any")
 
     val publishMetadata by key<InfoNode>("Meta information that should be published together with archives by 'publish'")

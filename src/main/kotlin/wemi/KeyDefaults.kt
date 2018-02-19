@@ -594,31 +594,49 @@ object KeyDefaults {
         }
     }
 
+    /**
+     * When java is run from "jre" part of the JDK install, "tools.jar" is not in the classpath by default.
+     * This can locate the tools.jar in [Keys.javaHome] for explicit loading.
+     */
+    private fun Scope.jdkToolsJar():Path? {
+        val javaHome = Keys.javaHome.get()
+        return javaHome.resolve("lib/tools.jar").takeIf { it.exists() }
+                ?: (if (javaHome.name == "jre") javaHome.resolve("../lib/tools.jar").takeIf { it.exists() } else null)
+    }
+
+    /**
+     * Return URL at which Java SE Javadoc is hosted for given [javaVersion].
+     */
+    private fun javadocUrl(javaVersion:Int?):String {
+        if (javaVersion != null && javaVersion <= 5) {
+            //These versions don't have API uploaded, so fall back to 1.5
+            // (Version 5 is the first one uploaded, but under non-typical URL)
+            return "https://docs.oracle.com/javase/1.5.0/docs/api/"
+        } else {
+            // Default is 9 because that is newest
+            return "https://docs.oracle.com/javase/${javaVersion ?: 9}/docs/api/"
+        }
+    }
+
     val ArchiveJavadocOptions: BoundKeyValue<WList<String>> = {
         using(archiving) {
             val options = WMutableList<String>()
 
             val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
-            var version = ""
+            var javaVersionString:String? = null
             compilerFlags.use(JavaCompilerFlags.sourceVersion) {
                 options.add("-source")
                 options.add(it.version)
-                version = it.version
+                javaVersionString = it.version
+            }
+            if (javaVersionString == null) {
+                javaVersionString = compilerFlags[JavaCompilerFlags.targetVersion]?.version
             }
 
-            val javaVersion = parseJavaVersion(version)
+            val javaVersion = parseJavaVersion(javaVersionString)
 
-            val linkURL =
-                    if (javaVersion != null && javaVersion <= 5) {
-                        //These versions don't have API uploaded, so fall back to 1.5
-                        // (Version 5 is the first one uploaded, but under non-typical URL)
-                        "https://docs.oracle.com/javase/1.5.0/docs/api/"
-                    } else {
-                        // Default is 9 because that is newest
-                        "https://docs.oracle.com/javase/${javaVersion ?: 9}/docs/api/"
-                    }
             options.add("-link")
-            options.add(linkURL)
+            options.add(javadocUrl(javaVersion))
 
             val pathSeparator = System.getProperty("path.separator", ":")
             options.add("-classpath")
@@ -651,10 +669,7 @@ object KeyDefaults {
             fileManager.setLocation(DocumentationTool.Location.DOCUMENTATION_OUTPUT, listOf(javadocOutput.toFile()))
 
             // Try to specify doclet path explicitly
-            // This is because when java is run from "jre" part of JDK install, "tools.jar" is not in the classpath
-            val javaHome = Keys.javaHome.get()
-            val toolsJar = javaHome.resolve("lib/tools.jar").takeIf { it.exists() }
-                ?: (if (javaHome.name == "jre") javaHome.resolve("../lib/tools.jar").takeIf { it.exists() } else null)
+            val toolsJar = jdkToolsJar()
 
             if (toolsJar != null) {
                 fileManager.setLocation(DocumentationTool.Location.DOCLET_PATH, listOf(toolsJar.toFile()))
@@ -706,18 +721,25 @@ object KeyDefaults {
         val options = DokkaOptions()
 
         options.moduleName = kotlinOptions[KotlinCompilerFlags.moduleName] ?: Keys.projectName.get()
-        options.jdkVersion = parseJavaVersion(
+        val javaVersion = parseJavaVersion(
                 javaOptions[JavaCompilerFlags.sourceVersion]?.version
-                ?: javaOptions[JavaCompilerFlags.targetVersion]?.version
-                ?: kotlinOptions[KotlinJVMCompilerFlags.jvmTarget]) ?: 6
+                        ?: javaOptions[JavaCompilerFlags.targetVersion]?.version
+                        ?: kotlinOptions[KotlinJVMCompilerFlags.jvmTarget])
+        if (javaVersion != null) {
+            options.jdkVersion = javaVersion
+        }
+        options.externalDocumentationLinks.add(DokkaOptions.ExternalDocumentation(javadocUrl(javaVersion)))
 
         options
     }
 
     private val DokkaFatJar = listOf(dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", JCenter))
-    private val Dokka:DokkaInterface by lazy {
-        val artifacts = DependencyResolver.resolveArtifacts(DokkaFatJar, emptyList())
+
+    val ArchiveDokkaInterface: BoundKeyValue<DokkaInterface> = {
+        val artifacts = DependencyResolver.resolveArtifacts(DokkaFatJar, emptyList())?.toMutableList()
                 ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
+
+        jdkToolsJar()?.let { artifacts.add(it) }
 
         ARCHIVE_DOKKA_LOG.trace("Classpath for Dokka: {}", artifacts)
 
@@ -755,7 +777,9 @@ object KeyDefaults {
 
             val options = Keys.archiveDokkaOptions.get()
 
-            Dokka.execute(sourceFiles, externalClasspath, dokkaOutput, packageListCacheFolder, options, ARCHIVE_DOKKA_LOG)
+            val dokka = Keys.archiveDokkaInterface.get()
+
+            dokka.execute(sourceFiles, externalClasspath, dokkaOutput, packageListCacheFolder, options, ARCHIVE_DOKKA_LOG)
 
             val locatedFiles = ArrayList<LocatedFile>()
             constructLocatedFiles(dokkaOutput, locatedFiles)

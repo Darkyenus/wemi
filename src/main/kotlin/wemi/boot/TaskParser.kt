@@ -407,6 +407,9 @@ object TaskParser : Parser {
             }
         }
 
+        /**
+         * <project>/<config1>:<config2>:<task> <input> = <content>
+         */
         private fun matchTask(machineReadable: Boolean): Task? {
             var flags = 0
 

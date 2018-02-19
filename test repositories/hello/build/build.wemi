@@ -1,7 +1,9 @@
 
 import wemi.Configurations.compilingKotlin
+import wemi.util.div
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
+import wemi.documentation.DokkaOptions.SourceLinkMapItem
 
 ///repository jitpack at https://jitpack.io
 ///dependency com.github.esotericsoftware:jsonbeans:0.9
@@ -53,6 +55,22 @@ val hello by project {
         metadata
     }
 
+    extend (archivingDocs) {
+        archiveDokkaOptions modify { options ->
+            options.outputFormat = wemi.documentation.DokkaOptions.FORMAT_HTML
+
+            val root = projectRoot.get()
+            for (sourceRoot in sourceRoots.get()) {
+                options.sourceLinks.add(SourceLinkMapItem(
+                        sourceRoot,
+                        "https://github.com/Darkyenus/WEMI/tree/master/test%20repositories/hello/${root.relativize(sourceRoot).toString()}",
+                        "#L"
+                ))
+            }
+
+            options
+        }
+    }
 
     foxColor set { "Red" }
 }

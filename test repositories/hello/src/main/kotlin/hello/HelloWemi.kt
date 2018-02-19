@@ -1,7 +1,7 @@
 package hello
 
 /**
- * [java.lang.Random] instance. Used from [hello.Greeter]!
+ * [java.util.Random] instance. Used from [hello.Greeter]!
  */
 val Random = java.util.Random()
 

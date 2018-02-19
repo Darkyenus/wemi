@@ -13,13 +13,13 @@ class DokkaOptions {
      * List of directories containing sample code (documentation for those directories is not generated,
      * but declarations from them can be referenced using the @sample tag).
      */
-    var sampleRoots: List<Path> = emptyList()
+    val sampleRoots: MutableList<Path> = ArrayList()
 
     /**
      * List of '.md' files with package and module docs.
      * See [documentation](http://kotlinlang.org/docs/reference/kotlin-doc.html#module-and-package-documentation).
      */
-    var includes: List<Path> = emptyList()
+    val includes: MutableList<Path> = ArrayList()
 
     /**
      * @see sourceLinks
@@ -33,7 +33,7 @@ class DokkaOptions {
      * Specifies the location of the project source code on the Web. If provided, Dokka generates "source" links
      * for each declaration.
      */
-    var sourceLinks: List<SourceLinkMapItem> = emptyList()
+    val sourceLinks: MutableList<SourceLinkMapItem> = ArrayList()
 
     /**
      * The name of the module being documented (used as the root directory of the generated documentation)
@@ -69,7 +69,7 @@ class DokkaOptions {
 
     //TODO Investigate
     /*<!-- See platforms section of documentation -->*/
-    var impliedPlatforms: List<String> = emptyList()
+    val impliedPlatforms: MutableList<String> = ArrayList()
 
     /**
      * @see [perPackageOptions]
@@ -87,7 +87,7 @@ class DokkaOptions {
     /**
      * Allows to customize documentation generation options on a per-package basis.
      */
-    var perPackageOptions: List<PackageOptions> = emptyList()
+    val perPackageOptions: MutableList<PackageOptions> = ArrayList()
 
     /**
      * @see externalDocumentationLinks
@@ -99,7 +99,7 @@ class DokkaOptions {
     /**
      * Allows linking to documentation of the project's dependencies (generated with Javadoc or Dokka).
      */
-    var externalDocumentationLinks: List<ExternalDocumentation> = emptyList()
+    val externalDocumentationLinks: ArrayList<ExternalDocumentation> = ArrayList()
 
     /**
      * No default documentation link to kotlin-stdlib.
@@ -137,5 +137,9 @@ class DokkaOptions {
          * Jekyll compatible markdown
          */
         const val FORMAT_JEKYLL = "jekyll"
+    }
+
+    override fun toString(): String {
+        return "sampleRoots=$sampleRoots\nincludes=$includes\nsourceLinks=$sourceLinks\nmoduleName='$moduleName'\noutputFormat='$outputFormat'\njdkVersion=$jdkVersion\nskipDeprecated=$skipDeprecated\nreportNotDocumented=$reportNotDocumented\nskipEmptyPackages=$skipEmptyPackages\nimpliedPlatforms=$impliedPlatforms\nperPackageOptions=$perPackageOptions\nexternalDocumentationLinks=$externalDocumentationLinks\nnoStdlibLink=$noStdlibLink"
     }
 }
