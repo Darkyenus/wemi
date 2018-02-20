@@ -841,8 +841,7 @@ object KeyDefaults {
             newChild("name") // MANDATORY, filled by user
             newChild("description") // MANDATORY, filled by user
             newChild("url") // MANDATORY, filled by user
-            @Suppress("DEPRECATION")
-            newChild("inceptionYear", Keys.startYear.get().toString())
+            //newChild("inceptionYear", "2018")
 
             /* Example
             newChild("organization") {

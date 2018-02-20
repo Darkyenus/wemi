@@ -2,8 +2,6 @@
 
 - Rename Project.dependency because it conflicts
 
-- Remove Keys.startYear
-
 - PGP signatures
 
 - Maven parallel repository resolution

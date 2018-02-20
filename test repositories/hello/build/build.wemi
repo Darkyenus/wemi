@@ -16,7 +16,13 @@ val hello by project {
     projectName set { "hello" }
     projectVersion set { "1.0-SNAPSHOT" }
 
-    startYear set { 2017 }
+    val startYear = "2017"
+
+    publishMetadata modify { metadata ->
+        metadata.apply {
+            child("inceptionYear", startYear)
+        }
+    }
 
     repositories add { repository("jitpack", "https://jitpack.io") }
 
@@ -27,11 +33,11 @@ val hello by project {
     libraryDependencies add { dependency("com.h2database:h2:1.4.196") }
 
     extend(compilingKotlin) {
-        compilerOptions[KotlinCompilerFlags.customFlags] += "-Xno-optimize"
+        compilerOptions[KotlinCompilerFlags.customFlags] += "-Xno-optimize" // (example, not needed)
     }
 
     extend(running) {
-        projectName set { "Greeting Simulator ${startYear.get()}" }
+        projectName set { "Greeting Simulator $startYear" }
     }
 
     extend(testing) {
