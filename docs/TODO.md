@@ -1,7 +1,6 @@
 # Things to do next
 
-
-###### Release 0.2
+- Rename Project.dependency because it conflicts
 
 - Remove Keys.startYear
 
