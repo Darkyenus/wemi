@@ -87,7 +87,7 @@ object Keys {
     val runOptions by key<WList<String>>("Options given to 'java' when running the project", defaultValue = wEmptyList())
     val runArguments by key<WList<String>>("Options given to the application when running the project", defaultValue = wEmptyList())
     val run by key<Int>("Compile and run the project, return exit code", cacheMode = null)
-    val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code", cacheMode = null)
+    val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code", cacheMode = null, inputKeys = arrayOf("main" to "Main class to run"))
 
     val testParameters by key<TestParameters>("Parameters for the test key. By default discovers all tests in the test sources.")
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it.prettyPrint() })

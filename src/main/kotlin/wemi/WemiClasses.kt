@@ -11,6 +11,9 @@ import wemi.compile.CompilerFlags
 import wemi.util.*
 import java.nio.file.Path
 
+typealias InputKey = String
+typealias InputKeyDescription = String
+
 /** 
  * Key which can have value of type [Value] assigned, through [Project] or [Configuration].
  */
@@ -36,6 +39,12 @@ class Key<Value> internal constructor(
          * Mode in which the result of this key's evaluation should be cached by the scope in which it was evaluated.
          */
         internal val cacheMode: KeyCacheMode<Value>?,
+        /**
+         * Input keys that are used by this key.
+         * Used only for documentation and CLI purposes (autocomplete).
+         * @see [Input]
+         */
+        internal val inputKeys:Array<Pair<InputKey, InputKeyDescription>>,
         /**
          * Optional function that can convert the result of this key's evaluation to a more readable
          * or more informative string.

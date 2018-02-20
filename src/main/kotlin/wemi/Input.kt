@@ -188,7 +188,7 @@ abstract class Input {
      * Get the key value from the stack if it has been specified explicitly and fits the validator.
      * Items on the top of the stack are considered before those on the bottom.
      */
-    abstract internal fun <Value> getPrepared(key: String, validator: Validator<Value>): Value?
+    internal abstract fun <Value> getPrepared(key: String, validator: Validator<Value>): Value?
 
     /**
      * Convenience method, calls [read] with [StringValidator].

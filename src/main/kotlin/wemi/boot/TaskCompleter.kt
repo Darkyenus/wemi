@@ -4,9 +4,11 @@ import org.jline.reader.Candidate
 import org.jline.reader.Completer
 import org.jline.reader.LineReader
 import org.jline.reader.ParsedLine
+import wemi.AllKeys
 import wemi.BuildScriptData
 import wemi.boot.TaskParser.TokenType.*
 import wemi.util.SimpleHistory
+import wemi.util.findCaseInsensitive
 
 /**
  * Provides completion for task lines, parsed by [TaskParser].
@@ -37,10 +39,10 @@ internal object TaskCompleter : Completer {
         for (name in BuildScriptData.AllProjects.keys) {
             candidates.add(Candidate(
                     name,
-                    name,
+                    name + TaskParser.PROJECT_SEPARATOR,
                     null, //"Projects",
                     null,
-                    TaskParser.PROJECT_SEPARATOR,
+                    null,
                     null,
                     false))
         }
@@ -72,10 +74,10 @@ internal object TaskCompleter : Completer {
         for (config in BuildScriptData.AllConfigurations.values) {
             candidates.add(Candidate(
                     config.name,
-                    config.name,
+                    config.name + TaskParser.CONFIGURATION_SEPARATOR,
                     null, //"Configurations",
                     config.description,
-                    TaskParser.CONFIGURATION_SEPARATOR,
+                    null,
                     null,
                     false))
         }
@@ -140,20 +142,34 @@ internal object TaskCompleter : Completer {
     }
 
     private fun completeInputKeys(key:String?, withSuffix:Boolean, candidates: MutableList<Candidate>) {
-        if (true) return
-        //TODO
-        if (withSuffix) {
-            candidates.add(Candidate(
-                    "$key.inputKey=",
-                    "$key.inputKey=",
-                    null,
-                    null,
-                    null,
-                    null,
-                    false
-            ))
-        } else {
-            candidates.add(Candidate("$key.inputKey"))
+        if (key == null) {
+            return
+        }
+        val foundKey = AllKeys.findCaseInsensitive(key) ?: return
+        for ((inputKey, description) in foundKey.inputKeys) {
+            val keyWithSuffix = "$inputKey${TaskParser.INPUT_SEPARATOR}"
+
+            if (withSuffix) {
+                candidates.add(Candidate(
+                        keyWithSuffix,
+                        keyWithSuffix,
+                        null,
+                        description,
+                        null,
+                        null,
+                        false
+                ))
+            } else {
+                candidates.add(Candidate(
+                        key,
+                        keyWithSuffix,
+                        null,
+                        description,
+                        null,
+                        null,
+                        false
+                ))
+            }
         }
     }
 

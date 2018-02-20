@@ -51,6 +51,8 @@ fun project(projectRoot: Path?, vararg archetypes: Archetype, initializer: Proje
     return ProjectDelegate(projectRoot, archetypes, initializer)
 }
 
+private val NO_INPUT_KEYS = emptyArray<Pair<InputKey, InputKeyDescription>>()
+
 /**
  * Create a new [Key] with a default value
  * To be used as a variable delegate target, example:
@@ -67,9 +69,10 @@ fun project(projectRoot: Path?, vararg archetypes: Archetype, initializer: Proje
  *          This same instance will be returned on each return, in every scope, so it MUST be immutable!
  *          Recommended to be used only for keys of [Collection]s with empty immutable default.
  * @param cacheMode describes how the key's evaluation result should be cached, null if it should not be cached
+ * @param inputKeys
  */
-fun <Value> key(description: String, defaultValue: Value, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
-    return KeyDelegate(description, true, defaultValue, cacheMode, prettyPrinter)
+fun <Value> key(description: String, defaultValue: Value, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+    return KeyDelegate(description, true, defaultValue, cacheMode, inputKeys, prettyPrinter)
 }
 
 /**
@@ -77,8 +80,8 @@ fun <Value> key(description: String, defaultValue: Value, cacheMode: KeyCacheMod
  *
  * @see [key] with default value for exact documentation
  */
-fun <Value> key(description: String, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
-    return KeyDelegate(description, false, null, cacheMode, prettyPrinter)
+fun <Value> key(description: String, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+    return KeyDelegate(description, false, null, cacheMode, inputKeys, prettyPrinter)
 }
 
 /**
