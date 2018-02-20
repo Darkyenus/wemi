@@ -54,7 +54,10 @@ object TaskParser : Parser {
                     continue
                 }
 
-                if (part.start < cursor) {
+                // Tries to match the rightmost part, that begins at/before the cursor
+                // When there is only one part, matches that
+                // When there are no parts, default 0:0 is kept
+                if (part.start <= cursor) {
                     positionWord = words.size
                     positionInWord = cursor - part.start
                 }
@@ -63,7 +66,36 @@ object TaskParser : Parser {
                 tokenTypes.add(part.meaning)
             }
 
-            //TODO Check that position behaves well even in corner cases described in docs
+            if (words.isEmpty()) {
+                // Add default edited word
+                words.add("")
+                tokenTypes.add(null)
+            } else {
+                if (tokenTypes[positionWord] == TokenType.Separator) {
+                    if (positionInWord == 0) {
+                        // User is at the start of a separator, this does not lead to any meaningful completion,
+                        // move back if possible
+                        if (positionWord > 0) {
+                            positionWord--
+                            positionInWord = words[positionWord].length
+                        }
+                    } else {
+                        // User is at the end of a separator
+                        // this does not lead to any meaningful completion, so insert dummy word
+                        positionWord++
+                        words.add(positionWord, "")
+                        tokenTypes.add(positionWord, null)
+                        positionInWord = 0
+                    }
+                } else if (positionInWord > words[positionWord].length) {
+                    // User is editing certain word, add empty edited word
+                    // This happens for example for line like "runMain |" (| = caret)
+                    positionWord++
+                    words.add(positionWord, "")
+                    tokenTypes.add(positionWord, null)
+                    positionInWord = 0
+                }
+            }
 
             this.words = words
             this.tokenTypes = tokenTypes
@@ -137,7 +169,7 @@ object TaskParser : Parser {
          *
          * Escape on end of the line is treated as a regular character, so are unmatched quotes.
          */
-        private fun createParts(sources: Collection<String>, allowQuotes: Boolean):List<Part> {
+        private fun createParts(sources: Collection<String>, allowQuotes: Boolean):MutableList<Part> {
             val parts = ArrayList<Part>()
             var indexBase = 0
 
