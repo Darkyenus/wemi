@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.darkyen.wemi.intellij</id>
     <name>WEMI</name>
-    <version>0.2</version>
+    <version>0.3-SNAPSHOT</version>
     <vendor email="darkyenus@gmail.com" url="http://darkyenus.github.io">Jan Polák</vendor>
 
     <description><![CDATA[
