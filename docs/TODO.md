@@ -1,6 +1,5 @@
 # Things to do next
 
-- Fix TaskCompleter, as it is probably broken after last TaskParser rewrite
 
 ###### Release 0.2
 

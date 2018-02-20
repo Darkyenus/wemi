@@ -305,6 +305,20 @@ internal class SimpleHistory(private val path: Path?) : History {
         }
 
         /**
+         * Return history name for [getHistory] or [getExistingHistory],
+         * for storing history of given key.
+         *
+         * @param inputKey or null if free input
+         */
+        internal fun inputHistoryName(inputKey:String?):String {
+            if (inputKey == null) {
+                return "input"
+            } else {
+                return "input.$inputKey"
+            }
+        }
+
+        /**
          * History when no history is needed
          */
         val NoHistory = SimpleHistory(null)

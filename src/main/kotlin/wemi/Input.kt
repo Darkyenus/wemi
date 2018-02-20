@@ -1,7 +1,6 @@
 package wemi
 
 import org.jline.reader.EndOfFileException
-import org.jline.reader.History
 import org.jline.reader.UserInterruptException
 import org.slf4j.LoggerFactory
 import wemi.boot.CLI
@@ -26,7 +25,7 @@ internal class InputBase(private val interactive: Boolean) : Input() {
                 val line = CLI.InputLineReader.run {
                     val previousHistory = history
                     try {
-                        history = getHistory(key)
+                        history = SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key))
                         readLine("${format(description, format = Format.Bold)} (${format(key, Color.White)}): ")
                     } finally {
                         history = previousHistory
@@ -47,13 +46,6 @@ internal class InputBase(private val interactive: Boolean) : Input() {
         }
     }
 
-}
-
-/**
- * Get command input history for given input key
- */
-private fun getHistory(key: String): History {
-    return SimpleHistory.getHistory("input.$key")
 }
 
 /**
@@ -81,7 +73,7 @@ private class InputExtensionBinding(val previous: Input, val extension: InputExt
 
             if (preparedValue != null) {
                 validator(preparedValue).use<Unit>({
-                    getHistory(key).add(preparedValue)
+                    SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key)).add(preparedValue)
                     return it
                 }, {
                     LOG.info("Can't use '{}' for input key '{}': {}", preparedValue, key, it)
@@ -103,7 +95,8 @@ private class InputExtensionBinding(val previous: Input, val extension: InputExt
                     val freeInput = freeInput[nextFreeInput]
                     validator(freeInput).success {
                         // We will use this free input
-                        getHistory(key).add(freeInput)
+                        SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key)).add(freeInput)
+                        SimpleHistory.getHistory(SimpleHistory.inputHistoryName(null)).add(freeInput)
                         nextFreeInput++
                         return it
                     }

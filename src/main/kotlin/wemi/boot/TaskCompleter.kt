@@ -173,25 +173,20 @@ internal object TaskCompleter : Completer {
         }
     }
 
-    private fun completeInputValues(key:String?, inputKey:String?, candidates: MutableList<Candidate>) {
-        //TODO More clever caching
+    private fun completeInputValues(inputKey:String?, candidates: MutableList<Candidate>) {
+        // Fill in from history for this key
+        val history = SimpleHistory.getExistingHistory(SimpleHistory.inputHistoryName(inputKey)) ?: return
+        for (item in history.items) {
+            candidates.add(Candidate(item))
+        }
 
-        if (inputKey != null) {
-            // Fill in from history for this key
-            val history = SimpleHistory.getExistingHistory("input.$inputKey")
-            if (history != null) {
-                for (item in history.items) {
-                    candidates.add(Candidate(item))
-                }
-            } else {
-                if (true) return
-                candidates.add(Candidate("inputValue"))
-            }
-        } else {
-            // Fill in free and bound completions
-            //TODO
-            if (true) return
-            candidates.add(Candidate("freeInputValue"))
+        // Also add items from free history, if not the same as previous
+        if (inputKey == null) {
+            return
+        }
+        val freeHistory = SimpleHistory.getExistingHistory(SimpleHistory.inputHistoryName(null)) ?: return
+        for (item in freeHistory.items) {
+            candidates.add(Candidate(item))
         }
     }
 
@@ -209,8 +204,7 @@ internal object TaskCompleter : Completer {
 
             // Fill in from history for this key
             val inputKey = line.retrieveInputKeyForInput(wordIndex)
-            val key = line.retrieveKeyForInput(wordIndex)
-            completeInputValues(key, inputKey, candidates)
+            completeInputValues(inputKey, candidates)
 
             // If not currently editing a task, offer to end
             if (type == null) {
@@ -240,7 +234,7 @@ internal object TaskCompleter : Completer {
                     // Time for input keys and end of task
                     val key = line.retrieveKeyForInput(wordIndex)
                     completeInputKeys(key, true, candidates)
-                    completeInputValues(key, null, candidates)
+                    completeInputValues(null, candidates)
                     candidates.add(taskSeparatorCandidate)
                 }
                 InputKey -> {
@@ -264,9 +258,8 @@ internal object TaskCompleter : Completer {
                         }
                         TaskParser.INPUT_SEPARATOR -> {
                             // Time to add some input
-                            val key = line.retrieveKeyForInput(wordIndex)
                             val inputKey = line.retrieveInputKeyForInput(wordIndex)
-                            completeInputValues(key, inputKey, candidates)
+                            completeInputValues(inputKey, candidates)
                         }
                         TaskParser.PROJECT_SEPARATOR -> {
                             // Project has been added, but configurations and keys are still missing
@@ -315,11 +308,11 @@ internal object TaskCompleter : Completer {
                 }
                 Input -> {
                     // Editing input
-                    val key = line.retrieveKeyForInput(wordIndex)
                     val inputKey = line.retrieveInputKeyForInput(wordIndex)
-                    completeInputValues(key, inputKey, candidates)
+                    completeInputValues(inputKey, candidates)
                     if (inputKey == null) {
                         // This may be a key being typed
+                        val key = line.retrieveKeyForInput(wordIndex)
                         completeInputKeys(key, true, candidates)
                     }
                 }
