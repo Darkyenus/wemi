@@ -41,6 +41,6 @@ class ProjectDependency internal constructor(val project: Project, val configura
 /**
  * Create a ProjectDependency for depending on this [Project], optionally with given configurations on top.
  */
-fun Project.dependency(vararg configurations: Configuration): ProjectDependency {
-    return ProjectDependency(this, configurations)
+fun dependency(project:Project, vararg configurations: Configuration): ProjectDependency {
+    return ProjectDependency(project, configurations)
 }

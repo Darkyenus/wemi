@@ -51,7 +51,7 @@ inline val Scope.JUnitAPI
     inline get() = _JUnitAPI
 val Scope.JUnitEngine
     inline get() = _JUnitEngine
-inline fun Project.dependency(vararg configurations:Configuration) = this._dependency(*configurations)
+inline fun dependency(project:Project, vararg configurations:Configuration) = _dependency(project, *configurations)
 
 // Path helpers
 inline fun path(path:String):Path = Paths.get(path)
