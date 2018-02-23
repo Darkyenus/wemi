@@ -3,6 +3,10 @@ package wemi
 import wemi.assembly.MergeStrategyChooser
 import wemi.assembly.RenameFunction
 import wemi.boot.BuildScript
+import wemi.collections.WList
+import wemi.collections.WSet
+import wemi.collections.wEmptyList
+import wemi.collections.wEmptySet
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion

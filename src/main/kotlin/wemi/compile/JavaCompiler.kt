@@ -2,7 +2,7 @@ package wemi.compile
 
 import com.esotericsoftware.jsonbeans.Json
 import wemi.boot.MachineWritable
-import wemi.util.wSetOf
+import wemi.collections.wSetOf
 
 /**
  * Extensions that a valid Java source file can have.

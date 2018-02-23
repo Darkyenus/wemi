@@ -1,6 +1,5 @@
 
 import wemi.Configurations.compilingKotlin
-import wemi.util.div
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.documentation.DokkaOptions.SourceLinkMapItem

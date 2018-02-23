@@ -9,7 +9,7 @@ import wemi.dependency.*
 import wemi.util.EnclaveClassLoader
 import wemi.util.LocatedFile
 import wemi.util.WemiDefaultClassLoader
-import wemi.util.wSetOf
+import wemi.collections.wSetOf
 import java.net.URLClassLoader
 import java.nio.file.Path
 

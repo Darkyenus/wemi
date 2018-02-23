@@ -2,6 +2,8 @@
 
 - Rename Project.dependency because it conflicts
 
+- When adding dependencies, sort them with those that have sources/docs on top
+
 - PGP signatures
 
 - Maven parallel repository resolution

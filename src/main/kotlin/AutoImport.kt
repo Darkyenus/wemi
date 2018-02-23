@@ -6,6 +6,8 @@ import wemi.Configurations
 import wemi.KeyCacheMode
 import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository
+import wemi.util.div as _div
+import java.net.URL
 import java.nio.file.Paths
 import wemi.kotlinDependency as _kotlinDependency
 import wemi.dependency.dependency as _dependency
@@ -45,13 +47,17 @@ inline fun repository(name: String, url: String, checksum: Repository.M2.Checksu
 
 // Helper functions
 inline fun Scope.kotlinDependency(name: String) = _kotlinDependency(name)
-val Scope.JUnitAPI
+inline val Scope.JUnitAPI
     inline get() = _JUnitAPI
 val Scope.JUnitEngine
     inline get() = _JUnitEngine
 inline fun Project.dependency(vararg configurations:Configuration) = this._dependency(*configurations)
 
-fun path(path:String):Path = Paths.get(path)
+// Path helpers
+inline fun path(path:String):Path = Paths.get(path)
+inline operator fun URL.div(path: CharSequence): URL = this._div(path)
+inline operator fun Path.div(path: CharSequence): Path = this._div(path)
+inline operator fun CharSequence.div(path: CharSequence): StringBuilder = this._div(path)
 
 // Configurations
 val compiling

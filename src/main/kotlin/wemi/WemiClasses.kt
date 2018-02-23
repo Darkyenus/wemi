@@ -6,6 +6,8 @@ import com.esotericsoftware.jsonbeans.Json
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import wemi.boot.MachineWritable
+import wemi.collections.WCollection
+import wemi.collections.WSet
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
 import wemi.util.*

@@ -1,6 +1,6 @@
 @file:Suppress("UNCHECKED_CAST", "unused")
 
-package wemi.util
+package wemi.collections
 
 /**
  * Base interface for Wemi collections.
@@ -12,27 +12,27 @@ interface WCollection<T>:Collection<T> {
     /**
      * Return new mutable collection if this one is immutable, but always return self if mutable.
      */
-    fun toMutable():WMutableCollection<T>
+    fun toMutable(): WMutableCollection<T>
 }
 
 /**
  * Ordered set specialization of [WCollection].
  */
-interface WSet<T>:WCollection<T>, Set<T> {
+interface WSet<T>: WCollection<T>, Set<T> {
     override fun toMutable(): WMutableSet<T>
 }
 
 /**
  * List specialization of [WCollection]
  */
-interface WList<T>:WCollection<T>, List<T> {
+interface WList<T>: WCollection<T>, List<T> {
     override fun toMutable(): WMutableList<T>
 }
 
 /**
  * Mutable counterpart to [WCollection]
  */
-interface WMutableCollection<T>:WCollection<T>, MutableCollection<T>
+interface WMutableCollection<T>: WCollection<T>, MutableCollection<T>
 
 /**
  * Ordered set that can be freely modified
@@ -94,18 +94,18 @@ private object WEmptyList:List<Nothing> by emptyList(), WList<Nothing> {
 /**
  * Create an empty [WSet]. Guaranteed to be immutable!
  */
-fun <T> wEmptySet():WSet<T> = WEmptySet as WSet<T>
+fun <T> wEmptySet(): WSet<T> = WEmptySet as WSet<T>
 
 /**
  * Create an empty [WList]. Guaranteed to be immutable!
  */
-fun <T> wEmptyList():WList<T> = WEmptyList as WList<T>
+fun <T> wEmptyList(): WList<T> = WEmptyList as WList<T>
 
 /**
  * Create an [WSet] with [items].
  * Guaranteed to be immutable in a way that [WCollection.toMutable] will return a new collection.
  */
-fun <T> wSetOf(vararg items:T):WSet<T> {
+fun <T> wSetOf(vararg items:T): WSet<T> {
     return if (items.isEmpty()) {
         WEmptySet as WSet<T>
     } else {
@@ -121,7 +121,7 @@ fun <T> wSetOf(vararg items:T):WSet<T> {
  * Create an [WSet] with [items].
  * Guaranteed to be immutable in a way that [WCollection.toMutable] will return a new collection.
  */
-fun <T> wMutableSetOf(vararg items:T):WSet<T> {
+fun <T> wMutableSetOf(vararg items:T): WSet<T> {
     return if (items.isEmpty()) {
         WEmptySet as WSet<T>
     } else {
@@ -137,7 +137,7 @@ fun <T> wMutableSetOf(vararg items:T):WSet<T> {
  * Create an [WList] with [items].
  * Guaranteed to be immutable in a way that [WCollection.toMutable] will return a new collection.
  */
-fun <T> wListOf(vararg items:T):WList<T> {
+fun <T> wListOf(vararg items:T): WList<T> {
     return if (items.isEmpty()) {
         WEmptyList as WList<T>
     } else {
@@ -152,7 +152,7 @@ fun <T> wListOf(vararg items:T):WList<T> {
 /**
  * Create an [WList] with [items].
  */
-fun <T> wMutableListOf(vararg items:T):WList<T> {
+fun <T> wMutableListOf(vararg items:T): WList<T> {
     return if (items.isEmpty()) {
         WEmptyList as WList<T>
     } else {
@@ -168,7 +168,7 @@ fun <T> wMutableListOf(vararg items:T):WList<T> {
  * Convert this collection to [WSet].
  * Return this if already [WSet].
  */
-fun <T> Collection<T>.toWSet():WSet<T> {
+fun <T> Collection<T>.toWSet(): WSet<T> {
     if (this is WSet) {
         return this
     } else {
@@ -180,7 +180,7 @@ fun <T> Collection<T>.toWSet():WSet<T> {
  * Convert this collection to [WList].
  * Return this if already [WList].
  */
-fun <T> Collection<T>.toWList():WList<T> {
+fun <T> Collection<T>.toWList(): WList<T> {
     if (this is WList) {
         return this
     } else {

@@ -3,6 +3,8 @@ package wemi.dependency
 import com.esotericsoftware.jsonbeans.Json
 import org.slf4j.LoggerFactory
 import wemi.boot.MachineWritable
+import wemi.collections.WSet
+import wemi.collections.wSetOf
 import wemi.publish.InfoNode
 import wemi.util.*
 import java.net.URI

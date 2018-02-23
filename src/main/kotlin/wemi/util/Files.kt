@@ -1,4 +1,4 @@
-@file:Suppress("unused")
+@file:Suppress("unused", "NOTHING_TO_INLINE")
 
 package wemi.util
 
@@ -20,7 +20,7 @@ import java.util.concurrent.Semaphore
 /**
  * Creates an URL with given path appended.
  */
-operator fun URL.div(path: CharSequence): URL {
+inline operator fun URL.div(path: CharSequence): URL {
     return URL(this, path.toString())
 }
 
@@ -77,19 +77,15 @@ fun URL.toPath(): Path? {
 
 /** Append given path to the file. It is safe to use '/' slashes for directories
  * (this is preferred to chaining [div] calls). Do not use '\' backslash. */
-@Suppress("NOTHING_TO_INLINE")
-inline operator fun Path.div(path: String): Path = this.resolve(path)
+inline operator fun Path.div(path: CharSequence): Path = this.resolve(path.toString())
 
 /** @see [Files.isDirectory] */
-@Suppress("NOTHING_TO_INLINE")
 inline fun Path.isDirectory(): Boolean = Files.isDirectory(this)
 
 /** @see [Files.exists] */
-@Suppress("NOTHING_TO_INLINE")
 inline fun Path.isHidden(): Boolean = Files.isHidden(this)
 
 /** @see [Files.exists] */
-@Suppress("NOTHING_TO_INLINE")
 inline fun Path.exists(): Boolean = Files.exists(this)
 
 /** @return name of the file, without the rest of the path, with extension */

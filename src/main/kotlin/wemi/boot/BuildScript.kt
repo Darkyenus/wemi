@@ -2,6 +2,7 @@ package wemi.boot
 
 import org.slf4j.LoggerFactory
 import wemi.WemiKotlinVersion
+import wemi.collections.*
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags

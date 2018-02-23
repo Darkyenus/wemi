@@ -14,6 +14,10 @@ import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
 import wemi.boot.WemiBuildScript
+import wemi.collections.WList
+import wemi.collections.WMutableList
+import wemi.collections.WMutableSet
+import wemi.collections.WSet
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags

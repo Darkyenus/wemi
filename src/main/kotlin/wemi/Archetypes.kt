@@ -7,6 +7,7 @@ import wemi.assembly.JarMergeStrategyChooser
 import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiCacheFolder
 import wemi.boot.WemiRunningInInteractiveMode
+import wemi.collections.*
 import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
 import wemi.dependency.LocalM2Repository
