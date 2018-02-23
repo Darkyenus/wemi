@@ -451,6 +451,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
 
         fun apply(project:DataNode<ProjectData>, modules:Map<String, DataNode<ModuleData>>) {
+            val projectToDependenciesMap = HashMap<DataNode<ModuleData>, ArrayList<LibraryDependencyData>>()
+
             for ((library, projects) in hashToDependencyAndProjects.values) {
                 val unresolved = library.artifacts.any { !it.exists() }
 
@@ -472,6 +474,16 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     val libraryDependencyData = LibraryDependencyData(projectModule.data, libraryData, LibraryLevel.PROJECT)
                     libraryDependencyData.scope = dependencyScope
                     libraryDependencyData.isExported = dependencyScope.exported
+
+                    projectToDependenciesMap.getOrPut(projectModule) { ArrayList() }.add(libraryDependencyData)
+                }
+            }
+
+            for ((projectModule, dependencies) in projectToDependenciesMap) {
+                // Sort dependencies
+                dependencies.sortWith(DependencyComparator)
+
+                for (libraryDependencyData in dependencies) {
                     projectModule.createChild(ProjectKeys.LIBRARY_DEPENDENCY, libraryDependencyData)
                 }
             }
@@ -638,6 +650,29 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
         private val DependencyScope.exported:Boolean
             get() = DependencyScope.COMPILE == this
+
+        private fun artifactCriteriaPriority(dependency:LibraryDependencyData):Int {
+            val target = dependency.target
+            when {
+                target.getPaths(LibraryPathType.SOURCE).isNotEmpty() -> return 0
+                target.getPaths(LibraryPathType.DOC).isNotEmpty() -> return 1
+                else -> return 2
+            }
+        }
+
+        /**
+         * Sorts dependencies.
+         * Criteria:
+         * 1. Dependencies with sources first, then those with documentation, then rest
+         *      (this is done because IntelliJ then tries to find sources/documentation in random jars
+         *      that may not have them and overlooks those that do have them)
+         * 2. Otherwise stable
+         */
+        private val DependencyComparator:Comparator<LibraryDependencyData> = Comparator { a, b ->
+            val a1 = artifactCriteriaPriority(a)
+            val b1 = artifactCriteriaPriority(b)
+             a1.compareTo(b1)
+        }
     }
 
     @Suppress("CanBeParameter")

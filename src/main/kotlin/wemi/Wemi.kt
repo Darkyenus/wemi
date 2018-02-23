@@ -9,8 +9,6 @@ import kotlin.reflect.KProperty0
 /** Version of Wemi build system */
 const val WemiVersion = "0.3-SNAPSHOT"
 
-internal val WemiVersionIsSnapshot = WemiVersion.endsWith("-SNAPSHOT")
-
 /** Version of Kotlin used for build scripts */
 val WemiKotlinVersion = KotlinCompilerVersion.Version1_2_21
 

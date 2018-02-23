@@ -1,7 +1,5 @@
 # Things to do next
 
-- When adding dependencies, sort them with those that have sources/docs on top
-
 - PGP signatures
 
 - Maven parallel repository resolution
