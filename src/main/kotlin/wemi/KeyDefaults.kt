@@ -15,11 +15,16 @@ import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
 import wemi.boot.WemiBuildScript
 import wemi.boot.WemiBundledLibrariesExclude
-import wemi.collections.*
+import wemi.collections.WList
+import wemi.collections.WMutableList
+import wemi.collections.WMutableSet
+import wemi.collections.WSet
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
+import wemi.compile.internal.MessageLocation
+import wemi.compile.internal.render
 import wemi.dependency.*
 import wemi.dependency.Repository.M2.Companion.JavadocClassifier
 import wemi.dependency.Repository.M2.Companion.SourcesClassifier
@@ -32,11 +37,14 @@ import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
 import wemi.util.*
+import java.io.BufferedReader
 import java.net.URI
 import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.time.ZonedDateTime
 import java.util.*
 import javax.tools.*
@@ -190,6 +198,64 @@ object KeyDefaults {
 
     private val CompileLOG = LoggerFactory.getLogger("Compile")
 
+    private val JavaDiagnosticListener : DiagnosticListener<JavaFileObject> = DiagnosticListener { diagnostic ->
+        val source = diagnostic.source
+        val location: MessageLocation? =
+            if (source == null) {
+                null
+            } else {
+                val lineNumber = diagnostic.lineNumber
+                var lineContent:String? = null
+                BufferedReader(diagnostic.source.openReader(true)).use {
+                    var line = 0L
+                    while (true) {
+                        val l = it.readLine() ?: break
+                        line++
+                        if (line == lineNumber) {
+                            lineContent = l
+                            break
+                        }
+                    }
+                }
+
+                MessageLocation(
+                        Paths.get(source.toUri()).toRealPath(LinkOption.NOFOLLOW_LINKS).absolutePath,
+                        lineNumber.toInt(),
+                        diagnostic.columnNumber.toInt(),
+                        lineContent,
+                        tabColumnCompensation = 8)
+            }
+
+        var lint:String? = null
+        // Try to extract lint info from the message
+        try {
+            // It is sadly not available through public api.
+            var jc = diagnostic
+            if (jc.javaClass.name == "com.sun.tools.javac.api.ClientCodeWrapper\$DiagnosticSourceUnwrapper") {
+                @Suppress("UNCHECKED_CAST")
+                jc = jc.javaClass.getDeclaredField("d").get(jc) as Diagnostic<JavaFileObject>
+            }
+            if (jc.javaClass.name == "com.sun.tools.javac.util.JCDiagnostic") {
+                val lintCategory = jc.javaClass.getMethod("getLintCategory").invoke(jc)
+                if (lintCategory != null) {
+                    lint = lintCategory.javaClass.getField("option").get(lintCategory) as String?
+                }
+            } else {
+                CompileLOG.debug("Failed to extract lint information from {}", diagnostic.javaClass)
+            }
+        } catch (ex:Exception) {
+            CompileLOG.debug("Failed to extract lint information from {}", diagnostic, ex)
+        }
+
+        var message = diagnostic.getMessage(Locale.getDefault())
+        if (lint != null) {
+            // Mimic default format
+            message = "[$lint] $message"
+        }
+
+        CompileLOG.render(null, diagnostic.kind.name, message, location)
+    }
+
     val CompileJava: BoundKeyValue<Path> = {
         using(Configurations.compiling) {
             val output = Keys.outputClassesDirectory.get()
@@ -246,7 +312,7 @@ object KeyDefaults {
                 val success = compiler.getTask(
                         writer,
                         fileManager,
-                        null,
+                        JavaDiagnosticListener,
                         compilerOptions,
                         null,
                         javaFiles
@@ -356,7 +422,7 @@ object KeyDefaults {
                 val success = compiler.getTask(
                         writer,
                         fileManager,
-                        null,
+                        JavaDiagnosticListener,
                         compilerOptions,
                         null,
                         javaFiles

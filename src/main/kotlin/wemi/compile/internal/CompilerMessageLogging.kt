@@ -5,14 +5,13 @@ import org.slf4j.Marker
 import wemi.boot.WemiRootFolder
 import wemi.util.Color
 import wemi.util.Format
-import wemi.util.appendTimes
 import wemi.util.format
 import java.nio.file.Paths
 
 /**
  * Mirror of [org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation]
  */
-class KotlinCompilerMessageLocation (val path: String, val line: Int, val column: Int, val lineContent: String?)
+class MessageLocation(val path: String, val line: Int, val column: Int, val lineContent: String?, val tabColumnCompensation:Int = 1)
 
 private val LINE_SEPARATOR = System.lineSeparator()
 
@@ -20,11 +19,12 @@ private val LINE_SEPARATOR = System.lineSeparator()
  * Log given message
  *
  * @param severity [org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity].name()
+ *                  or [javax.tools.Diagnostic.Kind].name()
  */
 fun Logger.render(marker: Marker?,
                   severity: String,
                   message: String,
-                  location: KotlinCompilerMessageLocation?) {
+                  location: MessageLocation?) {
     var important = false
     var color:Color? = null
 
@@ -36,16 +36,16 @@ fun Logger.render(marker: Marker?,
             color = Color.Red
             isErrorEnabled(marker)
         }
-        "STRONG_WARNING", "WARNING" -> {
+        "STRONG_WARNING", "WARNING", "MANDATORY_WARNING" -> {
             important = true
             color = Color.Yellow
             isWarnEnabled(marker)
         }
-        "INFO" -> {
+        "INFO", "NOTE" -> {
             color = Color.Blue
             isInfoEnabled(marker)
         }
-        "LOGGING", "OUTPUT" -> isDebugEnabled(marker)
+        "LOGGING", "OUTPUT", "OTHER" -> isDebugEnabled(marker)
         else -> true
     }
     if (!enabled) {
@@ -95,8 +95,22 @@ fun Logger.render(marker: Marker?,
     val lineContent = location?.lineContent
     if (lineContent != null) {
         result.append('\n').append(lineContent)
-        if (location.column in 1..lineContent.length + 1) {
-            result.append('\n').appendTimes(' ', location.column - 1).append('^')
+        var remainingSpaces = location.column - 1
+        if (remainingSpaces >= 0) {
+            result.append('\n')
+            var i = 0
+            while (remainingSpaces > 0) {
+                if (lineContent[i] == '\t') {
+                    result.append('\t')
+                    remainingSpaces -= location.tabColumnCompensation
+                } else {
+                    result.append(' ')
+                    remainingSpaces -= 1
+                }
+                i++
+            }
+
+            result.append('^')
         }
     }
 

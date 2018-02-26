@@ -1,5 +1,6 @@
 
 import wemi.Configurations.compilingKotlin
+import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.documentation.DokkaOptions.SourceLinkMapItem
@@ -30,6 +31,10 @@ val hello by project {
     libraryDependencies add { dependency("org.slf4j:slf4j-api:1.7.22") }
     libraryDependencies add { dependency("com.github.Darkyenus:tproll:v1.2.4") }
     libraryDependencies add { dependency("com.h2database:h2:1.4.196") }
+
+    extend(compilingJava) {
+        compilerOptions[JavaCompilerFlags.customFlags] += "-Xlint:all"
+    }
 
     extend(compilingKotlin) {
         compilerOptions[KotlinCompilerFlags.customFlags] += "-Xno-optimize" // (example, not needed)

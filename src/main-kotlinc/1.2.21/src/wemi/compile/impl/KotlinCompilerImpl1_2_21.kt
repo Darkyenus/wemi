@@ -17,7 +17,7 @@ import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
-import wemi.compile.internal.KotlinCompilerMessageLocation
+import wemi.compile.internal.MessageLocation
 import wemi.compile.internal.render
 import wemi.util.LocatedFile
 import wemi.util.absolutePath
@@ -218,7 +218,7 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
                 val loc = if (location == null)
                     null
                 else
-                    KotlinCompilerMessageLocation(location.path, location.line, location.column, location.lineContent)
+                    MessageLocation(location.path, location.line, location.column, location.lineContent)
                 log.render(marker, severity.name, message, loc)
             }
 
