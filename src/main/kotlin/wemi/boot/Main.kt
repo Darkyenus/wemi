@@ -16,6 +16,7 @@ import wemi.util.*
 import java.io.*
 import java.net.URL
 import java.net.URLClassLoader
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
@@ -52,13 +53,13 @@ internal var WemiRunningInInteractiveMode = false
 /**
  * Directory in which wemi executable is (./)
  */
-var WemiRootFolder: Path = Paths.get(".").toAbsolutePath()
+var WemiRootFolder: Path = Paths.get(".").toRealPath(LinkOption.NOFOLLOW_LINKS)
     private set(value) {
         if (field == value) {
             return
         }
-        field = value
-        WemiBuildFolder = value / "build"
+        field = value.toRealPath(LinkOption.NOFOLLOW_LINKS)
+        WemiBuildFolder = field / "build"
     }
 
 /**

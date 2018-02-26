@@ -5,7 +5,6 @@ import org.jetbrains.kotlin.cli.common.ExitCode
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.jetbrains.kotlin.config.Services
 import org.jetbrains.kotlin.incremental.*
@@ -13,9 +12,16 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
 import wemi.boot.WemiBuildScript
-import wemi.compile.*
+import wemi.compile.CompilerFlags
+import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
-import wemi.util.*
+import wemi.compile.KotlinCompilerFlags
+import wemi.compile.KotlinJVMCompilerFlags
+import wemi.compile.internal.KotlinCompilerMessageLocation
+import wemi.compile.internal.render
+import wemi.util.LocatedFile
+import wemi.util.absolutePath
+import wemi.util.copyRecursively
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -172,7 +178,7 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
                         sources.map { JvmSourceRoot(it.root.toFile(), null) }.toSet(),
                         versions, object : ICReporter {
                             override fun report(message: () -> String) {
-                                logger.info(loggerMarker, "IC: {}", message())
+                                logger.debug(loggerMarker, "IC: {}", message())
                             }
                         },
                         usePreciseJavaTracking = true
@@ -199,7 +205,7 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
         }
     }
 
-    private fun createLoggingMessageCollector(log: Logger, marker: Marker? = null): MessageCollector {
+    private fun createLoggingMessageCollector(log: Logger, marker: Marker?): MessageCollector {
         return object : MessageCollector {
 
             var hasErrors = false
@@ -209,37 +215,11 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
 
             override fun report(severity: CompilerMessageSeverity, message: String, location: CompilerMessageLocation?) {
                 hasErrors = hasErrors || severity.isError
-                val renderer = MessageRenderer.PLAIN_RELATIVE_PATHS
-                when (severity) {
-                    CompilerMessageSeverity.EXCEPTION, CompilerMessageSeverity.ERROR -> {
-                        if (!log.isErrorEnabled(marker)) {
-                            return
-                        }
-                        log.error(marker, renderer.render(severity, message, location))
-                    }
-                    CompilerMessageSeverity.STRONG_WARNING, CompilerMessageSeverity.WARNING -> {
-                        if (!log.isWarnEnabled(marker)) {
-                            return
-                        }
-                        log.warn(marker, renderer.render(severity, message, location))
-                    }
-                    CompilerMessageSeverity.INFO, CompilerMessageSeverity.OUTPUT -> {
-                        if (!log.isInfoEnabled(marker)) {
-                            return
-                        }
-                        log.info(marker, renderer.render(severity, message, location))
-                    }
-                    CompilerMessageSeverity.LOGGING -> {
-                        if (!log.isDebugEnabled(marker)) {
-                            return
-                        }
-                        log.debug(marker, renderer.render(severity, message, location))
-                    }
-                    else -> {
-                        log.error("Unsupported severity level: {}", severity)
-                        log.error(marker, renderer.render(severity, message, location))
-                    }
-                }
+                val loc = if (location == null)
+                    null
+                else
+                    KotlinCompilerMessageLocation(location.path, location.line, location.column, location.lineContent)
+                log.render(marker, severity.name, message, loc)
             }
 
             override fun hasErrors(): Boolean = hasErrors

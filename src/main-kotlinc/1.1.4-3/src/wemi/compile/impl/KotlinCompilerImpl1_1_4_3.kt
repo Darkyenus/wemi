@@ -4,7 +4,6 @@ import org.jetbrains.kotlin.cli.common.ExitCode
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.jetbrains.kotlin.config.Services
 import org.slf4j.Logger
@@ -14,6 +13,8 @@ import wemi.boot.WemiBuildFileExtensions
 import wemi.boot.WemiBuildScript
 import wemi.compile.*
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
+import wemi.compile.internal.KotlinCompilerMessageLocation
+import wemi.compile.internal.render
 import wemi.util.*
 import java.io.File
 import java.nio.file.Path
@@ -150,7 +151,7 @@ internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
         }
     }
 
-    private fun createLoggingMessageCollector(log: Logger, marker: Marker? = null): MessageCollector {
+    private fun createLoggingMessageCollector(log: Logger, marker: Marker?): MessageCollector {
         return object : MessageCollector {
 
             var hasErrors = false
@@ -160,37 +161,11 @@ internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
 
             override fun report(severity: CompilerMessageSeverity, message: String, location: CompilerMessageLocation?) {
                 hasErrors = hasErrors || severity.isError
-                val renderer = MessageRenderer.PLAIN_RELATIVE_PATHS
-                when (severity) {
-                    CompilerMessageSeverity.EXCEPTION, CompilerMessageSeverity.ERROR -> {
-                        if (!log.isErrorEnabled(marker)) {
-                            return
-                        }
-                        log.error(marker, renderer.render(severity, message, location))
-                    }
-                    CompilerMessageSeverity.STRONG_WARNING, CompilerMessageSeverity.WARNING -> {
-                        if (!log.isWarnEnabled(marker)) {
-                            return
-                        }
-                        log.warn(marker, renderer.render(severity, message, location))
-                    }
-                    CompilerMessageSeverity.INFO, CompilerMessageSeverity.OUTPUT -> {
-                        if (!log.isInfoEnabled(marker)) {
-                            return
-                        }
-                        log.info(marker, renderer.render(severity, message, location))
-                    }
-                    CompilerMessageSeverity.LOGGING -> {
-                        if (!log.isDebugEnabled(marker)) {
-                            return
-                        }
-                        log.debug(marker, renderer.render(severity, message, location))
-                    }
-                    else -> {
-                        log.error("Unsupported severity level: {}", severity)
-                        log.error(marker, renderer.render(severity, message, location))
-                    }
-                }
+                val loc = if (location == null)
+                    null
+                else
+                    KotlinCompilerMessageLocation(location.path, location.line, location.column, location.lineContent)
+                log.render(marker, severity.name, message, loc)
             }
 
             override fun hasErrors(): Boolean = hasErrors
