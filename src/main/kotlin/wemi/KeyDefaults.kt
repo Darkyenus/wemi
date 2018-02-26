@@ -193,7 +193,8 @@ object KeyDefaults {
     }
 
     fun outputClassesDirectory(tag: String): BoundKeyValue<Path> = {
-        Keys.buildDirectory.get() / "cache/$tag-${Keys.projectName.get().toSafeFileName('_')}"
+        // Using scopeProject() instead of Keys.projectName, because it has to be unique
+        Keys.cacheDirectory.get() / "$tag-${scopeProject().name.toSafeFileName('_')}"
     }
 
     private val CompileLOG = LoggerFactory.getLogger("Compile")
@@ -272,7 +273,7 @@ object KeyDefaults {
             // Compile Java
             if (javaSources.isNotEmpty()) {
                 val compiler = using(compilingJava) { Keys.javaCompiler.get() }
-                val fileManager = compiler.getStandardFileManager(null, Locale.getDefault(), StandardCharsets.UTF_8)
+                val fileManager = compiler.getStandardFileManager(JavaDiagnosticListener, Locale.getDefault(), StandardCharsets.UTF_8)
                 val writerSb = StringBuilder()
                 val writer = StringBuilderWriter(writerSb)
                 val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }

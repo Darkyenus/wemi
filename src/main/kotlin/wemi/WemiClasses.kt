@@ -681,6 +681,24 @@ class Scope internal constructor(
     }
 
     /**
+     * @return [Project] that is at the root of this [Scope]
+     */
+    fun scopeProject():Project {
+        // Project is always in the scope without parent
+        var scope = this
+        while (true) {
+            scope = scope.scopeParent ?: break
+        }
+        for (holder in scope.scopeBindingHolders) {
+            // Should be the first one
+            if (holder is Project) {
+                return holder
+            }
+        }
+        throw IllegalStateException("No Project in Scope")
+    }
+
+    /**
      * Forget cached values stored in this and descendant caches.
      *
      * @return amount of values forgotten
