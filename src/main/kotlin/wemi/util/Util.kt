@@ -125,7 +125,7 @@ fun StringBuilder.appendByteSize(bytes: Long): StringBuilder {
         relevant--
     }
 
-    if (relevant < R && relevant > 0) {
+    if (relevant > 0) {
         append(remaining).append(" B ")
     }
 
@@ -445,11 +445,15 @@ private fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
         if (value is Function<*>) {
             val javaClass = value.javaClass
             this.format(Color.White).append(" (").append(javaClass.name).append(')')
-        } else if (value is Path) {
-            try {
-                val size = Files.size(value)
-                this.format(Color.White).append(" (").appendByteSize(size).append(')')
-            } catch (ignored:Exception) {}
+        } else if (value is Path || value is LocatedFile) {
+            val path = value as? Path ?: (value as LocatedFile).file
+
+            if (Files.isRegularFile(path)) {
+                try {
+                    val size = Files.size(path)
+                    this.format(Color.White).append(" (").appendByteSize(size).append(')')
+                } catch (ignored:Exception) {}
+            }
         }
         this.format()
     }
