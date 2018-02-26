@@ -25,7 +25,7 @@ val hello by project {
 
     repositories add { repository("jitpack", "https://jitpack.io") }
 
-    kotlinVersion set { wemi.compile.KotlinCompilerVersion.Version1_2_20 }
+    kotlinVersion set { wemi.compile.KotlinCompilerVersion.Version1_2_21 }
 
     libraryDependencies add { dependency("org.slf4j:slf4j-api:1.7.22") }
     libraryDependencies add { dependency("com.github.Darkyenus:tproll:v1.2.4") }
@@ -33,6 +33,7 @@ val hello by project {
 
     extend(compilingKotlin) {
         compilerOptions[KotlinCompilerFlags.customFlags] += "-Xno-optimize" // (example, not needed)
+        compilerOptions[KotlinCompilerFlags.incremental] = true
     }
 
     extend(running) {

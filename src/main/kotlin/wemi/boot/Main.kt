@@ -10,6 +10,8 @@ import wemi.Configurations
 import wemi.WemiKotlinVersion
 import wemi.WemiVersion
 import wemi.WithExitCode
+import wemi.dependency.DefaultExclusions
+import wemi.dependency.DependencyExclusion
 import wemi.util.*
 import java.io.*
 import java.net.URL
@@ -81,6 +83,14 @@ var WemiBuildScript: BuildScript? = null
     private set
 
 internal val MainThread = Thread.currentThread()
+
+/**
+ * Exclusions to be used when downloading libraries that will be loaded at runtime into Wemi process itself.
+ * This is because Wemi bundles some libraries already and we don't need to duplicate them.
+ */
+internal val WemiBundledLibrariesExclude = DefaultExclusions + listOf(
+        DependencyExclusion("org.jetbrains.kotlin", "kotlin-stdlib", "*"),
+        DependencyExclusion("org.jetbrains.kotlin", "kotlin-reflect", "*"))
 
 /**
  * Entry point for the WEMI build tool

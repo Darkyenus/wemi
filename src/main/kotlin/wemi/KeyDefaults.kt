@@ -14,10 +14,8 @@ import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
 import wemi.boot.WemiBuildScript
-import wemi.collections.WList
-import wemi.collections.WMutableList
-import wemi.collections.WMutableSet
-import wemi.collections.WSet
+import wemi.boot.WemiBundledLibrariesExclude
+import wemi.collections.*
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags
@@ -37,6 +35,7 @@ import wemi.util.*
 import java.net.URI
 import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.nio.file.Path
 import java.time.ZonedDateTime
 import java.util.*
@@ -298,7 +297,11 @@ object KeyDefaults {
                 val compiler = using(compilingKotlin) { Keys.kotlinCompiler.get() }
                 val compilerFlags = using(compilingKotlin) { Keys.compilerOptions.get() }
 
-                val compileResult = compiler.compileJVM(javaSources + kotlinSources, externalClasspath, output, compilerFlags, CompileLOG, null)
+                //TODO Allow to configure cache folder?
+                val cacheFolder = output.resolveSibling(output.name + "-kotlin-cache")
+                Files.createDirectories(cacheFolder)
+
+                val compileResult = compiler.compileJVM(javaSources + kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, CompileLOG, null)
                 if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
                     throw WemiException("Kotlin compilation failed: " + compileResult, showStacktrace = false)
                 }
@@ -745,7 +748,7 @@ object KeyDefaults {
         options
     }
 
-    private val DokkaFatJar = listOf(dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", JCenter))
+    private val DokkaFatJar = listOf(Dependency(DependencyId("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", JCenter), WemiBundledLibrariesExclude))
 
     val ArchiveDokkaInterface: BoundKeyValue<DokkaInterface> = {
         val artifacts = DependencyResolver.resolveArtifacts(DokkaFatJar, emptyList())?.toMutableList()
@@ -761,8 +764,7 @@ object KeyDefaults {
         /** Makes sure that the implementation class is loaded in a class loader that has artifacts available. */
         val forceClassLoader = EnclaveClassLoader(emptyArray(), dependencyClassLoader,
                 implementationClassName, // Own entry point
-                "org.jetbrains.dokka.", // Force loading all of Dokka in here, because it must be here to load the Reflection below...
-                "kotlin.jvm.internal.Reflection") // Force loading of second Reflection, this time with full reflection library
+                "org.jetbrains.dokka.") // Force loading all of Dokka in here
 
         val clazz = Class.forName(implementationClassName, true, forceClassLoader)
 

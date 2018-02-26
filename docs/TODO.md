@@ -1,8 +1,15 @@
 # Things to do next
 
-- PGP signatures
+- Test plugin & core on windows
 
-- Maven parallel repository resolution
+- Test dokka & custom build script dependencies (class loader logic changed)
+
+- Dependency on both kotlin-stdlib and kotlin-reflect results in kotlin-stdlib being included twice?!
+	- Fix build/build.wemi
+
+- Show file sizes when displaying LocatedFile
+
+- Improve KotlinCompiler output rendering, with nicer colors and non-redundant level
 
 - Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
 
@@ -16,5 +23,9 @@
 - Android/MOE/RoboVM/TeaVM plugins
 
 - Source code change detection and caching (Check if worth it)
+
+- Maven parallel repository resolution
+
+- PGP signatures
 
 - Kotlin Native

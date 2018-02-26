@@ -7,6 +7,7 @@ import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.collections.toWList
 import wemi.collections.wEmptyList
+import wemi.collections.wListOf
 import wemi.compile.*
 import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.JavadocClassifier

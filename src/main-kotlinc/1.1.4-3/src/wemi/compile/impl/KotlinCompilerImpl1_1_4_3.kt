@@ -35,7 +35,7 @@ internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
         }
     }
 
-    override fun compileJVM(sources: Collection<LocatedFile>, classpath: Collection<Path>, destination: Path, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
+    override fun compileJVM(sources: Collection<LocatedFile>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
         val messageCollector = createLoggingMessageCollector(logger, loggerMarker)
         val compiler = K2JVMCompiler()
         val args = compiler.createArguments()

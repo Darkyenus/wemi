@@ -5,12 +5,12 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
 import wemi.boot.MachineWritable
+import wemi.boot.WemiBundledLibrariesExclude
 import wemi.dependency.*
 import wemi.util.EnclaveClassLoader
 import wemi.util.LocatedFile
 import wemi.util.WemiDefaultClassLoader
 import wemi.collections.wSetOf
-import java.net.URLClassLoader
 import java.nio.file.Path
 
 private val LOG = LoggerFactory.getLogger("KotlinCompiler")
@@ -21,13 +21,15 @@ private val LOG = LoggerFactory.getLogger("KotlinCompiler")
 interface KotlinCompiler {
     /**
      * @param sources kotlin files to be compiled
-     * @param destination for generated class files, folder or .jar file
+     * @param destination for generated class files, folder or .jar file (.jar is not supported for incremental compilation)
+     * @param cacheFolder folder for arbitrary opaque caching between runs (when null, caching will be forced off)
      * @param classpath for user class files
      * @param flags custom arguments, parsed by kotlin compiler
      */
     fun compileJVM(sources: Collection<LocatedFile>,
                    classpath: Collection<Path>,
                    destination: Path,
+                   cacheFolder: Path?,
                    flags: CompilerFlags,
                    logger: Logger = LoggerFactory.getLogger("KotlinCompiler"),
                    loggerMarker: Marker? = null): CompileExitStatus
@@ -60,22 +62,22 @@ enum class KotlinCompilerVersion (
     Version1_1_4_3(
             "1.1.4-3",
             "wemi.compile.impl.KotlinCompilerImpl1_1_4_3",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4-3")))
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4-3"), WemiBundledLibrariesExclude))
     ),
     Version1_1_61(
             "1.1.61",
             "wemi.compile.impl.KotlinCompilerImpl1_1_61",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.61")))
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.61"), WemiBundledLibrariesExclude))
     ),
     Version1_2_20(
             "1.2.20",
             "wemi.compile.impl.KotlinCompilerImpl1_2_20",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.20")))
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.20"), WemiBundledLibrariesExclude))
     ),
     Version1_2_21(
             "1.2.21",
             "wemi.compile.impl.KotlinCompilerImpl1_2_21",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.21")))
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.21"), WemiBundledLibrariesExclude))
     ),
     ;
 
@@ -97,16 +99,10 @@ enum class KotlinCompilerVersion (
                 LOG.trace("Classpath for {} compiler: {}", string, artifacts)
 
                 val implementationClassName = implementationClassName
-                val artifactURLs = artifacts.map { it.toUri().toURL() }
-                /** Loads dependencies of the compiler, such as standard library or reflection library.
-                 * This mostly just completes the [WemiDefaultClassLoader] if anything is missing.
-                 * (Therefore, items here should be compatible with what Wemi uses.) */
-                val dependencyClassLoader = URLClassLoader(artifactURLs.drop(1).toTypedArray(), WemiDefaultClassLoader)
                 /** Loads compiler jar into own enclave, with custom Reflection and own versions of all classes.
                  * This is done because different Kotlin compiler versions are not compatible*/
-                val compilerClassLoader = EnclaveClassLoader(artifactURLs.take(1).toTypedArray(), dependencyClassLoader,
-                        implementationClassName // Own entry point
-                        , "kotlin.jvm.internal.Reflection") // Force loading of second Reflection, this time with full reflection library
+                val compilerClassLoader = EnclaveClassLoader(artifacts.map { it.toUri().toURL() }.toTypedArray(),
+                        WemiDefaultClassLoader, implementationClassName) // Own entry point
 
                 val clazz = Class.forName(implementationClassName, true, compilerClassLoader)
 
@@ -142,6 +138,8 @@ object KotlinCompilerFlags {
 
     val languageVersion = CompilerFlag<String>("languageVersion", "Provide source compatibility with specified language version")
     val apiVersion = CompilerFlag<String>("apiVersion", "Allow to use declarations only from the specified version of bundled libraries")
+
+    val incremental = CompilerFlag<Boolean>("incremental", "Compile incrementally")
 
     val pluginOptions = CompilerFlag<Collection<String>>("pluginOptions", "Pass an option to a plugin")
     val pluginClasspath = CompilerFlag<Collection<String>>("pluginClasspath", "Load plugins from the given classpath")

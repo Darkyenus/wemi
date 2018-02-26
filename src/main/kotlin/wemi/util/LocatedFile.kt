@@ -43,6 +43,21 @@ class LocatedFile private constructor(val file: Path, val root: Path, val path: 
     val classpathEntry: Path
         get() = if (simple) file else root
 
+    val packageName:String?
+        get() {
+            val fileNameStart = path.lastIndexOf('/')
+            if (fileNameStart <= 0) {
+                return null
+            }
+
+            val chars = CharArray(fileNameStart)
+            for (i in chars.indices) {
+                val c = path[i]
+                chars[i] = if (c == '/') { '.' } else { c }
+            }
+            return String(chars)
+        }
+
     override fun toString(): String {
         return root.absolutePath + "//" + path
     }

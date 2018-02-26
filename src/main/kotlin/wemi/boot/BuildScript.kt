@@ -277,7 +277,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
                             LOG.warn("{}:{} Invalid dependency directive \"{}\". (Example: 'com.example:my-project:1.0')", buildScriptSources, lineNumber, value)
                         } else {
                             val (group, name, version) = match.destructured
-                            buildDependencyLibraries.add(Dependency(DependencyId(group, name, version)))
+                            buildDependencyLibraries.add(Dependency(DependencyId(group, name, version), WemiBundledLibrariesExclude))
                         }
                     }
                     "repository" -> {
@@ -356,7 +356,7 @@ data class BuildScript(val scriptJar: Path,
 
         LOG.debug("Compiling sources: {} classpath: {} resultJar: {} buildFlags: {}", sources, classpath, scriptJar, buildFlags)
 
-        val status = WemiKotlinVersion.compilerInstance().compileJVM(sources, classpath, scriptJar, buildFlags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
+        val status = WemiKotlinVersion.compilerInstance().compileJVM(sources, classpath, scriptJar, null, buildFlags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
         if (status != KotlinCompiler.CompileExitStatus.OK) {
             LOG.warn("Compilation failed for {}: {}", sources, status)
             return false

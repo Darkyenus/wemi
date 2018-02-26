@@ -1,5 +1,6 @@
 package wemi.compile.impl
 
+import org.jetbrains.kotlin.build.JvmSourceRoot
 import org.jetbrains.kotlin.cli.common.ExitCode
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
@@ -7,15 +8,16 @@ import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.jetbrains.kotlin.config.Services
+import org.jetbrains.kotlin.incremental.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
-import wemi.boot.WemiBuildFileExtensions
 import wemi.boot.WemiBuildScript
 import wemi.compile.*
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
 import wemi.util.*
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.reflect.KMutableProperty0
 
@@ -63,7 +65,7 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
         }
     }
 
-    override fun compileJVM(sources: Collection<LocatedFile>, classpath: Collection<Path>, destination: Path, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
+    override fun compileJVM(sources: Collection<LocatedFile>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
         val messageCollector = createLoggingMessageCollector(logger, loggerMarker)
         val compiler = K2JVMCompiler()
         val args = compiler.createArguments()
@@ -104,26 +106,7 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
         args::pluginClasspaths.ensure(null)
 
         // Setup args
-        val sourceSet = HashSet<String>()
         val compilingWemiBuildFiles = flags.useDefault(KotlinJVMCompilerFlags.compilingWemiBuildFiles, false)
-        for (source in sources) {
-            val file = source.file
-            when {
-                file.isDirectory() ||
-                        file.name.pathHasExtension(KotlinSourceFileExtensions) ||
-                        (compilingWemiBuildFiles && file.name.pathHasExtension(WemiBuildFileExtensions)) -> {
-                    sourceSet.add(file.absolutePath)
-                }
-                file.name.pathHasExtension(JavaSourceFileExtensions) -> {
-                    sourceSet.add(source.root.absolutePath)// Add folder
-                }
-                else -> {
-                    LOG.warn("Unrecognized source file, ignoring: {}", file)
-                }
-            }
-        }
-        args.freeArgs = sourceSet.toList()
-        args.destination = destination.absolutePath
         args.classpath = classpath.joinToString(separator = File.pathSeparator) { it.absolutePath }
         flags.use(KotlinJVMCompilerFlags.jdkHome) {
             args.jdkHome = it
@@ -165,7 +148,47 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
         args.pluginClasspaths = pluginClasspath.toTypedArray()
 
         // Compile
-        val exitCode = compiler.exec(messageCollector, Services.EMPTY, args)
+        var incremental = flags.useDefault(KotlinCompilerFlags.incremental, false)
+        if (incremental && cacheFolder == null) {
+            logger.warn(loggerMarker, "Disabling incremental compilation: null cache folder")
+            incremental = false
+        }
+
+        val exitCode: ExitCode
+        if (incremental) {
+            val cachedOutput = cacheFolder!!.resolve("output")
+            Files.createDirectories(cachedOutput)
+            args.destination = cachedOutput.absolutePath
+
+            val kotlincCache = cacheFolder.resolve("kotlinc-cache")
+            Files.createDirectories(kotlincCache)
+            val kotlincCacheFile = kotlincCache.toFile()
+
+            val versions = commonCacheVersions(kotlincCacheFile) + standaloneCacheVersion(kotlincCacheFile)
+
+            exitCode = withIC {
+                val compilerRunner = IncrementalJvmCompilerRunner(
+                        kotlincCacheFile,
+                        sources.map { JvmSourceRoot(it.root.toFile(), null) }.toSet(),
+                        versions, object : ICReporter {
+                            override fun report(message: () -> String) {
+                                logger.info(loggerMarker, "IC: {}", message())
+                            }
+                        },
+                        usePreciseJavaTracking = true
+                )
+                compilerRunner.compile(sources.map { it.file.toFile() }, args, messageCollector, providedChangedFiles = null)
+            }
+
+            if (exitCode == ExitCode.OK) {
+                // Copy kotlin output to real output
+                cachedOutput.copyRecursively(destination)
+            }
+        } else {
+            args.destination = destination.absolutePath
+            args.freeArgs = sources.map { it.file.absolutePath }
+            exitCode = compiler.exec(messageCollector, Services.EMPTY, args)
+        }
 
         // Done
         return when (exitCode) {

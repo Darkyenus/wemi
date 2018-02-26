@@ -11,11 +11,10 @@ import java.net.URLDecoder
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.attribute.FileTime
-import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.*
 import java.util.*
 import java.util.concurrent.Semaphore
+
 
 /**
  * Creates an URL with given path appended.
@@ -285,6 +284,97 @@ fun Path.deleteRecursively() {
         Files.walkFileTree(this, DELETING_FILE_VISITOR)
     } else {
         Files.delete(this)
+    }
+}
+
+/**
+ * Copy this file or folder to [to].
+ *
+ * Does nothing when the file does not exist, copies as file when this is file, copies recursively all contents
+ * when this is directory.
+ */
+fun Path.copyRecursively(to:Path, vararg options:CopyOption) {
+    if (!Files.exists(this)) {
+        return
+    }
+    if (!Files.isDirectory(this)) {
+        // File
+        Files.copy(this, to, *options)
+    } else {
+        // Directory
+        val root = this
+        Files.createDirectories(to.parent)
+        val copyAttributes = options.contains(StandardCopyOption.COPY_ATTRIBUTES)
+
+        Files.walkFileTree(root, object : FileVisitor<Path>{
+
+            // Based on https://stackoverflow.com/a/18691793/2694196
+
+            override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                val relative = root.relativize(dir)
+                val targetDir = to.resolve(relative)
+                // Tolerate "overriding" directories
+                // (used at least when copying to directory that already exists, but is empty)
+                if (!Files.isDirectory(targetDir, LinkOption.NOFOLLOW_LINKS)) {
+                    Files.createDirectory(targetDir)
+                }
+
+                if (copyAttributes) {
+                    Files.getFileAttributeView(dir, AclFileAttributeView::class.java)?.let { acl ->
+                        Files.getFileAttributeView(targetDir,AclFileAttributeView::class.java).acl = acl.acl
+                    }
+
+                    Files.getFileAttributeView(dir, DosFileAttributeView::class.java)?.readAttributes()?.let { dosAttrs ->
+                        val targetDosAttrs = Files.getFileAttributeView(targetDir,DosFileAttributeView::class.java)
+                        targetDosAttrs.setArchive(dosAttrs.isArchive)
+                        targetDosAttrs.setHidden(dosAttrs.isHidden)
+                        targetDosAttrs.setReadOnly(dosAttrs.isReadOnly)
+                        targetDosAttrs.setSystem(dosAttrs.isSystem)
+                    }
+
+                    Files.getFileAttributeView(dir, FileOwnerAttributeView::class.java)?.let { ownerAttrs ->
+                        val targetOwner = Files.getFileAttributeView(targetDir,FileOwnerAttributeView::class.java)
+                        targetOwner.owner = ownerAttrs.owner
+                    }
+
+                    Files.getFileAttributeView(dir, PosixFileAttributeView::class.java)?.readAttributes()?.let { sourcePosix ->
+                        val targetPosix = Files.getFileAttributeView(targetDir,PosixFileAttributeView::class.java)
+                        targetPosix.setPermissions(sourcePosix.permissions())
+                        targetPosix.setGroup(sourcePosix.group())
+                    }
+
+                    Files.getFileAttributeView(dir,UserDefinedFileAttributeView::class.java)?.let { userAttrs ->
+                        val targetUser = Files.getFileAttributeView(targetDir, UserDefinedFileAttributeView::class.java)
+                        for (key in userAttrs.list()) {
+                            val buffer = ByteBuffer.allocate(userAttrs.size(key))
+                            userAttrs.read(key, buffer)
+                            buffer.flip()
+                            targetUser.write(key, buffer)
+                        }
+                    }
+
+                    // Must be done last, otherwise last-modified time may be wrong
+                    val targetBasic = Files.getFileAttributeView(targetDir,BasicFileAttributeView::class.java)
+                    targetBasic.setTimes(attrs.lastModifiedTime(), attrs.lastAccessTime(), attrs.creationTime())
+                }
+
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
+                if (exc != null) throw exc
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                Files.copy(file, to.resolve(root.relativize(file)), *options)
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
+                throw exc
+            }
+        })
     }
 }
 

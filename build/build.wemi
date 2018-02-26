@@ -44,7 +44,8 @@ val core by project(path(".")) {
     repositories add { repository("jitpack", "https://jitpack.io") }
 
     libraryDependencies set { wSetOf(
-            kotlinDependency("stdlib"),
+            //kotlinDependency("stdlib"), TODO Remove, but buggy currently
+            kotlinDependency("reflect"),
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
             dependency("com.github.Darkyenus", "tproll", "v1.2.5"),
             dependency("com.github.Darkyenus", "DaveWebb", "v1.2"),
