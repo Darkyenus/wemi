@@ -32,11 +32,10 @@ internal object Maven2 {
     private val PomKey = ArtifactKey<Pom>("pom", false)
     private val PomUrlKey = ArtifactKey<URL>("pomUrl", true)
 
-    fun resolveInM2Repository(dependency: Dependency, repository: Repository.M2, chain: RepositoryChain): ResolvedDependency {
-        val (dependencyId, exclusions) = dependency
+    fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository.M2, chain: RepositoryChain): ResolvedDependency {
 
         // Just retrieving raw pom file
-        if (dependency.dependencyId.attribute(Repository.M2.Type) == "pom") {
+        if (dependencyId.attribute(Repository.M2.Type) == "pom") {
             return retrievePom(dependencyId, repository, chain)
         }
 
@@ -47,19 +46,6 @@ internal object Maven2 {
 
         if (resolvedPom.hasError) {
             LOG.warn("Retrieved pom for {} from {}, but resolution claims error ({}). Something may go wrong.", dependencyId, repository, resolvedPom.log)
-        }
-
-        val dependencies = pom.dependencies.mapNotNull { (pomDependencyId, dependencyExclusions) ->
-            if (exclusions.any { rule ->
-                if (rule.excludes(pomDependencyId)) {
-                    LOG.debug("Excluded {} with rule {} (dependency of {})", pomDependencyId, rule, dependency.dependencyId)
-                    true
-                } else false
-            }) {
-                return@mapNotNull null
-            } else {
-                return@mapNotNull Dependency(pomDependencyId, dependencyExclusions + exclusions)
-            }
         }
 
         val packaging = dependencyId.attribute(Repository.M2.Type) ?: pom.packaging
@@ -80,7 +66,7 @@ internal object Maven2 {
                     }
                 }
 
-                return ResolvedDependency(dependencyId, dependencies, repository, file == null).apply {
+                return ResolvedDependency(dependencyId, pom.dependencies, repository, file == null).apply {
                     this.artifact = file
                     this.artifactData = data
 
@@ -88,7 +74,7 @@ internal object Maven2 {
             }
             else -> {
                 LOG.warn("Unsupported packaging {} of {}", packaging, dependencyId)
-                return ResolvedDependency(dependencyId, dependencies, repository, true)
+                return ResolvedDependency(dependencyId, pom.dependencies, repository, true)
             }
         }
     }
@@ -390,7 +376,7 @@ internal object Maven2 {
 
             if (parent == null || parent.hasError) {
                 LOG.trace("Retrieving parent pom of '{}' by coordinates '{}'", pomPath, parentPomId)
-                parent = DependencyResolver.resolveSingleDependency(Dependency(parentPomId), chain)
+                parent = DependencyResolver.resolveSingleDependency(parentPomId, chain)
             }
 
             val parentPom = parent.getKey(PomKey)

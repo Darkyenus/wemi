@@ -31,6 +31,7 @@ val hello by project {
     libraryDependencies add { dependency("org.slf4j:slf4j-api:1.7.22") }
     libraryDependencies add { dependency("com.github.Darkyenus:tproll:v1.2.4") }
     libraryDependencies add { dependency("com.h2database:h2:1.4.196") }
+    libraryDependencies add { kotlinDependency("reflect") }
 
     extend(compilingJava) {
         compilerOptions[JavaCompilerFlags.customFlags] += "-Xlint:all"

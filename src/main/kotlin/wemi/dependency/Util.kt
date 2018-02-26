@@ -34,15 +34,19 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
     }
 
     // Connect nodes (even with cycles)
+    val notResolvedNodes = ArrayList<TreeNode<NodeData>>()// ConcurrentModification workaround
     nodes.forEach { depId, node ->
         this@prettyPrint[depId]?.dependencies?.forEach { dep ->
             var nodeToConnect = nodes[dep.dependencyId]
             if (nodeToConnect == null) {
                 nodeToConnect = TreeNode(NodeData(dep.dependencyId, StatusNotResolved))
-                nodes[dep.dependencyId] = nodeToConnect
+                notResolvedNodes.add(nodeToConnect)
             }
             node.add(nodeToConnect)
         }
+    }
+    for (notResolvedNode in notResolvedNodes) {
+        nodes[notResolvedNode.value.dependencyId] = notResolvedNode
     }
 
     val remainingNodes = HashMap(nodes)

@@ -30,7 +30,7 @@ sealed class Repository(val name: String) : MachineWritable {
      * @param dependency to resolve
      * @param chain of repositories which may be queried for looking up dependencies
      */
-    internal abstract fun resolveInRepository(dependency: Dependency, chain: RepositoryChain): ResolvedDependency
+    internal abstract fun resolveInRepository(dependency: DependencyId, chain: RepositoryChain): ResolvedDependency
 
     /**
      * @return directory to lock on while resolving from this repository
@@ -57,7 +57,7 @@ sealed class Repository(val name: String) : MachineWritable {
         override val local: Boolean
             get() = "file".equals(url.protocol, ignoreCase = true)
 
-        override fun resolveInRepository(dependency: Dependency, chain: RepositoryChain): ResolvedDependency {
+        override fun resolveInRepository(dependency: DependencyId, chain: RepositoryChain): ResolvedDependency {
             return Maven2.resolveInM2Repository(dependency, this, chain)
         }
 

@@ -2,11 +2,6 @@
 
 - Test plugin & core on windows
 
-- Test dokka & custom build script dependencies (class loader logic changed)
-
-- Dependency on both kotlin-stdlib and kotlin-reflect results in kotlin-stdlib being included twice?!
-	- Fix build/build.wemi
-
 - Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
 
 - New project wizard (IDE)
@@ -25,3 +20,7 @@
 - PGP signatures
 
 - Kotlin Native
+
+# Release
+
+- Fix build/build.wemi TODOs

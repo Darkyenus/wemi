@@ -39,13 +39,13 @@ data class DependencyId(val group: String,
         if (group != other.group) return false
         if (name != other.name) return false
         if (version != other.version) return false
+
         for ((key, value) in attributes) {
             if (key.makesUnique && other.attribute(key) != value) return false
         }
         for ((key, value) in other.attributes) {
             if (key.makesUnique && attribute(key) != value) return false
         }
-        if (attributes != other.attributes) return false
 
         return true
     }
@@ -54,12 +54,8 @@ data class DependencyId(val group: String,
         var result = group.hashCode()
         result = 31 * result + name.hashCode()
         result = 31 * result + version.hashCode()
-        for ((key, value) in attributes) {
-            if (key.makesUnique) {
-                result = 31 * result + key.hashCode()
-                result = 31 * result + value.hashCode()
-            }
-        }
+        // Can't use attributes when computing hashCode,
+        // because their default values are considered as well and may change equality.
         return result
     }
 
@@ -227,7 +223,7 @@ class ArtifactKey<T>(val name: String, val printOut: Boolean) {
  * @param hasError true if this dependency failed to resolve (partially or completely), for any reason
  * @param log may contain a message explaining why did the dependency failed to resolve
  */
-data class ResolvedDependency(val id: DependencyId,
+class ResolvedDependency constructor(val id: DependencyId,
                               val dependencies: List<Dependency>,
                               val resolvedFrom: Repository?,
                               val hasError: Boolean,
@@ -333,30 +329,6 @@ data class ResolvedDependency(val id: DependencyId,
         }
         json.writeArrayEnd()
         json.writeObjectEnd()
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        if (!super.equals(other)) return false
-
-        other as ResolvedDependency
-
-        if (id != other.id) return false
-        if (dependencies != other.dependencies) return false
-        if (resolvedFrom != other.resolvedFrom) return false
-        if (hasError != other.hasError) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = super.hashCode()
-        result = 31 * result + id.hashCode()
-        result = 31 * result + dependencies.hashCode()
-        result = 31 * result + (resolvedFrom?.hashCode() ?: 0)
-        result = 31 * result + hasError.hashCode()
-        return result
     }
 
     override fun toString(): String {

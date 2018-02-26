@@ -18,10 +18,10 @@ object DependencyResolver {
      * Does not resolve transitively.
      * When resolution fails, returns ResolvedDependency with [ResolvedDependency.hasError] = true.
      */
-    internal fun resolveSingleDependency(dependency: Dependency, repositories: RepositoryChain): ResolvedDependency {
+    internal fun resolveSingleDependency(dependencyId: DependencyId, repositories: RepositoryChain): ResolvedDependency {
         var log: StringBuilder? = null
 
-        LOG.debug("Resolving {}", dependency)
+        LOG.debug("Resolving {}", dependencyId)
 
         fun resolveInRepository(repository: Repository?): ResolvedDependency? {
             if (repository == null) {
@@ -29,7 +29,7 @@ object DependencyResolver {
             }
 
             LOG.debug("Trying in {}", repository)
-            val resolved = repository.resolveInRepository(dependency, repositories)
+            val resolved = repository.resolveInRepository(dependencyId, repositories)
             if (!resolved.hasError) {
                 LOG.debug("Resolution success {}", resolved)
                 return resolved
@@ -47,8 +47,8 @@ object DependencyResolver {
         }
 
         // Try preferred repository and its cache first
-        val preferred = (resolveInRepository(dependency.dependencyId.preferredRepository?.cache)
-                ?: resolveInRepository(dependency.dependencyId.preferredRepository))
+        val preferred = (resolveInRepository(dependencyId.preferredRepository?.cache)
+                ?: resolveInRepository(dependencyId.preferredRepository))
         if (preferred != null) {
             return preferred
         }
@@ -56,8 +56,8 @@ object DependencyResolver {
         // Try ordered repositories
         for (repository in repositories) {
             // Skip preferred repositories as those were already tried
-            if (repository == dependency.dependencyId.preferredRepository
-                    || repository == dependency.dependencyId.preferredRepository?.cache) {
+            if (repository == dependencyId.preferredRepository
+                    || repository == dependencyId.preferredRepository?.cache) {
                 continue
             }
 
@@ -65,8 +65,8 @@ object DependencyResolver {
         }
 
         // Fail
-        LOG.debug("Failed to resolve {}", dependency.dependencyId)
-        return ResolvedDependency(dependency.dependencyId, emptyList(), null, true, log ?: "no repositories to search in")
+        LOG.debug("Failed to resolve {}", dependencyId)
+        return ResolvedDependency(dependencyId, emptyList(), null, true, log ?: "no repositories to search in")
     }
 
     /**
@@ -77,27 +77,79 @@ object DependencyResolver {
      *
      * Remembers errors, but does not stop on them and tries to resolve as much as possible.
      *
-     * @param mapper to modify which dependency is actually resolved
      * @param resolved cache for already resolved dependencies
      * @param repositories to use
+     * @param mapper to modify which dependency is actually resolved
      * @return true if all dependencies resolved without error
      */
-    private fun doResolveArtifacts(resolved: MutableMap<DependencyId, ResolvedDependency>,
+    private fun doResolveArtifacts(dependencyStack:ArrayList<DependencyId>,
+                                   exclusionStack:ArrayList<DependencyExclusion>,
+                                   resolved: MutableMap<DependencyId, ResolvedDependency>,
                                    dependency: Dependency, repositories: RepositoryChain,
                                    mapper: (Dependency) -> Dependency): Boolean {
-        if (resolved.contains(dependency.dependencyId)) {
+
+        val (dependencyId, exclusions) = mapper(dependency)
+
+        val loopIndex = dependencyStack.indexOf(dependencyId)
+        if (loopIndex != -1) {
+            if (LOG.isInfoEnabled) {
+                val arrow = " → "
+
+                val sb = StringBuilder()
+                for (i in 0 until loopIndex) {
+                    sb.append(dependencyStack[i]).append(arrow)
+                }
+                sb.append('↪').append(' ')
+                for (i in loopIndex until dependencyStack.size) {
+                    sb.append(dependencyStack[i].toString()).append(arrow)
+                }
+                sb.setLength(Math.max(sb.length - arrow.length, 0))
+                sb.append(' ').append('↩')
+
+                LOG.info("Circular dependency: {}", sb)
+            }
             return true
         }
 
-        val resolvedProject = resolveSingleDependency(mapper(dependency), repositories)
-        resolved[dependency.dependencyId] = resolvedProject
+        // Push
+        dependencyStack.add(dependencyId)
+
+        // Resolve
+        var resolvedProject = resolved[dependencyId]
+        if (resolvedProject == null
+                || (resolvedProject.hasError
+                        && resolvedProject.id.preferredRepository == null
+                        && dependencyId.preferredRepository != null)) {
+            // Either nothing is resolved, or we now know a different repository to look in,
+            // so we might be more successful now. (Of course error is already in the result, so it won't count)
+            resolvedProject = resolveSingleDependency(dependencyId, repositories)
+            resolved[dependencyId] = resolvedProject
+        }
+
+        // Push
+        exclusionStack.addAll(exclusions)
 
         var ok = !resolvedProject.hasError
         for (transitiveDependency in resolvedProject.dependencies) {
-            if (!doResolveArtifacts(resolved, transitiveDependency, repositories, mapper)) {
-                ok = false
+            val excluded = exclusionStack.any { rule ->
+                if (rule.excludes(transitiveDependency.dependencyId)) {
+                    LOG.debug("Excluded {} with rule {} (dependency of {})", transitiveDependency.dependencyId, rule, dependencyId)
+                    true
+                } else false
+            }
+
+            if (!excluded) {
+                if (!doResolveArtifacts(dependencyStack, exclusionStack, resolved, transitiveDependency, repositories, mapper)) {
+                    ok = false
+                }
             }
         }
+
+        // Pop
+        for (i in exclusions.indices) {
+            exclusionStack.removeAt(exclusionStack.lastIndex)
+        }
+        dependencyStack.removeAt(dependencyStack.lastIndex)
         return ok
     }
 
@@ -152,11 +204,16 @@ object DependencyResolver {
         }
 
         return locked(0) {
+            val dependencyStack = ArrayList<DependencyId>()
+            val exclusionStack = ArrayList<DependencyExclusion>()
+
             var ok = true
             for (project in dependencies) {
-                if (!doResolveArtifacts(resolved, project, repositories, mapper)) {
+                if (!doResolveArtifacts(dependencyStack, exclusionStack, resolved, project, repositories, mapper)) {
                     ok = false
                 }
+                assert(dependencyStack.isEmpty())
+                assert(exclusionStack.isEmpty())
             }
             ok
         }

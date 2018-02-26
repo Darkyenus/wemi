@@ -4,6 +4,7 @@ import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TerminalColor
 import com.esotericsoftware.jsonbeans.Json
 import com.esotericsoftware.jsonbeans.JsonValue
+import org.slf4j.LoggerFactory
 import wemi.Key
 import java.nio.file.Files
 import java.nio.file.Path
@@ -460,6 +461,8 @@ private fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
     return this
 }
 
+private val APPEND_KEY_RESULT_LOG = LoggerFactory.getLogger("AppendKeyresult")
+
 /**
  * Append the [value] formatted like the result of the [key] and newline.
  */
@@ -471,6 +474,7 @@ fun <Value> StringBuilder.appendKeyResultLn(key: Key<Value>, value:Value) {
                 try {
                     prettyPrinter(value)
                 } catch (e: Exception) {
+                    APPEND_KEY_RESULT_LOG.warn("Pretty-printer for {} failed", key, e)
                     null
                 }
 
