@@ -39,6 +39,10 @@ const val EXIT_CODE_TASK_ERROR = 4
 /** Exit code reserved for general purpose task failure,
  * for example to be returned by [wemi.WithExitCode.processExitCode]. */
 const val EXIT_CODE_TASK_FAILURE = 5
+/**
+ * When Wemi exits, but wants to be restarted right after that.
+ */
+const val EXIT_CODE_RELOAD = 6
 // Machine-output exit codes
 const val EXIT_CODE_MACHINE_OUTPUT_THROWN_EXCEPTION_ERROR = 51
 const val EXIT_CODE_MACHINE_OUTPUT_NO_PROJECT_ERROR = 52
@@ -48,6 +52,9 @@ const val EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR = 55
 const val EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND = 56
 
 internal var WemiRunningInInteractiveMode = false
+    private set
+
+internal var WemiReloadSupported = false
     private set
 
 /**
@@ -150,6 +157,8 @@ fun main(args: Array<String>) {
                     machineReadableOutput = true
                 } else if (arg == "-allowBrokenBuildScripts") {
                     allowBrokenBuildScripts = true
+                } else if (arg == "-supportReload") {
+                    WemiReloadSupported = true
                 } else if (arg == "-v" || arg == "-version") {
                     println("Wemi $WemiVersion with Kotlin $WemiKotlinVersion")
                     exitIfNoTasks = true
@@ -165,6 +174,8 @@ fun main(args: Array<String>) {
                     println("      Print out machine readable output, interactivity must be specified explicitly, and allows to take commands from stdin")
                     println("  -allowBrokenBuildScripts")
                     println("      Do not quit on broken build scripts (normally would exit with $EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)")
+                    println("  -supportReload")
+                    println("      Will enable support for 'reload' command, which exits the process with code $EXIT_CODE_RELOAD to signal that the process should be started again")
                     println("  -root=[folder]")
                     println("      Start with [folder] as a root of the project")
                     println("  -v[ersion]")
@@ -326,34 +337,40 @@ fun main(args: Array<String>) {
     } else {
         CLI.init(WemiRootFolder)
 
-        var lastTaskResult: TaskEvaluationResult? = null
+        try {
+            var lastTaskResult: TaskEvaluationResult? = null
 
-        val formattedErrors = parsedArgs.formattedErrors(true)
-        if (formattedErrors.hasNext()) {
-            println(format("Errors in task input:", Color.Red))
-            do {
-                println(formattedErrors.next())
-            } while (formattedErrors.hasNext())
-        } else {
-            for (task in parsedArgs.tasks) {
-                lastTaskResult = CLI.evaluateAndPrint(task)
-            }
-        }
-
-        if (interactive) {
-            CLI.beginInteractive()
-        } else if (lastTaskResult != null) {
-            if (lastTaskResult.status == TaskEvaluationStatus.Success) {
-                val data = lastTaskResult.data
-                if (data is WithExitCode) {
-                    exitCode = data.processExitCode()
-                    LOG.debug("WithExitCode - using the exit code of '{}': {}", parsedArgs.tasks.last(), exitCode)
-                } else {
-                    LOG.debug("WithExitCode - {} does not provide exit code", parsedArgs.tasks.last())
-                }
+            val formattedErrors = parsedArgs.formattedErrors(true)
+            if (formattedErrors.hasNext()) {
+                println(format("Errors in task input:", Color.Red))
+                do {
+                    println(formattedErrors.next())
+                } while (formattedErrors.hasNext())
             } else {
-                exitCode = EXIT_CODE_TASK_ERROR
-                LOG.debug("WithExitCode - {} evaluation failed", parsedArgs.tasks.last())
+                for (task in parsedArgs.tasks) {
+                    lastTaskResult = CLI.evaluateAndPrint(task)
+                }
+            }
+
+            if (interactive) {
+                CLI.beginInteractive()
+            } else if (lastTaskResult != null) {
+                if (lastTaskResult.status == TaskEvaluationStatus.Success) {
+                    val data = lastTaskResult.data
+                    if (data is WithExitCode) {
+                        exitCode = data.processExitCode()
+                        LOG.debug("WithExitCode - using the exit code of '{}': {}", parsedArgs.tasks.last(), exitCode)
+                    } else {
+                        LOG.debug("WithExitCode - {} does not provide exit code", parsedArgs.tasks.last())
+                    }
+                } else {
+                    exitCode = EXIT_CODE_TASK_ERROR
+                    LOG.debug("WithExitCode - {} evaluation failed", parsedArgs.tasks.last())
+                }
+            }
+        } catch (exit:ExitWemi) {
+            if (exit.reload) {
+                exitCode = EXIT_CODE_RELOAD
             }
         }
     }
@@ -376,3 +393,5 @@ private fun TaskParser.PartitionedLine.machineReadableCheckErrors() {
         exitProcess(EXIT_CODE_ARGUMENT_ERROR)
     }
 }
+
+internal class ExitWemi(val reload:Boolean) : Exception(null, null, false, false)

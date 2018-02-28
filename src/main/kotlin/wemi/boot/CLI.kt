@@ -304,7 +304,15 @@ object CLI {
      */
     private val commands: Map<String, (Task) -> TaskEvaluationResult?> = HashMap<String, (Task) -> TaskEvaluationResult?>().apply {
         put("exit") {
-            throw EndOfFileException()
+            throw ExitWemi(false)
+        }
+        put("reload") {
+            if (WemiReloadSupported) {
+                throw ExitWemi(true)
+            } else {
+                printWarning("Reload is not supported")
+                null
+            }
         }
         put("project") { task ->
             val projectName = task.input.find { it.first == null || it.first == "project" }?.second
@@ -439,38 +447,42 @@ object CLI {
      * Begin interactive REPL loop in this thread.
      */
     internal fun beginInteractive() {
-        val lineReader = TaskLineReader
+        try {
+            val lineReader = TaskLineReader
 
-        val prompt = format("> ", format = Format.Bold).toString()
+            val prompt = format("> ", format = Format.Bold).toString()
 
-        while (true) {
-            val line:String?
-            try {
-                line = lineReader.readLine(prompt)
-                if (line.isNullOrBlank()) {
+            while (true) {
+                val line: String?
+                try {
+                    line = lineReader.readLine(prompt)
+                    if (line.isNullOrBlank()) {
+                        continue
+                    }
+                } catch (interrupt: UserInterruptException) {
+                    // User wants to delete written line or exit
+                    if (interrupt.partialLine.isNullOrEmpty()) {
+                        break
+                    }
                     continue
-                }
-            } catch (interrupt: UserInterruptException) {
-                // User wants to delete written line or exit
-                if (interrupt.partialLine.isNullOrEmpty()) {
+                } catch (_: EndOfFileException) {
+                    throw ExitWemi(false)
+                } catch (_: IOException) {
                     break
                 }
-                continue
-            } catch (_: EndOfFileException) {
-                break
-            } catch (_: IOException) {
-                break
-            }
 
-            try {
-                evaluateLine(line)
-            } catch (e: Exception) {
-                LOG.error("Error in interactive loop", e)
+                try {
+                    evaluateLine(line)
+                } catch (e: ExitWemi) {
+                    throw e
+                } catch (e: Exception) {
+                    LOG.error("Error in interactive loop", e)
+                }
             }
+        } finally {
+            System.out.flush()
+            System.err.flush()
         }
-
-        System.out.flush()
-        System.err.flush()
     }
 
     internal val ICON_SUCCESS = format("✔", Color.Green)

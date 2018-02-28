@@ -105,8 +105,7 @@ val core by project(path(".")) {
     }
 
     assemblyPrependData set {
-        "#!/usr/bin/env sh\nexec java -jar \"$0\" -root=\"$(dirname \"$0\")\" \"$@\"\n\n"
-                .toByteArray(Charsets.UTF_8)
+        Files.readAllBytes(buildDirectory.get() / "WemiPrepend.sh")
     }
 
     assemblyOutputFile set {
