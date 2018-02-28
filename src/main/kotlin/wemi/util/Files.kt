@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.io.OutputStreamWriter
 import java.net.URL
-import java.net.URLDecoder
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.*
@@ -64,11 +63,13 @@ fun URL.toPath(): Path? {
     var url = this
 
     if (url.protocol == "jar") {
+        // This is how JDK does it: java.net.JarURLConnection.parseSpecs
         url = URL(url.file.substring(0, url.file.lastIndexOf("!/")))
     }
 
     return if (url.protocol == "file") {
-        Paths.get(URLDecoder.decode(url.file, Charsets.UTF_8.name()))
+        // FileSystems.getDefault() is guaranteed to be "file" scheme FileSystem
+        FileSystems.getDefault().provider().getPath(url.toURI())
     } else {
         null
     }
