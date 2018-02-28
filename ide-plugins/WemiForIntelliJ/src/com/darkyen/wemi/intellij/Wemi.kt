@@ -37,7 +37,7 @@ class WemiLauncher internal constructor(val file: String) {
         command.exePath = javaExecutable
         command.charset = Charsets.UTF_8
         command.environment.putAll(env)
-        command.environment.put("TPROLL_COLOR", "false")
+        command.environment["TPROLL_COLOR"] = "false"
         command.workDirectory = File(file).parentFile
         command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
         jvmOptions.forEach {
@@ -46,21 +46,6 @@ class WemiLauncher internal constructor(val file: String) {
         command.addParameter("-jar")
         command.addParameter(file)
         command.isRedirectErrorStream = false
-
-        command.addParameter("-i")
-        command.addParameter("-machineReadableOutput")
-
-        return WemiLauncherSession(command, prefixConfigurations)
-    }
-
-    fun createMachineReadableSession(env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>):WemiLauncherSession {
-        val command = GeneralCommandLine()
-        command.exePath = file
-        command.charset = Charsets.UTF_8
-        command.environment.putAll(env)
-        command.environment.put("TPROLL_COLOR", "false")
-        command.workDirectory = File(file).parentFile
-        command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
 
         command.addParameter("-i")
         command.addParameter("-machineReadableOutput")

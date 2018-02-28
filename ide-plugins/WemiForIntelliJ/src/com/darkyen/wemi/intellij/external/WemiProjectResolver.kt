@@ -73,11 +73,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 prefixConfigurations += "offline"
             }
 
-            session = if (settings.javaVmExecutable.isBlank()) {
-                launcher.createMachineReadableSession(settings.env, settings.isPassParentEnvs, prefixConfigurations)
-            } else {
-                launcher.createMachineReadableSession(settings.javaVmExecutable, settings.vmOptions, settings.env, settings.isPassParentEnvs, prefixConfigurations)
-            }
+            val javaExecutable = if (settings.javaVmExecutable.isBlank()) "java" else settings.javaVmExecutable
+            session = launcher.createMachineReadableSession(javaExecutable, settings.vmOptions, settings.env, settings.isPassParentEnvs, prefixConfigurations)
 
             // First request on session will be probably waiting for build scripts to compile
             listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Loading Wemi build scripts"))
