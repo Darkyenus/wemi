@@ -5,6 +5,8 @@ import com.darkyen.tproll.integration.JavaLoggingIntegration
 import com.darkyen.tproll.logfunctions.*
 import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TimeFormatter
+import org.jline.reader.EndOfFileException
+import org.jline.reader.UserInterruptException
 import org.slf4j.LoggerFactory
 import wemi.Configurations
 import wemi.WemiKotlinVersion
@@ -217,72 +219,25 @@ fun main(args: Array<String>) {
     }
 
     WemiRunningInInteractiveMode = interactive
-
     LOG.trace("Starting Wemi from root: {}", WemiRootFolder)
-    val buildScriptSources = findBuildScriptSources(WemiBuildFolder)
 
     // Setup logging
-    val consoleLogger = ConsoleLogFunction(null, null)
-    if (buildScriptSources.isEmpty()) {
-        LOG.warn("No build files found")
+    TPLogger.setLogFunction(LogFunctionMultiplexer(
+            FileLogFunction(TimeFormatter.AbsoluteTimeFormatter(),
+                    LogFileHandler(
+                            (WemiBuildFolder / "logs").toFile(),
+                            DateTimeFileCreationStrategy(
+                                    DateTimeFileCreationStrategy.DEFAULT_DATE_TIME_FILE_NAME_FORMATTER,
+                                    false,
+                                    DateTimeFileCreationStrategy.DEFAULT_LOG_FILE_EXTENSION,
+                                    1024L,
+                                    Duration.ofDays(60)),
+                            false),
+                    true),
+            ConsoleLogFunction(null, null)
+    ))
 
-        TPLogger.setLogFunction(consoleLogger)
-    } else {
-        LOG.debug("{} build file(s) found", buildScriptSources.size)
-
-        TPLogger.setLogFunction(LogFunctionMultiplexer(
-                FileLogFunction(TimeFormatter.AbsoluteTimeFormatter(),
-                        LogFileHandler(
-                                (WemiBuildFolder / "logs").toFile(),
-                                DateTimeFileCreationStrategy(
-                                        DateTimeFileCreationStrategy.DEFAULT_DATE_TIME_FILE_NAME_FORMATTER,
-                                        false,
-                                        DateTimeFileCreationStrategy.DEFAULT_LOG_FILE_EXTENSION,
-                                        1024L,
-                                        Duration.ofDays(60)),
-                                false),
-                        true),
-                consoleLogger
-        ))
-    }
-
-    val buildScript = run {
-        if (buildScriptSources.isEmpty()) {
-            if (allowBrokenBuildScripts) {
-                null
-            } else {
-                LOG.warn("No build script sources found in {}", WemiBuildFolder)
-                exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
-            }
-        } else {
-            directorySynchronized(WemiBuildFolder, {
-                LOG.info("Waiting for lock on {}", WemiBuildFolder)
-            }) {
-                val compiledBuildScript = getBuildScript(WemiCacheFolder, buildScriptSources, cleanBuild)
-                if (compiledBuildScript == null) {
-                    LOG.warn("Failed to prepare build script")
-                    if (allowBrokenBuildScripts) {
-                        null
-                    } else {
-                        exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
-                    }
-                } else {
-                    // WemiBuildScript must be initialized before compilation, because compiler may depend on it
-                    WemiBuildScript = compiledBuildScript
-                    if (compiledBuildScript.ready()) {
-                        compiledBuildScript
-                    } else {
-                        LOG.warn("Build script failed to compile")
-                        if (allowBrokenBuildScripts) {
-                            null
-                        } else {
-                            exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
-                        }
-                    }
-                }
-            }
-        }
-    }
+    val buildScript = prepareBuildScript(allowBrokenBuildScripts, interactive && !machineReadableOutput, cleanBuild)
 
     // Load build files now
     if (buildScript != null) {
@@ -391,6 +346,98 @@ private fun TaskParser.PartitionedLine.machineReadableCheckErrors() {
         } while (formattedErrors.hasNext())
 
         exitProcess(EXIT_CODE_ARGUMENT_ERROR)
+    }
+}
+
+private fun prepareBuildScript(allowBrokenBuildScripts:Boolean, askUser:Boolean, cleanBuild:Boolean):BuildScript? {
+    var buildScript:BuildScript? = null
+
+    var Break = false
+    do {
+        val buildScriptSources = findBuildScriptSources(WemiBuildFolder)
+        if (buildScriptSources.isEmpty()) {
+            if (allowBrokenBuildScripts) {
+                LOG.warn("No build script sources found in {}", WemiBuildFolder)
+                break
+            } else if (!askUser) {
+                LOG.error("No build script sources found in {}", WemiBuildFolder)
+                exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+            } else {
+                if (buildScriptsBadAskIfReload("No build script sources found")) {
+                    continue
+                } else {
+                    exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+                }
+            }
+        }
+
+        Break = directorySynchronized(WemiBuildFolder, {
+            LOG.info("Waiting for lock on {}", WemiBuildFolder)
+        }) {
+            val compiledBuildScript = getBuildScript(WemiCacheFolder, buildScriptSources, cleanBuild)
+
+            if (compiledBuildScript == null) {
+                if (allowBrokenBuildScripts) {
+                    LOG.warn("Failed to prepare build script")
+                    true //break
+                } else if (!askUser) {
+                    LOG.error("Failed to prepare build script")
+                    exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+                } else {
+                    if (buildScriptsBadAskIfReload("Failed to prepare build script")) {
+                        false //continue
+                    } else {
+                        exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+                    }
+                }
+            } else {
+                // WemiBuildScript must be initialized before compilation, because compiler may depend on it
+                WemiBuildScript = compiledBuildScript
+                if (compiledBuildScript.ready()) {
+                    buildScript = compiledBuildScript
+                    true //break
+                } else if (allowBrokenBuildScripts) {
+                    LOG.warn("Build script failed to compile")
+                    true //break
+                } else if (!askUser) {
+                    LOG.error("Build script failed to compile")
+                    exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+                } else {
+                    if (buildScriptsBadAskIfReload("Build script failed to compile")) {
+                        false //continue
+                    } else {
+                        exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+                    }
+                }
+            }
+        }
+    } while (!Break && buildScript == null)
+
+    return buildScript
+}
+
+private fun buildScriptsBadAskIfReload(problem:String):Boolean {
+    val lineReader = CLI.createReloadBuildScriptLineReader()
+
+    val prompt = StringBuilder()
+            .format(Color.Red).append(problem).format().append(": ")
+            .format(Color.Yellow).append('R').format().append("eload/")
+            .format(Color.Yellow).append('A').format().append("bort?")
+            .toString()
+
+    try {
+        while (true) {
+            when (lineReader.readLine(prompt, null, "r")?.toLowerCase()) {
+                "reload", "r" ->
+                    return true
+                "abort", "a" ->
+                    return false
+            }
+        }
+    } catch (e: UserInterruptException) {
+        return false
+    } catch (e: EndOfFileException) {
+        return false
     }
 }
 

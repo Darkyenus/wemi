@@ -1,10 +1,7 @@
 package wemi.boot
 
 import com.darkyen.tproll.TPLogger
-import org.jline.reader.EndOfFileException
-import org.jline.reader.LineReader
-import org.jline.reader.LineReaderBuilder
-import org.jline.reader.UserInterruptException
+import org.jline.reader.*
 import org.jline.reader.impl.DefaultParser
 import org.jline.reader.impl.LineReaderImpl
 import org.jline.terminal.Terminal
@@ -79,6 +76,22 @@ object CLI {
                     isEofOnEscapedNewLine = false
                     isEofOnUnclosedQuote = false
                 })
+                .history(SimpleHistory.NoHistory)
+                .build() as LineReaderImpl
+    }
+
+    internal fun createReloadBuildScriptLineReader(): LineReaderImpl {
+        return LineReaderBuilder.builder()
+                .appName("Wemi")
+                .terminal(Terminal)
+                .parser(DefaultParser().apply {
+                    isEofOnEscapedNewLine = false
+                    isEofOnUnclosedQuote = false
+                })
+                .completer { _, _, candidates ->
+                    candidates.add(Candidate("r", "reload", null, "Reload sources and try compiling again", null, null, true))
+                    candidates.add(Candidate("a", "abort", null, "Abort and exit", null, null, true))
+                }
                 .history(SimpleHistory.NoHistory)
                 .build() as LineReaderImpl
     }
