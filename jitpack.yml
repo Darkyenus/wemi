@@ -1,0 +1,7 @@
+# See https://jitpack.io/docs/BUILDING/
+
+jdk:
+  - oraclejdk8
+install:
+   - echo "Running a custom install command to build Wemi"
+   - ./wemi

@@ -115,10 +115,10 @@ object Archetypes {
         get() = JavaKotlinProject
 
     /**
-     * Archetype for projects that serve only as an aggregation of dependencies and do not have any own sources.
+     * Archetype for projects that have no sources of their own.
+     * Those can serve as an aggregation of dependencies or as a Maven-like parent projects.
      */
-    val DependenciesOnly by archetype(::_JVMBase_) {
-        //TODO IDE still detects some sources here
+    val BlankJVMProject by archetype(::_JVMBase_) {
         Keys.internalClasspath set { wEmptyList() }
 
         Keys.sourceBases set { wEmptySet() }
@@ -128,6 +128,9 @@ object Archetypes {
         Keys.resourceRoots set { wEmptySet() }
         Keys.resourceFiles set { wEmptyList() }
     }
+
+    @Deprecated("Use BlankJVMProject instead")
+    val DependenciesOnly = BlankJVMProject
 
     /**
      * Primary archetype for projects that use pure Java.
