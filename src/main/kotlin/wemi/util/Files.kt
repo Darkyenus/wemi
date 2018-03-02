@@ -14,6 +14,7 @@ import java.nio.file.attribute.*
 import java.util.*
 import java.util.concurrent.Semaphore
 
+private val LOG = LoggerFactory.getLogger("Files")
 
 /**
  * Creates an URL with given path appended.
@@ -53,25 +54,33 @@ operator fun CharSequence.div(path: CharSequence): StringBuilder {
  * If the conversion fails, returns null.
  */
 fun URL.toPath(): Path? {
-    if (host != null
-            && !host.isBlank()
-            && !host.equals("localhost", ignoreCase = true)
-            && !host.equals("127.0.0.1", ignoreCase = true)) {
-        return null
-    }
+    try {
+        if (host != null
+                && !host.isBlank()
+                && !host.equals("localhost", ignoreCase = true)
+                && !host.equals("127.0.0.1", ignoreCase = true)) {
+            return null
+        }
 
-    var url = this
+        val url: URL
 
-    if (url.protocol == "jar") {
-        // This is how JDK does it: java.net.JarURLConnection.parseSpecs
-        url = URL(url.file.substring(0, url.file.lastIndexOf("!/")))
-    }
+        if (protocol == "jar") {
+            // This is how JDK does it: java.net.JarURLConnection.parseSpecs
+            url = URL(file.substring(0, file.lastIndexOf("!/")))
+        } else {
+            // Strip host, authority, etc.
+            url = URL(protocol, null, file)
+        }
 
-    return if (url.protocol == "file") {
-        // FileSystems.getDefault() is guaranteed to be "file" scheme FileSystem
-        FileSystems.getDefault().provider().getPath(url.toURI())
-    } else {
-        null
+        return if (url.protocol == "file") {
+            // FileSystems.getDefault() is guaranteed to be "file" scheme FileSystem
+            FileSystems.getDefault().provider().getPath(url.toURI())
+        } else {
+            null
+        }
+    } catch (e:Throwable) {
+        LOG.warn("URL to Path conversion failed for {}", this)
+        throw e
     }
 }
 
