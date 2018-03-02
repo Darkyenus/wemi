@@ -69,7 +69,7 @@ object CLI {
      * History should be set separately.
      */
     internal val InputLineReader: LineReaderImpl by lazy {
-        LineReaderBuilder.builder()
+        (LineReaderBuilder.builder()
                 .appName("Wemi")
                 .terminal(Terminal)
                 .parser(DefaultParser().apply {
@@ -77,11 +77,14 @@ object CLI {
                     isEofOnUnclosedQuote = false
                 })
                 .history(SimpleHistory.NoHistory)
-                .build() as LineReaderImpl
+                .build() as LineReaderImpl).apply {
+            unsetOpt(LineReader.Option.INSERT_TAB)
+            unsetOpt(LineReader.Option.MENU_COMPLETE)
+        }
     }
 
     internal fun createReloadBuildScriptLineReader(): LineReaderImpl {
-        return LineReaderBuilder.builder()
+        return (LineReaderBuilder.builder()
                 .appName("Wemi")
                 .terminal(Terminal)
                 .parser(DefaultParser().apply {
@@ -89,11 +92,14 @@ object CLI {
                     isEofOnUnclosedQuote = false
                 })
                 .completer { _, _, candidates ->
-                    candidates.add(Candidate("r", "reload", null, "Reload sources and try compiling again", null, null, true))
-                    candidates.add(Candidate("a", "abort", null, "Abort and exit", null, null, true))
+                    candidates.add(Candidate("reload", "reload", null, "Reload sources and try compiling again", null, null, false))
+                    candidates.add(Candidate("abort", "abort", null, "Abort and exit", null, null, false))
                 }
                 .history(SimpleHistory.NoHistory)
-                .build() as LineReaderImpl
+                .build() as LineReaderImpl).apply {
+            unsetOpt(LineReader.Option.INSERT_TAB)
+            unsetOpt(LineReader.Option.MENU_COMPLETE)
+        }
     }
 
     /**

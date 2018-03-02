@@ -422,12 +422,12 @@ private fun buildScriptsBadAskIfReload(problem:String):Boolean {
     val prompt = StringBuilder()
             .format(Color.Red).append(problem).format().append(": ")
             .format(Color.Yellow).append('R').format().append("eload/")
-            .format(Color.Yellow).append('A').format().append("bort?")
+            .format(Color.Yellow).append('A').format().append("bort?\n> ")
             .toString()
 
     try {
         while (true) {
-            when (lineReader.readLine(prompt, null, "r")?.toLowerCase()) {
+            when (lineReader.readLine(prompt, null, "r")?.trim()?.toLowerCase()) {
                 "reload", "r" ->
                     return true
                 "abort", "a" ->
