@@ -11,14 +11,18 @@ import wemi.boot.MachineWritable
  * Dependency pulls [project]s [wemi.Keys.internalClasspath] and [wemi.Keys.externalClasspath] into
  * this project's external classpath.
  *
+ * @param aggregate if `true`, [project]'s internal classpath will be considered a part of this project's
+ *          internal classpath when creating artifact archive. If `false`, this dependency will have to be
+ *          represented through metadata and both projects will have to be archived separately.
  * @see dependency
  */
-class ProjectDependency internal constructor(val project: Project, val configurations: Array<out Configuration>)
+class ProjectDependency internal constructor(val project: Project, val aggregate:Boolean, val configurations: Array<out Configuration>)
     : MachineWritable {
 
     override fun writeMachine(json: Json) {
         json.writeObjectStart()
         json.writeValue("project", project.name, String::class.java)
+        json.writeValue("aggregate", aggregate, Boolean::class.java)
         json.writeArrayStart("configurations")
         for (configuration in configurations) {
             json.writeValue(configuration.name as Any, String::class.java)
@@ -33,6 +37,9 @@ class ProjectDependency internal constructor(val project: Project, val configura
         for (c in configurations) {
             sb.append(c.name).append(':')
         }
+        if (aggregate) {
+            sb.append(" aggregate")
+        }
 
         return sb.toString()
     }
@@ -40,7 +47,9 @@ class ProjectDependency internal constructor(val project: Project, val configura
 
 /**
  * Create a ProjectDependency for depending on this [Project], optionally with given configurations on top.
+ *
+ * @param aggregate see [ProjectDependency.aggregate]
  */
-fun dependency(project:Project, vararg configurations: Configuration): ProjectDependency {
-    return ProjectDependency(project, configurations)
+fun dependency(project:Project, aggregate:Boolean, vararg configurations: Configuration): ProjectDependency {
+    return ProjectDependency(project, aggregate, configurations)
 }

@@ -119,7 +119,7 @@ object KeyDefaults {
     }
 
     private val ResolvedProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
-    val ResolvedProjectDependencies: BoundKeyValue<WList<LocatedFile>> = {
+    fun resolvedProjectDependencies(aggregate:Boolean?): BoundKeyValue<WList<LocatedFile>> = {
         ResolvedProjectDependencies_CircularDependencyProtection.block(this, failure = {
             //TODO Show cycle
             throw WemiException("Cyclic dependencies in projectDependencies are not allowed", showStacktrace = false)
@@ -128,6 +128,10 @@ object KeyDefaults {
             val projectDependencies = Keys.projectDependencies.get()
 
             for (projectDependency in projectDependencies) {
+                if (aggregate != null && aggregate != projectDependency.aggregate) {
+                    continue
+                }
+
                 // Enter a different scope
                 projectDependency.project.evaluate(*projectDependency.configurations) {
                     ExternalClasspath_LOG.debug("Resolving project dependency on {}", this)
