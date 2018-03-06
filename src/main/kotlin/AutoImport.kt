@@ -53,7 +53,10 @@ inline val Scope.JUnitAPI
     inline get() = _JUnitAPI
 val Scope.JUnitEngine
     inline get() = _JUnitEngine
-inline fun dependency(project:Project, vararg configurations:Configuration) = _dependency(project, *configurations)
+inline fun dependency(project:Project, aggregate:Boolean, vararg configurations:Configuration) = _dependency(project, aggregate, *configurations)
+
+@Deprecated("User version with explicit aggregate=true parameter.")
+inline fun dependency(project:Project, vararg configurations:Configuration) = _dependency(project, true, *configurations)
 
 // Path helpers
 inline fun path(path:String):Path = Paths.get(path)
