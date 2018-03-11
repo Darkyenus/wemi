@@ -13,6 +13,7 @@ import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
+import wemi.publish.ArtifactEntry
 import wemi.publish.InfoNode
 import wemi.test.TestParameters
 import wemi.test.TestReport
@@ -100,7 +101,10 @@ object Keys {
 
     val publishMetadata by key<InfoNode>("Meta information that should be published together with archives by 'publish'")
     val publishRepository by key<Repository>("Repository to which the archives are published")
-    val publishClassifier by key<String?>("Classifier that is being published, for repositories that support such notion", defaultValue = null)
+    /**
+     * @see wemi.publish.artifacts preferred method for adding to this list.
+     */
+    val publishArtifacts by key<WList<ArtifactEntry>>("Artifacts that should get published", defaultValue = wEmptyList())
     val publish by key<URI>("Publish archives to 'publishRepository' and return the URI to where it was published")
 
     val assemblyMergeStrategy by key<MergeStrategyChooser>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")

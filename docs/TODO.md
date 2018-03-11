@@ -1,6 +1,7 @@
 # Things to do next
 
 - Better Artifact abstraction
+- /\ DONE: TEST IT
 
 - Test plugin & core on windows
 

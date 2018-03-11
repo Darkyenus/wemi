@@ -196,8 +196,8 @@ val publishMetadata
     inline get() = wemi.Keys.publishMetadata
 val publishRepository
     inline get() = wemi.Keys.publishRepository
-val publishClassifier
-    inline get() = wemi.Keys.publishClassifier
+val publishArtifacts
+    inline get() = wemi.Keys.publishArtifacts
 val publish
     inline get() = wemi.Keys.publish
 

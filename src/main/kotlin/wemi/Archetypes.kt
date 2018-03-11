@@ -12,6 +12,7 @@ import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
 import wemi.dependency.LocalM2Repository
 import wemi.dependency.createRepositoryChain
+import wemi.publish.artifacts
 import wemi.run.javaExecutable
 import wemi.util.*
 import java.nio.file.Path
@@ -101,6 +102,7 @@ object Archetypes {
 
         Keys.publishMetadata set KeyDefaults.PublishModelM2
         Keys.publishRepository set { LocalM2Repository }
+        Keys.publishArtifacts addAll { artifacts(null, true, true) }
         Keys.publish set KeyDefaults.PublishM2
 
         Keys.assemblyMergeStrategy set {

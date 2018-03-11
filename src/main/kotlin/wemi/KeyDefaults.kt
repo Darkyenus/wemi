@@ -26,8 +26,6 @@ import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.internal.MessageLocation
 import wemi.compile.internal.render
 import wemi.dependency.*
-import wemi.dependency.Repository.M2.Companion.JavadocClassifier
-import wemi.dependency.Repository.M2.Companion.SourcesClassifier
 import wemi.dependency.Repository.M2.Companion.joinClassifiers
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
@@ -1061,24 +1059,8 @@ object KeyDefaults {
     val PublishM2: BoundKeyValue<URI> = {
         using(publishing) {
             val repository = Keys.publishRepository.get()
-
-            val artifact = Keys.archive.get()
-            val sourceArtifact = using(Configurations.archivingSources) { Keys.archive.get() }
-            val docsArtifact = using(Configurations.archivingDocs) { Keys.archive.get() }
-
             val metadata = Keys.publishMetadata.get()
-            val classifier = Keys.publishClassifier.get()
-
-            val artifacts = ArrayList<Pair<Path, String?>>()
-            if (artifact != null) {
-                artifacts.add(artifact to classifier)
-            }
-            if (sourceArtifact != null) {
-                artifacts.add(sourceArtifact to joinClassifiers(classifier, SourcesClassifier))
-            }
-            if (docsArtifact != null) {
-                artifacts.add(docsArtifact to joinClassifiers(classifier, JavadocClassifier))
-            }
+            val artifacts = Keys.publishArtifacts.get()
 
             repository.publish(metadata, artifacts)
         }

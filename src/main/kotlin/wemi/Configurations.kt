@@ -7,7 +7,6 @@ import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.collections.toWList
 import wemi.collections.wEmptyList
-import wemi.collections.wListOf
 import wemi.compile.*
 import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.JavadocClassifier
@@ -74,6 +73,9 @@ object Configurations {
      */
     val archiving by configuration("Used when archiving") {}
 
+    /**
+     * Use this configuration to obtain sources archived in [Keys.archive].
+     */
     val archivingSources by configuration("Used when archiving sources") {
         Keys.archiveOutputFile modify { original ->
             val originalName = original.name
@@ -84,6 +86,9 @@ object Configurations {
         Keys.archive set KeyDefaults.ArchiveSources
     }
 
+    /**
+     * Use this configuration to obtain documentation archived in [Keys.archive].
+     */
     val archivingDocs by configuration("Used when archiving documentation") {
         Keys.archiveOutputFile modify { original ->
             val originalName = original.name

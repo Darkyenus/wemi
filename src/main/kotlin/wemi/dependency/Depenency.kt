@@ -9,6 +9,13 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
+ * Artifact classifier.
+ *
+ * @see Repository.M2.Classifier for where it is used.
+ */
+typealias Classifier = String
+
+/**
  * Unique identifier for project/module to be resolved.
  * May have dependencies on other projects and may have artifacts.
  *
