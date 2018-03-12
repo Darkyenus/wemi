@@ -11,7 +11,6 @@ import org.jetbrains.kotlin.incremental.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
-import wemi.boot.WemiBuildScript
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
@@ -112,7 +111,6 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
         args::pluginClasspaths.ensure(null)
 
         // Setup args
-        val compilingWemiBuildFiles = flags.useDefault(KotlinJVMCompilerFlags.compilingWemiBuildFiles, false)
         args.classpath = classpath.joinToString(separator = File.pathSeparator) { it.absolutePath }
         flags.use(KotlinJVMCompilerFlags.jdkHome) {
             args.jdkHome = it
@@ -139,16 +137,6 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
         }
         flags.use(KotlinCompilerFlags.pluginClasspath) {
             pluginClasspath.addAll(it)
-        }
-        if (compilingWemiBuildFiles) {
-            // Hack to recognize .wemi files as kotlin files
-            // This has to be done as a "plugin" because that seems to be the only way to get hold of
-            // the file type registry before it is too late. By masquerading as a plugin, we get to
-            // execute arbitrary code when the FileTypeRegistry global is properly initialized,
-            // so we can register our type.
-
-            // This adds RegisterWemiFilesAsKotlinFilesInCompiler compiler plugin
-            pluginClasspath.add(WemiBuildScript!!.wemiLauncherJar.absolutePath)
         }
         args.pluginOptions = pluginOptions.toTypedArray()
         args.pluginClasspaths = pluginClasspath.toTypedArray()

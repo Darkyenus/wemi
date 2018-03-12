@@ -22,7 +22,7 @@ private val LOG = LoggerFactory.getLogger("BuildFiles")
  * Extensions that a valid Wemi build script file have.
  * Without leading dot.
  */
-val WemiBuildFileExtensions = listOf("wemi", "kt")
+val WemiBuildFileExtensions = listOf("kt")
 
 /**
  * Build file is a file with [WemiBuildFileExtensions], in [buildFolder].
@@ -69,8 +69,8 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
 
     val combinedBuildFileName = buildScriptSources.joinToString("-") { it.name.pathWithoutExtension() }
 
-    val resultJar = cacheFolder / (combinedBuildFileName + "-cache.jar")
-    val classpathFile = cacheFolder / (combinedBuildFileName + ".classpath")
+    val resultJar = cacheFolder / ("$combinedBuildFileName-cache.jar")
+    val classpathFile = cacheFolder / ("$combinedBuildFileName.classpath")
     val classpath = WMutableList<Path>()
 
     var recompileReason = ""
@@ -125,7 +125,6 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
     }
 
     val buildFlags = CompilerFlags()
-    buildFlags[KotlinJVMCompilerFlags.compilingWemiBuildFiles] = true
     buildFlags[KotlinCompilerFlags.moduleName] = combinedBuildFileName
     buildFlags[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
 

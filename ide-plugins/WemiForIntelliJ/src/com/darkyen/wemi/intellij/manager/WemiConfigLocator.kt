@@ -23,7 +23,7 @@ class WemiConfigLocator : ExternalSystemConfigLocator {
                 .getFileSystem("file")?.findFileByPath(externalProjectSettings.externalProjectPath)
                 ?:return result
 
-        val wemi = projectRoot.findChild("wemi")
+        val wemi = projectRoot.findChild(WemiLauncherFileName)
         if (wemi != null) {
             result.add(wemi)
         }

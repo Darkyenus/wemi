@@ -2,6 +2,7 @@ package com.darkyen.wemi.intellij.importing
 
 import com.darkyen.wemi.intellij.WemiBuildFileExtensions
 import com.darkyen.wemi.intellij.WemiProjectSystemId
+import com.darkyen.wemi.intellij.file.isWemiScriptSource
 import com.darkyen.wemi.intellij.settings.WemiProjectSettings
 import com.darkyen.wemi.intellij.settings.WemiSystemSettings
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -39,10 +40,9 @@ class ReloadProjectAction : AnAction("Reload Wemi Project",
         }
 
         if (e.place == ActionPlaces.PROJECT_VIEW_POPUP) {
-            // Right-clicking a file - is it a .wemi file?
-            val extension = e.dataContext.psiElement?.containingFile?.originalFile?.virtualFile?.extension
-            e.presentation.isEnabledAndVisible = extension != null
-                    && WemiBuildFileExtensions.any { it.equals(extension, ignoreCase = true) }
+            // Right-clicking a file - is it a Wemi script file?
+            e.presentation.isEnabledAndVisible = e.dataContext.psiElement
+                    ?.containingFile?.originalFile?.virtualFile.isWemiScriptSource(false)
         } else {
             // Elsewhere, possibly Tools
             e.presentation.isEnabledAndVisible = true

@@ -10,11 +10,12 @@ import com.intellij.openapi.project.Project
 import java.io.*
 import java.util.concurrent.TimeUnit
 
-val WemiBuildFileExtensions = listOf("wemi", "kt")
+// Must be a subset of Kotlin file extensions
+val WemiBuildFileExtensions = listOf("kt")
 
 val WemiProjectSystemId = ProjectSystemId("WEMI", "Wemi")
 
-val WemiLauncherFileName = "wemi"
+const val WemiLauncherFileName = "wemi"
 
 /**
  * Finds project's Wemi launcher, if present.

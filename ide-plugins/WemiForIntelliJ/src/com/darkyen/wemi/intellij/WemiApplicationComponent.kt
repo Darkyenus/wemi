@@ -18,9 +18,6 @@ class WemiApplicationComponent : ApplicationComponent {
 
     override fun initComponent() {
         FileTypeManager.getInstance().associate(WemiLauncherFileType, ExactFileNameMatcher(WemiLauncherFileName, false))
-        for (extension in WemiBuildFileExtensions) {
-            FileTypeManager.getInstance().associate(KotlinFileType.INSTANCE, ExtensionFileNameMatcher(extension))
-        }
 
         // Do not launch our WemiProjectResolver and WemiTaskManager in external process,
         // because it just adds delays and is messy

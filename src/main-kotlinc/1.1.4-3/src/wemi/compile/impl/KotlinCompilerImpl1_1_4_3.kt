@@ -9,8 +9,6 @@ import org.jetbrains.kotlin.config.Services
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
-import wemi.boot.WemiBuildFileExtensions
-import wemi.boot.WemiBuildScript
 import wemi.compile.*
 import wemi.compile.KotlinCompiler.CompileExitStatus.*
 import wemi.compile.internal.MessageLocation
@@ -80,13 +78,10 @@ internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
 
         // Setup args
         val sourceSet = HashSet<String>()
-        val compilingWemiBuildFiles = flags.useDefault(KotlinJVMCompilerFlags.compilingWemiBuildFiles, false)
         for (source in sources) {
             val file = source.file
             when {
-                file.isDirectory() ||
-                        file.name.pathHasExtension(KotlinSourceFileExtensions) ||
-                        (compilingWemiBuildFiles && file.name.pathHasExtension(WemiBuildFileExtensions)) -> {
+                file.isDirectory() || file.name.pathHasExtension(KotlinSourceFileExtensions) -> {
                     sourceSet.add(file.absolutePath)
                 }
                 file.name.pathHasExtension(JavaSourceFileExtensions) -> {
@@ -125,16 +120,6 @@ internal class KotlinCompilerImpl1_1_4_3 : KotlinCompiler {
         }
         flags.use(KotlinCompilerFlags.pluginClasspath) {
             pluginClasspath.addAll(it)
-        }
-        if (compilingWemiBuildFiles) {
-            // Hack to recognize .wemi files as kotlin files
-            // This has to be done as a "plugin" because that seems to be the only way to get hold of
-            // the file type registry before it is too late. By masquerading as a plugin, we get to
-            // execute arbitrary code when the FileTypeRegistry global is properly initialized,
-            // so we can register our type.
-
-            // This adds RegisterWemiFilesAsKotlinFilesInCompiler compiler plugin
-            pluginClasspath.add(WemiBuildScript!!.wemiLauncherJar.absolutePath)
         }
         args.pluginOptions = pluginOptions.toTypedArray()
         args.pluginClasspaths = pluginClasspath.toTypedArray()
