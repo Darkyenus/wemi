@@ -1,29 +1,17 @@
-@file:Suppress("UnusedImport") // Because Kotlin has problems with files in default packages?
-
+import wemi.Archetypes
 import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
-import wemi.compile.KotlinCompilerVersion
-import wemi.compile.KotlinJVMCompilerFlags
-import wemi.createProject
-import java.nio.file.Files
-
-import core
-import createKotlinCompilerProject
-import CompilerProjects
-import wemi.Archetypes
 import wemi.Keys
 import wemi.assembly.AssemblyOperation
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.MergeStrategy
-import wemi.boot.WemiBuildScript
 import wemi.boot.WemiCacheFolder
 import wemi.compile.KotlinCompilerFlags
+import wemi.compile.KotlinCompilerVersion
+import wemi.createProject
 import wemi.dependency.JCenter
-import wemi.dependency.LocalM2Repository
-import wemi.dependency.Repository
 import wemi.util.*
-import java.net.URL
-import java.util.zip.ZipEntry
+import java.nio.file.Files
 
 val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.4-3"),

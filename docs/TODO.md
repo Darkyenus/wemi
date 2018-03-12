@@ -1,8 +1,5 @@
 # Things to do next
 
-- Better Artifact abstraction
-- /\ DONE: TEST IT
-
 - Test plugin & core on windows
 
 - Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
