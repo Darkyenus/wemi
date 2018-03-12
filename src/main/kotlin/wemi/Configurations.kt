@@ -117,9 +117,51 @@ object Configurations {
     }
     //endregion
 
-    val offline by configuration("Disables non-local repositories from the repository chain for offline use") {
+    /**
+     * Attempts to disable all features that would fail while offline.
+     * Most features will rely on caches to do internet dependent things,
+     * so if you don't have caches built, some operations may fail.
+     *
+     * Note: as this disables some features, do not use it for official releases.
+     */
+    val offline by configuration("Disables features that are not available when offline") {
+        // Disable non-local repositories
         Keys.repositoryChain modify { oldChain ->
             oldChain.filter { it.local }
+        }
+
+        // Remove external documentation links if they don't have explicit package and don't point to 'file:' url
+        fun String.localUrl():Boolean {
+            return this.startsWith("file:", ignoreCase = true)
+        }
+
+        Keys.archiveDokkaOptions modify { options ->
+            // TODO This sadly does not work as org.jetbrains.dokka.DocumentationOptions adds own links.
+            // However, Dokka caches package-lists, so it should work after you package once and cache gets created.
+            options.apply {
+                externalDocumentationLinks.removeIf {
+                    if (it.packageListUrl != null) {
+                        false
+                    } else !it.url.localUrl()
+                }
+            }
+        }
+
+        Keys.archiveJavadocOptions modify {
+            // Search for -link options and remove them if they are not local
+            // There is also -linkoffline option, but that specifies explicit package-list, so it should be fine
+            it.toMutable().also { options ->
+                var i = 0
+                while (i < options.size - 1) {
+                    if (options[i] == "-link" && !options[i+1].localUrl()) {
+                        // Delete both link and url, do not move active index
+                        options.removeAt(i+1)
+                        options.removeAt(i)
+                    } else {
+                        i++
+                    }
+                }
+            }
         }
     }
 
