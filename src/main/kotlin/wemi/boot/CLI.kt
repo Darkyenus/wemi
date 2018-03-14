@@ -227,6 +227,8 @@ object CLI {
         }
     }
 
+    private val KEY_EVALUATION_PREFIX = formatLabel(if (WemiUnicodeOutputSupported) "→ " else "# ")
+
     /**
      * Evaluates the key or command and prints human readable, formatted output.
      */
@@ -240,7 +242,7 @@ object CLI {
         }
 
         // TODO Ideally, this would get rewritten with Done message if nothing was written between them
-        print(formatLabel("→ "))
+        print(KEY_EVALUATION_PREFIX)
         println(formatInput(task.key))
 
         val beginTime = System.currentTimeMillis()
@@ -504,11 +506,15 @@ object CLI {
         }
     }
 
-    internal val ICON_SUCCESS = format("✔", Color.Green)
-    internal val ICON_FAILURE = format("✘", Color.Red)
-    internal val ICON_EXCEPTION = format("❗", Color.Red)
-    internal val ICON_UNKNOWN = format("?", Color.Yellow)
-    internal val ICON_SKIPPED = format("↷", Color.Magenta)
-    internal val ICON_SEE_ABOVE = format("↑", Color.Magenta)//⤴ seems to be clipped in some contexts
-    internal val ICON_ABORTED = format("■", Color.Yellow)
+    private fun icon(unicode:String, dumb:String, color:Color):CharSequence {
+        return format(if (WemiUnicodeOutputSupported) unicode else dumb, color)
+    }
+
+    internal val ICON_SUCCESS = icon("✔", "OK", Color.Green)
+    internal val ICON_FAILURE = icon("✘", "FAIL", Color.Red)
+    internal val ICON_EXCEPTION = icon("❗", "ERROR", Color.Red)
+    internal val ICON_UNKNOWN = icon("?", "UNKNOWN", Color.Yellow)
+    internal val ICON_SKIPPED = icon("↷", "SKIP", Color.Magenta)
+    internal val ICON_SEE_ABOVE = icon("↑", "SEE ABOVE", Color.Magenta)//⤴ seems to be clipped in some contexts
+    internal val ICON_ABORTED = icon("■", "ABORT", Color.Yellow)
 }

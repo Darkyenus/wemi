@@ -1,11 +1,11 @@
 package wemi.util
 
 import com.darkyen.tproll.util.PrettyPrinter
-import com.darkyen.tproll.util.TerminalColor
 import com.esotericsoftware.jsonbeans.Json
 import com.esotericsoftware.jsonbeans.JsonValue
 import org.slf4j.LoggerFactory
 import wemi.Key
+import wemi.boot.WemiColorOutputSupported
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
@@ -320,11 +320,11 @@ fun <T> printTree(roots: Collection<TreeNode<T>>, result: StringBuilder = String
             prefix.setLength(prevPrefixLength)
             result.append(prefix)
             if (index + 1 == dependenciesSize) {
-                result.append("╘ ")
+                result.append(if (wemi.boot.WemiUnicodeOutputSupported) "╘ " else "\\=")
                 prefix.append("  ")
             } else {
-                result.append("╞ ")
-                prefix.append("│ ")
+                result.append(if (wemi.boot.WemiUnicodeOutputSupported) "╞ " else "|=")
+                prefix.append(if (wemi.boot.WemiUnicodeOutputSupported) "│ " else "| ")
             }
 
             dependency.println()
@@ -340,19 +340,19 @@ fun <T> printTree(roots: Collection<TreeNode<T>>, result: StringBuilder = String
             prefix.append("  ")
         } else {
             prefix.setLength(0)
-            prefix.append("│ ")
+            prefix.append(if (wemi.boot.WemiUnicodeOutputSupported) "│ " else "| ")
         }
 
         if (rootIndex == 0) {
             if (rootsSize == 1) {
-                result.append("═ ")
+                result.append(if (wemi.boot.WemiUnicodeOutputSupported) "═ " else "= ")
             } else {
-                result.append("╤ ")
+                result.append(if (wemi.boot.WemiUnicodeOutputSupported) "╤ " else "|=")
             }
         } else if (rootIndex + 1 == rootsSize) {
-            result.append("╘ ")
+            result.append(if (wemi.boot.WemiUnicodeOutputSupported) "╘ " else "\\=")
         } else {
-            result.append("╞ ")
+            result.append(if (wemi.boot.WemiUnicodeOutputSupported) "╞ " else "|=")
         }
 
         root.println()
@@ -383,7 +383,7 @@ const val ANSI_ESCAPE = '\u001B'
  * Format given char sequence using supplied parameters.
  */
 fun format(text: CharSequence, foreground: Color? = null, background: Color? = null, format: Format? = null): CharSequence {
-    if (!TerminalColor.COLOR_SUPPORTED || (foreground == null && background == null && format == null)) return text
+    if (!WemiColorOutputSupported || (foreground == null && background == null && format == null)) return text
     return StringBuilder()
             .format(foreground, background, format)
             .append(text)
@@ -391,7 +391,7 @@ fun format(text: CharSequence, foreground: Color? = null, background: Color? = n
 }
 
 fun StringBuilder.format(foreground: Color? = null, background: Color? = null, format: Format? = null):StringBuilder {
-    if (!TerminalColor.COLOR_SUPPORTED) return this
+    if (!WemiColorOutputSupported) return this
 
     append("$ANSI_ESCAPE[0") //Reset everything first
     if (foreground != null) {

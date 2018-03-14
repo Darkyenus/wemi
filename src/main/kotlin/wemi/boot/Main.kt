@@ -7,11 +7,9 @@ import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TimeFormatter
 import org.jline.reader.EndOfFileException
 import org.jline.reader.UserInterruptException
+import org.jline.utils.OSUtils
 import org.slf4j.LoggerFactory
-import wemi.Configurations
-import wemi.WemiKotlinVersion
-import wemi.WemiVersion
-import wemi.WithExitCode
+import wemi.*
 import wemi.dependency.DefaultExclusions
 import wemi.dependency.DependencyExclusion
 import wemi.util.*
@@ -58,6 +56,29 @@ internal var WemiRunningInInteractiveMode = false
 
 internal var WemiReloadSupported = false
     private set
+
+@JvmField
+internal val WemiUnicodeOutputSupported:Boolean = System.getenv("WEMI_UNICODE").let {
+    if (it == null)!OSUtils.IS_WINDOWS else it == "true" }
+
+@JvmField
+internal val WemiColorOutputSupported:Boolean = run {
+    // Try to determine if color output is enabled from TPROLL_COLOR and WEMI_COLOR variables and set them accordingly
+    val env = System.getenv("WEMI_COLOR") ?: System.getenv("TPROLL_COLOR") ?: ""
+
+    val value = BooleanValidator(env).value ?: run {
+        if (OSUtils.IS_WINDOWS) {
+            // Windows supports color only if terminal is sane
+            val term = System.getenv("TERM")
+            term?.contains("xterm") == true || term?.contains("color") == true
+        } else {
+            // Non-windows machines usually support color
+            true
+        }
+    }
+    //TODO: It would be nice to notify TPRoll if the color decision, but environment variables are immutable
+    value
+}
 
 /**
  * Directory in which wemi executable is (./)
@@ -106,9 +127,6 @@ internal val WemiBundledLibrariesExclude = DefaultExclusions + listOf(
  * Entry point for the WEMI build tool
  */
 fun main(args: Array<String>) {
-    TPLogger.attachUnhandledExceptionLogger()
-    JavaLoggingIntegration.enable()
-
     var cleanBuild = false
 
     var errors = 0
@@ -198,6 +216,9 @@ fun main(args: Array<String>) {
     if (exitIfNoTasks && taskArguments.isEmpty()) {
         exitProcess(EXIT_CODE_SUCCESS)
     }
+
+    TPLogger.attachUnhandledExceptionLogger()
+    JavaLoggingIntegration.enable()
 
     val machineOutput: PrintStream?
 
