@@ -76,7 +76,7 @@ internal val WemiColorOutputSupported:Boolean = run {
             true
         }
     }
-    //TODO: It would be nice to notify TPRoll if the color decision, but environment variables are immutable
+    System.setProperty("tproll.color", value.toString())
     value
 }
 

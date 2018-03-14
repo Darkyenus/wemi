@@ -35,7 +35,7 @@ val core by project(path(".")) {
             //kotlinDependency("stdlib"), TODO Remove, but buggy currently
             kotlinDependency("reflect"),
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
-            dependency("com.github.Darkyenus", "tproll", "v1.2.5"),
+            dependency("com.github.Darkyenus", "tproll", "v1.2.6"),
             dependency("com.github.Darkyenus", "DaveWebb", "v1.2"),
             dependency("com.github.EsotericSoftware", "jsonbeans", "cb0f3406fc"),
             dependency("org.jline", "jline", "3.3.0")
