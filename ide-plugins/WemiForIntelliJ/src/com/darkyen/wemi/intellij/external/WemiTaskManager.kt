@@ -85,17 +85,8 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                 sb.toString()
             }
 
-            session = if (settings.javaVmExecutable.isBlank() && vmOptions.isEmpty()) {
-                launcher.createTaskSession(env, settings.isPassParentEnvs, tasks)
-            } else {
-                var javaVmExecutable = settings.javaVmExecutable
-                if (javaVmExecutable.isBlank()) {
-                    javaVmExecutable = "java"
-                    listener.onTaskOutput(id, "WEMI: Using implicit java executable from PATH\n", false)
-                }
-
-                launcher.createTaskSession(javaVmExecutable, vmOptions, env, settings.isPassParentEnvs, tasks)
-            }
+            val javaExecutable = if (settings.javaVmExecutable.isBlank()) "java" else settings.javaVmExecutable
+            session = launcher.createTaskSession(javaExecutable, vmOptions, env, settings.isPassParentEnvs, tasks)
 
             val stdout = LineReadingOutputStream { line -> listener.onTaskOutput(id, line.toString(), true) }
             val stderr = LineReadingOutputStream { line -> listener.onTaskOutput(id, line.toString(), false) }

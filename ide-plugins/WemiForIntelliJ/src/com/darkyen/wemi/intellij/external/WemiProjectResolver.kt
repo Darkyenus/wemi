@@ -79,7 +79,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             // First request on session will be probably waiting for build scripts to compile
             listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Loading Wemi build scripts"))
             val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
-            LOG.info("Wemi version is "+wemiVersion)
+            LOG.info("Wemi version is $wemiVersion")
 
             return resolveProjectInfo(id, session, projectPath, settings, listener, wemiVersion)
         } catch (se:WemiSessionException) {

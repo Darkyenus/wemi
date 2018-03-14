@@ -72,19 +72,6 @@ class WemiLauncher internal constructor(val file: String) {
 
         return WemiLauncherSession(command)
     }
-
-    fun createTaskSession(env: Map<String, String>, inheritEnv: Boolean, tasks: List<String>):WemiLauncherSession {
-        val command = GeneralCommandLine()
-        command.exePath = file
-        command.charset = Charsets.UTF_8
-        command.environment.putAll(env)
-        command.workDirectory = File(file).parentFile
-        command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
-
-        command.addParameters(tasks)
-
-        return WemiLauncherSession(command)
-    }
 }
 
 class WemiLauncherSession(private val commandLine: GeneralCommandLine, private val prefixConfigurations: Array<String> = emptyArray()) {
@@ -264,7 +251,7 @@ class WemiLauncherSession(private val commandLine: GeneralCommandLine, private v
                     close()
                 }
             } catch (e:Exception) {
-                LOG.error("Error while evaluating task "+ task, e)
+                LOG.error("Error while evaluating task '$task'", e)
                 throw e
             }
         }
