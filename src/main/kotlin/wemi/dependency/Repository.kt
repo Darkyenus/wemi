@@ -33,7 +33,7 @@ sealed class Repository(val name: String) : MachineWritable {
     internal abstract fun resolveInRepository(dependency: DependencyId, chain: RepositoryChain): ResolvedDependency
 
     /**
-     * @return directory to lock on while resolving from this repository
+     * @return directory to lock on while resolving from this repository. It will be created if it doesn't exist.
      */
     internal abstract fun directoryToLock(): Path?
 
@@ -331,7 +331,7 @@ fun createRepositoryChain(repositories: Collection<Repository>): RepositoryChain
 /**
  * Local Maven repository stored in ~/.m2/repository
  */
-val LocalM2Repository = Repository.M2("local", URL("file", "localhost", System.getProperty("user.home") + "/.m2/repository/"), null)
+val LocalM2Repository = Repository.M2("local", (Paths.get(System.getProperty("user.home")) / ".m2/repository/").toUri().toURL(), null)
 /**
  * Maven Central repository at [maven.org](https://maven.org)
  *

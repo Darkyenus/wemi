@@ -422,6 +422,11 @@ private val LOCKED_PATHS = WeakHashMap<Path, Semaphore>()
 fun <Result> directorySynchronized(directory: Path, onWait:(()->Unit)? = null, action:() -> Result):Result {
     // Implementation of this is not trivial as all OSes have own quirks and differences
 
+    if (!Files.exists(directory)) {
+        // Otherwise toRealPath will crash
+        Files.createDirectories(directory)
+    }
+
     val lockedPath = directory.toRealPath()
 
     if (!Files.isDirectory(lockedPath)) {
