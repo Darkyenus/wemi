@@ -553,7 +553,6 @@ private fun parseOptions(args:Array<String>, options:Array<Option>):List<String>
                 val argument:String?
 
                 if (option.argument != false) {
-                    shortOptIndex = arg.length // No more options in this arg
                     if (shortOptIndex + 1 < arg.length) {
                         // Argument is without blank
                         argument = arg.substring(shortOptIndex)
@@ -564,6 +563,7 @@ private fun parseOptions(args:Array<String>, options:Array<Option>):List<String>
                         System.err.println("wemi: option '-$optName' requires an argument")
                         printWemiHelp(options, EXIT_CODE_ARGUMENT_ERROR)
                     }
+                    shortOptIndex = arg.length // No more short options in this arg
                 } else {
                     argument = null
                 }
