@@ -48,8 +48,8 @@ class WemiLauncher internal constructor(val file: String) {
         command.addParameter(file)
         command.isRedirectErrorStream = false
 
-        command.addParameter("-i")
-        command.addParameter("-machineReadableOutput")
+        command.addParameter("--interactive")
+        command.addParameter("--machine-readable-output")
 
         return WemiLauncherSession(command, prefixConfigurations)
     }

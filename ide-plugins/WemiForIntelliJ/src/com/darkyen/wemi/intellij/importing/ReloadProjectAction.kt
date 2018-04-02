@@ -1,6 +1,5 @@
 package com.darkyen.wemi.intellij.importing
 
-import com.darkyen.wemi.intellij.WemiBuildFileExtensions
 import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.file.isWemiScriptSource
 import com.darkyen.wemi.intellij.settings.WemiProjectSettings
