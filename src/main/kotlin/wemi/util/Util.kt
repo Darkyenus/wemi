@@ -164,6 +164,18 @@ fun StringBuilder.appendCentered(text:String, width:Int, padding:Char):StringBui
 }
 
 /**
+ * Append given [number], prefixed with [padding] to take up at least [width].
+ */
+fun StringBuilder.appendPadded(number:Int, width:Int, padding:Char):StringBuilder {
+    val originalLength = length
+    append(number)
+    while (length < originalLength + width) {
+        insert(originalLength, padding)
+    }
+    return this
+}
+
+/**
  * Represents index into the [CharSequence].
  */
 typealias Index = Int

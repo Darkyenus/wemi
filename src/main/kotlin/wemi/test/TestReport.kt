@@ -9,6 +9,12 @@ import wemi.util.putArrayStrings
 import wemi.util.writeStringArray
 
 /**
+ * Arbitrary string that is outputted by the test harness, before outputting the TestReport JSON.
+ * This is done because debug tools might inject messages that would break the output.
+ */
+internal const val TEST_LAUNCHER_OUTPUT_PREFIX = "WEMI-TEST-HARNESS-OUTPUT: "
+
+/**
  * Returned by the test.
  *
  * In execution order contains [TestIdentifier]s that were run and [TestData] informing about their execution.

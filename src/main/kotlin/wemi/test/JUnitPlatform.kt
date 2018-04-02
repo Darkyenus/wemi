@@ -11,11 +11,11 @@ import wemi.dependency.DependencyId
 import wemi.dependency.MavenCentral
 import wemi.test.TestStatus.*
 import wemi.util.*
-import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
 import java.time.Instant
 import java.time.ZoneId
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 private val LOG = LoggerFactory.getLogger("JUnitPlatform")
 private val TEST_OUTPUT_LOG = LoggerFactory.getLogger("TestOutput")
@@ -28,12 +28,12 @@ internal const val TEST_LAUNCHER_MAIN_CLASS = "wemi.test.forked.TestLauncherKt"
 /**
  * Currently used JUnit Platform version
  */
-val JUnitPlatformVersion = "1.0.2"
+const val JUnitPlatformVersion = "1.0.2"
 
 /**
  * Currently used JUnit Jupiter api/engine version
  */
-val JUnitEngineVersion = "5.0.2"
+const val JUnitEngineVersion = "5.0.2"
 
 /**
  * Dependency on JUnit 5 API
@@ -97,7 +97,19 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
         it.flush()
     }
 
-    val stdout = ByteArrayOutputStream()
+    var outputJson = ""
+
+    val stdout = LineReadingOutputStream { line ->
+        if (line.startsWith(TEST_LAUNCHER_OUTPUT_PREFIX)) {
+            outputJson = line.substring(TEST_LAUNCHER_OUTPUT_PREFIX.length)
+            LOG.trace("Test process returned json: {}", outputJson)
+        } else {
+            val trimmedLine = line.dropLastWhile { it.isWhitespace() }
+            if (trimmedLine.isNotEmpty()) {
+                TEST_OUTPUT_LOG.info("{}", trimmedLine)
+            }
+        }
+    }
     val stderr = LineReadingOutputStream { line ->
         val trimmedLine = line.dropLastWhile { it.isWhitespace() }
         if (trimmedLine.isNotEmpty()) {
@@ -108,17 +120,19 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
     val procStdout = process.inputStream
     val procStderr = process.errorStream
 
-    while (true) {
-        val alive = process.isAlive
-        readFully(stdout, procStdout)
-        readFully(stderr, procStderr)
+    try {
+        while (true) {
+            val exited = process.waitFor(10, TimeUnit.MILLISECONDS)
+            readFully(stdout, procStdout)
+            readFully(stderr, procStderr)
 
-        if (alive) {
-            Thread.sleep(10)
-        } else {
-            stderr.close()
-            break
+            if (exited) {
+                break
+            }
         }
+    } finally {
+        stdout.close()
+        stderr.close()
     }
 
     val status = process.exitValue()
@@ -128,13 +142,10 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
         LOG.warn("Test process ended with status {}", status)
     }
 
-    val stdoutString = stdout.toString(Charsets.UTF_8.name())
-    LOG.trace("Test process returned stdout: {}", stdoutString)
-
     return try {
-        val stdoutJson = JsonReader().parse(stdoutString)
+        val stdoutJson = JsonReader().parse(outputJson)
         if (stdoutJson == null) {
-            LOG.error("Failed to parse returned output:\n{}", stdoutString)
+            LOG.error("Failed to parse returned output:\n{}", outputJson)
             return null
         }
 
@@ -144,7 +155,7 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
 
         report
     } catch (e: Exception) {
-        LOG.error("Malformed test report output:\n{}", stdoutString, e)
+        LOG.error("Malformed test report output:\n{}", outputJson, e)
         null
     }
 }
@@ -295,32 +306,51 @@ fun TestReport.prettyPrint(): CharSequence {
         }
     }
 
-    result.append('\n')
-    //TODO Colors
-    result.append(String.format("           - Summary -           \n"
-            + "[%7d containers found       ]\n"
-            + "[%7d containers skipped     ]\n"
-            + "[%7d containers aborted     ]\n"
-            + "[%7d containers successful  ]\n"
-            + "[%7d containers failed      ]\n"
-
-            + "[%7d tests found            ]\n"
-            + "[%7d tests skipped          ]\n"
-            + "[%7d tests aborted          ]\n"
-            + "[%7d tests successful       ]\n"
-            + "[%7d tests failed           ]\n",
-            containersFound,
-            containersSkipped,
-            containersAborted,
-            containersSuccessful,
-            containersFailed,
-
-            testsFound,
-            testsSkipped,
-            testsAborted,
-            testsSuccessful,
-            testsFailed
-    ))
-
+    result.append("\n           - Summary -           \n")
+    result.appendReport(containersFound, "container", "found", false)
+    result.appendReport(containersSkipped, "container", "skipped", null)
+    result.appendReport(containersAborted, "container", "aborted", null)
+    result.appendReport(containersSuccessful, "container", "successful", false)
+    result.appendReport(containersFailed, "container", "failed", true)
+    result.appendReport(testsFound, "test", "found", false)
+    result.appendReport(testsSkipped, "test", "skipped", null)
+    result.appendReport(testsAborted, "test", "aborted", null)
+    result.appendReport(testsSuccessful, "test", "successful", false)
+    result.appendReport(testsFailed, "test", "failed", true)
     return result
+}
+
+/** Mimics default JUnit report sheet. */
+private fun StringBuilder.appendReport(amount:Int, noun:String, action:String, zeroIsGood:Boolean?) {
+    var reportWidth = 33
+    var initialLength = length
+
+    append('[')
+
+    initialLength -= length
+    if (amount != 0 && zeroIsGood != null) {
+        if (zeroIsGood) {
+            this.format(foreground = wemi.util.Color.Red)
+        } else {
+            this.format(foreground = wemi.util.Color.Green)
+        }
+    }
+    initialLength += length
+
+    appendPadded(amount, 7, ' ')
+
+    initialLength -= length
+    this.format()
+    initialLength += length
+
+    this.append(' ').append(noun)
+
+    if (amount != 1) {
+        append('s')
+    }
+    append(' ')
+        .append(action)
+
+    appendTimes(' ', initialLength + reportWidth - 1 - length)
+        .append(']').append('\n')
 }

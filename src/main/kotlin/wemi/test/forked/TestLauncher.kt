@@ -27,10 +27,7 @@ import org.junit.platform.launcher.TestIdentifier
 import org.junit.platform.launcher.TestPlan
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder
 import org.junit.platform.launcher.core.LauncherFactory
-import wemi.test.TestData
-import wemi.test.TestParameters
-import wemi.test.TestReport
-import wemi.test.TestStatus
+import wemi.test.*
 import wemi.util.appendWithStackTrace
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -106,11 +103,14 @@ fun main(args: Array<String>) {
         }
         val report = reportBuilder.testReport()
 
-        val jsonWriter = JsonWriter(OutputStreamWriter(out, Charsets.UTF_8))
-        jsonWriter.setOutputType(OutputType.json)
-        json.setWriter(jsonWriter)
-        report.write(json)
-        jsonWriter.flush()
+        OutputStreamWriter(out, Charsets.UTF_8).use { writer ->
+            writer.append(TEST_LAUNCHER_OUTPUT_PREFIX)
+            val jsonWriter = JsonWriter(writer)
+            jsonWriter.setOutputType(OutputType.json)
+            json.setWriter(jsonWriter)
+            report.write(json)
+            jsonWriter.flush()
+        }
 
         exitCode = 0
     } catch (e: Throwable) {
@@ -162,9 +162,13 @@ private class ReportBuildingListener(val filterStackTraces: Boolean) : TestExecu
             else -> return null
         }
         return { originalStackTrace ->
-            val filtered = originalStackTrace.dropLastWhile {
+            // Filters JUnit innards
+            var filtered = originalStackTrace.dropLastWhile {
                 it.className != className
             }
+            // Filter Assumptions extras (it throws from deep inside and it is not relevant)
+            filtered = filtered.dropWhile { it.className == "org.junit.jupiter.api.Assumptions" }
+
 
             if (filtered.isEmpty()) {
                 originalStackTrace.toList()
@@ -189,15 +193,17 @@ private class ReportBuildingListener(val filterStackTraces: Boolean) : TestExecu
                     createStackTraceMapper(testIdentifier.source.get())
                 else null
 
+                val stackTrace = StringBuilder()
                 if (filter == null) {
-                    val stackTrace = StringBuilder()
                     throwable.printStackTrace(StringBuilderWriter(stackTrace))
-                    this.stackTrace = stackTrace.toString()
                 } else {
-                    val stackTrace = StringBuilder()
                     stackTrace.appendWithStackTrace(throwable, filter)
-                    this.stackTrace = stackTrace.toString()
                 }
+                // Drop trailing newline/whitespace
+                while (stackTrace.isNotEmpty() && stackTrace.last().isWhitespace()) {
+                    stackTrace.setLength(stackTrace.length - 1)
+                }
+                this.stackTrace = stackTrace.toString()
             }
         }
     }
@@ -215,7 +221,7 @@ private class ReportBuildingListener(val filterStackTraces: Boolean) : TestExecu
     fun testReport(): TestReport {
         val result = TestReport()
         testReport.forEach { k, v ->
-            result.put(k.toWemi(), v)
+            result[k.toWemi()] = v
         }
         return result
     }
