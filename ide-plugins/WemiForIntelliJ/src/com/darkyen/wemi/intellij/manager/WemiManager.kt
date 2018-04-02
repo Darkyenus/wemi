@@ -5,6 +5,7 @@ import com.darkyen.wemi.intellij.WemiLauncherFileName
 import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.external.WemiProjectResolver
 import com.darkyen.wemi.intellij.external.WemiTaskManager
+import com.darkyen.wemi.intellij.file.isWemiScriptSource
 import com.darkyen.wemi.intellij.file.pathHasExtension
 import com.darkyen.wemi.intellij.findWemiLauncher
 import com.darkyen.wemi.intellij.settings.*
@@ -26,10 +27,12 @@ import com.intellij.openapi.util.Pair
 import com.intellij.openapi.vfs.CharsetToolkit
 import com.intellij.util.Function
 import com.intellij.util.PathUtil
+import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.containers.ContainerUtilRt
 import icons.WemiIcons
 import java.io.File
 import java.net.URL
+import java.nio.file.Paths
 
 /**
  * Core of the import boilerplate.
@@ -154,6 +157,8 @@ class WemiManager : ExternalSystemUiAware,
     //endregion
 
     //region ExternalSystemAutoImportAware
+    private val affectedExternalProjectCache = ContainerUtil.newConcurrentMap<String/* file path */, String/* root external project path */>()
+
     /**
      * Called when:
      * - File changes
@@ -161,15 +166,29 @@ class WemiManager : ExternalSystemUiAware,
      * @param changedFileOrDirPath path to the changed file, sometimes relative, sometimes absolute
      */
     override fun getAffectedExternalProjectPath(changedFileOrDirPath: String, project: Project): String? {
-        if (changedFileOrDirPath.pathHasExtension(WemiBuildFileExtensions)) {
-            val start = changedFileOrDirPath.lastIndexOf('/')
-            // Ignore hidden files
-            if (start != -1 && start + 1 != changedFileOrDirPath.length
-                    && changedFileOrDirPath[start+1] != '.') {
-                return project.basePath
+        // Gradle returns ExternalProjectSettings.getExternalProjectPath() if passed file is .gradle script
+        val stored = affectedExternalProjectCache[changedFileOrDirPath]
+        if (stored != null) {
+            if (stored.isEmpty()) {
+                return null
+            } else {
+                return stored
             }
         }
-        return null
+
+        val result = run {
+            if (!changedFileOrDirPath.pathHasExtension(WemiBuildFileExtensions)) {
+                return@run null
+            }
+            val file = Paths.get(changedFileOrDirPath)
+            if (file.isWemiScriptSource(true)) {
+                return@run file.parent.parent.toString()
+            } else {
+                return@run null
+            }
+        }
+        affectedExternalProjectCache[changedFileOrDirPath] = result ?: ""
+        return result
     }
     //endregion
 
