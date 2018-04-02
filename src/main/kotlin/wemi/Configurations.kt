@@ -165,6 +165,20 @@ object Configurations {
         }
     }
 
+    /**
+     * To be used when developing something and debugger needs to be attached to the forked process.
+     * Enables JWDP in server mode, suspended, on port 5005, by adding relevant flags to the [Keys.runOptions].
+     * Any JWDP related flags already present are removed.
+     */
+    val debug by configuration("Enables JVM debug on any forked process") {
+        Keys.runOptions modify { oldOptions ->
+            val options = oldOptions.toMutable()
+            options.removeIf {it.startsWith("-agentlib:jdwp=")}
+            options.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005")
+            options
+        }
+    }
+
     val wemiBuildScript by configuration("Setup with information about the build script " +
             "(but not actually used for building the build script)") {
         Keys.repositories set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositories }
