@@ -138,9 +138,9 @@ fun main(args: Array<String>) {
                     false, null) {
                 cleanBuild = true
             },
-            Option('l', "log", "set the log level to one of: trace, debug, info, warn, error",
-                    true, "LEVEL") {
-                when (it) {
+            Option('l', "log", "set the log level (single letter variants also allowed)",
+                    true, "{trace|debug|info|warn|error}") {
+                when (it?.toLowerCase()) {
                     "trace", "t" -> TPLogger.TRACE()
                     "debug", "d" -> TPLogger.DEBUG()
                     "info", "i" -> TPLogger.INFO()
@@ -522,17 +522,17 @@ private fun parseOptions(args:Array<String>, options:Array<Option>):List<String>
             val optName = if (equalsIndex >= 0) arg.substring(2, equalsIndex) else arg.substring(2)
             val option = options.find { option: Option ->  option.long == optName }
             if (option == null) {
-                System.err.println("Unknown option: --$optName")
+                System.err.println("wemi: unrecognized option '--$optName'")
                 printWemiHelp(options, EXIT_CODE_ARGUMENT_ERROR)
             }
 
             if (option.argument == false && equalsIndex >= 0) {
-                System.err.println("--$optName does not take arguments")
+                System.err.println("wemi: option '--$optName' doesn't allow an argument")
                 printWemiHelp(options, EXIT_CODE_ARGUMENT_ERROR)
             }
 
             if (option.argument == true && equalsIndex < 0) {
-                System.err.println("--$optName needs an argument")
+                System.err.println("wemi: option '--$optName' requires an argument")
                 printWemiHelp(options, EXIT_CODE_ARGUMENT_ERROR)
             }
 
@@ -546,7 +546,7 @@ private fun parseOptions(args:Array<String>, options:Array<Option>):List<String>
                 val optName = arg[shortOptIndex++]
                 val option = options.find { option:Option -> option.short == optName }
                 if (option == null) {
-                    System.err.println("Unknown option: -$optName")
+                    System.err.println("wemi: unrecognized option '-$optName'")
                     printWemiHelp(options, EXIT_CODE_ARGUMENT_ERROR)
                 }
 
@@ -561,7 +561,7 @@ private fun parseOptions(args:Array<String>, options:Array<Option>):List<String>
                         // Argument is in the next args
                         argument = args[argsIndex++]
                     } else {
-                        System.err.println("-$optName needs an argument")
+                        System.err.println("wemi: option '-$optName' requires an argument")
                         printWemiHelp(options, EXIT_CODE_ARGUMENT_ERROR)
                     }
                 } else {
