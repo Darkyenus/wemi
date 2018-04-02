@@ -1,7 +1,5 @@
 # Things to do next
 
-- Use long options
-
 - Truncate assumption stack traces
 
 - Explore forcing colors and unicode ON in the IDE plugin

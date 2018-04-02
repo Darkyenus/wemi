@@ -8,14 +8,14 @@ import com.intellij.openapi.externalSystem.settings.AbstractExternalSystemSettin
 import com.intellij.openapi.externalSystem.settings.ExternalSystemSettingsListener
 import com.intellij.openapi.project.Project
 import com.intellij.util.containers.ContainerUtilRt
-import com.intellij.util.xmlb.annotations.AbstractCollection
+import com.intellij.util.xmlb.annotations.XCollection
 
 /**
  * Wemi settings (mostly) boilerplate.
  *
  * Based on GradleSettings
  */
-@State(name = "WemiSettings", storages = arrayOf(Storage("wemi.xml")))
+@State(name = "WemiSettings", storages = [(Storage("wemi.xml"))])
 class WemiSystemSettings(project: Project) :
         AbstractExternalSystemSettings<WemiSystemSettings, WemiProjectSettings, WemiSettingsListener>
             (WemiSettingsListener.TOPIC, project),
@@ -65,7 +65,9 @@ class WemiSystemSettings(project: Project) :
         var wemiLauncherJre:String = ""
         private val projectSettings = ContainerUtilRt.newTreeSet<WemiProjectSettings>()
 
-        @AbstractCollection(surroundWithTag = false, elementTypes = arrayOf(WemiProjectSettings::class))
+        @Suppress("DEPRECATION") // @AbstractCollection is deprecated, but don't remove it for backwards compatibility
+        @com.intellij.util.xmlb.annotations.AbstractCollection(surroundWithTag = false, elementTypes = [(WemiProjectSettings::class)])
+        @XCollection(elementTypes = [(WemiProjectSettings::class)])
         override fun getLinkedExternalProjectsSettings(): Set<WemiProjectSettings> {
             return projectSettings
         }
