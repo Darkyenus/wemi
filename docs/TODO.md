@@ -1,7 +1,5 @@
 # Things to do next
 
-- **RELEASE**
-
 - Fix build/build.wemi TODOs
 
 - Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
