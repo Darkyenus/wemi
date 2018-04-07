@@ -53,8 +53,8 @@ class WemiRunConfiguration(project: Project,
          * In that case, IDE will launch Wemi with environment variable [WEMI_SUPPRESS_DEBUG_ENVIRONMENT_VARIABLE_NAME]
          * (= "WEMI_RUN_DEBUG_PORT") so that the project can be run with the debugger on the correct port.
          */
-        val WEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG = "wemi.defer-debug"
+        const val WEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG = "wemi.defer-debug"
 
-        val WEMI_SUPPRESS_DEBUG_ENVIRONMENT_VARIABLE_NAME = "WEMI_RUN_DEBUG_PORT"
+        const val WEMI_SUPPRESS_DEBUG_ENVIRONMENT_VARIABLE_NAME = "WEMI_RUN_DEBUG_PORT"
     }
 }

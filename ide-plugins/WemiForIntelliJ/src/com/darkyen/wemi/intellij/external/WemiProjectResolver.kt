@@ -4,6 +4,9 @@ import com.darkyen.wemi.intellij.WemiLauncherSession
 import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.importing.KotlinCompilerSettingsData
 import com.darkyen.wemi.intellij.importing.WEMI_KOTLIN_COMPILER_SETTINGS_KEY
+import com.darkyen.wemi.intellij.importing.WEMI_MODULE_DATA_KEY
+import com.darkyen.wemi.intellij.importing.WemiModuleComponentData
+import com.darkyen.wemi.intellij.module.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
 import com.darkyen.wemi.intellij.util.digestToHexString
 import com.darkyen.wemi.intellij.util.update
@@ -81,7 +84,9 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
             LOG.info("Wemi version is $wemiVersion")
 
-            return resolveProjectInfo(id, session, projectPath, settings, listener, wemiVersion)
+            @Suppress("UnnecessaryVariable") // Creates place for breakpoint
+            val resolvedProject = resolveProjectInfo(id, session, projectPath, settings, listener, wemiVersion)
+            return resolvedProject
         } catch (se:WemiSessionException) {
             LOG.warn("WemiSessionException encountered while resolving", se)
             throw ExternalSystemException(se.result.output).apply {
@@ -145,6 +150,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving project "+project.projectName))
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, project.moduleData(projectPath))
             moduleNode.createChild(ProjectKeys.CONTENT_ROOT, project.contentRoot())
+            moduleNode.createChild(WEMI_MODULE_DATA_KEY, WemiModuleComponentData(WemiModuleType.PROJECT))
             projectModules[project.projectName] = moduleNode
 
             // Collect dependencies
@@ -241,6 +247,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
             // Module Node
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, moduleData)
+            moduleNode.createChild(WEMI_MODULE_DATA_KEY, WemiModuleComponentData(WemiModuleType.BUILD_SCRIPT))
 
             val contentRoot = ContentRootData(WemiProjectSystemId, buildFolder)
             contentRoot.storePath(ExternalSystemSourceType.SOURCE, buildFolder)
@@ -251,7 +258,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
             // Dependencies
             val unresolved = classpath.any { !it.exists() }
-            val libraryData = LibraryData(WemiProjectSystemId, name+" Classpath", unresolved)
+            val libraryData = LibraryData(WemiProjectSystemId, "$name Classpath", unresolved)
             // Classpath
             for (artifact in classpath) {
                 libraryData.addPath(LibraryPathType.BINARY, artifact.path)
@@ -382,7 +389,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 add(file.absolutePath, WemiLibraryDependency(file.name, file))
             }
         } catch (e:WemiSessionException) {
-            LOG.warn("Failed to resolve dependencies for "+config.joinToString(""){it+":"}+projectName, e)
+            LOG.warn("Failed to resolve dependencies for "+config.joinToString(""){ "$it:" }+projectName, e)
         }
 
         return dependencies

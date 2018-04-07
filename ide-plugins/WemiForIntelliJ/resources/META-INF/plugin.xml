@@ -62,12 +62,19 @@
         </component>
     </application-components>
 
+    <module-components>
+        <component>
+            <implementation-class>com.darkyen.wemi.intellij.module.WemiModuleComponent</implementation-class>
+        </component>
+    </module-components>
+
     <extensions defaultExtensionNs="com.intellij">
         <!-- Import -->
         <postStartupActivity implementation="com.darkyen.wemi.intellij.importing.OfferImportStartupActivity"/>
         <projectImportProvider implementation="com.darkyen.wemi.intellij.importing.WemiProjectImportProvider"/>
         <projectImportBuilder implementation="com.darkyen.wemi.intellij.importing.ImportFromWemiControlBuilder"/>
         <externalProjectDataService implementation="com.darkyen.wemi.intellij.importing.KotlinCompilerSettingsDataService"/>
+        <externalProjectDataService implementation="com.darkyen.wemi.intellij.importing.WemiModuleComponentDataService"/>
 
         <!-- Settings -->
         <projectService serviceImplementation="com.darkyen.wemi.intellij.settings.WemiSystemSettings"/>
@@ -84,6 +91,8 @@
         <stepsBeforeRunProvider implementation="com.darkyen.wemi.intellij.execution.WemiBeforeRunTaskProvider"/>
         <runConfigurationProducer implementation="com.darkyen.wemi.intellij.execution.WemiRunConfigurationProducer"/>
 
+        <!-- Compiler Integration -->
+        <projectTaskRunner order="first" implementation="com.darkyen.wemi.intellij.compilerIntegration.WemiProjectTaskRunner"/>
 
         <!-- Manager -->
         <externalSystemManager implementation="com.darkyen.wemi.intellij.manager.WemiManager"/>

@@ -206,7 +206,7 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 
 	private enum DebugMode {
 		DEBUG_BUILD_SCRIPT("Debug build scripts", ""),
-		DEBUG_FORKED_PROGRAM("Debug forked process (e.g. by run task)", WemiRunConfiguration.Companion.getWEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG());
+		DEBUG_FORKED_PROGRAM("Debug forked process (e.g. by run task)", WemiRunConfiguration.WEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG);
 
 		private final String description, scriptParameters;
 
