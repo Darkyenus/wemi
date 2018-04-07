@@ -54,7 +54,7 @@ internal fun Path?.isWemiScriptSource(deepCheck:Boolean = false):Boolean {
 
     if (deepCheck) {
         val buildDirectory = this.parent ?: return false
-        if (!buildDirectory.fileName.toString().equals("build", ignoreCase = true)) {
+        if (buildDirectory.fileName?.toString()?.equals("build", ignoreCase = true) != true) {
             return false
         }
         val projectDirectory = buildDirectory.parent ?: return false

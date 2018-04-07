@@ -31,8 +31,6 @@ class WemiProjectTaskRunner : ProjectTaskRunner() {
         var errors = 0
         var warnings = 0
 
-        val taskIterator = tasks.iterator()
-
         fun handleNextTask(from:Iterator<ProjectTask>) {
             if (from.hasNext()) {
                 val task = from.next()

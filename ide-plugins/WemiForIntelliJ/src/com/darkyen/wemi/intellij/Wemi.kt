@@ -38,7 +38,8 @@ class WemiLauncher internal constructor(val file: String) {
         command.exePath = javaExecutable
         command.charset = Charsets.UTF_8
         command.environment.putAll(env)
-        command.environment["TPROLL_COLOR"] = "false"
+        command.environment["WEMI_COLOR"] = "false"
+        command.environment["WEMI_UNICODE"] = "true"
         command.workDirectory = File(file).parentFile
         command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
         jvmOptions.forEach {
@@ -59,6 +60,8 @@ class WemiLauncher internal constructor(val file: String) {
         command.exePath = javaExecutable
         command.charset = Charsets.UTF_8
         command.environment.putAll(env)
+        command.environment["WEMI_COLOR"] = "true"
+        command.environment["WEMI_UNICODE"] = "true"
         command.workDirectory = File(file).parentFile
         command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
         jvmOptions.forEach {

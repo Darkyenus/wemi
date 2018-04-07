@@ -1,7 +1,5 @@
 # Things to do next
 
-- Explore forcing colors and unicode ON in the IDE plugin
-
 - **RELEASE**
 
 - Fix build/build.wemi TODOs
