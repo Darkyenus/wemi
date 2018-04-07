@@ -23,7 +23,7 @@ val CompilerProjects = listOf(
 val core by project(path(".")) {
     projectName set { "wemi" }
     projectGroup set { "com.darkyen" }
-    projectVersion set { "0.3" }
+    projectVersion set { "0.4-SNAPSHOT" }
 
     kotlinVersion set { KotlinCompilerVersion.Version1_2_21 }
 
