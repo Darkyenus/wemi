@@ -32,7 +32,7 @@ val core by project(path(".")) {
     repositories add { repository("jitpack", "https://jitpack.io") }
 
     libraryDependencies set { wSetOf(
-            //kotlinDependency("stdlib"), TODO Remove, but buggy currently
+            kotlinDependency("stdlib"),
             kotlinDependency("reflect"),
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
             dependency("com.github.Darkyenus", "tproll", "v1.2.6"),
@@ -151,7 +151,7 @@ fun createKotlinCompilerProject(version:String):Project {
         }
 
         projectDependencies set {
-            wSetOf(core.dependency())
+            wSetOf(dependency(core, false))
         }
 
         libraryDependencies set { wSetOf(

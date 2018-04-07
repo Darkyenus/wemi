@@ -22,7 +22,7 @@ val lwjgl3 by project(path("lwjgl3")) {
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-backend-lwjgl3", gdxVersion) }
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-platform", gdxVersion, Repository.M2.Classifier to "natives-desktop") }
 
-    projectDependencies add { dependency(core) }
+    projectDependencies add { dependency(core, true) }
 
     runOptions add {"-XstartOnFirstThread"}
     mainClass set {"game.Main"}
@@ -54,7 +54,7 @@ val lwjgl2 by project(path("./lwjgl2/")) {
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-backend-lwjgl", gdxVersion) }
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-platform", gdxVersion, Repository.M2.Classifier to "natives-desktop") }
 
-    projectDependencies add { dependency(core) }
+    projectDependencies add { dependency(core, true) }
 
     mainClass set {"game.Main"}
 }
