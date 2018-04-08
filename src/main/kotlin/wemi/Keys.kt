@@ -1,5 +1,7 @@
 package wemi
 
+import wemi.assembly.AssemblyMapFilter
+import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.MergeStrategyChooser
 import wemi.assembly.RenameFunction
 import wemi.boot.BuildScript
@@ -18,7 +20,8 @@ import wemi.publish.InfoNode
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.prettyPrint
-import wemi.util.*
+import wemi.util.LocatedFile
+import wemi.util.Partial
 import java.net.URI
 import java.nio.file.Path
 import javax.tools.JavaCompiler
@@ -109,6 +112,7 @@ object Keys {
 
     val assemblyMergeStrategy by key<MergeStrategyChooser>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
     val assemblyRenameFunction by key<RenameFunction>("Function for renaming assembled duplicate files for which merge strategy is Rename. Paths after rename must not conflict, rules are not recursive.")
+    val assemblyMapFilter by key<AssemblyMapFilter>("Function that allows to control what gets into the resulting archive on a fine grained level.", defaultValue = DefaultAssemblyMapFilter)
     val assemblyPrependData by key<ByteArray>("Data to prepend to the jar created by assembly task", defaultValue = ByteArray(0))
     val assemblyOutputFile by key<Path>("File to which assembled jar should be saved")
     val assembly by key<Path>("Assembly the project and its dependencies into a fat jar")

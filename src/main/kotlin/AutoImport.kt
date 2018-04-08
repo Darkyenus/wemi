@@ -224,6 +224,8 @@ val assemblyMergeStrategy
     inline get() = wemi.Keys.assemblyMergeStrategy
 val assemblyRenameFunction
     inline get() = wemi.Keys.assemblyRenameFunction
+val assemblyMapFilter
+    inline get() = wemi.Keys.assemblyMapFilter
 val assemblyPrependData
     inline get() = wemi.Keys.assemblyPrependData
 val assemblyOutputFile

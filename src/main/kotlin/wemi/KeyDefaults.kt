@@ -9,10 +9,7 @@ import wemi.Configurations.assembling
 import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.Configurations.publishing
-import wemi.assembly.AssemblyOperation
-import wemi.assembly.DefaultRenameFunction
-import wemi.assembly.NoConflictStrategyChooser
-import wemi.assembly.NoPrependData
+import wemi.assembly.*
 import wemi.boot.WemiBuildScript
 import wemi.boot.WemiBundledLibrariesExclude
 import wemi.collections.WList
@@ -372,7 +369,7 @@ object KeyDefaults {
 
                 val compileResult = compiler.compileJVM(javaSources + kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, CompileLOG, null)
                 if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
-                    throw WemiException("Kotlin compilation failed: " + compileResult, showStacktrace = false)
+                    throw WemiException("Kotlin compilation failed: $compileResult", showStacktrace = false)
                 }
 
                 compilerFlags.warnAboutUnusedFlags("Kotlin compiler")
@@ -547,6 +544,7 @@ object KeyDefaults {
                 assemblyOperation.assembly(
                         NoConflictStrategyChooser,
                         DefaultRenameFunction,
+                        Keys.assemblyMapFilter.get(),
                         outputFile,
                         NoPrependData,
                         compress = true)
@@ -575,6 +573,7 @@ object KeyDefaults {
                 assemblyOperation.assembly(
                         NoConflictStrategyChooser,
                         DefaultRenameFunction,
+                        DefaultAssemblyMapFilter,
                         outputFile,
                         NoPrependData,
                         compress = true)
@@ -596,6 +595,7 @@ object KeyDefaults {
                 assemblyOperation.assembly(
                         NoConflictStrategyChooser,
                         DefaultRenameFunction,
+                        DefaultAssemblyMapFilter,
                         outputFile,
                         NoPrependData,
                         compress = true)
@@ -661,6 +661,7 @@ object KeyDefaults {
                 assemblyOperation.assembly(
                         NoConflictStrategyChooser,
                         DefaultRenameFunction,
+                        DefaultAssemblyMapFilter,
                         outputFile,
                         NoPrependData,
                         compress = true)
@@ -781,6 +782,7 @@ object KeyDefaults {
                 assemblyOperation.assembly(
                         NoConflictStrategyChooser,
                         DefaultRenameFunction,
+                        DefaultAssemblyMapFilter,
                         outputFile,
                         NoPrependData,
                         compress = true)
@@ -875,6 +877,7 @@ object KeyDefaults {
                 assemblyOperation.assembly(
                         NoConflictStrategyChooser,
                         DefaultRenameFunction,
+                        DefaultAssemblyMapFilter,
                         outputFile,
                         NoPrependData,
                         compress = true)
@@ -1080,6 +1083,7 @@ object KeyDefaults {
                 val outputFile = Keys.assemblyOutputFile.get()
                 assemblyOperation.assembly(Keys.assemblyMergeStrategy.get(),
                         Keys.assemblyRenameFunction.get(),
+                        Keys.assemblyMapFilter.get(),
                         outputFile,
                         Keys.assemblyPrependData.get(),
                         compress = true)
