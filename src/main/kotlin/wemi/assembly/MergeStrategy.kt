@@ -14,6 +14,11 @@ enum class MergeStrategy {
     SingleOrError,
     /** Concatenate all copies byte by byte */
     Concatenate,
+    /** Line-aware [Concatenate]. Adds trailing newline, attempts to use present line endings, reverts to \n if ambiguous.
+     * Data is assumed to be in UTF-8. */
+    Lines,
+    /** Like [Lines], but duplicate lines are dropped */
+    UniqueLines,
     /** If more than one copy, discard all of them */
     Discard,
     /** Only one value is expected, take the copy only if all other copies hold equal data */

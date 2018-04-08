@@ -1,4 +1,5 @@
 # 0.4
+- Add `Lines` and `UniqueLines` MergeStrategy
 
 # 0.3 2018-04-08
 - **Change CLI options to follow GNU standard, including long/short options and `--help`/`--version` convention.**

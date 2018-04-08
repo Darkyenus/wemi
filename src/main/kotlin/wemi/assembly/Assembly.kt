@@ -40,7 +40,7 @@ val JarMergeStrategyChooser:MergeStrategyChooser = { name ->
     } else if (name.equals("META-INF/MANIFEST.MF", ignoreCase = true)) {
         MergeStrategy.Rename
     } else if (name.startsWith("META-INF/services/", ignoreCase = true)) {
-        MergeStrategy.Concatenate
+        MergeStrategy.UniqueLines
     } else if (name.startsWith("META-INF/", ignoreCase = true)) {
         MergeStrategy.SingleOwn
     } else {
@@ -135,15 +135,10 @@ class AssemblyOperation : Closeable {
     }
 
     /**
-     * Assembly added sources and produce jar with [outputFile] path.
-     * [prependData] will be prepended to the jar, but not in accordance with zip file format. `java` can still
-     * read those files, but other tools do not.
-     * [mergeStrategy] and [renameFunction] are used iff [addSource] has added duplicate entries,
-     * to resolve how they should be handled.
-     *
-     * @throws WemiException on failure
+     * Resolve duplicates and return sources that should be assembled into the resulting archive.
+     * Used by [assembly].
      */
-    fun assembly(mergeStrategy: MergeStrategyChooser, renameFunction: RenameFunction, outputFile: Path, prependData:ByteArray, compress:Boolean) {
+    fun resolve(mergeStrategy: MergeStrategyChooser, renameFunction: RenameFunction): MutableMap<String, Pair<AssemblySource?, ByteArray>>? {
         // Trim duplicates
         val assemblySources = LinkedHashMap<String, Pair<AssemblySource?, ByteArray>>()
 
@@ -243,6 +238,46 @@ class AssemblyOperation : Closeable {
 
                     assemblySources[path] = Pair(null, concatenated)
                 }
+                MergeStrategy.Lines, MergeStrategy.UniqueLines -> {
+                    val lineEndings = arrayOf("\r\n", "\n", "\r")
+                    val lines:MutableCollection<String> = if (strategy != MergeStrategy.UniqueLines) ArrayList() else LinkedHashSet()
+                    var lineEnding:String? = null
+                    var totalLength = 0
+                    var lineEndingsInconsistent = false
+
+                    for (assemblySource in dataList) {
+                        val sourceString = String(assemblySource.data, Charsets.UTF_8)
+                        val sourceLines = sourceString.split(*lineEndings)
+                        if (!lineEndingsInconsistent && sourceLines.size > 1) {
+                            // If line endings are inconsistent, or there are none, don't bother searching
+                            for (le in lineEndings) {
+                                if (sourceString.contains(le)) {
+                                    if (lineEnding == null) {
+                                        lineEnding = le
+                                    } else if (lineEnding != le) {
+                                        lineEndingsInconsistent = true
+                                    }
+                                    break
+                                }
+                            }
+                        }
+                        // Add all lines (except empty trailing newline)
+                        for (i in 0 until sourceLines.size - if (sourceLines.last().isEmpty()) 1 else 0) {
+                            lines.add(sourceLines[i].apply { totalLength += length })
+                        }
+                    }
+
+                    if (lineEnding == null) {
+                        lineEnding = "\n"
+                    }
+
+                    val result = StringBuilder(totalLength + lines.size * lineEnding.length)
+                    for (line in lines) {
+                        result.append(line).append(lineEnding)
+                    }
+
+                    assemblySources[path] = Pair(null, result.toString().toByteArray(Charsets.UTF_8))
+                }
                 MergeStrategy.Discard -> {
                     if (LOG.isDebugEnabled) {
                         LOG.debug("Discarding {} items", dataList.size)
@@ -305,8 +340,23 @@ class AssemblyOperation : Closeable {
         }
 
         if (hasError) {
-            throw WemiException("assembly task failed", showStacktrace = false)
+            return null
+        } else {
+            return assemblySources
         }
+    }
+
+    /**
+     * Assembly added sources and produce jar with [outputFile] path.
+     * [prependData] will be prepended to the jar, but not in accordance with zip file format. `java` can still
+     * read those files, but other tools do not.
+     * [mergeStrategy] and [renameFunction] are used iff [addSource] has added duplicate entries,
+     * to resolve how they should be handled.
+     *
+     * @throws WemiException on failure
+     */
+    fun assembly(mergeStrategy: MergeStrategyChooser, renameFunction: RenameFunction, outputFile: Path, prependData:ByteArray, compress:Boolean) {
+        val assemblySources = resolve(mergeStrategy, renameFunction) ?: throw WemiException("assembly task failed", showStacktrace = false)
 
         BufferedOutputStream(Files.newOutputStream(outputFile)).use { out ->
             if (prependData.isNotEmpty()) {
