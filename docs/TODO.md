@@ -1,7 +1,5 @@
 # Things to do next
 
-- Fix build/build.wemi TODOs
-
 - Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
 
 - New project wizard (IDE)

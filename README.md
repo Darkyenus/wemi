@@ -1,16 +1,53 @@
 ![WEMI Build System](docs/logo_doc.svg)  
 *Wonders Expeditiously, Mundane Instantly*
 
-## Why‽
-All major Java/Kotlin-building build systems feel clunky and slow.
-I don't want to, wait 8 seconds just to load the build script,
-I don't want to download hundreds of JARs whenever I want to run on
-a different machine, I don't want to read and write baroque XML,
-I don't want everything to be a magical macro just because it solves problems that I don't have,
-I want to do whatever I want and I don't want to wait for it.
+Build system aimed at those, who don't want to be limited nor slowed down by their tools.
+Key features:
+- Simple and expressive
+	- Build scripts in Kotlin allow to easily create any functionality with Wemi's DSL, usually in just a few lines of code
+	- Transparent internal structure without magic is easy to debug and understand
+- No installation, simple upgrades
+	- Whole build system is in single executable (~5MB) that goes directly into the project's directory
+- Fast
+	- Written with performance and user's time in ind
+	- Minimal use of libraries means that the code does exactly what it should be doing and nothing more
+- Works
+- Out of the box supports:
+	- Java and Kotlin compiling
+	- Javadoc, Dokka
+	- JUnit 5
+	- Artifact assembling (including fat-jars) and publishing
 
+## Overview
+This is how a simple build script might look like:
+```kotlin
+val iceCreamFactory by project {
+    projectGroup set { "com.example.ice.cream" }
+    projectName set { "ice-cream-factory" }
+    projectVersion set { "1.0" }
 
-This is my attempt at fixing all that. Even the command name is quick to write!
+    libraryDependencies add { dependency("com.example", "ice-provider", "2.1.1") }
+    libraryDependencies add { dependency("com.example", "flavor-provider", "2.0.0") }
+    
+    extend(testing) {
+        libraryDependencies add { JUnitAPI }
+        libraryDependencies add { JUnitEngine }
+        libraryDependencies add { dependency("com.example", "flavor-tester", "2.0.0") }
+    }
+
+    mainClass set { "com.example.ice.cream.Main" }
+}
+```
+Whole configuration is stored in key-value pairs, including tasks - there is no distinction between keys that store 
+simple static settings and those that store computations. So, for example `libraryDependencies` key binds collection
+of Maven library coordinates, and `compile` key binds a code that collects settings from other keys, like library jars
+and source files, and invokes the compiler. These dependencies are easily seen with `trace` command.
+
+Key-value entries are not stored globally, but in scopes. Scope is composed of a project and one or more configurations.
+For example, in the example above, `JUnitAPI` dependency is added to the `iceCreamFactory/testing` scope, which,
+as name suggests, is used when executing unit tests.
+
+Keys have sensible defaults bound to them in the relevant scopes. You can also easily declare your own keys and configurations.
 
 ## Getting started
 While the project is still work in progress and far from being production ready,
@@ -18,9 +55,9 @@ you are welcome to try it out! However remember that everything is subject to ch
 so don't get too attached to any of the features or bugs.
 
 1. Start by downloading `wemi` launcher (= the whole build system) and IntelliJ plugin from the releases.
-If you don't use IntelliJ, don't worry, Wemi is designed to be used standalone.
-2. Then put downloaded `wemi` file directly into the root of your project (yes, see below if that seems weird).
-3. Create a build script, in `<your-project-root>/build/build.wemi`, with following lines:
+If you don't use IntelliJ, don't worry, Wemi is designed to be used standalone anyway.
+2. Then put downloaded `wemi` file directly into the root of your project (see below if that seems weird).
+3. Create a build script, in `<your-project-root>/build/build.kt`, with following lines:
 ```kotlin
 // myProject here can be whatever you want, it is the name by which Wemi will refer to your project
 val myProject by project {
@@ -31,30 +68,30 @@ val myProject by project {
     projectVersion set { "1.0" }
 
 	// This is how Maven-like dependencies are added
-    //libraryDependencies add { dependency("com.esotericsoftware:kryo:4.0.1") }
+    libraryDependencies add { dependency("com.esotericsoftware:kryo:4.0.1") }
 
 	// Main class, if you have any
     mainClass set { "com.example.MyMain" }
 }
 ```
-All `.wemi` files are like Kotlin `.kt` files, just different extension.
 Things like `projectGroup` or `mainClass` above, are keys. Setting any of them is optional, most of them have
 sensible default values. There is more to them, check the [design documentation](docs/DESIGN.md).
 4. Now you have a build script that can compile and run Java and Kotlin projects. Add your sources to 
 `<your-project-root>/src/main/java` and/or `<your-project-root>/src/main/kotlin`.
 Dependency on Kotlin's standard library is added by default (if you do not want that, add line 
 `libraryDependencies set { emptyList() }`, or change the project's archetype to `wemi.Archetypes.JavaProject`
-if you don't want Kotlin at all) .
-5. Run it! Open your shell with `bash` support (sorry, `cmd.exe` won't do) and in your project's root directory, type `./wemi run`.
+if you don't want Kotlin at all).
+5. Run it! Open your shell with `bash`/`sh` support (sorry, `cmd.exe` won't do) and in your project's root directory, type `./wemi run`.
 This will compile the sources, with specified libraries on classpath, and run the specified main class. 
 
 Running `./wemi` by itself will start an interactive session for your tasks. This is actually preferred,
 at least when developing, because the compile times are often much shorter.
+Type `help` to see what you can do and feel free to experiment.
 
-And that is it. If you are interested, look at the examples in [test repositories](test%20repositories) and
+Also check out examples in [test repositories](test%20repositories) and
 the [design document](docs/DESIGN.md) with detailed documentation of Wemi's inner workings.
 
 ## Contributing & License
 The code is not yet under any license, but you can still read it.
-Likewise, contributions are not accepted by default - yet, but if you want to
+Likewise, contributions are not accepted yet, but if you want to
 join the effort or send feedback, send me a mail!
