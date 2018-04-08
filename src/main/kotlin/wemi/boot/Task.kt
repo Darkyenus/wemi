@@ -49,6 +49,24 @@ class Task(
                 && configurations.isEmpty()
 
     /**
+     * Returns first [input] that has given [name] or is free if [orFree].
+     */
+    fun firstInput(name:String, orFree:Boolean):String? {
+        return input.find { (it.first == null && orFree) || it.first == name }?.second
+    }
+
+    /**
+     * Returns all [input]s that have given [name] or are free
+     */
+    fun inputs(name:String):List<String> {
+        return input.mapNotNull { (n, i) ->
+            if (n == null || n == name) {
+                i
+            } else null
+        }
+    }
+
+    /**
      * Evaluate this task.
      *
      * May throw an exception, but not [WemiException], those are indicated by [TaskEvaluationStatus.Exception].

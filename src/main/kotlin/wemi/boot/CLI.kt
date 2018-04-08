@@ -336,7 +336,7 @@ object CLI {
             }
         }
         put("project") { task ->
-            val projectName = task.input.find { it.first == null || it.first == "project" }?.second
+            val projectName = task.firstInput("project", true)
             if (projectName == null) {
                 printWarning("project <project> - switch default project")
             } else {
@@ -350,45 +350,57 @@ object CLI {
             null
         }
 
-        fun printLabeled(label: String, items: Map<String, WithDescriptiveString>) {
-            println(formatLabel("${items.size} $label${if (items.isEmpty()) "" else "s"}:"))
-            for (value in items.values) {
+        fun printLabeled(label: String, items: Map<String, WithDescriptiveString>, task:Task) {
+            val filter = task.firstInput("filter", true)
+            val found:Collection<WithDescriptiveString>
+            if (filter == null) {
+                found = items.values
+            } else {
+                found = items.entries.mapNotNull {(k, v) ->
+                    if (k.contains(filter, ignoreCase = true)) {
+                        v
+                    } else null
+                }
+            }
+
+            println(formatLabel("${found.size} $label${if (found.isEmpty()) "" else "s"}:"))
+            for (value in found) {
                 print("   ")
                 println(value.toDescriptiveAnsiString())
             }
         }
         put("projects") {
-            printLabeled("project", AllProjects)
+            printLabeled("project", AllProjects, it)
             null
         }
         put("configurations") {
-            printLabeled("configuration", AllConfigurations)
+            printLabeled("configuration", AllConfigurations, it)
             null
         }
         put("keys") {
-            printLabeled("key", AllKeys)
+            printLabeled("key", AllKeys, it)
             null
         }
 
         put("trace") { task ->
             var result:TaskEvaluationResult? = null
 
-            val tasks = task.input.filter { it.first == null || it.first == "task" }
+            val tasks = task.inputs("task")
             if (tasks.isEmpty()) {
                 printWarning("trace <task> - trace task invocation")
             } else {
                 val sb = StringBuilder()
 
-                val printValues = BooleanValidator(task.input.find { it.first == "values" }?.second ?: "").use({it}, {true})
+                val printValues = BooleanValidator(task.firstInput("values", false) ?: "").use({it}, {true})
                 val treePrintingListener = TreeBuildingKeyEvaluationListener(printValues)
 
-                for ((_, taskText) in tasks) {
+                for (taskText in tasks) {
                     useKeyEvaluationListener(treePrintingListener) {
                         result = evaluateLine(taskText)
                     }
                     treePrintingListener.appendResultTo(sb)
 
-                    println("🐾 ${format("Trace", format = Format.Bold)}")
+                    println("${if(WemiUnicodeOutputSupported) "🐾" else "#"} ${format("Trace", format = Format.Bold)}")
                     if (sb.isEmpty()) {
                         println(format("\t(no keys evaluated)", foreground = Color.White))
                     } else {
@@ -404,7 +416,7 @@ object CLI {
         }
 
         put("log") { task ->
-            val level = task.input.find { it.first == null || it.first == "level" }?.second
+            val level = task.firstInput("level", true)
             if (level == null) {
                 printWarning("log <level> - change log level")
             } else {
