@@ -1,7 +1,6 @@
 package com.darkyen.wemi.intellij.module
 
 import com.intellij.openapi.components.PersistentStateComponent
-import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleComponent
 import com.intellij.util.xmlb.XmlSerializerUtil
 
@@ -9,7 +8,7 @@ import com.intellij.util.xmlb.XmlSerializerUtil
  * Modules with this component belong to Wemi.
  */
 @com.intellij.openapi.components.State(name = "wemi.WemiModuleComponent", reloadable = true, defaultStateAsResource = false)
-class WemiModuleComponent(val module: Module) : ModuleComponent, PersistentStateComponent<WemiModuleComponent> {
+class WemiModuleComponent : ModuleComponent, PersistentStateComponent<WemiModuleComponent> {
 
     /**
      * Type of Wemi module this represents. Null if this module is not a wemi module.

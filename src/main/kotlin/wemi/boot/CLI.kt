@@ -382,6 +382,11 @@ object CLI {
             null
         }
 
+        put("info") { task ->
+
+
+        }
+
         put("trace") { task ->
             var result:TaskEvaluationResult? = null
 
@@ -438,7 +443,7 @@ object CLI {
         put("help") {
             println(formatLabel("Wemi $WemiVersion (Kotlin $WemiKotlinVersion)"))
             print(formatLabel("Commands: "))
-            println("exit, project <project>, projects, configurations, keys, trace <task>, log <level>, help")
+            println("exit, project <project>, projects [filter], configurations [filter], keys [filter], trace <task>, log <level>, help")
             print(formatLabel("Keys: "))
             println("Configurations and projects hold values/behavior of keys. That can be mundane data like version of\n" +
                     "the project in 'projectVersion' key or complex operation, like compiling and running in 'run' key.\n" +
