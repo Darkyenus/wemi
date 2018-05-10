@@ -263,8 +263,8 @@ object KeyDefaults {
 
             val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
             val javaSourceRoots = mutableSetOf<Path>()
-            for ((file, _, root) in javaSources) {
-                javaSourceRoots.add((root ?: file).toAbsolutePath())
+            for ((_, _, root) in javaSources) {
+                javaSourceRoots.add(root.toAbsolutePath())
             }
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
@@ -345,8 +345,8 @@ object KeyDefaults {
 
             val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
             val javaSourceRoots = mutableSetOf<Path>()
-            for ((file, _, root) in javaSources) {
-                javaSourceRoots.add((root ?: file).toAbsolutePath())
+            for ((_, _, root) in javaSources) {
+                javaSourceRoots.add(root.toAbsolutePath())
             }
             val kotlinSources = using(compilingKotlin) { Keys.sourceFiles.get() }
 
@@ -831,7 +831,7 @@ object KeyDefaults {
 
         val implementationClassName = "wemi.documentation.impl.DokkaInterfaceImpl"
         /** Loads artifacts normally. */
-        val dependencyClassLoader = URLClassLoader(artifacts.map { it.toUri().toURL() }.toTypedArray(), WemiDefaultClassLoader)
+        val dependencyClassLoader = URLClassLoader(artifacts.map { it.toUri().toURL() }.toTypedArray(), Magic.WemiDefaultClassLoader)
         /** Makes sure that the implementation class is loaded in a class loader that has artifacts available. */
         val forceClassLoader = EnclaveClassLoader(emptyArray(), dependencyClassLoader,
                 implementationClassName, // Own entry point

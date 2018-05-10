@@ -10,6 +10,7 @@ import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinCompilerVersion
 import wemi.createProject
 import wemi.dependency.JCenter
+import wemi.publish.InfoNode
 import wemi.util.*
 import java.nio.file.Files
 
@@ -20,10 +21,16 @@ val CompilerProjects = listOf(
         createKotlinCompilerProject("1.2.21")
 )
 
-val core by project(path(".")) {
+private const val WemiGroup = "com.darkyen.wemi"
+private const val WemiVersion = "0.4-SNAPSHOT"
+
+/**
+ * Wemi Build System core. Builds
+ */
+val core:Project by project(path(".")) {
     projectName set { "wemi" }
-    projectGroup set { "com.darkyen" }
-    projectVersion set { "0.4-SNAPSHOT" }
+    projectGroup set { WemiGroup }
+    projectVersion set { WemiVersion }
 
     kotlinVersion set { KotlinCompilerVersion.Version1_2_21 }
 
@@ -108,24 +115,33 @@ val core by project(path(".")) {
     }
 
     publishMetadata modify { metadata ->
-        metadata.apply {
-            child("name", "Wemi Build system")
-            child("description", "Wonders Expeditiously, Mundane Instantly - Simple yet powerful build system, batteries included and replaceable")
-            child("url", "https://github.com/Darkyenus/WEMI")
+        setupSharedPublishMetadata(
+                metadata,
+                "Wemi",
+                "Wonders Expeditiously, Mundane Instantly - Simple yet powerful build system - core jar",
+                "2017"
+                )
+    }
+}
 
-            child("inceptionYear", "2017")
+fun setupSharedPublishMetadata(metadata:InfoNode, name:String, description:String, inceptionYear:String): InfoNode {
+    return metadata.apply {
+        child("name", name)
+        child("description", description)
+        child("url", "https://github.com/Darkyenus/WEMI")
 
-            child("scm") {
-                newChild("connection", "scm:git:https://github.com/Darkyenus/WEMI")
-                newChild("developerConnection", "scm:git:https://github.com/Darkyenus/WEMI")
-                newChild("tag", "HEAD")
-                newChild("url", "https://github.com/Darkyenus/WEMI")
-            }
+        child("inceptionYear", inceptionYear)
 
-            child("issueManagement") {
-                child("system", "GitHub Issues")
-                child("url", "https://github.com/Darkyenus/WEMI/issues")
-            }
+        child("scm") {
+            newChild("connection", "scm:git:https://github.com/Darkyenus/WEMI")
+            newChild("developerConnection", "scm:git:https://github.com/Darkyenus/WEMI")
+            newChild("tag", "HEAD")
+            newChild("url", "https://github.com/Darkyenus/WEMI")
+        }
+
+        child("issueManagement") {
+            child("system", "GitHub Issues")
+            child("url", "https://github.com/Darkyenus/WEMI/issues")
         }
     }
 }
@@ -159,6 +175,33 @@ fun createKotlinCompilerProject(version:String):Project {
                 dependency("org.slf4j", "slf4j-api", "1.7.25")
         ) }
 
+    }
+}
+
+/**
+ * Plugin for hotswapping JVM code at runtime.
+ */
+val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
+    projectName set { "wemi-plugin-jvm-hotswap" }
+    projectGroup set { WemiGroup }
+    projectVersion set { WemiVersion }
+
+    extend(compiling) {
+        projectDependencies add { dependency(core, false) }
+    }
+
+    extend(testing) {
+        libraryDependencies add { JUnitAPI }
+        libraryDependencies add { JUnitEngine }
+    }
+
+    publishMetadata modify { metadata ->
+        setupSharedPublishMetadata(
+                metadata,
+                "Wemi Plugin: JVM Hotswap",
+                "Adds JVM code hotswap integration for Wemi Build System",
+                "2018"
+        )
     }
 }
 

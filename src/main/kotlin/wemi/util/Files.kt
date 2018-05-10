@@ -88,6 +88,9 @@ fun URL.toPath(): Path? {
  * (this is preferred to chaining [div] calls). Do not use '\' backslash. */
 inline operator fun Path.div(path: CharSequence): Path = this.resolve(path.toString())
 
+/** @see [Files.isRegularFile] */
+inline fun Path.isRegularFile(): Boolean = Files.isRegularFile(this)
+
 /** @see [Files.isDirectory] */
 inline fun Path.isDirectory(): Boolean = Files.isDirectory(this)
 

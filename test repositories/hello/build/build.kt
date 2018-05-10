@@ -1,12 +1,12 @@
+@file:BuildDependencyRepository("jitpack", "https://jitpack.io")
+@file:BuildDependency("com.github.esotericsoftware:jsonbeans:0.9")
 
 import wemi.Configurations.compilingKotlin
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.documentation.DokkaOptions.SourceLinkMapItem
-
-///repository jitpack at https://jitpack.io
-///dependency com.github.esotericsoftware:jsonbeans:0.9
+import com.esotericsoftware.jsonbeans.JsonValue
 
 val foxColor by key<String>("Color of an animal")
 
@@ -84,6 +84,13 @@ val hello by project {
         }
     }
 
+    // Test of build-script dependencies
+    if (JsonValue(true).toString() != "true") {
+        // Does not happen.
+        println("Json doesn't work!")
+    }
+
+    // Fox example
     foxColor set { "Red" }
 }
 

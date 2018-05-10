@@ -383,8 +383,54 @@ object CLI {
         }
 
         put("info") { task ->
+            for ((type, name) in task.input) {
+                if (type == "project" || (type == null && name.endsWith("/"))) {
+                    val projectName = name.removeSuffix("/")
+                    val project = AllProjects.findCaseInsensitive(projectName)
+                    if (project == null) {
+                        println(format("No project named '$projectName' found", Color.White))
+                        continue
+                    }
 
+                    print(formatLabel("Project: "))
+                    println(formatValue(project.name))
+                    print(formatLabel("At: "))
+                    println(formatValue(project.projectRoot?.toString() ?: "<no root>"))
+                } else if (type == "configuration" || (type == null && name.endsWith(":"))) {
+                    val configurationName = name.removeSuffix(":")
+                    val configuration = AllConfigurations.findCaseInsensitive(configurationName)
+                    if (configuration == null) {
+                        println(format("No configuration named '$configurationName' found", Color.White))
+                        continue
+                    }
 
+                    print(formatLabel("Configuration: "))
+                    println(formatValue(configuration.name))
+                    println(format(configuration.description, Color.Black))
+                } else if (type == "key" || (type == null && name.isNotEmpty() && name.last().isJavaIdentifierPart())) {
+                    val key = AllKeys.findCaseInsensitive(name)
+                    if (key == null) {
+                        println(format("No key named '$name' found", Color.White))
+                        continue
+                    }
+
+                    print(formatLabel("Key: "))
+                    println(formatValue(key.name))
+                    println(format(key.description, Color.Black))
+                    print(formatLabel("Default value: "))
+                    println(formatValue(if (key.hasDefaultValue) { key.defaultValue.toString() } else "<none>"))
+                    print(formatLabel("Cache mode: "))
+                    println(formatValue(key.cacheMode.toString()))
+                    if (key.inputKeys.isNotEmpty()) {
+                        println(formatLabel("Input keys:"))
+                        for ((inputKey, description) in key.inputKeys) {
+                            println(""+format(inputKey, format = Format.Bold)+": "+formatValue(description))
+                        }
+                    }
+                }
+            }
+
+            null
         }
 
         put("trace") { task ->

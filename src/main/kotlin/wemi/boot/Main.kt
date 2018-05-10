@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.dependency.DefaultExclusions
 import wemi.dependency.DependencyExclusion
+import wemi.plugin.PluginEnvironment
 import wemi.util.*
 import java.io.*
 import java.net.URL
@@ -20,6 +21,7 @@ import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
+import java.util.*
 import kotlin.system.exitProcess
 
 private val LOG = LoggerFactory.getLogger("Main")
@@ -121,7 +123,9 @@ internal val MainThread = Thread.currentThread()
  */
 internal val WemiBundledLibrariesExclude = DefaultExclusions + listOf(
         DependencyExclusion("org.jetbrains.kotlin", "kotlin-stdlib", "*"),
-        DependencyExclusion("org.jetbrains.kotlin", "kotlin-reflect", "*"))
+        DependencyExclusion("org.jetbrains.kotlin", "kotlin-reflect", "*")
+        //TODO Add Wemi itself here!
+)
 
 /**
  * Entry point for the WEMI build tool
@@ -247,7 +251,15 @@ fun main(args: Array<String>) {
         for (file in buildScript.classpath) {
             urls[i++] = file.toUri().toURL()
         }
-        val loader = URLClassLoader(urls, WemiDefaultClassLoader)
+        val loader = URLClassLoader(urls, Magic.WemiDefaultClassLoader)
+        LOG.debug("Loading plugins for file {}", buildScript)
+        val pluginServiceLoader = ServiceLoader.load(PluginEnvironment::class.java, loader)
+        for (pluginService in pluginServiceLoader) {
+            LOG.debug("Loading plugin service {}", pluginService)
+
+            pluginService.initialize()
+        }
+
         LOG.debug("Loading build file {}", buildScript)
         for (initClass in buildScript.initClasses) {
             try {

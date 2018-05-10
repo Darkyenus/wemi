@@ -28,8 +28,13 @@ private val LOG: Logger = LoggerFactory.getLogger("LocatedFile")
 class LocatedFile private constructor(val file: Path, val root: Path, val path: String, val simple: Boolean)
     : MachineWritable {
 
+    //TODO Remove path, it should be determined as in third constructor, always
+    //TODO Consider removing simple?
+    //TODO Add assert that file is in root
+
     constructor(file: Path) : this(file, file.parent, file.name, true)
     constructor(file: Path, location: String, root: Path) : this(file, root, location, false)
+    constructor(file: Path, root: Path) : this(file, root, root.relativize(file).toString(), false)
 
     init {
         assert(!file.isDirectory()) { "LocatedFile.file must not be a directory: " + this }
@@ -37,26 +42,11 @@ class LocatedFile private constructor(val file: Path, val root: Path, val path: 
     }
 
     inline operator fun component1(): Path = file
-    inline operator fun component2(): String? = path
-    inline operator fun component3(): Path? = root
+    inline operator fun component2(): String = path
+    inline operator fun component3(): Path = root
 
     val classpathEntry: Path
         get() = if (simple) file else root
-
-    val packageName:String?
-        get() {
-            val fileNameStart = path.lastIndexOf('/')
-            if (fileNameStart <= 0) {
-                return null
-            }
-
-            val chars = CharArray(fileNameStart)
-            for (i in chars.indices) {
-                val c = path[i]
-                chars[i] = if (c == '/') { '.' } else { c }
-            }
-            return String(chars)
-        }
 
     override fun toString(): String {
         return root.absolutePath + "//" + path

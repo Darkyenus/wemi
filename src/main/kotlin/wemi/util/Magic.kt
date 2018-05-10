@@ -7,29 +7,48 @@ import java.nio.file.Path
  * File full of black magic.
  * No muggles allowed.
  */
+object Magic {
 
-private val LOG = LoggerFactory.getLogger("Magic")
+    private val LOG = LoggerFactory.getLogger("Magic")
 
-/**
- * Only used as a known and stable place to start magic from.
- */
-@Suppress("ClassName")
-private class __ResourceHook
+    /**
+     * Returns the classpath file, from which given class has been loaded.
+     * This may be a jar file, or a directory in which it resides.
+     */
+    fun classpathFileOf(c:Class<*>):Path? {
+        val name = c.name
+        val classNameStart = name.lastIndexOf('.')
+        val resourceName = "${if (classNameStart == -1) name else name.substring(classNameStart + 1)}.class"
+        var path:Path = c.getResource(resourceName)?.toPath() ?: return null
 
-/**
- * .jar or folder that is a classpath entry that contains Wemi
- */
-internal val WemiLauncherFile: Path = __ResourceHook::class.java.getResource("MagicKt.class").let {
-    var result: Path = it?.toPath() ?: throw IllegalStateException("Wemi must be launched from filesystem (current URL: $it)")
+        if (path.name == resourceName) {
+            // Not a jar, but a file inside directory
+            path = path.parent ?: return null // To directory
+            if (classNameStart != -1) {
+                // Amount of dots (package separators) is the same as the amount of steps to parent
+                for (i in 0..classNameStart) {
+                    if (name[i] == '.') {
+                        path = path.parent ?: return null
+                    }
+                }
+            } // else in default directory, so the path is correct
+        }
 
-    if (result.name == "MagicKt.class") {
-        result = result.parent //./wemi/util
-        result = result.parent //./wemi
-        result = result.parent //./
+        return path
     }
 
-    LOG.debug("WemiLauncherFile found at {}", result)
-    result
-}
+    /**
+     * .jar or folder that is a classpath entry that contains Wemi
+     */
+    internal val WemiLauncherFile: Path = classpathFileOf(this.javaClass).let {
+        val result = it ?: throw IllegalStateException("Wemi must be launched from filesystem (current URL: $it)")
 
-internal val WemiDefaultClassLoader: ClassLoader = __ResourceHook::class.java.classLoader
+        LOG.debug("WemiLauncherFile found at {}", result)
+        result
+    }
+
+    /**
+     * Class loader with which Wemi core was loaded
+     */
+    internal val WemiDefaultClassLoader: ClassLoader = javaClass.classLoader
+}

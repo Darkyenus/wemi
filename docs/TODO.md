@@ -1,13 +1,29 @@
 # Things to do next
 
+- Fix prepended sh file to comply with sh syntax (`[[]]`)
+
+- Write [UPDATE_PROTOCOLS.md](UPDATE_PROTOCOLS.md)
+
+- Cleanup LocatedFile
+
+- Refactor BuildScriptClasspathConfiguration to store info with classpath in json, this lazy class is weird
+	- Change warnings in parsing to errors
+
+- Hotswapping jvm code
+
+- Consider removing sourcesBase and (re)sourceFiles keys. Are they worth the confusion?
+	- Maybe introduce something like non-rebindable keys
+
+- Create system, to allow automatic caching of key results, when no input keys have changed.
+	- This will need good arbitrary object serialization/comparison - with files serialized as their file/directory/exist info + checksum of files
+	- Maybe not serialization, just checksuming... interface Checksumable { String checksum() } ?
+
 - Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
 
 - New project wizard (IDE)
 
 - Kotlin Multiplatform
 	- Kotlin JS
-
-- Hotswapping jvm code
 
 - Android/MOE/RoboVM/TeaVM plugins
 

@@ -6,9 +6,7 @@ import com.esotericsoftware.jsonbeans.Json
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import wemi.boot.MachineWritable
-import wemi.collections.WCollection
-import wemi.collections.WList
-import wemi.collections.WSet
+import wemi.collections.*
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
 import wemi.util.*
@@ -331,6 +329,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
  * Archetype usually specifies which languages can be used and what the compile output is.
  *
  * @param name used mostly for debugging
+ * @see Archetypes for more info about this concept
  */
 class Archetype internal constructor(val name: String, val parent:Archetype?) : BindingHolder(), WithDescriptiveString {
 
@@ -1003,6 +1002,46 @@ sealed class BindingHolder {
             internal val key: Key<CompilerFlags>,
             internal val flag: CompilerFlag<Type>)
     //endregion
+
+    /**
+     * Bind this key to values that itself holds, under given configurations.
+     */
+    internal infix fun <Value> Key<WSet<Value>>.setToUnion(configurations: Scope.()->Iterable<Configuration>) {
+        this set {
+            val configurationsIter = configurations().iterator()
+            if (!configurationsIter.hasNext()) {
+                wEmptySet()
+            } else {
+                var result = using(configurationsIter.next()) { this@setToUnion.get() }
+                while (configurationsIter.hasNext()) {
+                    val mutableResult = result.toMutable()
+                    mutableResult.addAll(using(configurationsIter.next()) { this@setToUnion.get() })
+                    result = mutableResult
+                }
+                result
+            }
+        }
+    }
+
+    /**
+     * Bind this key to values that itself holds, under given configurations.
+     */
+    internal infix fun <Value> Key<WList<Value>>.setToConcatenation(configurations: Scope.()->Iterable<Configuration>) {
+        this set {
+            val configurationsIter = configurations().iterator()
+            if (!configurationsIter.hasNext()) {
+                wEmptyList()
+            } else {
+                var result = using(configurationsIter.next()) { this@setToConcatenation.get() }
+                while (configurationsIter.hasNext()) {
+                    val mutableResult = result.toMutable()
+                    mutableResult.addAll(using(configurationsIter.next()) { this@setToConcatenation.get() })
+                    result = mutableResult
+                }
+                result
+            }
+        }
+    }
 }
 
 /**

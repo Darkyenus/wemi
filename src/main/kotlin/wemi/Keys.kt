@@ -55,9 +55,15 @@ object Keys {
      * use language configuration, for example [wemi.Configurations.compilingJava].
      * Under [wemi.Configurations.testing] contains test sources as well (in addition to normal sources).
      */
-    val sourceFiles by key<WList<LocatedFile>>("Files to be compiled. Usually derived from sourceRoots and sourceFilter. Maps source root -> source files", defaultValue = wEmptyList())
+    val sourceFiles by key<WList<LocatedFile>>("Files to be compiled. Usually derived from sourceRoots and sourceExtensions. Maps source root -> source files", defaultValue = wEmptyList())
     val resourceRoots by key<WSet<Path>>("Directories which are resource roots for the project (example: '/src/main/resources')", defaultValue = wEmptySet())
     val resourceFiles by key<WList<LocatedFile>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files", defaultValue = wEmptyList())
+
+    /**
+     * Used to generalize keys like [sourceFiles] or [sourceExtensions] to union of distinct subsets.
+     * Is typically not used to implement the compilation itself, as it usually needs specialized inter-operation of languages.
+     */
+    val compilingConfigurations by key<WSet<Configuration>>("Configurations that are used when compiling the sources, such as `compilingJava`.", defaultValue = wEmptySet())
 
     val repositories by key<WSet<Repository>>("Repositories to be used when resolving dependencies", defaultValue = wEmptySet())
     val repositoryChain by key<RepositoryChain>("ADVANCED - Resolved repository chain from 'repositories'")

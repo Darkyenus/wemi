@@ -67,7 +67,7 @@ fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRoo
         for (a in archetypes) {
             var archetype = a
             while (true) {
-                if (archetype === Archetypes._Base_) {
+                if (archetype === Archetypes.Base) {
                     baseArchetypeCount++
                 }
                 archetype = archetype.parent ?: break
@@ -190,10 +190,25 @@ fun createConfiguration(name:String, description: String, parent: Configuration?
  */
 class ArchetypeDelegate internal constructor(
         private val parent: KProperty0<Archetype>?,
-        private val initializer: Archetype.() -> Unit
+        private var initializer: (Archetype.() -> Unit)?
 ) : ReadOnlyProperty<Any?, Archetype> {
 
     private var archetype:Archetype? = null
+
+    /**
+     * @see wemi.inject for usage location
+     */
+    internal fun inject(additionalInitializer:Archetype.() -> Unit) {
+        if (this.archetype != null) {
+            throw IllegalStateException("$archetype is already initialized")
+        }
+
+        val baseInitializer = this.initializer!!
+        initializer = {
+            baseInitializer()
+            additionalInitializer()
+        }
+    }
 
     override fun getValue(thisRef: Any?, property: KProperty<*>): Archetype {
         var archetype: Archetype? = archetype
@@ -201,8 +216,12 @@ class ArchetypeDelegate internal constructor(
             return archetype
         }
 
+        val initializer = this.initializer!!
+        this.initializer = null // Free to GC
+
         archetype = Archetype(property.name, parent?.get())
         archetype.initializer()
+        archetype.locked = true
         this.archetype = archetype
         return archetype
     }

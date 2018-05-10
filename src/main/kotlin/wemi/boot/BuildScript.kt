@@ -91,9 +91,9 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
         recompileReason = "Missing cache metadata"
         LOG.debug("Rebuilding build scripts: No classpath cache")
         true
-    } else if (WemiLauncherFile.lastModified > resultJar.lastModified) {
+    } else if (Magic.WemiLauncherFile.lastModified > resultJar.lastModified) {
         recompileReason = "Updated launcher"
-        LOG.debug("Rebuilding build scripts: Launcher updated ({})", WemiLauncherFile)
+        LOG.debug("Rebuilding build scripts: Launcher updated ({})", Magic.WemiLauncherFile)
         true
     } else {
         // All seems good, try to load the result classpath
@@ -116,7 +116,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
             if (classpath.isEmpty()) {
                 recompileReason = "Cache is missing launcher"
                 recompile = true
-            } else if (!Files.isSameFile(WemiLauncherFile, classpath[0])) {
+            } else if (!Files.isSameFile(Magic.WemiLauncherFile, classpath[0])) {
                 recompileReason = "First classpath item does not point to a Wemi launcher file"
                 recompile = true
             }
@@ -146,6 +146,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
             return null
         }
         classpath.addAll(resolved.artifacts())
+        classpath.addAll(classpathConfiguration.fileDependencies)
 
         classpathFile.writeText(classpath.joinToString(separator = "\n") { file -> file.absolutePath })
 
@@ -161,7 +162,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
 }
 
 private fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
-    val wemiLauncherFile = WemiLauncherFile
+    val wemiLauncherFile = Magic.WemiLauncherFile
     if (wemiLauncherFile.name.endsWith(".jar", ignoreCase = true) || wemiLauncherFile.isDirectory()) {
         LOG.debug("wemiLauncherFileWithJarExtension used unchanged {}", wemiLauncherFile)
         return wemiLauncherFile
@@ -234,19 +235,24 @@ private fun transformFileNameToKotlinClassName(fileNameWithoutExtension: String)
 /**
  * Regex used to find lines with directives.
  *
- * Directives must begin line with `///` then have directory identifier and then arbitrary text for the directive.
+ * Directives are file annotations from Directives file, such as [BuildDependency].
+ *
+ * Matches: `@file:<wemi.boot.>BuildAnnotation(...)`
  */
-private val DirectiveRegex = "///\\s*([a-zA-Z0-9\\-]+)\\s+(.*?)\\s*".toRegex()
+private val DirectiveRegex = "\\s+@file\\s*:\\s*(?:wemi\\s*\\.\\s*boot\\s*\\.\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\((.*)\\)\\s*".toRegex()
 
 /**
- * <repository name> at <repository address>
+ * Matches single, optionally named, argument, passed into the [DirectiveRegex] constructor.
  */
-private val M2RepositoryDirectiveRegex = "(\\S+)\\s+at\\s+(\\S+:\\S+)".toRegex()
+private val DirectiveConstructorPartRegex = "^\\s*(?:([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*)?\"([^\"]*)\"\\s*,?".toRegex()
 
 /**
- * <group> : <name> : <version>
+ * Recognized directives.
  */
-private val LibraryDirectiveRegex = "(\\S+)\\s*:\\s*(\\S+)\\s*:\\s*(\\S+)".toRegex()
+private val Directives = arrayOf(
+        BuildDependency::class.java,
+        BuildDependencyRepository::class.java,
+        BuildClasspathDependency::class.java)
 
 /**
  * Configuration of classpath for a build script.
@@ -255,41 +261,100 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
     private var _repositories: WSet<Repository>? = null
     private var _repositoryChain: RepositoryChain? = null
     private var _dependencies: WSet<Dependency>? = null
+    private var _fileDependencies: WSet<Path>? = null
 
     private fun resolve() {
         val repositories = WMutableSet<Repository>()
         repositories.addAll(DefaultRepositories)
         val buildDependencyLibraries = WMutableSet<Dependency>()
+        val buildDependencyFiles = WMutableSet<Path>()
 
         for (source in buildScriptSources) {
             var lineNumber = 0
             source.forEachLine { line ->
                 lineNumber++
                 val directiveMatch = DirectiveRegex.matchEntire(line) ?: return@forEachLine
-                val directive = (directiveMatch.groups[1]?.value ?: "").toLowerCase()
-                val value = directiveMatch.groups[2]?.value ?: ""
+                val directiveName = directiveMatch.groups[1]?.value ?: ""
+                val directiveClass = Directives.find { it.simpleName == directiveName } ?: return@forEachLine
 
-                when (directive) {
-                    "dependency" -> {
-                        val match = LibraryDirectiveRegex.matchEntire(value)
-                        if (match == null) {
-                            LOG.warn("{}:{} Invalid dependency directive \"{}\". (Example: 'com.example:my-project:1.0')", buildScriptSources, lineNumber, value)
+                val directiveClassFieldNames = directiveClass.getAnnotation(DirectiveFields::class.java).value
+                val directiveClassFieldMethods = directiveClass.methods
+
+                // Assume that all values are strings (because they are at this point)
+                val directiveConstructorValues = arrayOfNulls<String>(directiveClassFieldNames.size)
+
+                val constructor = directiveMatch.groups[2]?.value ?: ""
+
+                val parameter = DirectiveConstructorPartRegex.find(constructor)
+                var parameterIndex = 0
+                while (parameter != null) {
+                    val name = parameter.groupValues[1]
+                    val valueIndex : Int
+                    if (name.isEmpty()) {
+                        if (parameterIndex >= 0) {
+                            valueIndex = parameterIndex++
                         } else {
-                            val (group, name, version) = match.destructured
-                            buildDependencyLibraries.add(Dependency(DependencyId(group, name, version), WemiBundledLibrariesExclude))
+                            LOG.warn("{}:{} Invalid directive annotation - only named parameters are allowed after first named parameter", buildScriptSources, line)
+                            return@forEachLine
+                        }
+                    } else {
+                        parameterIndex = -1
+                        val index = directiveClassFieldNames.indexOf(name)
+                        if (index < 0) {
+                            LOG.warn("{}:{} Invalid directive annotation - unknown parameter name {}", buildScriptSources, line, name)
+                            return@forEachLine
+                        }
+                        if (directiveConstructorValues[index] != null) {
+                            LOG.warn("{}:{} Invalid directive annotation - parameter {} set multiple times", buildScriptSources, line, name)
+                            return@forEachLine
+                        }
+                        valueIndex = index
+                    }
+                    directiveConstructorValues[valueIndex] = parameter.groupValues[2]
+                }
+
+                // Complete with default values and check if all variables are set
+                for (i in directiveConstructorValues.indices) {
+                    if (directiveConstructorValues[i] == null) {
+                        directiveConstructorValues[i] = directiveClassFieldMethods.find { it.name == directiveClassFieldNames[i] }?.defaultValue as String?
+                        if (directiveConstructorValues[i] == null) {
+                            LOG.warn("{}:{} Invalid directive annotation - parameter {} needs to be set", buildScriptSources, line, directiveClassFieldNames[i])
+                            return@forEachLine
                         }
                     }
-                    "repository" -> {
-                        val match = M2RepositoryDirectiveRegex.matchEntire(value)
-                        if (match == null) {
-                            LOG.warn("{}:{} Invalid repository directive \"{}\". (Example: 'my-repo at https://example.com')", buildScriptSources, lineNumber, value)
+                }
+
+                // No value can be now null
+                @Suppress("UNCHECKED_CAST")
+                directiveConstructorValues as Array<String>
+
+                // Use it
+                when (directiveClass) {
+                    BuildDependency::class.java -> {
+                        val (groupOrFull, name, version) = directiveConstructorValues
+                        if (name.isEmpty() && version.isEmpty()) {
+                            buildDependencyLibraries.add(Dependency(DependencyId(groupOrFull, name, version), WemiBundledLibrariesExclude))
                         } else {
-                            val (name, url) = match.destructured
-                            repositories.add(Repository.M2(name, URL(url), LocalM2Repository))
+                            buildDependencyLibraries.add(Dependency(wemi.dependencyId(groupOrFull, null), WemiBundledLibrariesExclude))
                         }
+                    }
+                    BuildDependencyRepository::class.java -> {
+                        val (name, url) = directiveConstructorValues
+
+                        repositories.add(Repository.M2(name, URL(url), LocalM2Repository))
+                    }
+                    BuildClasspathDependency::class.java -> {
+                        val (file) = directiveConstructorValues
+
+                        var path = Paths.get(file)
+                        if (!path.isAbsolute) {
+                            path = WemiRootFolder.resolve(path)
+                        }
+
+                        buildDependencyFiles.add(path)
                     }
                     else -> {
-                        LOG.warn("{}:{} Invalid directive \"{}\". Supported directives are 'dependency' and 'repository'.", buildScriptSources, lineNumber, directive)
+                        throw AssertionError()//Not possible
                     }
                 }
             }
@@ -298,6 +363,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
         _repositories = repositories
         _repositoryChain = createRepositoryChain(repositories)
         _dependencies = buildDependencyLibraries
+        _fileDependencies = buildDependencyFiles
     }
 
     /**
@@ -331,6 +397,17 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
                 resolve()
             }
             return _dependencies!!
+        }
+
+    /**
+     * File classpath dependencies of the build script
+     */
+    val fileDependencies: WSet<Path>
+        get() {
+            if (_fileDependencies == null) {
+                resolve()
+            }
+            return _fileDependencies!!
         }
 }
 

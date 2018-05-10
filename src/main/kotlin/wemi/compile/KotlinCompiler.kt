@@ -9,8 +9,8 @@ import wemi.boot.WemiBundledLibrariesExclude
 import wemi.dependency.*
 import wemi.util.EnclaveClassLoader
 import wemi.util.LocatedFile
-import wemi.util.WemiDefaultClassLoader
 import wemi.collections.wSetOf
+import wemi.util.Magic
 import java.nio.file.Path
 
 private val LOG = LoggerFactory.getLogger("KotlinCompiler")
@@ -102,7 +102,7 @@ enum class KotlinCompilerVersion (
                 /** Loads compiler jar into own enclave, with custom Reflection and own versions of all classes.
                  * This is done because different Kotlin compiler versions are not compatible*/
                 val compilerClassLoader = EnclaveClassLoader(artifacts.map { it.toUri().toURL() }.toTypedArray(),
-                        WemiDefaultClassLoader, implementationClassName) // Own entry point
+                        Magic.WemiDefaultClassLoader, implementationClassName) // Own entry point
 
                 val clazz = Class.forName(implementationClassName, true, compilerClassLoader)
 
@@ -152,7 +152,4 @@ object KotlinJVMCompilerFlags {
     val jdkHome = CompilerFlag<String>("jdkHome", "Path to JDK home directory to include into classpath, if differs from default JAVA_HOME")
 
     val jvmTarget = CompilerFlag<String>("jvmTarget", "Target version of the generated JVM bytecode (1.6, 1.8)")
-
-    /** Used to allow compiling of .wemi files by Kotlin compiler */
-    val compilingWemiBuildFiles = CompilerFlag<Boolean>("compilingWemiBuildFiles", "Internal flag to allow compiling .wemi files as .kt files")
 }

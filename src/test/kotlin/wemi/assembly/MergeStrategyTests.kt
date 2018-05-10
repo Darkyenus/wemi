@@ -15,7 +15,7 @@ class MergeStrategyTests {
             "third".toByteArray()
     )
 
-    private fun assertMapEquals(expected:Map<String, Pair<AssemblySource?, ByteArray>>?, actual:Map<String, Pair<AssemblySource?, ByteArray>>?) {
+    private fun assertMapEquals(expected:Map<String, AssemblySource>?, actual:Map<String, AssemblySource>?) {
         if (expected == null && actual == null) {
             return
         } else if (expected == null || actual == null) {
@@ -26,9 +26,7 @@ class MergeStrategyTests {
         for ((key, expectedValue) in expected) {
             assertTrue(actualRemaining.containsKey(key)) { "Actual should contain $key -> $expectedValue, but doesn't" }
             val removed = actualRemaining.remove(key)
-            // We don't care about source
-            //assertEquals(expectedValue.first, removed?.first) {"Actual source should contain something else"}
-            assertArrayEquals(expectedValue.second, removed?.second) {"Actual data should contain something else"}
+            assertArrayEquals(expectedValue.data, removed?.data) {"Actual data should contain something else"}
         }
         assertTrue(actualRemaining.isEmpty()) {"Actual has unexpected values: $actualRemaining"}
     }
@@ -46,7 +44,7 @@ class MergeStrategyTests {
         val resolved =
                 fooOperation(-1).resolve({MergeStrategy.First}, DefaultRenameFunction)
 
-        assertMapEquals(mapOf("foo" to Pair(null, VALUES[0])), resolved)
+        assertMapEquals(mapOf("foo" to source(VALUES[0])), resolved)
     }
 
     @Test
@@ -54,7 +52,7 @@ class MergeStrategyTests {
         val resolved =
                 fooOperation(-1).resolve({MergeStrategy.Last}, DefaultRenameFunction)
 
-        assertMapEquals(mapOf("foo" to Pair(null, VALUES.last())), resolved)
+        assertMapEquals(mapOf("foo" to source(VALUES.last())), resolved)
     }
 
     @Test
@@ -63,7 +61,7 @@ class MergeStrategyTests {
             val resolved =
                     fooOperation(index).resolve({MergeStrategy.SingleOwn}, DefaultRenameFunction)
 
-            assertMapEquals(mapOf("foo" to Pair(null, VALUES[index])), resolved)
+            assertMapEquals(mapOf("foo" to source(VALUES[index])), resolved)
         }
     }
 
@@ -73,18 +71,18 @@ class MergeStrategyTests {
 
         val operation = AssemblyOperation()
         operation.addSource("foo", VALUES[0], false)
-        assertMapEquals(mapOf("foo" to Pair(null, VALUES[0])), operation.resolve({MergeStrategy.SingleOrError}, DefaultRenameFunction))
+        assertMapEquals(mapOf("foo" to source(VALUES[0])), operation.resolve({MergeStrategy.SingleOrError}, DefaultRenameFunction))
     }
 
     @Test
     fun concatenate() {
-        assertMapEquals(mapOf("foo" to Pair(null, VALUES.fold(ByteArray(0)) {l, r -> l + r})),
+        assertMapEquals(mapOf("foo" to source(VALUES.fold(ByteArray(0)) {l, r -> l + r})),
                 fooOperation(-1).resolve({MergeStrategy.Concatenate}, DefaultRenameFunction))
     }
 
     @Test
     fun lines() {
-        assertMapEquals(mapOf("foo" to Pair(null, "first\nsecond\nthird\n".toByteArray())),
+        assertMapEquals(mapOf("foo" to source("first\nsecond\nthird\n".toByteArray())),
                 fooOperation(-1).resolve({MergeStrategy.Lines}, DefaultRenameFunction))
 
         AssemblyOperation().let { operation ->
@@ -94,14 +92,14 @@ class MergeStrategyTests {
                     "third\r\nfourth".toByteArray())) {
                 operation.addSource("foo", value, false)
             }
-            assertMapEquals(mapOf("foo" to Pair(null, "third\r\nsecond\r\nthird\r\nfourth\r\n".toByteArray())),
+            assertMapEquals(mapOf("foo" to source("third\r\nsecond\r\nthird\r\nfourth\r\n".toByteArray())),
                     operation.resolve({MergeStrategy.Lines}, DefaultRenameFunction))
         }
     }
 
     @Test
     fun uniqueLines() {
-        assertMapEquals(mapOf("foo" to Pair(null, "first\nsecond\nthird\n".toByteArray())),
+        assertMapEquals(mapOf("foo" to source("first\nsecond\nthird\n".toByteArray())),
                 fooOperation(-1).resolve({MergeStrategy.UniqueLines}, DefaultRenameFunction))
 
         AssemblyOperation().let { operation ->
@@ -111,7 +109,7 @@ class MergeStrategyTests {
                     "third\r\nfourth".toByteArray())) {
                 operation.addSource("foo", value, false)
             }
-            assertMapEquals(mapOf("foo" to Pair(null, "third\r\nsecond\r\nfourth\r\n".toByteArray())),
+            assertMapEquals(mapOf("foo" to source("third\r\nsecond\r\nfourth\r\n".toByteArray())),
                     operation.resolve({MergeStrategy.UniqueLines}, DefaultRenameFunction))
         }
     }
@@ -125,9 +123,9 @@ class MergeStrategyTests {
                 operation.addSource("foo$i", value, false)
             }
             assertMapEquals(mapOf(
-                    "foo0" to Pair(null, VALUES[0]),
-                    "foo1" to Pair(null, VALUES[1]),
-                    "foo2" to Pair(null, VALUES[2])
+                    "foo0" to source(VALUES[0]),
+                    "foo1" to source(VALUES[1]),
+                    "foo2" to source(VALUES[2])
             ), operation.resolve({MergeStrategy.Discard}, DefaultRenameFunction))
         }
     }
@@ -141,8 +139,8 @@ class MergeStrategyTests {
             operation.addSource("foo", VALUES[0], false)
             operation.addSource("foo1", VALUES[1], false)
             assertMapEquals(mapOf(
-                    "foo" to Pair(null, VALUES[0]),
-                    "foo1" to Pair(null, VALUES[1])
+                    "foo" to source(VALUES[0]),
+                    "foo1" to source(VALUES[1])
             ), operation.resolve({MergeStrategy.Deduplicate}, DefaultRenameFunction))
         }
     }
@@ -151,9 +149,9 @@ class MergeStrategyTests {
     fun rename() {
         var order = 0
         assertMapEquals(mapOf(
-                "foo0" to Pair(null, VALUES[0]),
-                "foo" to Pair(null, VALUES[1]),
-                "foo1" to Pair(null, VALUES[2])
+                "foo0" to source(VALUES[0]),
+                "foo" to source(VALUES[1]),
+                "foo1" to source(VALUES[2])
         ), fooOperation(1).resolve({MergeStrategy.Rename}, {
             source, name ->
             if (source.own) {
@@ -162,5 +160,9 @@ class MergeStrategyTests {
                 "$name${order++}"
             }
         }))
+    }
+
+    private fun source(bytes:ByteArray):AssemblySource {
+        return AssemblySource("test-source", null, -1, false, bytes)
     }
 }

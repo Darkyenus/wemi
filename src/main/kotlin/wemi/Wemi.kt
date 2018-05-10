@@ -12,15 +12,15 @@ const val WemiVersion = "0.4-SNAPSHOT"
 /** Version of Kotlin used for build scripts */
 val WemiKotlinVersion = KotlinCompilerVersion.Version1_2_21
 
-/** Immutable view into the list of loaded projects. */
+/** Immutable view into the list of loaded [Project]s. */
 val AllProjects: Map<String, Project>
     get() = BuildScriptData.AllProjects
 
-/** Immutable view into the list of loaded keys. */
+/** Immutable view into the list of loaded [Key]s. */
 val AllKeys: Map<String, Key<*>>
     get() = BuildScriptData.AllKeys
 
-/** Immutable view into the list of loaded keys. */
+/** Immutable view into the list of loaded [Configuration]s. */
 val AllConfigurations: Map<String, Configuration>
     get() = BuildScriptData.AllConfigurations
 
@@ -131,11 +131,28 @@ fun archetype(parent: KProperty0<Archetype>? = null, initializer: Archetype.() -
         return ArchetypeDelegate(parent, initializer)
 }
 
-/** Convenience Dependency creator.
+/**
+ * Injects given archetype initializer into the [Archetype].
+ * To be invoked in [wemi.plugin.PluginEnvironment.initialize],
+ * as it can be called only on unlocked [Archetype] properties created by [archetype] delegate.
+ *
+ * [injectedInitializer] will be run when the receiver lazy [Archetype] is created, after the base initializer.
+ *
+ * @throws IllegalArgumentException when given property is not created by [archetype]
+ * @throws IllegalStateException when given property's archetype is already created
+ */
+fun KProperty0<Archetype>.inject(injectedInitializer:Archetype.() -> Unit) {
+    val delegate = this.getDelegate() as? ArchetypeDelegate
+            ?: throw IllegalArgumentException("Property $this is not created by archetype()")
+
+    delegate.inject(injectedInitializer)
+}
+
+/** Convenience DependencyId creator.
  * @param groupNameVersion Gradle-like semicolon separated group, name and version of the dependency.
  *          If the amount of ':'s isn't exactly 2, or one of the triplet is empty, runtime exception is thrown.
  */
-fun dependency(groupNameVersion: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>): Dependency {
+fun dependencyId(groupNameVersion:String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>):DependencyId {
     val first = groupNameVersion.indexOf(':')
     val second = groupNameVersion.indexOf(':', startIndex = maxOf(first + 1, 0))
     val third = groupNameVersion.indexOf(':', startIndex = maxOf(second + 1, 0))
@@ -150,7 +167,13 @@ fun dependency(groupNameVersion: String, preferredRepository: Repository?, varar
     val name = groupNameVersion.substring(first + 1, second)
     val version = groupNameVersion.substring(second + 1)
 
-    return dependency(group, name, version, preferredRepository, *attributes)
+    return DependencyId(group, name, version, preferredRepository, attributes = mapOf(*attributes))
+}
+
+/** Convenience Dependency creator using [dependencyId].
+ */
+fun dependency(groupNameVersion: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>): Dependency {
+    return Dependency(dependencyId(groupNameVersion, preferredRepository, *attributes))
 }
 
 /**

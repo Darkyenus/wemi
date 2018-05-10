@@ -7,28 +7,33 @@ import wemi.assembly.JarMergeStrategyChooser
 import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiCacheFolder
 import wemi.boot.WemiRunningInInteractiveMode
-import wemi.collections.*
+import wemi.collections.wEmptyList
+import wemi.collections.wEmptySet
+import wemi.collections.wMutableSetOf
+import wemi.collections.wSetOf
 import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
 import wemi.dependency.LocalM2Repository
 import wemi.dependency.createRepositoryChain
 import wemi.publish.artifacts
 import wemi.run.javaExecutable
-import wemi.util.*
-import java.nio.file.Path
+import wemi.util.div
 import javax.tools.ToolProvider
 
 /**
  * Default Wemi project [Archetype]s.
  *
- * There are two kinds of archetypes. Primary and secondary.
- * Project can have only one primary archetype, as those setup things like compiler, source folders,
- * and generally dictate what language project will use and what will be the result of [Keys.compile].
- *
- * Secondary archetypes, on the other hand, add additional functionality on top of existing project.
- * There may be zero or more secondary archetypes, although this depends on the functionality provided.
- *
- * Base archetypes whose names are surrounded with underscores (_) are not meant for direct use.
+ * There are two kinds of archetypes:
+ * - Primary
+ *      - Project can have only one primary archetype, as those setup things like compiler, source folders,
+ *       and generally dictate what language project will use and what will be the result of [Keys.compile].
+ *      - `*Base` named serve as a parents for other `*Base` and `*Project` archetypes.
+ *          Do not use them directly as your project's archetype.
+ *      - `*Project` named are to be used by the user defined projects and generally inherit from a `*Base` archetype
+ * - Secondary
+ *      - Secondary archetypes add additional functionality on top of existing project.
+ *      There may be zero or more secondary archetypes per project.
+ *      - These are named `*Facet`
  */
 object Archetypes {
 
@@ -38,7 +43,7 @@ object Archetypes {
      *
      * Implements basic key implementations that don't usually change.
      */
-    val _Base_ by archetype {
+    val Base by archetype {
         Keys.input set { InputBase(WemiRunningInInteractiveMode) }
 
         Keys.buildDirectory set { WemiBuildFolder }
@@ -48,6 +53,35 @@ object Archetypes {
 
         Keys.resourceRoots set KeyDefaults.ResourceRoots
         Keys.resourceFiles set KeyDefaults.ResourceFiles
+
+        Keys.sourceRoots set {
+            val configurations = Keys.compilingConfigurations.get().iterator()
+            if (!configurations.hasNext()) {
+                wEmptySet()
+            } else {
+                var result = using(configurations.next()) { Keys.sourceRoots.get() }
+                while (configurations.hasNext()) {
+                    val mutableResult = result.toMutable()
+                    mutableResult.addAll(using(configurations.next()) { Keys.sourceRoots.get() })
+                    result = mutableResult
+                }
+                result
+            }
+        }
+        Keys.sourceFiles set {
+            val configurations = Keys.compilingConfigurations.get().iterator()
+            if (!configurations.hasNext()) {
+                wEmptyList()
+            } else {
+                var result = using(configurations.next()) { Keys.sourceFiles.get() }
+                while (configurations.hasNext()) {
+                    val mutableResult = result.toMutable()
+                    mutableResult.addAll(using(configurations.next()) { Keys.sourceFiles.get() })
+                    result = mutableResult
+                }
+                result
+            }
+        }
 
         Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
@@ -83,7 +117,7 @@ object Archetypes {
      *
      * Implements basic key implementations for JVM that don't usually change.
      */
-    val _JVMBase_ by archetype(::_Base_) {
+    val JVMBase by archetype(::Base) {
         Keys.repositories set { DefaultRepositories }
 
         Keys.javaHome set { wemi.run.JavaHome }
@@ -125,26 +159,21 @@ object Archetypes {
      * Archetype for projects that have no sources of their own.
      * Those can serve as an aggregation of dependencies or as a Maven-like parent projects.
      */
-    val BlankJVMProject by archetype(::_JVMBase_) {
+    val BlankJVMProject by archetype(::JVMBase) {
         Keys.internalClasspath set { wEmptyList() }
 
         Keys.sourceBases set { wEmptySet() }
-        Keys.sourceRoots set { wEmptySet() }
-        Keys.sourceFiles set { wEmptyList() }
 
         Keys.resourceRoots set { wEmptySet() }
         Keys.resourceFiles set { wEmptyList() }
     }
 
-    @Deprecated("Use BlankJVMProject instead")
-    val DependenciesOnly = BlankJVMProject
-
     /**
      * Primary archetype for projects that use pure Java.
      */
-    val JavaProject by archetype(::_JVMBase_) {
-        Keys.sourceRoots set { using(Configurations.compilingJava) { Keys.sourceRoots.get() } }
-        Keys.sourceFiles set { using(Configurations.compilingJava) { Keys.sourceFiles.get() } }
+    val JavaProject by archetype(::JVMBase) {
+        Keys.compilingConfigurations set { wSetOf(Configurations.compilingJava) }
+
         Keys.compile set KeyDefaults.CompileJava
 
         Keys.archiveJavadocOptions set KeyDefaults.ArchiveJavadocOptions
@@ -157,23 +186,9 @@ object Archetypes {
     /**
      * Primary archetype for projects that use Java and Kotlin.
      */
-    val JavaKotlinProject by archetype(::_JVMBase_) {
-        Keys.sourceRoots set {
-            val java = using(Configurations.compilingJava) { Keys.sourceRoots.get() }
-            val kotlin = using(Configurations.compilingKotlin) { Keys.sourceRoots.get() }
-            val files = WMutableSet<Path>(java.size + kotlin.size)
-            files.addAll(java)
-            files.addAll(kotlin)
-            files
-        }
-        Keys.sourceFiles set {
-            val java = using(Configurations.compilingJava) { Keys.sourceFiles.get() }
-            val kotlin = using(Configurations.compilingKotlin) { Keys.sourceFiles.get() }
-            val files = WMutableList<LocatedFile>(java.size + kotlin.size)
-            files.addAll(java)
-            files.addAll(kotlin)
-            files
-        }
+    val JavaKotlinProject by archetype(::JVMBase) {
+        Keys.compilingConfigurations set { wSetOf(Configurations.compilingJava, Configurations.compilingKotlin) }
+
         Keys.libraryDependencies add { kotlinDependency("stdlib") }
         Keys.compile set KeyDefaults.CompileJavaKotlin
 

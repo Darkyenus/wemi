@@ -136,6 +136,9 @@ val resourceRoots
 val resourceFiles
     inline get() = wemi.Keys.resourceFiles
 
+val compilingConfigurations
+    inline get() = wemi.Keys.compilingConfigurations
+
 val repositories
     inline get() = wemi.Keys.repositories
 val repositoryChain
@@ -232,3 +235,8 @@ val assemblyOutputFile
     inline get() = wemi.Keys.assemblyOutputFile
 val assembly
     inline get() = wemi.Keys.assembly
+
+// Build script directive annotations
+typealias BuildDependency = wemi.boot.BuildDependency
+typealias BuildDependencyRepository = wemi.boot.BuildDependencyRepository
+typealias BuildClasspathRepository = wemi.boot.BuildClasspathDependency

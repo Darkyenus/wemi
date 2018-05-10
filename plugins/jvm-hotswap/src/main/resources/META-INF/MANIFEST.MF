@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Agent-Class: wemiplugin.jvmhotswap.agent.AgentMain
+Premain-Class: wemiplugin.jvmhotswap.agent.AgentMain
+Can-Redefine-Classes: true

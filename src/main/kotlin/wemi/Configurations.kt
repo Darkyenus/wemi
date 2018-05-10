@@ -2,10 +2,10 @@
 
 package wemi
 
+import WMutableList
 import configuration
 import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
-import wemi.collections.toWList
 import wemi.collections.wEmptyList
 import wemi.compile.*
 import wemi.dependency.Dependency
@@ -184,7 +184,17 @@ object Configurations {
         Keys.repositories set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositories }
         Keys.repositoryChain set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositoryChain }
         Keys.libraryDependencies set { Keys.buildScript.get().buildScriptClasspathConfiguration.dependencies }
-        Keys.externalClasspath set { Keys.buildScript.get().classpath.map { LocatedFile(it) }.toWList() }
+        Keys.externalClasspath set {
+            val files = WMutableList<LocatedFile>()
+            val buildScript = Keys.buildScript.get()
+            for (path in buildScript.classpath) {
+                files.add(LocatedFile(path))
+            }
+            for (fileDependency in buildScript.buildScriptClasspathConfiguration.fileDependencies) {
+                files.add(LocatedFile(fileDependency))
+            }
+            files
+        }
         Keys.compilerOptions set { Keys.buildScript.get().buildFlags }
         Keys.compile set { Keys.buildScript.get().scriptJar }
         Keys.resourceFiles set { wEmptyList() }
