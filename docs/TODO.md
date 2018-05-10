@@ -1,7 +1,5 @@
 # Things to do next
 
-- Fix prepended sh file to comply with sh syntax (`[[]]`)
-
 - Write [UPDATE_PROTOCOLS.md](UPDATE_PROTOCOLS.md)
 
 - Cleanup LocatedFile
@@ -9,7 +7,8 @@
 - Refactor BuildScriptClasspathConfiguration to store info with classpath in json, this lazy class is weird
 	- Change warnings in parsing to errors
 
-- Hotswapping jvm code
+- Hotswapping jvm code:
+	- Test plugin and continue working on it
 
 - Consider removing sourcesBase and (re)sourceFiles keys. Are they worth the confusion?
 	- Maybe introduce something like non-rebindable keys

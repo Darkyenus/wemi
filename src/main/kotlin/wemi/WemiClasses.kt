@@ -1006,16 +1006,16 @@ sealed class BindingHolder {
     /**
      * Bind this key to values that itself holds, under given configurations.
      */
-    internal infix fun <Value> Key<WSet<Value>>.setToUnion(configurations: Scope.()->Iterable<Configuration>) {
+    internal infix fun <Value> Key<WSet<Value>>.setToUnionOfSelfIn(configurations: Scope.()->Iterable<Configuration>) {
         this set {
             val configurationsIter = configurations().iterator()
             if (!configurationsIter.hasNext()) {
                 wEmptySet()
             } else {
-                var result = using(configurationsIter.next()) { this@setToUnion.get() }
+                var result = using(configurationsIter.next()) { this@setToUnionOfSelfIn.get() }
                 while (configurationsIter.hasNext()) {
                     val mutableResult = result.toMutable()
-                    mutableResult.addAll(using(configurationsIter.next()) { this@setToUnion.get() })
+                    mutableResult.addAll(using(configurationsIter.next()) { this@setToUnionOfSelfIn.get() })
                     result = mutableResult
                 }
                 result
@@ -1026,16 +1026,16 @@ sealed class BindingHolder {
     /**
      * Bind this key to values that itself holds, under given configurations.
      */
-    internal infix fun <Value> Key<WList<Value>>.setToConcatenation(configurations: Scope.()->Iterable<Configuration>) {
+    internal infix fun <Value> Key<WList<Value>>.setToConcatenationOfSelfIn(configurations: Scope.()->Iterable<Configuration>) {
         this set {
             val configurationsIter = configurations().iterator()
             if (!configurationsIter.hasNext()) {
                 wEmptyList()
             } else {
-                var result = using(configurationsIter.next()) { this@setToConcatenation.get() }
+                var result = using(configurationsIter.next()) { this@setToConcatenationOfSelfIn.get() }
                 while (configurationsIter.hasNext()) {
                     val mutableResult = result.toMutable()
-                    mutableResult.addAll(using(configurationsIter.next()) { this@setToConcatenation.get() })
+                    mutableResult.addAll(using(configurationsIter.next()) { this@setToConcatenationOfSelfIn.get() })
                     result = mutableResult
                 }
                 result

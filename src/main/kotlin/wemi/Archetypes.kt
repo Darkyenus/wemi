@@ -54,34 +54,8 @@ object Archetypes {
         Keys.resourceRoots set KeyDefaults.ResourceRoots
         Keys.resourceFiles set KeyDefaults.ResourceFiles
 
-        Keys.sourceRoots set {
-            val configurations = Keys.compilingConfigurations.get().iterator()
-            if (!configurations.hasNext()) {
-                wEmptySet()
-            } else {
-                var result = using(configurations.next()) { Keys.sourceRoots.get() }
-                while (configurations.hasNext()) {
-                    val mutableResult = result.toMutable()
-                    mutableResult.addAll(using(configurations.next()) { Keys.sourceRoots.get() })
-                    result = mutableResult
-                }
-                result
-            }
-        }
-        Keys.sourceFiles set {
-            val configurations = Keys.compilingConfigurations.get().iterator()
-            if (!configurations.hasNext()) {
-                wEmptyList()
-            } else {
-                var result = using(configurations.next()) { Keys.sourceFiles.get() }
-                while (configurations.hasNext()) {
-                    val mutableResult = result.toMutable()
-                    mutableResult.addAll(using(configurations.next()) { Keys.sourceFiles.get() })
-                    result = mutableResult
-                }
-                result
-            }
-        }
+        Keys.sourceRoots setToUnionOfSelfIn { Keys.compilingConfigurations.get() }
+        Keys.sourceFiles setToConcatenationOfSelfIn { Keys.compilingConfigurations.get() }
 
         Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
