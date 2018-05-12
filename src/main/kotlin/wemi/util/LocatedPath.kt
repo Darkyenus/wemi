@@ -11,64 +11,79 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
 
-private val LOG: Logger = LoggerFactory.getLogger("LocatedFile")
+private val LOG: Logger = LoggerFactory.getLogger("LocatedPath")
 
-@Suppress("NOTHING_TO_INLINE")
 /**
- * File that may or may not have an explicit location in the file tree.
+ * Path that may have an explicit root location in the file tree.
  *
  * Used when handling classpath entries, where not only the file name and content, but also file's location in
- * the (re)source root is important.
- *
- * @property file represented
- * @property path to the file, *without* leading '/', including the file name
- * @property root to which [path] is relative to
- * @property simple is true if the (File) constructor has been used and the file is not really "located"
+ * the (re)source root is important. For example, *.class files are added to classpath by their root, not by their
+ * full path.
  */
-class LocatedFile private constructor(val file: Path, val root: Path, val path: String, val simple: Boolean)
+class LocatedPath private constructor(
+        /** Explicit root, if specified, prefix of [file] */
+        val root: Path?,
+        /** Represented file */
+        val file: Path,
+        @Suppress("UNUSED_PARAMETER") dummy: Unit?)
     : MachineWritable {
 
-    //TODO Remove path, it should be determined as in third constructor, always
-    //TODO Consider removing simple?
-    //TODO Add assert that file is in root
+    /**
+     * Create without explicit root. [file] itself is an classpath entry, or this distinction is not relevant.
+     * [root] will be reported as the [file]'s direct parent.
+     * [classpathEntry] is considered to be [file].
+     * Used, for example, for *.jar files.
+     */
+    constructor(file: Path) : this(null, file, null)
 
-    constructor(file: Path) : this(file, file.parent, file.name, true)
-    constructor(file: Path, location: String, root: Path) : this(file, root, location, false)
-    constructor(file: Path, root: Path) : this(file, root, root.relativize(file).toString(), false)
-
-    init {
-        assert(!file.isDirectory()) { "LocatedFile.file must not be a directory: " + this }
-        assert(!root.isDirectory()) { "LocatedFile.root must be a directory: " + this }
+    /**
+     * Create with explicit root.
+     * [root] MUST be a prefix of [file].
+     * [classpathEntry] is considered to be [root].
+     * Used, for example, for *.class files.
+     */
+    constructor(root: Path, file: Path) : this(root, file, null) {
+        assert(file.startsWith(root)) { "root must be prefix of the file" }
     }
 
-    inline operator fun component1(): Path = file
-    inline operator fun component2(): String = path
-    inline operator fun component3(): Path = root
+    /**
+     * Path to the file from root, *without* leading '/', including the file name
+     */
+    val path: String
+        get() {
+            if (root == null) {
+                return file.name
+            } else {
+                return root.relativize(file).toString()
+            }
+        }
 
     val classpathEntry: Path
-        get() = if (simple) file else root
+        get() = root ?: file
 
     override fun toString(): String {
-        return root.absolutePath + "//" + path
+        if (root == null) {
+            return file.absolutePath
+        } else {
+            return "${root.absolutePath}//$path"
+        }
     }
 
     override fun writeMachine(json: Json) {
         json.writeObjectStart()
-        json.writeValue("file", file, Path::class.java)
         json.writeValue("root", root, Path::class.java)
-        json.writeValue("path", path, String::class.java)
-        json.writeValue("simple", simple, Boolean::class.java)
+        json.writeValue("file", path, Path::class.java)
         json.writeObjectEnd()
     }
 }
 
 /**
- * Walk the filesystem, starting at [from] and create a [LocatedFile] for each encountered file,
+ * Walk the filesystem, starting at [from] and create a [LocatedPath] for each encountered file,
  * that fulfills the [predicate]. Then put the created file to [to].
  *
  * Created files will have their root at [from].
  */
-fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, predicate: (Path) -> Boolean = { true }) {
+fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedPath>, predicate: (Path) -> Boolean = { true }) {
     // Walking is hard, don't do it if we don't have to
     if (!from.exists()) {
         return
@@ -76,7 +91,7 @@ fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, predic
 
     if (!from.isDirectory()) {
         if (!from.isHidden() && predicate(from)) {
-            to.add(LocatedFile(from))
+            to.add(LocatedPath(from))
         }
         return
     }
@@ -93,10 +108,7 @@ fun constructLocatedFiles(from: Path, to: MutableCollection<LocatedFile>, predic
 
         override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
             if (!attrs.isDirectory && !file.isHidden() && predicate(file)) {
-                val originalLength = pathStack.length
-                pathStack.append(file.name)
-                to.add(LocatedFile(file, pathStack.toString(), from))
-                pathStack.setLength(originalLength)
+                to.add(LocatedPath(from, file))
             }
 
             return FileVisitResult.CONTINUE

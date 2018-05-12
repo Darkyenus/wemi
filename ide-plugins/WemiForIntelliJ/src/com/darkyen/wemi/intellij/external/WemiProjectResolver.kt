@@ -384,7 +384,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             }
 
             session.jsonArray(projectName, *config, task = "unmanagedDependencies").forEach {
-                val file = File(it.getString(if (it.getBoolean("simple")) "file" else "root")).absoluteFile
+                val file = File(it.getString("root") ?: it.getString("file")).absoluteFile
 
                 add(file.absolutePath, WemiLibraryDependency(file.name, file))
             }

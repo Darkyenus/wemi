@@ -185,13 +185,13 @@ object Configurations {
         Keys.repositoryChain set { Keys.buildScript.get().buildScriptClasspathConfiguration.repositoryChain }
         Keys.libraryDependencies set { Keys.buildScript.get().buildScriptClasspathConfiguration.dependencies }
         Keys.externalClasspath set {
-            val files = WMutableList<LocatedFile>()
+            val files = WMutableList<LocatedPath>()
             val buildScript = Keys.buildScript.get()
             for (path in buildScript.classpath) {
-                files.add(LocatedFile(path))
+                files.add(LocatedPath(path))
             }
             for (fileDependency in buildScript.buildScriptClasspathConfiguration.fileDependencies) {
-                files.add(LocatedFile(fileDependency))
+                files.add(LocatedPath(fileDependency))
             }
             files
         }

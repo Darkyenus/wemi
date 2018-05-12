@@ -8,7 +8,7 @@ import wemi.boot.MachineWritable
 import wemi.boot.WemiBundledLibrariesExclude
 import wemi.dependency.*
 import wemi.util.EnclaveClassLoader
-import wemi.util.LocatedFile
+import wemi.util.LocatedPath
 import wemi.collections.wSetOf
 import wemi.util.Magic
 import java.nio.file.Path
@@ -26,7 +26,7 @@ interface KotlinCompiler {
      * @param classpath for user class files
      * @param flags custom arguments, parsed by kotlin compiler
      */
-    fun compileJVM(sources: Collection<LocatedFile>,
+    fun compileJVM(sources: Collection<LocatedPath>,
                    classpath: Collection<Path>,
                    destination: Path,
                    cacheFolder: Path?,

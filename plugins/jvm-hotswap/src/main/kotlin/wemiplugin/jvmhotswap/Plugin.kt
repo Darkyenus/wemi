@@ -66,10 +66,10 @@ object JvmHotswap {
                 }
 
                 // Create initial snapshot of sources
-                val sourceIncluded: (LocatedFile) -> Boolean = { !it.file.isHidden() }
+                val sourceIncluded: (LocatedPath) -> Boolean = { !it.file.isHidden() }
                 var sourceSnapshot = snapshotFiles(Keys.sourceFiles.get(), sourceIncluded)
                 // Create initial snapshot of internal classpath
-                val classpathIncluded: (LocatedFile) -> Boolean = { it.file.name.pathHasExtension("class") }
+                val classpathIncluded: (LocatedPath) -> Boolean = { it.file.name.pathHasExtension("class") }
                 var classpathSnapshot = snapshotFiles(initialInternalClasspath, classpathIncluded)
 
                 // Start the process

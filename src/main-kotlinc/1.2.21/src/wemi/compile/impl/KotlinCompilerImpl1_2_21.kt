@@ -18,7 +18,7 @@ import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.internal.MessageLocation
 import wemi.compile.internal.render
-import wemi.util.LocatedFile
+import wemi.util.LocatedPath
 import wemi.util.absolutePath
 import wemi.util.copyRecursively
 import java.io.File
@@ -70,7 +70,7 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
         }
     }
 
-    override fun compileJVM(sources: Collection<LocatedFile>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
+    override fun compileJVM(sources: Collection<LocatedPath>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
         val messageCollector = createLoggingMessageCollector(logger, loggerMarker)
         val compiler = K2JVMCompiler()
         val args = compiler.createArguments()
@@ -163,7 +163,14 @@ internal class KotlinCompilerImpl1_2_21 : KotlinCompiler {
             exitCode = withIC {
                 val compilerRunner = IncrementalJvmCompilerRunner(
                         kotlincCacheFile,
-                        sources.map { JvmSourceRoot(it.root.toFile(), null) }.toSet(),
+                        sources.mapNotNull {
+                            val root = it.root
+                            if (root != null) {
+                                JvmSourceRoot(root.toFile(), null)
+                            } else {
+                                null
+                            }
+                        }.toSet(),
                         versions, object : ICReporter {
                             override fun report(message: () -> String) {
                                 logger.debug(loggerMarker, "IC: {}", message())

@@ -1,9 +1,5 @@
 # Things to do next
 
-- Write [UPDATE_PROTOCOLS.md](UPDATE_PROTOCOLS.md)
-
-- Cleanup LocatedFile
-
 - Refactor BuildScriptClasspathConfiguration to store info with classpath in json, this lazy class is weird
 	- Change warnings in parsing to errors
 

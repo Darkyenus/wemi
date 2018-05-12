@@ -128,7 +128,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
     buildFlags[KotlinCompilerFlags.moduleName] = combinedBuildFileName
     buildFlags[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
 
-    val sources = buildScriptSources.map { LocatedFile(it) }.toWList()
+    val sources = buildScriptSources.map { LocatedPath(it) }.toWList()
 
     val classpathConfiguration = BuildScriptClasspathConfiguration(buildScriptSources)
 
@@ -419,7 +419,7 @@ class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Pat
 data class BuildScript(val scriptJar: Path,
                        val classpath: WList<Path>, val initClasses: WList<String>,
                        val buildScriptClasspathConfiguration: BuildScriptClasspathConfiguration,
-                       val sources: WList<LocatedFile>, val buildFlags: CompilerFlags,
+                       val sources: WList<LocatedPath>, val buildFlags: CompilerFlags,
                        private var ready:Boolean) {
 
     val wemiLauncherJar:Path

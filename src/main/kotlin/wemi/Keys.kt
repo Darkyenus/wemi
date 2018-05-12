@@ -20,7 +20,7 @@ import wemi.publish.InfoNode
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.prettyPrint
-import wemi.util.LocatedFile
+import wemi.util.LocatedPath
 import wemi.util.Partial
 import java.net.URI
 import java.nio.file.Path
@@ -55,9 +55,9 @@ object Keys {
      * use language configuration, for example [wemi.Configurations.compilingJava].
      * Under [wemi.Configurations.testing] contains test sources as well (in addition to normal sources).
      */
-    val sourceFiles by key<WList<LocatedFile>>("Files to be compiled. Usually derived from sourceRoots and sourceExtensions. Maps source root -> source files", defaultValue = wEmptyList())
+    val sourceFiles by key<WList<LocatedPath>>("Files to be compiled. Usually derived from sourceRoots and sourceExtensions. Maps source root -> source files", defaultValue = wEmptyList())
     val resourceRoots by key<WSet<Path>>("Directories which are resource roots for the project (example: '/src/main/resources')", defaultValue = wEmptySet())
-    val resourceFiles by key<WList<LocatedFile>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files", defaultValue = wEmptyList())
+    val resourceFiles by key<WList<LocatedPath>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files", defaultValue = wEmptyList())
 
     /**
      * Used to generalize keys like [sourceFiles] or [sourceExtensions] to union of distinct subsets.
@@ -72,12 +72,12 @@ object Keys {
     val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved ->
         resolved.value.prettyPrint(null)
     }, cacheMode = CACHE_ALWAYS)
-    val unmanagedDependencies by key<WList<LocatedFile>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = wEmptyList())
+    val unmanagedDependencies by key<WList<LocatedPath>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = wEmptyList())
     val projectDependencies by key<WSet<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = wEmptySet())
-    val resolvedProjectDependencies by key<WList<LocatedFile>>("Classpath contribution of projectDependencies into externalClasspath")
+    val resolvedProjectDependencies by key<WList<LocatedPath>>("Classpath contribution of projectDependencies into externalClasspath")
 
-    val externalClasspath by key<WList<LocatedFile>>("Classpath of the project, elements from external sources, i.e. library and project dependencies", defaultValue = wEmptyList())
-    val internalClasspath by key<WList<LocatedFile>>("Classpath of the project, created internally, i.e. compiled sources and resources", defaultValue = wEmptyList())
+    val externalClasspath by key<WList<LocatedPath>>("Classpath of the project, elements from external sources, i.e. library and project dependencies", defaultValue = wEmptyList())
+    val internalClasspath by key<WList<LocatedPath>>("Classpath of the project, created internally, i.e. compiled sources and resources", defaultValue = wEmptyList())
 
     val clean by key<Int>("Clean compile directories and internal cache, returns approximate amount of items cleaned", cacheMode = null)
 

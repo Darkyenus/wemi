@@ -104,8 +104,8 @@ class AssemblyOperation : Closeable {
     private val loadedSources = LinkedHashMap<String, ArrayList<AssemblySource>>()
     private val filesToClose = ArrayList<Closeable>()
 
-    fun addSource(locatedFile: LocatedFile, own: Boolean, extractJarEntries: Boolean = true) {
-        val file = locatedFile.file
+    fun addSource(locatedPath: LocatedPath, own: Boolean, extractJarEntries: Boolean = true) {
+        val file = locatedPath.file
         if (extractJarEntries && file.name.pathHasExtension("jar")) {
             // Add jar entries
             val zip = ZipFile(file.toFile(), ZipFile.OPEN_READ, StandardCharsets.UTF_8)
@@ -122,7 +122,7 @@ class AssemblyOperation : Closeable {
             }
         } else {
             // Add file entry
-            loadedSources.getOrPut(normalizeZipPath(locatedFile.path)) { ArrayList() }.add(AssemblySource(locatedFile.toString(), file, file.lastModified.toMillis(), own) {
+            loadedSources.getOrPut(normalizeZipPath(locatedPath.path)) { ArrayList() }.add(AssemblySource(locatedPath.toString(), file, file.lastModified.toMillis(), own) {
 
                 Files.readAllBytes(file)
             })

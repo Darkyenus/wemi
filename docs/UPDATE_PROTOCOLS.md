@@ -10,7 +10,8 @@
     - [IDEA plugin changelog](../ide-plugins/WemiForIntelliJ/resources/META-INF/plugin.xml)
 3. Create and push git commit
 4. Create github release, with binary builds of IDEA plugin and wemi itself
-5. Create and push commit that changes versions to <NEXT_VERSION>-SNAPSHOT
+5. Create commit that changes versions to <NEXT_VERSION>-SNAPSHOT
+6. Update wemi used by Wemi, update build script, if needed, commit and push
 
 # New Kotlin Version
 1. Add it to [CompilerProjects in build script](../build/build.wemi.kt)
@@ -22,3 +23,4 @@ This propagates to `kotlinVersion` key, used to compile user projects.
 # New Java Version
 - Check [BytecodeUtil](../plugins/jvm-hotswap/src/main/kotlin/wemiplugin/jvmhotswap/agent/BytecodeUtil.java)
 	and update `.class` parsing logic.
+- Update `javadocUrl` in [KeyDefaults](../src/main/kotlin/wemi/KeyDefaults.kt)

@@ -72,10 +72,10 @@ object KeyDefaults {
         roots
     }
 
-    val SourceFiles: BoundKeyValue<WList<LocatedFile>> = {
+    val SourceFiles: BoundKeyValue<WList<LocatedPath>> = {
         val roots = Keys.sourceRoots.get()
         val extensions = Keys.sourceExtensions.get()
-        val result = WMutableList<LocatedFile>()
+        val result = WMutableList<LocatedPath>()
 
         for (root in roots) {
             constructLocatedFiles(root, result) { it.name.pathHasExtension(extensions) }
@@ -84,9 +84,9 @@ object KeyDefaults {
         result
     }
 
-    val ResourceFiles: BoundKeyValue<WList<LocatedFile>> = {
+    val ResourceFiles: BoundKeyValue<WList<LocatedPath>> = {
         val roots = Keys.resourceRoots.get()
-        val result = WMutableList<LocatedFile>()
+        val result = WMutableList<LocatedPath>()
 
         for (root in roots) {
             constructLocatedFiles(root, result)
@@ -114,12 +114,12 @@ object KeyDefaults {
     }
 
     private val ResolvedProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
-    fun resolvedProjectDependencies(aggregate:Boolean?): BoundKeyValue<WList<LocatedFile>> = {
+    fun resolvedProjectDependencies(aggregate:Boolean?): BoundKeyValue<WList<LocatedPath>> = {
         ResolvedProjectDependencies_CircularDependencyProtection.block(this, failure = {
             //TODO Show cycle
             throw WemiException("Cyclic dependencies in projectDependencies are not allowed", showStacktrace = false)
         }, action = {
-            val result = WMutableList<LocatedFile>()
+            val result = WMutableList<LocatedPath>()
             val projectDependencies = Keys.projectDependencies.get()
 
             for (projectDependency in projectDependencies) {
@@ -139,15 +139,15 @@ object KeyDefaults {
     }
 
     private val ExternalClasspath_LOG = LoggerFactory.getLogger("ProjectDependencyResolution")
-    val ExternalClasspath: BoundKeyValue<WList<LocatedFile>> = {
-        val result = WMutableList<LocatedFile>()
+    val ExternalClasspath: BoundKeyValue<WList<LocatedPath>> = {
+        val result = WMutableList<LocatedPath>()
 
         val resolved = Keys.resolvedLibraryDependencies.get()
         if (!resolved.complete) {
             throw WemiException("Failed to resolve all artifacts\n${resolved.value.prettyPrint(null)}", showStacktrace = false)
         }
         for ((_, resolvedDependency) in resolved.value) {
-            result.add(LocatedFile(resolvedDependency.artifact ?: continue))
+            result.add(LocatedPath(resolvedDependency.artifact ?: continue))
         }
 
         val projectDependencies = Keys.resolvedProjectDependencies.get()
@@ -159,11 +159,11 @@ object KeyDefaults {
         result
     }
 
-    val InternalClasspath: BoundKeyValue<WList<LocatedFile>> = {
+    val InternalClasspath: BoundKeyValue<WList<LocatedPath>> = {
         val compiled = Keys.compile.get()
         val resources = Keys.resourceFiles.get()
 
-        val classpath = WMutableList<LocatedFile>(resources.size + 128)
+        val classpath = WMutableList<LocatedPath>(resources.size + 128)
         constructLocatedFiles(compiled, classpath)
         classpath.addAll(resources)
 
@@ -262,10 +262,6 @@ object KeyDefaults {
             output.ensureEmptyDirectory()
 
             val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
-            val javaSourceRoots = mutableSetOf<Path>()
-            for ((_, _, root) in javaSources) {
-                javaSourceRoots.add(root.toAbsolutePath())
-            }
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
 
@@ -298,8 +294,6 @@ object KeyDefaults {
                 compilerOptions.add("-classpath")
                 val classpathString = externalClasspath.joinToString(pathSeparator) { it.absolutePath }
                 compilerOptions.add(classpathString)
-                compilerOptions.add("-sourcepath")
-                compilerOptions.add(javaSourceRoots.joinToString(pathSeparator) { it.absolutePath })
                 compilerOptions.add("-d")
                 compilerOptions.add(output.absolutePath)
                 compilerOptions.add("-s")
@@ -344,22 +338,12 @@ object KeyDefaults {
             output.ensureEmptyDirectory()
 
             val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
-            val javaSourceRoots = mutableSetOf<Path>()
-            for ((_, _, root) in javaSources) {
-                javaSourceRoots.add(root.toAbsolutePath())
-            }
             val kotlinSources = using(compilingKotlin) { Keys.sourceFiles.get() }
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
 
             // Compile Kotlin
             if (kotlinSources.isNotEmpty()) {
-                val sources: MutableList<Path> = mutableListOf()
-                for ((file, _, _) in kotlinSources) {
-                    sources.add(file)
-                }
-                sources.addAll(javaSourceRoots)
-
                 val compiler = using(compilingKotlin) { Keys.kotlinCompiler.get() }
                 val compilerFlags = using(compilingKotlin) { Keys.compilerOptions.get() }
 
@@ -408,8 +392,6 @@ object KeyDefaults {
                 } else {
                     compilerOptions.add(classpathString)
                 }
-                compilerOptions.add("-sourcepath")
-                compilerOptions.add(javaSourceRoots.joinToString(pathSeparator) { it.absolutePath })
                 compilerOptions.add("-d")
                 compilerOptions.add(output.absolutePath)
                 compilerOptions.add("-s")
@@ -690,8 +672,8 @@ object KeyDefaults {
             // (Version 5 is the first one uploaded, but under non-typical URL)
             return "https://docs.oracle.com/javase/1.5.0/docs/api/"
         } else {
-            // Default is 9 because that is newest
-            return "https://docs.oracle.com/javase/${javaVersion ?: 9}/docs/api/"
+            // Default is 10 because that is newest
+            return "https://docs.oracle.com/javase/${javaVersion ?: 10}/docs/api/"
         }
     }
 
@@ -769,7 +751,7 @@ object KeyDefaults {
                 throw WemiException("Failed to package javadoc", showStacktrace = false)
             }
 
-            val locatedFiles = ArrayList<LocatedFile>()
+            val locatedFiles = ArrayList<LocatedPath>()
             constructLocatedFiles(javadocOutput, locatedFiles)
 
             AssemblyOperation().use { assemblyOperation ->
@@ -864,7 +846,7 @@ object KeyDefaults {
 
             dokka.execute(externalClasspath, dokkaOutput, packageListCacheFolder, options, ARCHIVE_DOKKA_LOG)
 
-            val locatedFiles = ArrayList<LocatedFile>()
+            val locatedFiles = ArrayList<LocatedPath>()
             constructLocatedFiles(dokkaOutput, locatedFiles)
 
             AssemblyOperation().use { assemblyOperation ->

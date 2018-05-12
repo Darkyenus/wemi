@@ -458,8 +458,8 @@ private fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
         if (value is Function<*>) {
             val javaClass = value.javaClass
             this.format(Color.White).append(" (").append(javaClass.name).append(')')
-        } else if (value is Path || value is LocatedFile) {
-            val path = value as? Path ?: (value as LocatedFile).file
+        } else if (value is Path || value is LocatedPath) {
+            val path = value as? Path ?: (value as LocatedPath).file
 
             if (Files.isRegularFile(path)) {
                 try {
