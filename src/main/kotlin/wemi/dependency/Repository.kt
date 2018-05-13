@@ -295,11 +295,9 @@ sealed class Repository(val name: String) {
                         field("type", "M2")
                         field("name", value.name)
                         field("url", value.url)
+
                         field("cache", value.cache)
                         field("checksum", value.checksum)
-
-                        //TODO Remove, check if not used in IDE plugin first
-                        field("local", value.local)
                     }
                 }
             }
