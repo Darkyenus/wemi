@@ -1,12 +1,14 @@
 package wemi.dependency
 
-import com.esotericsoftware.jsonbeans.Json
+import com.esotericsoftware.jsonbeans.JsonException
+import com.esotericsoftware.jsonbeans.JsonValue
+import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
-import wemi.boot.MachineWritable
 import wemi.collections.WSet
 import wemi.collections.wSetOf
 import wemi.publish.InfoNode
 import wemi.util.*
+import wemi.util.Json
 import java.net.URI
 import java.net.URL
 import java.nio.file.*
@@ -15,7 +17,8 @@ import java.security.MessageDigest
 /**
  * Represents repository from which artifacts may be retrieved
  */
-sealed class Repository(val name: String) : MachineWritable {
+@Json(Repository.Serializer::class)
+sealed class Repository(val name: String) {
 
     /** Local repositories are preferred, because retrieving from them is faster. */
     abstract val local: Boolean
@@ -52,6 +55,7 @@ sealed class Repository(val name: String) : MachineWritable {
      * @param cache of this repository
      * @param checksum to use when retrieving artifacts from here
      */
+    @Json(Repository.Serializer::class)
     class M2(name: String, val url: URL, override val cache: M2? = null, val checksum: Checksum = M2.Checksum.SHA1) : Repository(name) {
 
         override val local: Boolean
@@ -275,20 +279,47 @@ sealed class Repository(val name: String) : MachineWritable {
             }
             return sb.toString()
         }
-
-        override fun writeMachine(json: Json) {
-            json.writeObjectStart()
-            json.writeValue("type", "M2", String::class.java)
-            json.writeValue("url", url.toExternalForm(), String::class.java)
-            json.writeValue("local", local, Boolean::class.java)
-            json.writeValue("cache", cache, M2::class.java)
-            json.writeValue("checksum", checksum, M2.Checksum::class.java)
-            json.writeObjectEnd()
-        }
     }
 
     override fun toString(): String {
         return "Repository: $name"
+    }
+
+    internal class Serializer : wemi.util.JsonSerializer<Repository> {
+
+        override fun JsonWriter.write(value: Repository) {
+            // Exhaustive when
+            return when (value) {
+                is Repository.M2 -> {
+                    writeObject {
+                        field("type", "M2")
+                        field("name", value.name)
+                        field("url", value.url)
+                        field("cache", value.cache)
+                        field("checksum", value.checksum)
+
+                        //TODO Remove, check if not used in IDE plugin first
+                        field("local", value.local)
+                    }
+                }
+            }
+        }
+
+        override fun read(value: JsonValue): Repository {
+            val type = value.getString("type")
+            when (type) {
+                "M2" -> {
+                    return Repository.M2(
+                            value.field("name"),
+                            value.field("url"),
+                            value.field("cache"),
+                            value.field("checksum"))
+                }
+                else -> {
+                    throw JsonException("Unknown Repository type: $type")
+                }
+            }
+        }
     }
 }
 
@@ -332,6 +363,7 @@ fun createRepositoryChain(repositories: Collection<Repository>): RepositoryChain
  * Local Maven repository stored in ~/.m2/repository
  */
 val LocalM2Repository = Repository.M2("local", (Paths.get(System.getProperty("user.home")) / ".m2/repository/").toUri().toURL(), null)
+
 /**
  * Maven Central repository at [maven.org](https://maven.org)
  *
@@ -345,6 +377,7 @@ val MavenCentral = Repository.M2("central", URL("https://repo1.maven.org/maven2/
  * Cached by [LocalM2Repository].
  */
 val JCenter = Repository.M2("jcenter", URL("https://jcenter.bintray.com/"), LocalM2Repository)
+
 /**
  * Jitpack repository at [jitpack.io](https://jitpack.io)
  *

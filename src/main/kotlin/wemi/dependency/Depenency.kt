@@ -1,12 +1,16 @@
 package wemi.dependency
 
-import com.esotericsoftware.jsonbeans.Json
+import com.esotericsoftware.jsonbeans.JsonException
+import com.esotericsoftware.jsonbeans.JsonValue
+import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
-import wemi.boot.MachineWritable
 import wemi.collections.TinyMap
-import wemi.util.WithDescriptiveString
+import wemi.dependency.ArtifactKey.Companion.ArtifactData
+import wemi.dependency.ArtifactKey.Companion.ArtifactFile
+import wemi.util.*
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.*
 
 /**
  * Artifact classifier.
@@ -26,12 +30,13 @@ typealias Classifier = String
  * @param preferredRepository repository in which to search for this project first
  *          (its cache, if any, is searched even earlier)
  */
+@Json(DependencyId.Serializer::class)
 data class DependencyId(val group: String,
                         val name: String,
                         val version: String,
 
                         val preferredRepository: Repository? = null,
-                        val attributes: Map<DependencyAttribute, String> = emptyMap()) : MachineWritable {
+                        val attributes: Map<DependencyAttribute, String> = emptyMap()) {
 
     fun attribute(attribute: DependencyAttribute): String? {
         return attributes[attribute] ?: attribute.defaultValue
@@ -78,21 +83,38 @@ data class DependencyId(val group: String,
         return result.toString()
     }
 
-    override fun writeMachine(json: Json) {
-        json.writeObjectStart()
-        json.writeValue("group", group, String::class.java)
-        json.writeValue("name", name, String::class.java)
-        json.writeValue("version", version, String::class.java)
 
-        json.writeValue("preferredRepository", preferredRepository, Repository::class.java)
-        json.writeValue("attributes", attributes, Map::class.java)
-        json.writeObjectEnd()
+    internal class Serializer : JsonSerializer<DependencyId> {
+
+        override fun JsonWriter.write(value: DependencyId) {
+            writeObject {
+                field("group", value.group)
+                field("name", value.name)
+                field("version", value.version)
+
+                field("preferredRepository", value.preferredRepository)
+                fieldMap("attributes", value.attributes)
+            }
+        }
+
+        override fun read(value: JsonValue): DependencyId {
+            return DependencyId(
+                    value.field("group"),
+                    value.field("name"),
+                    value.field("version"),
+
+                    value.field("preferredRepository"),
+                    value.fieldToMap("attributes", HashMap())
+                    )
+        }
     }
 }
 
 /**
  * Instance of this class uniquely defines a dependency attribute for [DependencyId.attributes].
  * Values bound to [DependencyAttribute] keys are [String]s.
+ *
+ * When creating new attributes, make sure that they are loaded earlier than any of their deserialization.
  *
  * @param name of this attribute
  * @param makesUnique if two equal [DependencyId], differing only in value/presence of this attribute, are equal or not
@@ -104,18 +126,43 @@ data class DependencyId(val group: String,
  * @see Repository.M2.Classifier
  * @see Repository.M2.Optional
  */
-data class DependencyAttribute(val name: String, val makesUnique: Boolean, val defaultValue: String? = null) : MachineWritable {
+@Json(DependencyAttribute.Serializer::class)
+data class DependencyAttribute internal constructor(val name: String, val makesUnique: Boolean, val defaultValue: String? = null) {
+
+    init {
+        KNOWN_DEPENDENCY_ATTRIBUTES[name] = this
+    }
+
     override fun toString(): String = name
 
-    override fun writeMachine(json: Json) {
-        json.writeValue(name as Any, String::class.java)
+    internal class Serializer : JsonSerializer<DependencyAttribute> {
+
+        init {
+            // Make sure that attributes in there are registered
+            Repository.M2
+        }
+
+        override fun JsonWriter.write(value: DependencyAttribute) {
+            writeValue(value.name, String::class.java)
+        }
+
+        override fun read(value: JsonValue): DependencyAttribute {
+            val name = value.to(String::class.java)
+            return KNOWN_DEPENDENCY_ATTRIBUTES[name] ?: throw JsonException("Unknown DependencyAttribute: $name")
+        }
     }
 }
+
+/**
+ * Registered dependency attributes, for deserialization.
+ */
+private val KNOWN_DEPENDENCY_ATTRIBUTES:MutableMap<String, DependencyAttribute> = Collections.synchronizedMap(HashMap())
 
 /** Represents exclusion rule. All fields must match precisely to be considered for exclusion.
  * [group], [name] and [version] may contain "*" to signify wildcard that matches all.
  * Such wildcard in attribute means presence of that attribute, with any value. */
-data class DependencyExclusion(val group: String, val name: String, val version: String, val attributes: Map<DependencyAttribute, String> = emptyMap()) : MachineWritable {
+@Json(DependencyExclusion.Serializer::class)
+data class DependencyExclusion(val group: String, val name: String, val version: String, val attributes: Map<DependencyAttribute, String> = emptyMap()) {
 
     private fun matches(pattern: String, value: String?): Boolean {
         return (pattern == "*" && value != null) || pattern == value
@@ -138,14 +185,26 @@ data class DependencyExclusion(val group: String, val name: String, val version:
         return "$group:$name:$version $attributes"
     }
 
-    override fun writeMachine(json: Json) {
-        json.writeObjectStart()
-        json.writeValue("group", group, String::class.java)
-        json.writeValue("name", name, String::class.java)
-        json.writeValue("version", version, String::class.java)
+    internal class Serializer : JsonSerializer<DependencyExclusion> {
+        override fun JsonWriter.write(value: DependencyExclusion) {
+            writeObject {
+                field("group", value.group)
+                field("name", value.name)
+                field("version", value.version)
 
-        json.writeValue("attributes", attributes, Map::class.java)
-        json.writeObjectEnd()
+                fieldMap("attributes", value.attributes)
+            }
+        }
+
+        override fun read(value: JsonValue): DependencyExclusion {
+            return DependencyExclusion(
+                    value.field("group"),
+                    value.field("name"),
+                    value.field("version"),
+
+                    value.fieldToMap("attributes", HashMap())
+            )
+        }
     }
 }
 
@@ -172,20 +231,35 @@ val DefaultExclusions = listOf(
 /** Represents dependency on a [dependencyId], with transitive dependencies, which may be excluded by [exclusions].
  *
  * @param exclusions to filter transitive dependencies with. [DefaultExclusions] by default. */
-data class Dependency(val dependencyId: DependencyId, val exclusions: List<DependencyExclusion> = DefaultExclusions) : MachineWritable, WithDescriptiveString {
-
-    override fun writeMachine(json: Json) {
-        json.writeObjectStart()
-        json.writeValue("id", dependencyId, DependencyId::class.java)
-        json.writeValue("exclusions", exclusions, List::class.java)
-        json.writeObjectEnd()
-    }
+@Json(Dependency.Serializer::class)
+data class Dependency(val dependencyId: DependencyId, val exclusions: List<DependencyExclusion> = DefaultExclusions) : WithDescriptiveString {
 
     override fun toDescriptiveAnsiString(): String {
         return if (exclusions === DefaultExclusions) {
             dependencyId.toString()
         } else {
             "$dependencyId, exclusions= $exclusions"
+        }
+    }
+
+    internal class Serializer : JsonSerializer<Dependency> {
+        override fun JsonWriter.write(value: Dependency) {
+            writeObject {
+                field("id", value.dependencyId)
+                if (value.exclusions !== DefaultExclusions) {
+                    fieldCollection("exclusions", value.exclusions)
+                }
+            }
+        }
+
+        override fun read(value: JsonValue): Dependency {
+            val id = value.field<DependencyId>("id")
+            val exclusionsJson = value.get("exclusions")
+            if (exclusionsJson == null) {
+                return Dependency(id)
+            } else {
+                return Dependency(id, exclusionsJson.toCollection(DependencyExclusion::class.java, ArrayList()))
+            }
         }
     }
 }
@@ -235,7 +309,7 @@ class ResolvedDependency constructor(val id: DependencyId,
                               val resolvedFrom: Repository?,
                               val hasError: Boolean,
                               val log: CharSequence = "")
-    : TinyMap<ArtifactKey<*>, Any>(), MachineWritable {
+    : TinyMap<ArtifactKey<*>, Any>(), JsonWritable {
 
     /**
      * Path to the artifact. Convenience accessor.
@@ -318,24 +392,24 @@ class ResolvedDependency constructor(val id: DependencyId,
         return super.remove(key) as T?
     }
 
-    override fun writeMachine(json: Json) {
-        json.writeObjectStart()
-        json.writeValue("id", id)
-        json.writeValue("dependencies", dependencies)
-        json.writeValue("resolvedFrom", resolvedFrom)
-        json.writeValue("hasError", hasError, Boolean::class.java)
-        json.writeValue("log", log.toString(), String::class.java)
-        json.writeArrayStart("data")
-        forEachEntry { key, value ->
-            json.writeObjectStart()
-            json.writeValue("name", key.name)
-            if (key.printOut) {
-                json.writeValue("value", value)
+    override fun JsonWriter.write() {
+        writeObject {
+            field("id", id)
+            field("dependencies", dependencies)
+            field("resolvedFrom", resolvedFrom)
+            field("hasError", hasError)
+            field("log", log.toString())
+            name("data").writeArray {
+                forEachEntry { key, value ->
+                    writeObject {
+                        field("name", key.name)
+                        if (key.printOut) {
+                            name("value").writeValue(value, null)
+                        }
+                    }
+                }
             }
-            json.writeObjectEnd()
         }
-        json.writeArrayEnd()
-        json.writeObjectEnd()
     }
 
     override fun toString(): String {

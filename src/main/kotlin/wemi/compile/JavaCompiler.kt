@@ -1,8 +1,9 @@
 package wemi.compile
 
-import com.esotericsoftware.jsonbeans.Json
-import wemi.boot.MachineWritable
+import com.esotericsoftware.jsonbeans.JsonWriter
 import wemi.collections.wSetOf
+import wemi.util.JsonWritable
+import wemi.util.writeValue
 
 /**
  * Extensions that a valid Java source file can have.
@@ -23,7 +24,7 @@ object JavaCompilerFlags {
  *
  * Used in [JavaCompilerFlags].
  */
-enum class JavaVersion(val version: String) : MachineWritable {
+enum class JavaVersion(val version: String) : JsonWritable {
     V1_5("1.5"),
     V1_6("1.6"),
     V1_7("1.7"),
@@ -31,8 +32,8 @@ enum class JavaVersion(val version: String) : MachineWritable {
     V1_9("1.9"),
     ;
 
-    override fun writeMachine(json: Json) {
-        json.writeValue(version as Any, String::class.java)
+    override fun JsonWriter.write() {
+        writeValue(version, String::class.java)
     }
 
     override fun toString(): String = version

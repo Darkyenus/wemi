@@ -1,9 +1,8 @@
 package wemi.util
 
-import com.esotericsoftware.jsonbeans.Json
+import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import wemi.boot.MachineWritable
 import java.io.IOException
 import java.nio.file.FileVisitResult
 import java.nio.file.FileVisitor
@@ -26,7 +25,7 @@ class LocatedPath private constructor(
         /** Represented file */
         val file: Path,
         @Suppress("UNUSED_PARAMETER") dummy: Unit?)
-    : MachineWritable {
+    : JsonWritable {
 
     /**
      * Create without explicit root. [file] itself is an classpath entry, or this distinction is not relevant.
@@ -69,11 +68,11 @@ class LocatedPath private constructor(
         }
     }
 
-    override fun writeMachine(json: Json) {
-        json.writeObjectStart()
-        json.writeValue("root", root, Path::class.java)
-        json.writeValue("file", path, Path::class.java)
-        json.writeObjectEnd()
+    override fun JsonWriter.write() {
+        writeObject {
+            field("root", root)
+            field("file", file)
+        }
     }
 }
 

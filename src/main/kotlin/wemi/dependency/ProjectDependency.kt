@@ -1,9 +1,9 @@
 package wemi.dependency
 
-import com.esotericsoftware.jsonbeans.Json
+import com.esotericsoftware.jsonbeans.JsonWriter
 import wemi.Configuration
 import wemi.Project
-import wemi.boot.MachineWritable
+import wemi.util.*
 
 /**
  * Defines a dependency on a project defined in the same build script.
@@ -17,18 +17,18 @@ import wemi.boot.MachineWritable
  * @see dependency
  */
 class ProjectDependency internal constructor(val project: Project, val aggregate:Boolean, val configurations: Array<out Configuration>)
-    : MachineWritable {
+    : JsonWritable {
 
-    override fun writeMachine(json: Json) {
-        json.writeObjectStart()
-        json.writeValue("project", project.name, String::class.java)
-        json.writeValue("aggregate", aggregate, Boolean::class.java)
-        json.writeArrayStart("configurations")
-        for (configuration in configurations) {
-            json.writeValue(configuration.name as Any, String::class.java)
+    override fun JsonWriter.write() {
+        writeObject {
+            field("project", project.name)
+            field("aggregate", aggregate)
+            name("configurations").writeArray {
+                for (configuration in configurations) {
+                    writeValue(configuration.name, String::class.java)
+                }
+            }
         }
-        json.writeArrayEnd()
-        json.writeObjectEnd()
     }
 
     override fun toString(): String {

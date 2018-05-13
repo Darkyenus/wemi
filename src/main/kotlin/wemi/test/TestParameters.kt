@@ -1,15 +1,14 @@
 package wemi.test
 
-import com.esotericsoftware.jsonbeans.Json
-import com.esotericsoftware.jsonbeans.JsonSerializable
 import com.esotericsoftware.jsonbeans.JsonValue
-import wemi.util.putArrayStrings
-import wemi.util.writeStringArray
+import com.esotericsoftware.jsonbeans.JsonWriter
+import wemi.util.*
 
 /**
  * Parameters for the test run, using JUnit Platform.
  */
-class TestParameters : JsonSerializable {
+@Json(TestParameters.Serializer::class)
+class TestParameters {
 
     /**
      * The configuration parameters to be used.
@@ -122,64 +121,65 @@ class TestParameters : JsonSerializable {
         }
     }
 
+    internal class Serializer : JsonSerializer<TestParameters> {
+        override fun JsonWriter.write(value: TestParameters) {
+            writeObject {
+                // Configuration
+                fieldMap("configuration", value.configuration)
 
-    override fun write(json: Json) {
-        // Configuration
-        json.writeArrayStart("configuration")
-        for ((key, value) in configuration) {
-            json.writeValue(key, value, String::class.java)
-        }
-        json.writeArrayEnd()
+                field("filterStackTraces", value.filterStackTraces)
 
-        json.writeValue("filterStackTraces", filterStackTraces, Boolean::class.java)
+                // Selector
+                name("selector").writeObject {
+                    fieldCollection("uris", value.select.uris)
+                    fieldCollection("files", value.select.files)
+                    fieldCollection("directories", value.select.directories)
+                    fieldCollection("packages", value.select.packages)
+                    fieldCollection("classes", value.select.classes)
+                    fieldCollection("methods", value.select.methods)
+                    fieldCollection("resources", value.select.resources)
+                    fieldCollection("classpathRoots", value.select.classpathRoots)
+                }
 
-        // Selector
-        json.writeObjectStart("selector")
-        json.writeStringArray(select.uris, "uris", skipEmpty = true)
-        json.writeStringArray(select.files, "files", skipEmpty = true)
-        json.writeStringArray(select.directories, "directories", skipEmpty = true)
-        json.writeStringArray(select.packages, "packages", skipEmpty = true)
-        json.writeStringArray(select.classes, "classes", skipEmpty = true)
-        json.writeStringArray(select.methods, "methods", skipEmpty = true)
-        json.writeStringArray(select.resources, "resources", skipEmpty = true)
-        json.writeStringArray(select.classpathRoots, "classpathRoots", skipEmpty = true)
-        json.writeObjectEnd()
-
-        // Filter
-        json.writeObjectStart("filter")
-        json.writeValue("engines", filter.engines, IncludeExcludeList::class.java)
-        json.writeValue("classNamePatterns", filter.classNamePatterns, IncludeExcludeList::class.java)
-        json.writeValue("packages", filter.packages, IncludeExcludeList::class.java)
-        json.writeValue("tags", filter.tags, IncludeExcludeList::class.java)
-        json.writeObjectEnd()
-    }
-
-    override fun read(json: Json, value: JsonValue) {
-        // Configuration
-        value.get("configuration")?.forEach {
-            configuration[it.name] = it.asString()
+                // Filter
+                name("filter").writeObject {
+                    field("engines", value.filter.engines)
+                    field("classNamePatterns", value.filter.classNamePatterns)
+                    field("packages", value.filter.packages)
+                    field("tags", value.filter.tags)
+                }
+            }
         }
 
-        filterStackTraces = value.getBoolean("filterStackTraces", true)
+        override fun read(value: JsonValue): TestParameters {
+            val result = TestParameters()
 
-        // Selector
-        value.get("selector")?.let { selectorValue ->
-            selectorValue.get("uris").putArrayStrings(select.uris)
-            selectorValue.get("files").putArrayStrings(select.files)
-            selectorValue.get("directories").putArrayStrings(select.directories)
-            selectorValue.get("packages").putArrayStrings(select.packages)
-            selectorValue.get("classes").putArrayStrings(select.classes)
-            selectorValue.get("methods").putArrayStrings(select.methods)
-            selectorValue.get("resources").putArrayStrings(select.resources)
-            selectorValue.get("classpathRoots").putArrayStrings(select.classpathRoots)
-        }
+            // Configuration
+            value.fieldToMap("configuration", result.configuration)
 
-        // Filter
-        value.get("filter")?.let { filterValue ->
-            filterValue.get("engines")?.let { filter.engines.read(json, it) }
-            filterValue.get("classNamePatterns")?.let { filter.classNamePatterns.read(json, it) }
-            filterValue.get("packages")?.let { filter.packages.read(json, it) }
-            filterValue.get("tags")?.let { filter.tags.read(json, it) }
+            result.filterStackTraces = value.field("filterStackTraces")
+
+            // Selector
+            value.get("selector")?.let { selectorValue ->
+                selectorValue.fieldToCollection("uris", result.select.uris)
+                selectorValue.fieldToCollection("files", result.select.files)
+                selectorValue.fieldToCollection("directories", result.select.directories)
+                selectorValue.fieldToCollection("packages", result.select.packages)
+                selectorValue.fieldToCollection("classes", result.select.classes)
+                selectorValue.fieldToCollection("methods", result.select.methods)
+                selectorValue.fieldToCollection("resources", result.select.resources)
+                selectorValue.fieldToCollection("classpathRoots", result.select.classpathRoots)
+            }
+
+            // Filter
+            value.get("filter")?.let { filterValue ->
+                filterValue.fieldTo("engines", result.filter.engines)
+                filterValue.fieldTo("classNamePatterns", result.filter.classNamePatterns)
+                filterValue.fieldTo("packages", result.filter.packages)
+                filterValue.fieldTo("tags", result.filter.tags)
+            }
+
+            return result
         }
     }
 
@@ -191,7 +191,7 @@ class TestParameters : JsonSerializable {
     /**
      * Mutable collection coupling included and excluded names/patterns.
      */
-    class IncludeExcludeList : JsonSerializable {
+    class IncludeExcludeList : JsonReadable, JsonWritable {
         /**
          * Names/patterns that are included.
          */
@@ -234,34 +234,20 @@ class TestParameters : JsonSerializable {
          */
         fun isEmpty(): Boolean = included.isEmpty() && excluded.isEmpty()
 
-        override fun write(json: Json) {
-            if (included.isNotEmpty()) {
-                json.writeArrayStart("included")
-                for (i in included) {
-                    json.writeValue(i as Any, String::class.java)
-                }
-                json.writeArrayEnd()
-            }
-            if (excluded.isNotEmpty()) {
-                json.writeArrayStart("excluded")
-                for (e in excluded) {
-                    json.writeValue(e as Any, String::class.java)
-                }
-                json.writeArrayEnd()
-            }
-        }
-
-        override fun read(json: Json, value: JsonValue) {
-            value.get("included")?.forEach {
-                included.add(it.asString())
-            }
-            value.get("excluded")?.forEach {
-                excluded.add(it.asString())
-            }
-        }
-
         override fun toString(): String {
             return "+$included -$excluded"
+        }
+
+        override fun JsonWriter.write() {
+            writeObject {
+                fieldCollection("included", included)
+                fieldCollection("excluded", excluded)
+            }
+        }
+
+        override fun read(value: JsonValue) {
+            value.fieldToCollection("included", included)
+            value.fieldToCollection("excluded", excluded)
         }
     }
 }

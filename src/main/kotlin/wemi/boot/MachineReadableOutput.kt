@@ -1,17 +1,11 @@
 package wemi.boot
 
-import com.esotericsoftware.jsonbeans.Json
-import com.esotericsoftware.jsonbeans.JsonException
-import com.esotericsoftware.jsonbeans.JsonSerializable
-import com.esotericsoftware.jsonbeans.JsonSerializer
+import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
 import wemi.*
-import wemi.util.absolutePath
-import java.io.File
-import java.io.IOException
+import wemi.util.*
 import java.io.OutputStreamWriter
 import java.io.PrintStream
-import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
 
@@ -43,36 +37,35 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
                 return
             }
             "keysWithDescription" -> {
-                machineReadablePrint(out, object : MachineWritable {
-                    override fun writeMachine(json: Json) {
-                        json.writeArrayStart()
-                        for (key in AllKeys.values) {
-                            json.writeObjectStart()
-                            json.writeValue("name", key.name, String::class.java)
-                            json.writeValue("description", key.description, String::class.java)
-                            json.writeObjectEnd()
+                machineReadablePrint(out, object : JsonWritable {
+                    override fun JsonWriter.write() {
+                        writeArray {
+                            for (key in AllKeys.values) {
+                                writeObject {
+                                    field("name", key.name)
+                                    field("description", key.description)
+                                }
+                            }
                         }
-                        json.writeArrayEnd()
                     }
                 })
                 return
             }
             "buildScript" -> {
-                machineReadablePrint(out, object : MachineWritable {
-                    override fun writeMachine(json: Json) {
+                machineReadablePrint(out, object : JsonWritable {
+
+                    override fun JsonWriter.write() {
                         val buildFile = WemiBuildScript
                         if (buildFile == null) {
-                            json.writeValue(null)
+                            writeValue(null, null)
                         } else {
-                            json.writeObjectStart()
-
-                            json.writeValue("buildFolder", WemiBuildFolder)
-                            json.writeValue("cacheFolder", WemiCacheFolder)
-                            json.writeValue("sources", buildFile.sources)
-                            json.writeValue("scriptJar", buildFile.scriptJar)
-                            json.writeValue("classpath", buildFile.classpath)
-
-                            json.writeObjectEnd()
+                            writeObject {
+                                field("buildFolder", WemiBuildFolder)
+                                field("cacheFolder", WemiCacheFolder)
+                                fieldCollection("sources", buildFile.sources)
+                                field("scriptJar", buildFile.scriptJar)
+                                fieldCollection("classpath", buildFile.externalClasspath)
+                            }
                         }
                     }
                 })
@@ -147,121 +140,10 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
     }
 }
 
-private val MACHINE_READABLE_JSON_WRITING = object : Json() {
-
-    fun isSimpleType(type: Class<*>): Boolean {
-        return type.isPrimitive || type == String::class.java || type == Int::class.java || type == Boolean::class.java
-                || type == Float::class.java || type == Long::class.java || type == Double::class.java
-                || type == Short::class.java || type == Byte::class.java || type == Char::class.java
-    }
-
-    override fun writeValue(value: Any?, knownType: Class<*>?, elementType: Class<*>?) {
-        try {
-            val writer = this.writer
-
-            if (value == null) {
-                writer.value(null)
-            } else if (knownType != null && isSimpleType(knownType)) {
-                writer.value(value)
-            } else {
-                val actualType: Class<*> = value.javaClass
-                @Suppress("UNCHECKED_CAST")
-                val serializer = getSerializer(actualType) as JsonSerializer<Any>?
-
-                when {
-                    serializer != null -> {
-                        serializer.write(this, value, knownType)
-                    }
-                    value is MachineWritable -> {
-                        value.writeMachine(this)
-                    }
-                    value is JsonSerializable -> {
-                        this.writeObjectStart(actualType, knownType)
-                        value.write(this)
-                        this.writeObjectEnd()
-                    }
-                    isSimpleType(actualType) -> {
-                        this.writeValue(value)
-                    }
-                    actualType.isArray -> {
-                        val length = java.lang.reflect.Array.getLength(value)
-                        this.writeArrayStart()
-
-                        var i = 0
-                        while (i < length) {
-                            this.writeValue(java.lang.reflect.Array.get(value, i) as Any, elementType ?: actualType.componentType, null as Class<*>?)
-                            i++
-                        }
-
-                        this.writeArrayEnd()
-                    }
-                    value is Map<*, *> -> {
-                        this.writeArrayStart()
-                        for ((k, v) in value) {
-                            this.writeObjectStart()
-                            this.writeValue("key", k)
-                            this.writeValue("value", v)
-                            this.writeObjectEnd()
-                        }
-                        this.writeArrayEnd()
-                    }
-                    value is Collection<*> -> {
-                        this.writeArrayStart()
-                        for (item in value) {
-                            this.writeValue(item)
-                        }
-                        this.writeArrayEnd()
-                    }
-                    value is File -> {
-                        writer.value(value.absolutePath)
-                    }
-                    value is Path -> {
-                        writer.value(value.absolutePath)
-                    }
-                    Enum::class.java.isAssignableFrom(actualType) -> {
-                        //Does not respect enumNames!!!
-                        writer.value((value as Enum<*>).name)
-                    }
-                    else -> {
-                        this.writeObjectStart(actualType, knownType)
-                        this.writeFields(value)
-                        this.writeObjectEnd()
-                    }
-                }
-            }
-        } catch (e: IOException) {
-            throw JsonException(e)
-        }
-    }
-}.apply {
-    this.setOutputType(com.esotericsoftware.jsonbeans.OutputType.json)
-    this.setUsePrototypes(false)
-    this.setEnumNames(true)
-}
-
 private fun machineReadablePrint(out: PrintStream, thing: Any?) {
     val writer = OutputStreamWriter(out)
-    val json = MACHINE_READABLE_JSON_WRITING
-    json.setWriter(writer)
-    json.writeValue(thing, null, null)
-    json.setWriter(null)
+    writer.writeJson(thing, null)
     writer.append(0.toChar())
     writer.flush()
 }
 
-/**
- * Marks this object as "machine-writable" which means that it has a custom JSON representation when it is being used
- * as an output of [machineReadableEvaluateAndPrint].
- *
- * Similar to [JsonSerializable].
- */
-interface MachineWritable {
-
-    /**
-     * Write the object out to the [json], so that all relevant information may be easily read back.
-     *
-     * Json object start is not written like in [JsonSerializable],
-     * so either print as a nameless value, or create a new object/array.
-     */
-    fun writeMachine(json: Json)
-}

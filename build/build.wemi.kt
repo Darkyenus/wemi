@@ -44,7 +44,7 @@ val core:Project by project(path(".")) {
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
             dependency("com.github.Darkyenus", "tproll", "v1.2.6"),
             dependency("com.github.Darkyenus", "DaveWebb", "v1.2"),
-            dependency("com.github.EsotericSoftware", "jsonbeans", "cb0f3406fc"),
+            dependency("com.github.EsotericSoftware", "jsonbeans", "0.9"),
             dependency("org.jline", "jline", "3.3.0")
         ) }
 

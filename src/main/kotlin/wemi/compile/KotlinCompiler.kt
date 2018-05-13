@@ -1,16 +1,13 @@
 package wemi.compile
 
-import com.esotericsoftware.jsonbeans.Json
+import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
-import wemi.boot.MachineWritable
 import wemi.boot.WemiBundledLibrariesExclude
-import wemi.dependency.*
-import wemi.util.EnclaveClassLoader
-import wemi.util.LocatedPath
 import wemi.collections.wSetOf
-import wemi.util.Magic
+import wemi.dependency.*
+import wemi.util.*
 import java.nio.file.Path
 
 private val LOG = LoggerFactory.getLogger("KotlinCompiler")
@@ -57,7 +54,7 @@ enum class KotlinCompilerVersion (
         /** Class that implements [KotlinCompiler] for given version. */
         private val implementationClassName: String,
         /** Dependencies needed to load [implementationClassName]. */
-        private val compilerDependency:Collection<Dependency>) : MachineWritable {
+        private val compilerDependency:Collection<Dependency>) : JsonWritable {
 
     Version1_1_4_3(
             "1.1.4-3",
@@ -114,8 +111,8 @@ enum class KotlinCompilerVersion (
         }
     }
 
-    override fun writeMachine(json: Json) {
-        json.writeValue(string as Any, String::class.java)
+    override fun JsonWriter.write() {
+        writeValue(string, String::class.java)
     }
 
     override fun toString(): String = string

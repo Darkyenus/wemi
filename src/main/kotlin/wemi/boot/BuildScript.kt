@@ -1,5 +1,7 @@
 package wemi.boot
 
+import com.esotericsoftware.jsonbeans.JsonValue
+import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
 import wemi.WemiKotlinVersion
 import wemi.collections.*
@@ -15,17 +17,12 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 
 private val LOG = LoggerFactory.getLogger("BuildFiles")
 
 /**
- * Extensions that a valid Wemi build script file have.
- * Without leading dot.
- */
-val WemiBuildFileExtensions = listOf("kt")
-
-/**
- * Build file is a file with [WemiBuildFileExtensions], in [buildFolder].
+ * Build file is a file with `.kt` extension, in [buildFolder].
  */
 internal fun findBuildScriptSources(buildFolder: Path): List<Path> {
     var result: ArrayList<Path>? = null
@@ -34,7 +31,7 @@ internal fun findBuildScriptSources(buildFolder: Path): List<Path> {
         Files.newDirectoryStream(buildFolder).use { stream ->
             for (path in stream) {
                 if (!path.isDirectory() && !path.isHidden() && !path.name.startsWith('.')
-                        && path.name.pathHasExtension(WemiBuildFileExtensions)) {
+                        && path.name.pathHasExtension("kt")) {
                     var r = result
                     if (r == null) {
                         r = ArrayList()
@@ -54,7 +51,7 @@ internal fun findBuildScriptSources(buildFolder: Path): List<Path> {
  *
  * Tries to use existing files before compiling.
  */
-internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScript? {
+internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScriptCompiler? {
     if (cacheFolder.exists() && !cacheFolder.isDirectory()) {
         LOG.error("Build directory {} exists and is not a directory", cacheFolder)
         return null
@@ -67,98 +64,87 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
         }
     }
 
-    val combinedBuildFileName = buildScriptSources.joinToString("-") { it.name.pathWithoutExtension() }
-
-    val resultJar = cacheFolder / ("$combinedBuildFileName-cache.jar")
-    val classpathFile = cacheFolder / ("$combinedBuildFileName.classpath")
-    val classpath = WMutableList<Path>()
+    val resultJar = cacheFolder / "build.jar"
+    val buildScriptInfoFile = cacheFolder / "build-info.json"
+    val buildScriptInfo = BuildScript(resultJar, buildScriptSources.map { LocatedPath(it) }.toWList())
 
     var recompileReason = ""
 
-    val recompile = if (forceCompile) {
-        recompileReason = "Requested"
-        LOG.debug("Rebuilding build scripts: Requested")
-        true
-    } else if (!resultJar.exists() || resultJar.isDirectory()) {
-        recompileReason = "No cache"
-        LOG.debug("Rebuilding build scripts: No cache at {}", resultJar)
-        true
-    } else if (resultJar.lastModified.let { jarLastModified -> buildScriptSources.any { source -> jarLastModified < source.lastModified } }) {
-        recompileReason = "Script changed"
-        LOG.debug("Rebuilding build scripts: Old cache")
-        true
-    } else if (!classpathFile.exists() || classpathFile.isDirectory()) {
-        recompileReason = "Missing cache metadata"
-        LOG.debug("Rebuilding build scripts: No classpath cache")
-        true
-    } else if (Magic.WemiLauncherFile.lastModified > resultJar.lastModified) {
-        recompileReason = "Updated launcher"
-        LOG.debug("Rebuilding build scripts: Launcher updated ({})", Magic.WemiLauncherFile)
-        true
-    } else {
-        // All seems good, try to load the result classpath
-        classpathFile.forEachLine { line ->
-            if (line.isNotBlank()) {
-                classpath.add(Paths.get(line))
+    val recompile:Boolean = run recompile@{
+        if (forceCompile) {
+            recompileReason = "Requested"
+            LOG.debug("Rebuilding build scripts: Requested")
+            return@recompile true
+        }
+        if (!resultJar.exists() || resultJar.isDirectory()) {
+            recompileReason = "No cache"
+            LOG.debug("Rebuilding build scripts: No cache at {}", resultJar)
+            return@recompile true
+        }
+        val jarLastModified = resultJar.lastModified
+        if (buildScriptSources.any { source -> source.lastModified > jarLastModified }) {
+            recompileReason = "Script changed"
+            LOG.debug("Rebuilding build scripts: Old cache")
+            return@recompile true
+        }
+        if (!buildScriptInfoFile.isRegularFile()) {
+            recompileReason = "Missing cache metadata"
+            LOG.debug("Rebuilding build scripts: No classpath cache")
+            return@recompile true
+        }
+        if (Magic.WemiLauncherFile.lastModified > resultJar.lastModified) {
+            recompileReason = "Updated launcher"
+            LOG.debug("Rebuilding build scripts: Launcher updated ({})", Magic.WemiLauncherFile)
+            return@recompile true
+        }
+
+        // Load the build-script info json
+        try {
+            Files.newBufferedReader(buildScriptInfoFile, Charsets.UTF_8).use {
+                it.readJsonTo(buildScriptInfo)
+            }
+        } catch (e:Exception) {
+            recompileReason = "Can't read build-script info"
+            LOG.debug("Failed to build script info from {}", buildScriptInfoFile, e)
+            return@recompile true
+        }
+
+        // Validate loaded data
+        if (buildScriptInfo.externalClasspath.isEmpty()) {
+            recompileReason = "Corrupted build-script info"
+            LOG.debug("Rebuilding build scripts: Missing Wemi launcher entry in classpath")
+            return@recompile true
+        }
+
+        for (classpathEntry in buildScriptInfo.externalClasspath) {
+            if (!classpathEntry.exists()) {
+                recompileReason = "Corrupted build-script info: classpath entries missing"
+                LOG.debug("Rebuilding build scripts: Classpath cache corrupted ({} does not exist)", classpathEntry)
+                return@recompile true
             }
         }
-        var recompile = false
-        for (file in classpath) {
-            if (!file.exists()) {
-                recompileReason = "Corrupted cache metadata"
-                LOG.debug("Rebuilding build scripts: Classpath cache corrupted ({} does not exist)", file)
-                classpath.clear()
-                recompile = true
-                break
-            }
-        }
-        if (!recompile) {
-            if (classpath.isEmpty()) {
-                recompileReason = "Cache is missing launcher"
-                recompile = true
-            } else if (!Files.isSameFile(Magic.WemiLauncherFile, classpath[0])) {
-                recompileReason = "First classpath item does not point to a Wemi launcher file"
-                recompile = true
-            }
-        }
-        recompile
+
+        // All is fine
+        return@recompile false
     }
 
-    val buildFlags = CompilerFlags()
-    buildFlags[KotlinCompilerFlags.moduleName] = combinedBuildFileName
-    buildFlags[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
-
-    val sources = buildScriptSources.map { LocatedPath(it) }.toWList()
-
-    val classpathConfiguration = BuildScriptClasspathConfiguration(buildScriptSources)
-
+    // Do preparation of build-script info
     if (recompile) {
-        // Recompile
         LOG.info("Compiling build script: {}", recompileReason)
         resultJar.deleteRecursively()
+        buildScriptInfo.resolve(cacheFolder)
 
-        // Wemi also contains Kotlin runtime
-        classpath.add(wemiLauncherFileWithJarExtension(cacheFolder)) // This must be first in classpath
-        val resolved = HashMap<DependencyId, ResolvedDependency>()
-        val resolutionOk = DependencyResolver.resolve(resolved, classpathConfiguration.dependencies, classpathConfiguration.repositoryChain)
-        if (!resolutionOk) {
-            LOG.warn("Failed to retrieve all build file dependencies for {}:\n{}", sources, resolved.prettyPrint(classpathConfiguration.dependencies.map { it.dependencyId }))
-            return null
+        try {
+            Files.newBufferedWriter(buildScriptInfoFile, Charsets.UTF_8, StandardOpenOption.CREATE).use {
+                it.writeJson(buildScriptInfo, BuildScript::class.java)
+            }
+        } catch (e:Exception) {
+            LOG.warn("Failed to save build-script info, next run will have to construct it again", e)
         }
-        classpath.addAll(resolved.artifacts())
-        classpath.addAll(classpathConfiguration.fileDependencies)
-
-        classpathFile.writeText(classpath.joinToString(separator = "\n") { file -> file.absolutePath })
-
         // Compilation is handled lazily later, in BuildScript.ready()
     }
 
-    return BuildScript(resultJar,
-            classpath,
-            // Figure out the init class
-            buildScriptSources.map { transformFileNameToKotlinClassName(it.name.pathWithoutExtension()) }.toWList(),
-            classpathConfiguration, sources,
-            buildFlags, !recompile)
+    return BuildScriptCompiler(buildScriptInfo, recompile)
 }
 
 private fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
@@ -168,7 +154,7 @@ private fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
         return wemiLauncherFile
     }
     // We have create a link to/copy of the launcher file somewhere and name it with .jar
-    val linked = cacheFolder / "wemi-launcher-link.jar"
+    val linked = cacheFolder / "wemi.jar"
 
     if (Files.exists(linked) && Files.exists(wemiLauncherFile.toRealPath())
             && (Files.isSameFile(linked, wemiLauncherFile) // If link
@@ -232,213 +218,155 @@ private fun transformFileNameToKotlinClassName(fileNameWithoutExtension: String)
     return sb.toString()
 }
 
+
 /**
- * Regex used to find lines with directives.
+ * Metadata about build script, needed to compile it.
  *
- * Directives are file annotations from Directives file, such as [BuildDependency].
+ * Obtained initially by resolving from source, then by loading from json.
  *
- * Matches: `@file:<wemi.boot.>BuildAnnotation(...)`
+ * Also handles it's compilation, internally.
  */
-private val DirectiveRegex = "\\s+@file\\s*:\\s*(?:wemi\\s*\\.\\s*boot\\s*\\.\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\((.*)\\)\\s*".toRegex()
+class BuildScript internal constructor(
+        /** jar to which the build script has been compiled */
+        val scriptJar: Path,
+        /** source files, from which the build script is compiled */
+        val sources: WList<LocatedPath>) : JsonReadable, JsonWritable {
 
-/**
- * Matches single, optionally named, argument, passed into the [DirectiveRegex] constructor.
- */
-private val DirectiveConstructorPartRegex = "^\\s*(?:([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*)?\"([^\"]*)\"\\s*,?".toRegex()
+    private val _repositories = HashSet<Repository>()
+    private val _dependencies = HashSet<Dependency>()
+    // First entry of this list must be
+    private val _externalClasspath = ArrayList<Path>()
 
-/**
- * Recognized directives.
- */
-private val Directives = arrayOf(
-        BuildDependency::class.java,
-        BuildDependencyRepository::class.java,
-        BuildClasspathDependency::class.java)
+    val repositories:Set<Repository>
+        get() = _repositories
+    val dependencies:Set<Dependency>
+        get() = _dependencies
+    val externalClasspath:List<Path>
+        get() = _externalClasspath
 
-/**
- * Configuration of classpath for a build script.
- */
-class BuildScriptClasspathConfiguration(private val buildScriptSources: List<Path>) {
-    private var _repositories: WSet<Repository>? = null
-    private var _repositoryChain: RepositoryChain? = null
-    private var _dependencies: WSet<Dependency>? = null
-    private var _fileDependencies: WSet<Path>? = null
+    val wemiLauncherJar:Path
+        get() = externalClasspath.first() // By convention
 
-    private fun resolve() {
-        val repositories = WMutableSet<Repository>()
-        repositories.addAll(DefaultRepositories)
-        val buildDependencyLibraries = WMutableSet<Dependency>()
-        val buildDependencyFiles = WMutableSet<Path>()
+    /**
+     * Main classes of the [scriptJar], that should be initialized to load the build script.
+     */
+    val initClasses:List<String>
+        get() = sources.map { transformFileNameToKotlinClassName(it.file.name.pathWithoutExtension()) }
 
-        for (source in buildScriptSources) {
-            var lineNumber = 0
-            source.forEachLine { line ->
-                lineNumber++
-                val directiveMatch = DirectiveRegex.matchEntire(line) ?: return@forEachLine
-                val directiveName = directiveMatch.groups[1]?.value ?: ""
-                val directiveClass = Directives.find { it.simpleName == directiveName } ?: return@forEachLine
-
-                val directiveClassFieldNames = directiveClass.getAnnotation(DirectiveFields::class.java).value
-                val directiveClassFieldMethods = directiveClass.methods
-
-                // Assume that all values are strings (because they are at this point)
-                val directiveConstructorValues = arrayOfNulls<String>(directiveClassFieldNames.size)
-
-                val constructor = directiveMatch.groups[2]?.value ?: ""
-
-                val parameter = DirectiveConstructorPartRegex.find(constructor)
-                var parameterIndex = 0
-                while (parameter != null) {
-                    val name = parameter.groupValues[1]
-                    val valueIndex : Int
-                    if (name.isEmpty()) {
-                        if (parameterIndex >= 0) {
-                            valueIndex = parameterIndex++
-                        } else {
-                            LOG.warn("{}:{} Invalid directive annotation - only named parameters are allowed after first named parameter", buildScriptSources, line)
-                            return@forEachLine
-                        }
-                    } else {
-                        parameterIndex = -1
-                        val index = directiveClassFieldNames.indexOf(name)
-                        if (index < 0) {
-                            LOG.warn("{}:{} Invalid directive annotation - unknown parameter name {}", buildScriptSources, line, name)
-                            return@forEachLine
-                        }
-                        if (directiveConstructorValues[index] != null) {
-                            LOG.warn("{}:{} Invalid directive annotation - parameter {} set multiple times", buildScriptSources, line, name)
-                            return@forEachLine
-                        }
-                        valueIndex = index
-                    }
-                    directiveConstructorValues[valueIndex] = parameter.groupValues[2]
-                }
-
-                // Complete with default values and check if all variables are set
-                for (i in directiveConstructorValues.indices) {
-                    if (directiveConstructorValues[i] == null) {
-                        directiveConstructorValues[i] = directiveClassFieldMethods.find { it.name == directiveClassFieldNames[i] }?.defaultValue as String?
-                        if (directiveConstructorValues[i] == null) {
-                            LOG.warn("{}:{} Invalid directive annotation - parameter {} needs to be set", buildScriptSources, line, directiveClassFieldNames[i])
-                            return@forEachLine
-                        }
-                    }
-                }
-
-                // No value can be now null
-                @Suppress("UNCHECKED_CAST")
-                directiveConstructorValues as Array<String>
-
-                // Use it
-                when (directiveClass) {
-                    BuildDependency::class.java -> {
-                        val (groupOrFull, name, version) = directiveConstructorValues
-                        if (name.isEmpty() && version.isEmpty()) {
-                            buildDependencyLibraries.add(Dependency(DependencyId(groupOrFull, name, version), WemiBundledLibrariesExclude))
-                        } else {
-                            buildDependencyLibraries.add(Dependency(wemi.dependencyId(groupOrFull, null), WemiBundledLibrariesExclude))
-                        }
-                    }
-                    BuildDependencyRepository::class.java -> {
-                        val (name, url) = directiveConstructorValues
-
-                        repositories.add(Repository.M2(name, URL(url), LocalM2Repository))
-                    }
-                    BuildClasspathDependency::class.java -> {
-                        val (file) = directiveConstructorValues
-
-                        var path = Paths.get(file)
-                        if (!path.isAbsolute) {
-                            path = WemiRootFolder.resolve(path)
-                        }
-
-                        buildDependencyFiles.add(path)
-                    }
-                    else -> {
-                        throw AssertionError()//Not possible
-                    }
-                }
-            }
-        }
-
-        _repositories = repositories
-        _repositoryChain = createRepositoryChain(repositories)
-        _dependencies = buildDependencyLibraries
-        _fileDependencies = buildDependencyFiles
+    /**
+     * Flags used to build the build-script.
+     */
+    val buildFlags = CompilerFlags().also {
+        it[KotlinCompilerFlags.moduleName] = "wemi-build-script"
+        it[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
     }
 
-    /**
-     * Repositories used when resolving dependencies for the build scripts
-     */
-    val repositories: WSet<Repository>
-        get() {
-            if (_repositories == null) {
-                resolve()
+    private fun consumeDirective(annotation:Class<out Annotation>, fields:Array<String>) {
+        when (annotation) {
+            BuildDependency::class.java -> {
+                val (groupOrFull, name, version) = fields
+                if (name.isEmpty() && version.isEmpty()) {
+                    _dependencies.add(Dependency(DependencyId(groupOrFull, name, version), WemiBundledLibrariesExclude))
+                } else {
+                    _dependencies.add(Dependency(wemi.dependencyId(groupOrFull, null), WemiBundledLibrariesExclude))
+                }
             }
-            return _repositories!!
+            BuildDependencyRepository::class.java -> {
+                val (name, url) = fields
+
+                _repositories.add(Repository.M2(name, URL(url), LocalM2Repository))
+            }
+            BuildClasspathDependency::class.java -> {
+                val (file) = fields
+
+                var path = Paths.get(file)
+                if (!path.isAbsolute) {
+                    path = WemiRootFolder.resolve(path)
+                }
+
+                _externalClasspath.add(path)
+            }
+            else -> {
+                throw AssertionError(annotation)//Not possible
+            }
+        }
+    }
+
+    internal fun resolve(cacheFolder:Path):Boolean {
+        _repositories.clear()
+        _dependencies.clear()
+        _externalClasspath.clear()
+
+        // Wemi also contains Kotlin runtime
+        _externalClasspath.add(wemiLauncherFileWithJarExtension(cacheFolder)) // This must be first in classpath
+        _repositories.addAll(DefaultRepositories)
+
+        for (sourceFile in sources) {
+            val success = try {
+                Files.newBufferedReader(sourceFile.file, Charsets.UTF_8).use {
+                    parseFileDirectives(it, SupportedDirectives, ::consumeDirective)
+                }
+            } catch (e:Exception) {
+                LOG.warn("Failed to read directives from {}", sourceFile, e)
+                false
+            }
+
+            if (!success) {
+                return false
+            }
         }
 
-    /**
-     * Repository chain used when resolving dependencies for the build scripts
-     */
-    val repositoryChain: RepositoryChain
-        get() {
-            if (_repositoryChain == null) {
-                resolve()
-            }
-            return _repositoryChain!!
+        val resolved = HashMap<DependencyId, ResolvedDependency>()
+        val resolutionOk = DependencyResolver.resolve(resolved, _dependencies, createRepositoryChain(_repositories))
+        if (!resolutionOk) {
+            LOG.warn("Failed to retrieve all build-script dependencies:\n{}", resolved.prettyPrint(_dependencies.map { it.dependencyId }))
+            return false
         }
+        _externalClasspath.addAll(resolved.artifacts())
 
-    /**
-     * Dependencies of the build script
-     */
-    val dependencies: WSet<Dependency>
-        get() {
-            if (_dependencies == null) {
-                resolve()
-            }
-            return _dependencies!!
-        }
+        return true
+    }
 
-    /**
-     * File classpath dependencies of the build script
-     */
-    val fileDependencies: WSet<Path>
-        get() {
-            if (_fileDependencies == null) {
-                resolve()
-            }
-            return _fileDependencies!!
+    override fun JsonWriter.write() {
+        writeObject {
+            fieldCollection("repositories", _repositories)
+            fieldCollection("dependencies", _dependencies)
+            fieldCollection("externalClasspath", _externalClasspath)
         }
+    }
+
+    override fun read(value: JsonValue) {
+        value.fieldToCollection("repositories", _repositories)
+        value.fieldToCollection("dependencies", _dependencies)
+        value.fieldToCollection("externalClasspath", _externalClasspath)
+    }
+
+    override fun toString(): String {
+        return "BuildScriptInfo(scriptJar=$scriptJar, sources=$sources, _repositories=$_repositories, _dependencies=$_dependencies, _externalClasspath=$_externalClasspath, buildFlags=$buildFlags)"
+    }
 }
 
 /**
- * @property scriptJar jar to which the build script has been compiled
- * @property classpath used to compile and to run the scriptJar
- * @property initClasses main classes of the [scriptJar]
+ * Handles compilation of the build script.
+ *
+ * @property info about the build-script, used for its compilation
  */
-data class BuildScript(val scriptJar: Path,
-                       val classpath: WList<Path>, val initClasses: WList<String>,
-                       val buildScriptClasspathConfiguration: BuildScriptClasspathConfiguration,
-                       val sources: WList<LocatedPath>, val buildFlags: CompilerFlags,
-                       private var ready:Boolean) {
+internal class BuildScriptCompiler (val info: BuildScript, private var compilationNeeded: Boolean) {
 
-    val wemiLauncherJar:Path
-        get() = classpath.first()
-
-    fun ready():Boolean {
-        if (ready) {
+    internal fun ensureCompiled():Boolean {
+        if (!compilationNeeded) {
             return true
         }
 
-        LOG.debug("Compiling sources: {} classpath: {} resultJar: {} buildFlags: {}", sources, classpath, scriptJar, buildFlags)
+        LOG.debug("Compiling sources: {} classpath: {} resultJar: {} buildFlags: {}", info.sources, info.externalClasspath, info.scriptJar, info.buildFlags)
 
-        val status = WemiKotlinVersion.compilerInstance().compileJVM(sources, classpath, scriptJar, null, buildFlags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
+        val status = WemiKotlinVersion.compilerInstance().compileJVM(info.sources, info.externalClasspath, info.scriptJar, null, info.buildFlags, LoggerFactory.getLogger("BuildScriptCompilation"), null)
         if (status != KotlinCompiler.CompileExitStatus.OK) {
-            LOG.warn("Compilation failed for {}: {}", sources, status)
+            LOG.warn("Compilation failed for {}: {}", info.sources, status)
             return false
         }
 
-        ready = true
+        compilationNeeded = false
         return true
     }
 }

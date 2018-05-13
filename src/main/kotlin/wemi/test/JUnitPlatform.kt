@@ -1,8 +1,5 @@
 package wemi.test
 
-import com.esotericsoftware.jsonbeans.Json
-import com.esotericsoftware.jsonbeans.JsonReader
-import com.esotericsoftware.jsonbeans.OutputType
 import org.slf4j.LoggerFactory
 import wemi.Scope
 import wemi.boot.CLI
@@ -89,12 +86,8 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
     LOG.debug("Starting test process")
     val process = builder.start()
 
-    val json = Json(OutputType.json)
-    val testParametersJson = json.toJson(testParameters, TestParameters::class.java)
-
     OutputStreamWriter(process.outputStream, Charsets.UTF_8).use {
-        it.write(testParametersJson)
-        it.flush()
+        it.writeJson(testParameters, TestParameters::class.java)
     }
 
     var outputJson = ""
@@ -143,16 +136,8 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
     }
 
     return try {
-        val stdoutJson = JsonReader().parse(outputJson)
-        if (stdoutJson == null) {
-            LOG.error("Failed to parse returned output:\n{}", outputJson)
-            return null
-        }
-
-        val report = TestReport()
-        report.read(json, stdoutJson)
+        val report = fromJson<TestReport>(outputJson)
         LOG.debug("Test process returned report: {}", report)
-
         report
     } catch (e: Exception) {
         LOG.error("Malformed test report output:\n{}", outputJson, e)
@@ -322,7 +307,7 @@ fun TestReport.prettyPrint(): CharSequence {
 
 /** Mimics default JUnit report sheet. */
 private fun StringBuilder.appendReport(amount:Int, noun:String, action:String, zeroIsGood:Boolean?) {
-    var reportWidth = 33
+    val reportWidth = 33
     var initialLength = length
 
     append('[')
@@ -348,8 +333,7 @@ private fun StringBuilder.appendReport(amount:Int, noun:String, action:String, z
     if (amount != 1) {
         append('s')
     }
-    append(' ')
-        .append(action)
+    append(' ').append(action)
 
     appendTimes(' ', initialLength + reportWidth - 1 - length)
         .append(']').append('\n')

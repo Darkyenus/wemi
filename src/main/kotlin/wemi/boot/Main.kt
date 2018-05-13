@@ -245,10 +245,10 @@ fun main(args: Array<String>) {
     if (buildScript != null) {
         PrettyPrinter.setApplicationRootDirectory(WemiRootFolder)
 
-        val urls = arrayOfNulls<URL>(1 + buildScript.classpath.size)
-        urls[0] = buildScript.scriptJar.toUri().toURL()
+        val urls = arrayOfNulls<URL>(1 + buildScript.info.externalClasspath.size)
+        urls[0] = buildScript.info.scriptJar.toUri().toURL()
         var i = 1
-        for (file in buildScript.classpath) {
+        for (file in buildScript.info.externalClasspath) {
             urls[i++] = file.toUri().toURL()
         }
         val loader = URLClassLoader(urls, Magic.WemiDefaultClassLoader)
@@ -261,7 +261,7 @@ fun main(args: Array<String>) {
         }
 
         LOG.debug("Loading build file {}", buildScript)
-        for (initClass in buildScript.initClasses) {
+        for (initClass in buildScript.info.initClasses) {
             try {
                 Class.forName(initClass, true, loader)
             } catch (e: Exception) {
@@ -359,8 +359,8 @@ private fun TaskParser.PartitionedLine.machineReadableCheckErrors() {
     }
 }
 
-private fun prepareBuildScript(allowBrokenBuildScripts:Boolean, askUser:Boolean, cleanBuild:Boolean):BuildScript? {
-    var buildScript:BuildScript? = null
+private fun prepareBuildScript(allowBrokenBuildScripts:Boolean, askUser:Boolean, cleanBuild:Boolean):BuildScriptCompiler? {
+    var buildScript:BuildScriptCompiler? = null
 
     var Break = false
     do {
@@ -402,8 +402,8 @@ private fun prepareBuildScript(allowBrokenBuildScripts:Boolean, askUser:Boolean,
                 }
             } else {
                 // WemiBuildScript must be initialized before compilation, because compiler may depend on it
-                WemiBuildScript = compiledBuildScript
-                if (compiledBuildScript.ready()) {
+                WemiBuildScript = compiledBuildScript.info
+                if (compiledBuildScript.ensureCompiled()) {
                     buildScript = compiledBuildScript
                     true //break
                 } else if (allowBrokenBuildScripts) {

@@ -1,7 +1,6 @@
 package wemi.util
 
-import com.esotericsoftware.jsonbeans.Json
-import wemi.boot.MachineWritable
+import com.esotericsoftware.jsonbeans.JsonWriter
 
 /**
  * Value that exists, but may be incomplete.
@@ -10,12 +9,13 @@ import wemi.boot.MachineWritable
  * @param value that may be partial
  * @param complete true if the [value] is not partial
  */
-class Partial<out T>(val value: T, val complete: Boolean) : MachineWritable {
-    override fun writeMachine(json: Json) {
-        json.writeObjectStart()
-        json.writeValue("complete", complete, Boolean::class.java)
-        json.writeValue("value", value)
-        json.writeObjectEnd()
+class Partial<out T>(val value: T, val complete: Boolean) : JsonWritable {
+
+    override fun JsonWriter.write() {
+        writeObject {
+            field("complete", complete)
+            name("value").writeValue(value, null)
+        }
     }
 
     override fun toString(): String {

@@ -2,10 +2,9 @@
 
 package wemi
 
-import com.esotericsoftware.jsonbeans.Json
+import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import wemi.boot.MachineWritable
 import wemi.collections.*
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
@@ -52,7 +51,7 @@ class Key<Value> internal constructor(
          *
          * Called when the key is evaluated in CLI top level.
          */
-        internal val prettyPrinter: ((Value) -> CharSequence)?) : WithDescriptiveString, MachineWritable {
+        internal val prettyPrinter: ((Value) -> CharSequence)?) : WithDescriptiveString, JsonWritable {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -75,13 +74,13 @@ class Key<Value> internal constructor(
      */
     override fun toDescriptiveAnsiString(): String = "${format(name, format = Format.Bold)} - $description"
 
-    override fun writeMachine(json: Json) {
-        json.writeObjectStart()
-        json.writeValue("name", name, String::class.java)
-        json.writeValue("description", description, String::class.java)
-        json.writeValue("hasDefaultValue", hasDefaultValue, Boolean::class.java)
-        json.writeValue("cached", cacheMode != null, Boolean::class.java)
-        json.writeObjectEnd()
+    override fun JsonWriter.write() {
+        writeObject {
+            field("name", name)
+            field("description", description)
+            field("hasDefaultValue", hasDefaultValue)
+            field("cached", cacheMode != null)
+        }
     }
 }
 
@@ -99,7 +98,7 @@ class Key<Value> internal constructor(
 class Configuration internal constructor(val name: String,
                                          val description: String,
                                          val parent: Configuration?)
-    : BindingHolder(), WithDescriptiveString, MachineWritable {
+    : BindingHolder(), WithDescriptiveString, JsonWritable {
 
     /**
      * @return [name]
@@ -113,11 +112,11 @@ class Configuration internal constructor(val name: String,
      */
     override fun toDescriptiveAnsiString(): String = "${format(name, format = Format.Bold)} - \"$description\""
 
-    override fun writeMachine(json: Json) {
-        json.writeObjectStart()
-        json.writeValue("name", name, String::class.java)
-        json.writeValue("description", description, String::class.java)
-        json.writeObjectEnd()
+    override fun JsonWriter.write() {
+        writeObject {
+            field("name", name)
+            field("description", description)
+        }
     }
 }
 
@@ -164,7 +163,7 @@ class ConfigurationExtension internal constructor(
  * @see BindingHolder for info about how the values are bound
  */
 class Project internal constructor(val name: String, internal val projectRoot: Path?, archetypes:Array<out Archetype>)
-    : BindingHolder(), WithDescriptiveString, MachineWritable {
+    : BindingHolder(), WithDescriptiveString, JsonWritable {
 
     /**
      * @return [name]
@@ -182,8 +181,8 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         }
     }
 
-    override fun writeMachine(json: Json) {
-        json.writeValue(name as Any, String::class.java)
+    override fun JsonWriter.write() {
+        writeValue(name, String::class.java)
     }
 
     /**

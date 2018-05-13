@@ -1,8 +1,6 @@
 package wemi.util
 
 import com.darkyen.tproll.util.PrettyPrinter
-import com.esotericsoftware.jsonbeans.Json
-import com.esotericsoftware.jsonbeans.JsonValue
 import org.slf4j.LoggerFactory
 import wemi.Key
 import wemi.boot.WemiColorOutputSupported
@@ -277,22 +275,6 @@ fun String.isValidIdentifier(): Boolean {
         }
     }
     return true
-}
-
-fun JsonValue?.putArrayStrings(into: MutableCollection<String>) {
-    this?.forEach {
-        into.add(it.asString())
-    }
-}
-
-fun Json.writeStringArray(from: Collection<String>, name: String, skipEmpty: Boolean = false) {
-    if (from.isNotEmpty() || !skipEmpty) {
-        writeArrayStart(name)
-        for (s in from) {
-            writeValue(s as Any, String::class.java)
-        }
-        writeArrayEnd()
-    }
 }
 
 /**

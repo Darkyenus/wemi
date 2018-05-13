@@ -5,6 +5,7 @@ import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.MergeStrategyChooser
 import wemi.assembly.RenameFunction
 import wemi.boot.BuildScript
+import wemi.boot.BuildScriptCompiler
 import wemi.collections.WList
 import wemi.collections.WSet
 import wemi.collections.wEmptyList

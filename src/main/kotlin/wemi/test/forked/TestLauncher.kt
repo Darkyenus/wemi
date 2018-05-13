@@ -1,10 +1,6 @@
 package wemi.test.forked
 
 import com.darkyen.tproll.util.StringBuilderWriter
-import com.esotericsoftware.jsonbeans.Json
-import com.esotericsoftware.jsonbeans.JsonReader
-import com.esotericsoftware.jsonbeans.JsonWriter
-import com.esotericsoftware.jsonbeans.OutputType
 import org.junit.platform.engine.DiscoverySelector
 import org.junit.platform.engine.Filter
 import org.junit.platform.engine.TestExecutionResult
@@ -29,6 +25,8 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder
 import org.junit.platform.launcher.core.LauncherFactory
 import wemi.test.*
 import wemi.util.appendWithStackTrace
+import wemi.util.readJson
+import wemi.util.writeJson
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.nio.file.Path
@@ -52,16 +50,7 @@ fun main(args: Array<String>) {
         val out = System.out
         System.setOut(System.err)
 
-        val json = Json(OutputType.json)
-        json.setUsePrototypes(false)
-
-        val testParameters: TestParameters = run {
-            val jsonValue = InputStreamReader(System.`in`, Charsets.UTF_8).use { input ->
-                JsonReader().parse(input)
-            }
-
-            json.readValue(TestParameters::class.java, jsonValue)
-        }
+        val testParameters: TestParameters = InputStreamReader(System.`in`, Charsets.UTF_8).readJson()
 
         val launcher = LauncherFactory.create()
         val reportBuilder = ReportBuildingListener(testParameters.filterStackTraces)
@@ -105,11 +94,8 @@ fun main(args: Array<String>) {
 
         OutputStreamWriter(out, Charsets.UTF_8).use { writer ->
             writer.append(TEST_LAUNCHER_OUTPUT_PREFIX)
-            val jsonWriter = JsonWriter(writer)
-            jsonWriter.setOutputType(OutputType.json)
-            json.setWriter(jsonWriter)
-            report.write(json)
-            jsonWriter.flush()
+            writer.writeJson(report, TestReport::class.java)
+            writer.flush()
         }
 
         exitCode = 0

@@ -1,8 +1,5 @@
 # Things to do next
 
-- Refactor BuildScriptClasspathConfiguration to store info with classpath in json, this lazy class is weird
-	- Change warnings in parsing to errors
-
 - Hotswapping jvm code:
 	- Test plugin and continue working on it
 

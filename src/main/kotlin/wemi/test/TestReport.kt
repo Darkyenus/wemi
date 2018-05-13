@@ -1,12 +1,9 @@
 package wemi.test
 
-import com.esotericsoftware.jsonbeans.Json
-import com.esotericsoftware.jsonbeans.JsonSerializable
 import com.esotericsoftware.jsonbeans.JsonValue
+import com.esotericsoftware.jsonbeans.JsonWriter
 import wemi.WithExitCode
-import wemi.boot.MachineWritable
-import wemi.util.putArrayStrings
-import wemi.util.writeStringArray
+import wemi.util.*
 
 /**
  * Arbitrary string that is outputted by the test harness, before outputting the TestReport JSON.
@@ -19,62 +16,8 @@ internal const val TEST_LAUNCHER_OUTPUT_PREFIX = "WEMI-TEST-HARNESS-OUTPUT: "
  *
  * In execution order contains [TestIdentifier]s that were run and [TestData] informing about their execution.
  */
-class TestReport : LinkedHashMap<TestIdentifier, TestData>(), JsonSerializable, MachineWritable, WithExitCode {
-    private fun TestIdentifier.write(json: Json) {
-        json.writeValue("id", id, String::class.java)
-        json.writeValue("parentId", parentId, String::class.java)
-        json.writeValue("displayName", displayName, String::class.java)
-
-        json.writeValue("isTest", isTest, Boolean::class.java)
-        json.writeValue("isContainer", isContainer, Boolean::class.java)
-        json.writeStringArray(tags, "tags")
-        json.writeValue("testSource", testSource, String::class.java)
-    }
-
-    override fun write(json: Json) {
-        json.writeArrayStart()
-        forEach { identifier, data ->
-            json.writeObjectStart()
-
-            json.writeObjectStart("identifier")
-            identifier.write(json)
-            json.writeObjectEnd()
-
-            json.writeObjectStart("data")
-            data.write(json)
-            json.writeObjectEnd()
-
-            json.writeObjectEnd()
-        }
-        json.writeArrayEnd()
-    }
-
-    private fun JsonValue.readTestIdentifier(): TestIdentifier {
-        val id = this.getString("id")
-        val parentId = this.getString("parentId")
-        val displayName = this.getString("displayName")
-
-        val isTest = this.getBoolean("isTest")
-        val isContainer = this.getBoolean("isContainer")
-        val tags = HashSet<String>()
-        this.get("tags")?.putArrayStrings(tags)
-        val testSource = this.getString("testSource")
-
-        return TestIdentifier(id, parentId, displayName, isTest, isContainer, tags, testSource)
-    }
-
-    override fun read(json: Json, value: JsonValue) {
-        for (entry in value) {
-            val identifier = entry.get("identifier").readTestIdentifier()
-            val data = TestData().apply { read(json, entry.get("data")) }
-
-            put(identifier, data)
-        }
-    }
-
-    override fun writeMachine(json: Json) {
-        write(json)
-    }
+@Json(TestReport.Serializer::class)
+class TestReport : LinkedHashMap<TestIdentifier, TestData>(), WithExitCode {
 
     /**
      * Returns [wemi.boot.EXIT_CODE_SUCCESS] when all tests are either successful or skipped.
@@ -85,6 +28,32 @@ class TestReport : LinkedHashMap<TestIdentifier, TestData>(), JsonSerializable, 
             return wemi.boot.EXIT_CODE_SUCCESS
         }
         return wemi.boot.EXIT_CODE_TASK_FAILURE
+    }
+
+    internal class Serializer : JsonSerializer<TestReport> {
+        override fun JsonWriter.write(value: TestReport) {
+            writeArray {
+                value.forEach { identifier, data ->
+                    writeObject {
+                        field("identifier", identifier)
+                        field("data", data)
+                    }
+                }
+            }
+        }
+
+        override fun read(value: JsonValue): TestReport {
+            val report = TestReport()
+
+            for (entry in value) {
+                val identifier = entry.field<TestIdentifier>("identifier")
+                val data = entry.field<TestData>("data")
+
+                report[identifier] = data
+            }
+
+            return report
+        }
     }
 }
 
@@ -100,6 +69,7 @@ class TestReport : LinkedHashMap<TestIdentifier, TestData>(), JsonSerializable, 
  * @param tags assigned
  * @param testSource in which this test/container has been found. No content/format is guaranteed, used for debugging.
  */
+@Json(TestIdentifier.Serializer::class)
 class TestIdentifier(
         val id: String,
         val parentId: String?,
@@ -153,6 +123,36 @@ class TestIdentifier(
 
         return sb.toString()
     }
+
+    internal class Serializer : JsonSerializer<TestIdentifier> {
+        override fun JsonWriter.write(value: TestIdentifier) {
+            writeObject {
+                field("id", value.id)
+                field("parentId", value.parentId)
+                field("displayName", value.displayName)
+
+                field("isTest", value.isTest)
+                field("isContainer", value.isContainer)
+                name("tags").writeArray {
+                    for (tag in value.tags) {
+                        writeValue(tag, String::class.java)
+                    }
+                }
+                field("testSource", value.testSource)
+            }
+        }
+
+        override fun read(value: JsonValue): TestIdentifier {
+            return TestIdentifier(
+                    value.field("id"),
+                    value.field("parentId"),
+                    value.field("displayName"),
+                    value.field("isTest"),
+                    value.field("isContainer"),
+                    value.fieldToCollection("tags", HashSet()),
+                    value.field("testSource"))
+        }
+    }
 }
 
 /**
@@ -160,7 +160,8 @@ class TestIdentifier(
  *
  * Mutable.
  */
-class TestData : JsonSerializable {
+@Json(TestData.Serializer::class)
+class TestData {
 
     /**
      * Status of this [TestIdentifier]'s run
@@ -191,35 +192,6 @@ class TestData : JsonSerializable {
      * See http://junit.org/junit5/docs/current/user-guide/#writing-tests-dependency-injection TestReporter.
      */
     val reports: ArrayList<ReportEntry> = ArrayList()
-
-    override fun write(json: Json) {
-        json.writeValue("status", status, TestStatus::class.java)
-        json.writeValue("duration", duration, Long::class.java)
-        json.writeValue("skipReason", skipReason, String::class.java)
-        json.writeValue("stackTrace", stackTrace, String::class.java)
-        json.writeArrayStart("reports")
-        for (report in reports) {
-            json.writeObjectStart()
-            json.writeValue("timestamp", report.timestamp, Long::class.java)
-            json.writeValue("key", report.key, String::class.java)
-            json.writeValue("value", report.value, String::class.java)
-            json.writeObjectEnd()
-        }
-        json.writeArrayEnd()
-    }
-
-    override fun read(json: Json, value: JsonValue) {
-        status = json.readValue("status", TestStatus::class.java, value)
-        duration = value.getLong("duration")
-        skipReason = value.getString("skipReason")
-        stackTrace = value.getString("stackTrace")
-        value.get("reports")?.forEach { report ->
-            reports.add(ReportEntry(
-                    report.getLong("timestamp"),
-                    report.getString("key"),
-                    report.getString("value")))
-        }
-    }
 
     data class ReportEntry(val timestamp: Long, val key: String, val value: String)
 
@@ -252,6 +224,44 @@ class TestData : JsonSerializable {
         sb.append('}')
 
         return sb.toString()
+    }
+
+    internal class Serializer : JsonSerializer<TestData> {
+
+        override fun JsonWriter.write(value: TestData) {
+            writeObject {
+                field("status", value.status)
+                field("duration", value.duration)
+                field("skipReason", value.skipReason)
+                field("stackTrace", value.stackTrace)
+
+                name("reports").writeArray {
+                    for (report in value.reports) {
+                        writeObject {
+                            field("timestamp", report.timestamp)
+                            field("key", report.key)
+                            field("value", report.value)
+                        }
+                    }
+                }
+            }
+        }
+
+        override fun read(value: JsonValue): TestData {
+            return TestData().apply {
+                status = value.field("status")
+                duration = value.field("duration")
+                skipReason = value.field("skipReason")
+                stackTrace = value.field("stackTrace")
+                value.get("reports")?.forEach { report ->
+                    reports.add(ReportEntry(
+                            report.getLong("timestamp"),
+                            report.getString("key"),
+                            report.getString("value")))
+                }
+            }
+
+        }
     }
 }
 
