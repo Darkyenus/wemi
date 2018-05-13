@@ -1,0 +1,23 @@
+
+@file:BuildClasspathDependency("BCD")
+
+@file:BuildDependency("GOF")
+
+@file:BuildDependency("G", "N", "V")
+
+@file:BuildDependency(groupOrFull = "G", name="N",version="V")
+@file:BuildDependency(name="N", version="V", groupOrFull = "G")
+@file:BuildDependency(version="V", name="N",    groupOrFull = "G")
+
+@file:BuildDependencyRepository("NAME", url=    "\tCRAZY:U\\R\"L\t")
+
+import wemi.Keys.runOptions
+import wemi.dependency.Repository
+import wemi.util.executable
+
+val variable = "abcd"
+
+val core by project(path("core")) {
+
+
+}

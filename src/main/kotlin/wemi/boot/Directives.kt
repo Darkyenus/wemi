@@ -4,7 +4,6 @@ package wemi.boot
 
 import org.slf4j.LoggerFactory
 import java.io.BufferedReader
-import java.io.Reader
 
 /**
  * Since Java does not guarantee any persistency in ordering of annotation's fields/methods,
@@ -86,12 +85,13 @@ private val LOG = LoggerFactory.getLogger("Directives")
  *
  * Matches: `@file:<wemi.boot.>BuildAnnotation(...)`
  */
-private val DirectiveRegex = "\\s+@file\\s*:\\s*(?:wemi\\s*\\.\\s*boot\\s*\\.\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\((.*)\\)\\s*".toRegex()
+private val DirectiveRegex = "\\s*@file\\s*:\\s*(?:wemi\\s*\\.\\s*boot\\s*\\.\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\((.*)\\)\\s*".toRegex()
 
 /**
  * Matches single, optionally named, argument, passed into the [DirectiveRegex] constructor.
+ * Also parses some escape sequences that may appear in the string.
  */
-private val DirectiveConstructorPartRegex = "^\\s*(?:([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*)?\"([^\"]*)\"\\s*,?".toRegex()
+private val DirectiveConstructorPartRegex = "\\s*(?:([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*)?\"((?:\\\\[tnr\"'\\\\]|[^\"])*)\"\\s*,?".toRegex()
 
 /**
  * Read [source] as Kotlin file, that may optionally contain [directives] file annotations.
@@ -120,16 +120,31 @@ internal fun parseFileDirectives(source: BufferedReader, directives:Array<Class<
 
         val constructor = directiveMatch.groupValues[2]
 
+        var expectedParameterStart = 0
         var parameter = DirectiveConstructorPartRegex.find(constructor)
         var parameterIndex = 0
         while (parameter != null) {
+            if (parameter.range.first != expectedParameterStart) {
+                LOG.warn("{}:{} Unexpected characters between {} and {}", source, line, expectedParameterStart, parameter.range.first)
+                return false
+            }
+            expectedParameterStart = parameter.range.endInclusive + 1
+
             val name = parameter.groupValues[1]
+            val value = parameter.groupValues[2]
+                    .replace("\\t", "\t")
+                    .replace("\\n", "\n")
+                    .replace("\\r", "\r")
+                    .replace("\\\"", "\"")
+                    .replace("\\'", "'")
+                    .replace("\\\\", "\\")
+
             if (name.isEmpty()) {
                 if (parameterIndex == -1) {
                     LOG.warn("{}:{} Invalid directive annotation - only named parameters are allowed after first named parameter", source, line)
                     return false
                 }
-                directiveConstructorValues[parameterIndex++] = parameter.groupValues[2]
+                directiveConstructorValues[parameterIndex++] = value
             } else {
                 @Suppress("UNUSED_VALUE")//TODO Remove when bug in plugin flow analyser is fixed
                 parameterIndex = -1
@@ -142,10 +157,14 @@ internal fun parseFileDirectives(source: BufferedReader, directives:Array<Class<
                     LOG.warn("{}:{} Invalid directive annotation - parameter {} set multiple times", source, line, name)
                     return false
                 }
-                directiveConstructorValues[index] = parameter.groupValues[2]
+                directiveConstructorValues[index] = value
             }
 
             parameter = parameter.next()
+        }
+        if (expectedParameterStart != constructor.length) {
+            LOG.warn("{}:{} Unexpected characters between {} and {}", source, line, expectedParameterStart, constructor.length)
+            return false
         }
 
         // Complete with default values and check if all variables are set

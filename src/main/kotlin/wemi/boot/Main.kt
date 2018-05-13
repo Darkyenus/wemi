@@ -252,7 +252,7 @@ fun main(args: Array<String>) {
             urls[i++] = file.toUri().toURL()
         }
         val loader = URLClassLoader(urls, Magic.WemiDefaultClassLoader)
-        LOG.debug("Loading plugins for file {}", buildScript)
+        LOG.debug("Loading plugins for {}", buildScript.info)
         val pluginServiceLoader = ServiceLoader.load(PluginEnvironment::class.java, loader)
         for (pluginService in pluginServiceLoader) {
             LOG.debug("Loading plugin service {}", pluginService)
@@ -260,7 +260,7 @@ fun main(args: Array<String>) {
             pluginService.initialize()
         }
 
-        LOG.debug("Loading build file {}", buildScript)
+        LOG.debug("Loading build {}", buildScript.info)
         for (initClass in buildScript.info.initClasses) {
             try {
                 Class.forName(initClass, true, loader)

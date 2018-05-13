@@ -239,4 +239,4 @@ val assembly
 // Build script directive annotations
 typealias BuildDependency = wemi.boot.BuildDependency
 typealias BuildDependencyRepository = wemi.boot.BuildDependencyRepository
-typealias BuildClasspathRepository = wemi.boot.BuildClasspathDependency
+typealias BuildClasspathDependency = wemi.boot.BuildClasspathDependency

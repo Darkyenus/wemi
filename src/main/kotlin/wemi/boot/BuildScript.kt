@@ -4,7 +4,8 @@ import com.esotericsoftware.jsonbeans.JsonValue
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
 import wemi.WemiKotlinVersion
-import wemi.collections.*
+import wemi.collections.WList
+import wemi.collections.toWList
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags
@@ -17,7 +18,6 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.nio.file.StandardOpenOption
 
 private val LOG = LoggerFactory.getLogger("BuildFiles")
 
@@ -135,7 +135,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
         buildScriptInfo.resolve(cacheFolder)
 
         try {
-            Files.newBufferedWriter(buildScriptInfoFile, Charsets.UTF_8, StandardOpenOption.CREATE).use {
+            Files.newBufferedWriter(buildScriptInfoFile, Charsets.UTF_8).use {
                 it.writeJson(buildScriptInfo, BuildScript::class.java)
             }
         } catch (e:Exception) {
@@ -342,7 +342,7 @@ class BuildScript internal constructor(
     }
 
     override fun toString(): String {
-        return "BuildScriptInfo(scriptJar=$scriptJar, sources=$sources, _repositories=$_repositories, _dependencies=$_dependencies, _externalClasspath=$_externalClasspath, buildFlags=$buildFlags)"
+        return "BuildScript(scriptJar=$scriptJar, sources=$sources, _repositories=$_repositories, _dependencies=$_dependencies, _externalClasspath=$_externalClasspath, buildFlags=$buildFlags)"
     }
 }
 

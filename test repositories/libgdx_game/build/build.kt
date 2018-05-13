@@ -1,4 +1,7 @@
 
+// Testing only
+@file:BuildClasspathDependency("../../../build/wemi-plugin-jvm-hotswap-0.4-SNAPSHOT.jar")
+
 import wemi.Keys.runOptions
 import wemi.dependency.Repository
 import wemi.util.executable
