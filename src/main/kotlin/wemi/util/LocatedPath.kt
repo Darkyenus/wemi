@@ -19,12 +19,11 @@ private val LOG: Logger = LoggerFactory.getLogger("LocatedPath")
  * the (re)source root is important. For example, *.class files are added to classpath by their root, not by their
  * full path.
  */
-class LocatedPath private constructor(
-        /** Explicit root, if specified, prefix of [file] */
+class LocatedPath(
+        /** Explicit root. Must be prefix of [file] when not null. */
         val root: Path?,
         /** Represented file */
-        val file: Path,
-        @Suppress("UNUSED_PARAMETER") dummy: Unit?)
+        val file: Path)
     : JsonWritable {
 
     /**
@@ -33,16 +32,10 @@ class LocatedPath private constructor(
      * [classpathEntry] is considered to be [file].
      * Used, for example, for *.jar files.
      */
-    constructor(file: Path) : this(null, file, null)
+    constructor(file: Path) : this(null, file)
 
-    /**
-     * Create with explicit root.
-     * [root] MUST be a prefix of [file].
-     * [classpathEntry] is considered to be [root].
-     * Used, for example, for *.class files.
-     */
-    constructor(root: Path, file: Path) : this(root, file, null) {
-        assert(file.startsWith(root)) { "root must be prefix of the file" }
+    init {
+        assert(root == null || file.startsWith(root)) { "root must be prefix of the file" }
     }
 
     /**
