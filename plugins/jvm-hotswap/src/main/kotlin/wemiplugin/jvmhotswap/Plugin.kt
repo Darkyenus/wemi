@@ -1,6 +1,8 @@
 package wemiplugin.jvmhotswap
 
+import org.slf4j.LoggerFactory
 import wemi.*
+import wemi.KeyDefaults.inProjectDependencies
 import wemi.util.*
 import java.io.DataOutputStream
 import java.io.IOException
@@ -14,6 +16,8 @@ import java.util.concurrent.TimeUnit
  * Keys, configurations and their implementations
  */
 object JvmHotswap {
+
+    private val LOG = LoggerFactory.getLogger("Hotswap")
 
     val runHotswap by key<Int>("Compile and run the project, watch changes to source files and recompile+hotswap them automatically, return exit code")
 
@@ -68,7 +72,7 @@ object JvmHotswap {
 
                 // Create initial snapshot of sources
                 val sourceIncluded: (LocatedPath) -> Boolean = { !it.file.isHidden() }
-                var sourceSnapshot = snapshotFiles(Keys.sourceFiles.get(), sourceIncluded)
+                var sourceSnapshot = snapshotFiles(hotswapSources(), sourceIncluded)
                 // Create initial snapshot of internal classpath
                 val classpathIncluded: (LocatedPath) -> Boolean = { it.file.name.pathHasExtension("class") }
                 var classpathSnapshot = snapshotFiles(initialInternalClasspath, classpathIncluded)
@@ -88,7 +92,7 @@ object JvmHotswap {
                 while (!process.waitFor(2, TimeUnit.SECONDS)) {
                     // Process is still running, check filesystem for changes
                     cleanEvaluationCache(false)
-                    val newSourceSnapshot = snapshotFiles(Keys.sourceFiles.get(), sourceIncluded)
+                    val newSourceSnapshot = snapshotFiles(hotswapSources(), sourceIncluded)
                     if (snapshotsAreEqual(newSourceSnapshot, sourceSnapshot)) {
                         // No changes
                         continue
@@ -96,9 +100,14 @@ object JvmHotswap {
                     sourceSnapshot = newSourceSnapshot
 
                     // Recompile
-                    val newClasspathSnapshot = snapshotFiles(Keys.internalClasspath.get(), classpathIncluded)
+                    val newClasspathSnapshot = try {
+                        snapshotFiles(Keys.internalClasspath.get(), classpathIncluded)
+                    } catch (e: WemiException.CompilationException) {
+                        LOG.info("Can't swap: {}", e.message)
+                        continue
+                    }
 
-                    var anyChangesToFlush = false
+                    var changeCount = 0
 
                     // We can't do anything about added classes (those should get picked up automatically),
                     // nor removed classes. So just detect what has changed and recompile it.
@@ -110,19 +119,35 @@ object JvmHotswap {
                         if (!MessageDigest.isEqual(value, newHash)) {
                             // This file changed!
                             outputStream.writeUTF(key.file.absolutePath)
-                            anyChangesToFlush = true
+                            changeCount++
                         }
                     }
 
-                    if (anyChangesToFlush) {
+                    if (changeCount > 0) {
                         outputStream.writeUTF("")
                     }
 
                     classpathSnapshot = newClasspathSnapshot
+
+                    if (changeCount == 1) {
+                        LOG.info("Swapped 1 class")
+                    } else if (changeCount > 1) {
+                        LOG.info("Swapped {} classes", changeCount)
+                    }
                 }
 
                 process.exitValue()
             }
+        }
+
+        private fun Scope.hotswapSources():List<LocatedPath> {
+            val files = Keys.sourceFiles.get().toMutable()
+
+            inProjectDependencies(null) {
+                files.addAll(Keys.sourceFiles.get())
+            }
+
+            return files
         }
 
     }

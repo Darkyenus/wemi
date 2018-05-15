@@ -6,6 +6,7 @@ import WMutableList
 import configuration
 import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
+import wemi.KeyDefaults.inProjectDependencies
 import wemi.collections.WMutableSet
 import wemi.collections.wEmptyList
 import wemi.compile.*
@@ -21,7 +22,21 @@ import wemi.util.*
 object Configurations {
 
     //region Stage configurations
-    val compiling by configuration("Configuration used when compiling") {}
+    val compiling by configuration("Configuration used when compiling") {
+
+        Keys.externalClasspath modify { classpath ->
+            // Internal classpath of aggregate projects is not included in standard external classpath.
+            // But it is needed for the compilation, so we add it explicitly.
+
+            val result = classpath.toMutable()
+            inProjectDependencies(true) {
+                result.addAll(Keys.internalClasspath.get())
+            }
+            result
+        }
+
+
+    }
 
     val running by configuration("Configuration used when running, sources are resources") {}
 

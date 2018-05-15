@@ -328,7 +328,7 @@ object KeyDefaults {
                 }
 
                 if (!success) {
-                    throw WemiException("Java compilation failed", showStacktrace = false)
+                    throw WemiException.CompilationException("Java compilation failed")
                 }
 
                 compilerFlags.warnAboutUnusedFlags("Java compiler")
@@ -359,7 +359,7 @@ object KeyDefaults {
 
                 val compileResult = compiler.compileJVM(javaSources + kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, CompileLOG, null)
                 if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
-                    throw WemiException("Kotlin compilation failed: $compileResult", showStacktrace = false)
+                    throw WemiException.CompilationException("Kotlin compilation failed: $compileResult")
                 }
 
                 compilerFlags.warnAboutUnusedFlags("Kotlin compiler")
@@ -426,7 +426,7 @@ object KeyDefaults {
                 }
 
                 if (!success) {
-                    throw WemiException("Java compilation failed", showStacktrace = false)
+                    throw WemiException.CompilationException("Java compilation failed")
                 }
 
                 compilerFlags.warnAboutUnusedFlags("Java compiler")
