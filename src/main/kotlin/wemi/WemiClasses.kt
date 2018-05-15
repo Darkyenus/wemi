@@ -698,6 +698,13 @@ class Scope internal constructor(
     }
 
     /**
+     * Forget values stored in this and descendant scopes
+     */
+    fun cleanRunCache() {
+
+    }
+
+    /**
      * Forget cached values stored in this and descendant caches.
      *
      * @return amount of values forgotten

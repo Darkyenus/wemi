@@ -7,6 +7,7 @@ import wemi.util.isRegularFile
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.*
 
 private val LOG = LoggerFactory.getLogger("FileTreeWatcher")
 
@@ -43,7 +44,7 @@ private fun snapshotFile(digest:MessageDigest, result:HashMap<LocatedPath, ByteA
         return
     }
 
-    val file = path.classpathEntry
+    val file = path.file
     if (file.isDirectory()) {
         result[path] = null
         Files.list(file).forEachOrdered {
@@ -72,5 +73,23 @@ fun snapshotFiles(roots:Collection<LocatedPath>, isIncluded:(LocatedPath) -> Boo
     }
 
     return result
+}
+
+fun snapshotsAreEqual(first:Map<LocatedPath, ByteArray?>, second:Map<LocatedPath, ByteArray?>):Boolean {
+    if (first.size != second.size) {
+        return false
+    }
+
+    for ((key, value) in first) {
+        if (!second.containsKey(key)) {
+            return false
+        }
+        // Not using MessageDigest.isEqual because we don't need time-constant comparisons
+        if (!Arrays.equals(value, second[key])) {
+            return false
+        }
+    }
+
+    return true
 }
 

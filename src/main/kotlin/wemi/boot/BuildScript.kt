@@ -266,9 +266,9 @@ class BuildScript internal constructor(
             BuildDependency::class.java -> {
                 val (groupOrFull, name, version) = fields
                 if (name.isEmpty() && version.isEmpty()) {
-                    _dependencies.add(Dependency(DependencyId(groupOrFull, name, version), WemiBundledLibrariesExclude))
-                } else {
                     _dependencies.add(Dependency(wemi.dependencyId(groupOrFull, null), WemiBundledLibrariesExclude))
+                } else {
+                    _dependencies.add(Dependency(DependencyId(groupOrFull, name, version), WemiBundledLibrariesExclude))
                 }
             }
             BuildDependencyRepository::class.java -> {
@@ -282,6 +282,13 @@ class BuildScript internal constructor(
                 var path = Paths.get(file)
                 if (!path.isAbsolute) {
                     path = WemiRootFolder.resolve(path)
+                }
+
+                try {
+                    path = path.toRealPath()
+                } catch (e:IOException) {
+                    LOG.warn("BuildClasspathDependency - file not found and ignored {}", path)
+                    return
                 }
 
                 _externalClasspath.add(path)

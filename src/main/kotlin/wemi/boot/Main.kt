@@ -244,6 +244,7 @@ fun main(args: Array<String>) {
     // Load build files now
     if (buildScript != null) {
         PrettyPrinter.setApplicationRootDirectory(WemiRootFolder)
+        LOG.debug("Obtained build script {}", buildScript.info)
 
         val urls = arrayOfNulls<URL>(1 + buildScript.info.externalClasspath.size)
         urls[0] = buildScript.info.scriptJar.toUri().toURL()
@@ -252,7 +253,7 @@ fun main(args: Array<String>) {
             urls[i++] = file.toUri().toURL()
         }
         val loader = URLClassLoader(urls, Magic.WemiDefaultClassLoader)
-        LOG.debug("Loading plugins for {}", buildScript.info)
+        LOG.debug("Loading plugins...")
         val pluginServiceLoader = ServiceLoader.load(PluginEnvironment::class.java, loader)
         for (pluginService in pluginServiceLoader) {
             LOG.debug("Loading plugin service {}", pluginService)
@@ -260,7 +261,7 @@ fun main(args: Array<String>) {
             pluginService.initialize()
         }
 
-        LOG.debug("Loading build {}", buildScript.info)
+        LOG.debug("Loading build...")
         for (initClass in buildScript.info.initClasses) {
             try {
                 Class.forName(initClass, true, loader)

@@ -51,7 +51,8 @@ object JvmHotswap {
                 val mainClass = Keys.mainClass.get()
                 val options = Keys.runOptions.get().toMutable()
                 val port = hotswapAgentPort.get()
-                options.add("-javaagent:${Magic.classpathFileOf(javaClass)!!.absolutePath}=$port")
+                val agentJar = Magic.classpathFileOf(JvmHotswap.javaClass)!!
+                options.add("-javaagent:${agentJar.absolutePath}=$port")
 
                 val arguments = Keys.runArguments.get()
 
@@ -84,10 +85,10 @@ object JvmHotswap {
                 }
                 val outputStream = DataOutputStream(agentSocket.getOutputStream())
 
-                while (!process.waitFor(5, TimeUnit.SECONDS)) {
+                while (!process.waitFor(2, TimeUnit.SECONDS)) {
                     // Process is still running, check filesystem for changes
                     val newSourceSnapshot = snapshotFiles(Keys.sourceFiles.get(), sourceIncluded)
-                    if (newSourceSnapshot == sourceSnapshot) {
+                    if (snapshotsAreEqual(newSourceSnapshot, sourceSnapshot)) {
                         // No changes
                         continue
                     }

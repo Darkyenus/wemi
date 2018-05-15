@@ -67,6 +67,24 @@ class LocatedPath(
             field("file", file)
         }
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as LocatedPath
+
+        if (root != other.root) return false
+        if (file != other.file) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = root?.hashCode() ?: 0
+        result = 31 * result + file.hashCode()
+        return result
+    }
 }
 
 /**

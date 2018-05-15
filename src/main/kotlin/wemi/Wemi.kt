@@ -5,6 +5,7 @@ import wemi.dependency.*
 import java.net.URL
 import java.nio.file.Path
 import kotlin.reflect.KProperty0
+import kotlin.reflect.jvm.isAccessible
 
 /** Version of Wemi build system */
 const val WemiVersion = "0.4-SNAPSHOT"
@@ -142,6 +143,7 @@ fun archetype(parent: KProperty0<Archetype>? = null, initializer: Archetype.() -
  * @throws IllegalStateException when given property's archetype is already created
  */
 fun KProperty0<Archetype>.inject(injectedInitializer:Archetype.() -> Unit) {
+    this.isAccessible = true // Delegate is stored as not accessible
     val delegate = this.getDelegate() as? ArchetypeDelegate
             ?: throw IllegalArgumentException("Property $this is not created by archetype()")
 
