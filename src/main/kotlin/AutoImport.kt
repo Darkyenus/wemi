@@ -153,8 +153,6 @@ val unmanagedDependencies
     inline get() = wemi.Keys.unmanagedDependencies
 val projectDependencies
     inline get() = wemi.Keys.projectDependencies
-val resolvedProjectDependencies
-    inline get() = wemi.Keys.resolvedProjectDependencies
 
 val externalClasspath
     inline get() = wemi.Keys.externalClasspath

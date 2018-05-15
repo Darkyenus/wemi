@@ -24,7 +24,7 @@ private fun MessageDigest.digest(path:Path):ByteArray? {
                 if (read <= 0) {
                     break
                 }
-                this@digest.digest(buffer, 0, read)
+                this@digest.update(buffer, 0, read)
             }
 
             this@digest.digest()

@@ -87,6 +87,7 @@ object JvmHotswap {
 
                 while (!process.waitFor(2, TimeUnit.SECONDS)) {
                     // Process is still running, check filesystem for changes
+                    cleanEvaluationCache(false)
                     val newSourceSnapshot = snapshotFiles(Keys.sourceFiles.get(), sourceIncluded)
                     if (snapshotsAreEqual(newSourceSnapshot, sourceSnapshot)) {
                         // No changes

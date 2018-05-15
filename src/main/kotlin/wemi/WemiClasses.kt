@@ -238,7 +238,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         @Volatile
         private var currentlyEvaluatingThread:Thread? = null
         private var currentlyEvaluatingNestLevel = 0
-        private val currentlyEvaluatingScopeRoots = ArrayList<Scope>()
+        internal val currentlyEvaluatingProjects = ArrayList<Project>()
 
         /**
          * Keys evaluated in this evaluation block.
@@ -271,6 +271,12 @@ class Project internal constructor(val name: String, internal val projectRoot: P
                 }
             }
 
+            // Add project, whose scope's cache will be cleared later
+            if (!currentlyEvaluatingProjects.contains(project)) {
+                currentlyEvaluatingProjects.add(project)
+            }
+
+            // Prepare scope to use
             var scope = project.projectScope
             if (configurationsArray != null) {
                 for (config in configurationsArray) {
@@ -282,10 +288,6 @@ class Project internal constructor(val name: String, internal val projectRoot: P
                 }
             }
 
-            // Add scope that will be used to the roots to be cleared later
-            if (!currentlyEvaluatingScopeRoots.contains(scope)) {
-                currentlyEvaluatingScopeRoots.add(scope)
-            }
             currentlyEvaluatingNestLevel++
             return scope
         }
@@ -299,12 +301,10 @@ class Project internal constructor(val name: String, internal val projectRoot: P
                 val cleanupStartTime = System.nanoTime()
                 var purgedCount = 0
 
-                // NOTE: due to the way how scopes are added, we may end up cleaning the same scope twice,
-                // albeit indirectly. In general, it is probably faster to allow this than to try to mitigate this.
-                for (scope in currentlyEvaluatingScopeRoots) {
-                    purgedCount += scope.cleanCache(false)
+                for (project in currentlyEvaluatingProjects) {
+                    purgedCount += project.projectScope.cleanCache(false)
                 }
-                currentlyEvaluatingScopeRoots.clear()
+                currentlyEvaluatingProjects.clear()
 
                 // Cleanup used keys
                 currentEvaluationUsedKeys.clear()
@@ -698,10 +698,26 @@ class Scope internal constructor(
     }
 
     /**
-     * Forget values stored in this and descendant scopes
+     * Forget cached values, that would be removed after the full task evaluation.
+     *
+     * This is useful when key binding wants to emulate launching given key repeatedly,
+     * for example when compiling the same code multiple times.
+     *
+     * @param thisScopeTreeOnly if only scopes of this scope tree should be cleared,
+     * or (false) if all evaluation roots should get cleared.
      */
-    fun cleanRunCache() {
-
+    fun cleanEvaluationCache(thisScopeTreeOnly:Boolean) {
+        if (thisScopeTreeOnly) {
+            var scope = this
+            while (true) {
+                scope = scope.scopeParent ?: break
+            }
+            scope.cleanCache(false)
+        } else {
+            for (project in Project.currentlyEvaluatingProjects) {
+                project.projectScope.cleanCache(false)
+            }
+        }
     }
 
     /**

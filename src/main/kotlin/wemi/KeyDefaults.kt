@@ -113,13 +113,12 @@ object KeyDefaults {
         Partial(resolved, complete)
     }
 
-    private val ResolvedProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
-    fun resolvedProjectDependencies(aggregate:Boolean?): BoundKeyValue<WList<LocatedPath>> = {
-        ResolvedProjectDependencies_CircularDependencyProtection.block(this, failure = {
+    private val ResolveProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
+    fun Scope.inProjectDependencies(aggregate:Boolean?, operation:Scope.(dep:ProjectDependency)->Unit) {
+        ResolveProjectDependencies_CircularDependencyProtection.block(this, failure = {
             //TODO Show cycle
             throw WemiException("Cyclic dependencies in projectDependencies are not allowed", showStacktrace = false)
         }, action = {
-            val result = WMutableList<LocatedPath>()
             val projectDependencies = Keys.projectDependencies.get()
 
             for (projectDependency in projectDependencies) {
@@ -129,16 +128,13 @@ object KeyDefaults {
 
                 // Enter a different scope
                 projectDependency.project.evaluate(*projectDependency.configurations) {
-                    ExternalClasspath_LOG.debug("Resolving project dependency on {}", this)
-                    result.addAll(Keys.externalClasspath.get())
-                    result.addAll(Keys.internalClasspath.get())
+                    operation(projectDependency)
                 }
             }
-            result
         })
     }
 
-    private val ExternalClasspath_LOG = LoggerFactory.getLogger("ProjectDependencyResolution")
+    private val ClasspathResolution_LOG = LoggerFactory.getLogger("ClasspathResolution")
     val ExternalClasspath: BoundKeyValue<WList<LocatedPath>> = {
         val result = WMutableList<LocatedPath>()
 
@@ -150,8 +146,13 @@ object KeyDefaults {
             result.add(LocatedPath(resolvedDependency.artifact ?: continue))
         }
 
-        val projectDependencies = Keys.resolvedProjectDependencies.get()
-        result.addAll(projectDependencies)
+        inProjectDependencies(null) { projectDependency ->
+            ClasspathResolution_LOG.debug("Resolving project dependency on {}", this)
+            result.addAll(Keys.externalClasspath.get())
+            if (!projectDependency.aggregate) {
+                result.addAll(Keys.internalClasspath.get())
+            }
+        }
 
         val unmanaged = Keys.unmanagedDependencies.get()
         result.addAll(unmanaged)
@@ -166,6 +167,11 @@ object KeyDefaults {
         val classpath = WMutableList<LocatedPath>(resources.size + 128)
         constructLocatedFiles(compiled, classpath)
         classpath.addAll(resources)
+
+        inProjectDependencies(true) {
+            ClasspathResolution_LOG.debug("Resolving internal project dependency on {}", this)
+            classpath.addAll(Keys.internalClasspath.get())
+        }
 
         classpath
     }
@@ -545,10 +551,6 @@ object KeyDefaults {
                 // Load data
                 for (file in Keys.internalClasspath.get()) {
                     assemblyOperation.addSource(file, true)
-                }
-
-                for (file in Keys.resolvedProjectDependencies.get()) {
-                    assemblyOperation.addSource(file, false)
                 }
 
                 val outputFile = Keys.archiveOutputFile.get()

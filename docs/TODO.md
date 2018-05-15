@@ -3,9 +3,6 @@
 - Hotswapping jvm code:
 	- Test plugin and continue working on it
 
-- **Bug**: It appears, that values can be stored up further the scope tree,
-	but it is cleared only from the invocation source, e.g. project/whatever
-
 - Consider removing sourcesBase and (re)sourceFiles keys. Are they worth the confusion?
 	- Maybe introduce something like non-rebindable keys
 

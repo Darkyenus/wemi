@@ -59,7 +59,6 @@ object Archetypes {
 
         Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
-        Keys.resolvedProjectDependencies set KeyDefaults.resolvedProjectDependencies(null)
         Keys.internalClasspath set KeyDefaults.InternalClasspath
         Keys.externalClasspath set KeyDefaults.ExternalClasspath
 
@@ -74,11 +73,6 @@ object Archetypes {
 
         Keys.archiveOutputFile set { Keys.buildDirectory.get() / "${Keys.projectName.get()}-${Keys.projectVersion.get()}.zip" }
         Keys.archive set KeyDefaults.Archive
-
-        extend(Configurations.archiving) {
-            // When archiving, don't include project dependencies that are not aggregated
-            Keys.resolvedProjectDependencies set KeyDefaults.resolvedProjectDependencies(false)
-        }
 
         extend(Configurations.publishing) {
             Keys.archive set KeyDefaults.ArchivePublishing

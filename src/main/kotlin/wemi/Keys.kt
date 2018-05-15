@@ -5,7 +5,6 @@ import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.MergeStrategyChooser
 import wemi.assembly.RenameFunction
 import wemi.boot.BuildScript
-import wemi.boot.BuildScriptCompiler
 import wemi.collections.WList
 import wemi.collections.WSet
 import wemi.collections.wEmptyList
@@ -75,10 +74,9 @@ object Keys {
     }, cacheMode = CACHE_ALWAYS)
     val unmanagedDependencies by key<WList<LocatedPath>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = wEmptyList())
     val projectDependencies by key<WSet<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = wEmptySet())
-    val resolvedProjectDependencies by key<WList<LocatedPath>>("Classpath contribution of projectDependencies into externalClasspath")
 
-    val externalClasspath by key<WList<LocatedPath>>("Classpath of the project, elements from external sources, i.e. library and project dependencies", defaultValue = wEmptyList())
-    val internalClasspath by key<WList<LocatedPath>>("Classpath of the project, created internally, i.e. compiled sources and resources", defaultValue = wEmptyList())
+    val externalClasspath by key<WList<LocatedPath>>("Classpath, externally obtained elements from external sources, i.e. library dependencies, external classpath of all project dependencies and internal classpath of non-aggregate dependencies", defaultValue = wEmptyList())
+    val internalClasspath by key<WList<LocatedPath>>("Classpath, internally created elements, i.e. compiled sources and resources, including those of aggregate project dependencies", defaultValue = wEmptyList())
 
     val clean by key<Int>("Clean compile directories and internal cache, returns approximate amount of items cleaned", cacheMode = null)
 
