@@ -5,12 +5,13 @@ Build system aimed at those, who don't want to be limited nor slowed down by the
 Key features:
 - Simple and expressive
 	- Build scripts in Kotlin allow to easily create any functionality with Wemi's DSL, usually in just a few lines of code
+	- Convention dominates default settings, but everything is easily reconfigurable
 	- Transparent internal structure without magic is easy to debug and understand
 - No installation, simple upgrades
 	- Whole build system is in single executable (~5MB) that goes directly into the project's directory
 - Fast
-	- Written with performance and user's time in ind
-	- Minimal use of libraries means that the code does exactly what it should be doing and nothing more
+	- Written with performance and your valuable time in mind
+	- Minimal use of libraries means that the code does exactly what it should be, and nothing more
 - Works
 - Out of the box supports:
 	- Java and Kotlin compiling
