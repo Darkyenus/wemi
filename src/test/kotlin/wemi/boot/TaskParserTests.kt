@@ -8,9 +8,18 @@ import org.junit.jupiter.api.Test
  */
 class TaskParserTests {
 
+    private val Whitespace = Regex("\\s+")
+
     private fun assertEquals(line:String, vararg tasks:Task) {
         val parsed = TaskParser.PartitionedLine(listOf(line), true, false)
         assertArrayEquals(tasks, parsed.tasks.toTypedArray())
+
+        if (line.indexOf('"') == -1) {
+            // Test it as if it came from command line
+            // (simple test does not handle quotes yet)
+            val parsedFromCommandLine = TaskParser.PartitionedLine(line.split(Whitespace), false, false)
+            assertArrayEquals(tasks, parsedFromCommandLine.tasks.toTypedArray())
+        }
     }
 
     private fun assertEqualsMulti(line: String, vararg tasks: Task) {

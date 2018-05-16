@@ -275,6 +275,14 @@ object TaskParser : Parser {
                 // Finish last word
                 endWord(source.length)
 
+                if (!allowQuotes) {
+                    // When quotes are not allowed, we are reading already whitespace-split words
+                    // and we don't want to ignore the space in between, which once was there
+                    val wordSplit = Part("", source.length, source.length)
+                    wordSplit.meaning = TokenType.Whitespace
+                    parts.add(wordSplit)
+                }
+
                 indexBase += source.length
             }
 

@@ -1,7 +1,5 @@
 # Things to do next
 
-- BUG: `./wemi trace projectName` calls task `traceprojectName`
-
 - Hotswapping jvm code:
 	- Test plugin and continue working on it
 
