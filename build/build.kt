@@ -185,6 +185,7 @@ fun createKotlinCompilerProject(version:String):Project {
 /**
  * Plugin for hotswapping JVM code at runtime.
  */
+@Suppress("unused")
 val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
     projectName set { "wemi-plugin-jvm-hotswap" }
     projectGroup set { WemiGroup }
