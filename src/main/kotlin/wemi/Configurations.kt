@@ -4,11 +4,13 @@ package wemi
 
 import WMutableList
 import configuration
+import path
 import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.KeyDefaults.inProjectDependencies
 import wemi.collections.WMutableSet
 import wemi.collections.wEmptyList
+import wemi.collections.wSetOf
 import wemi.compile.*
 import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.JavadocClassifier
@@ -22,7 +24,11 @@ import wemi.util.*
 object Configurations {
 
     //region Stage configurations
+    /**
+     * @see Keys.compile
+     */
     val compiling by configuration("Configuration used when compiling") {
+        Keys.sourceFiles set KeyDefaults.SourceFiles
 
         Keys.externalClasspath modify { classpath ->
             // Internal classpath of aggregate projects is not included in standard external classpath.
@@ -34,20 +40,38 @@ object Configurations {
             }
             result
         }
-
-
     }
 
+    /**
+     * @see Keys.run
+     */
     val running by configuration("Configuration used when running, sources are resources") {}
 
+    /**
+     * @see Keys.test
+     */
+    val testing by configuration("Used when testing") {
+        Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
+        Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
+        Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
+
+        Keys.libraryDependencies add { Dependency(JUnitPlatformLauncher) }
+    }
+
+    /**
+     * @see Keys.assembly
+     */
     val assembling by configuration("Configuration used when assembling Jar with dependencies") {}
     //endregion
 
     //region Compiling
     val compilingJava by configuration("Configuration layer used when compiling Java sources", compiling) {
-        Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
+        Keys.sourceRoots set { wSetOf(path("src/main/java")) }
+        extend (Configurations.testing) {
+            Keys.sourceRoots add { path("src/test/java") }
+        }
+
         Keys.sourceExtensions set { JavaSourceFileExtensions }
-        Keys.sourceFiles set KeyDefaults.SourceFiles
 
         Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
         Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
@@ -55,9 +79,13 @@ object Configurations {
     }
 
     val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
-        Keys.sourceRoots set KeyDefaults.SourceRootsJavaKotlin
+        Keys.sourceRoots set { wSetOf(path("src/main/java")) }
+        Keys.sourceRoots set { wSetOf(path("src/main/kotlin")) }
+        extend (Configurations.testing) {
+            Keys.sourceRoots add { path("src/test/java") }
+            Keys.sourceRoots add { path("src/test/kotlin") }
+        }
         Keys.sourceExtensions set { KotlinSourceFileExtensions }
-        Keys.sourceFiles set KeyDefaults.SourceFiles
 
         Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance() }
         Keys.compilerOptions modify {
@@ -66,20 +94,6 @@ object Configurations {
             }
         }
         Keys.compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
-    }
-    //endregion
-
-    //region Testing configuration
-    /**
-     * Used by [Keys.test]
-     */
-    val testing by configuration("Used when testing") {
-        Keys.sourceBases add { Keys.projectRoot.get() / "src/test" }
-        Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
-        Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
-        Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
-
-        Keys.libraryDependencies add { Dependency(JUnitPlatformLauncher) }
     }
     //endregion
 

@@ -14,8 +14,6 @@ import wemi.boot.WemiBuildScript
 import wemi.boot.WemiBundledLibrariesExclude
 import wemi.collections.WList
 import wemi.collections.WMutableList
-import wemi.collections.WMutableSet
-import wemi.collections.WSet
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags
@@ -52,25 +50,6 @@ import kotlin.collections.LinkedHashSet
  * This includes implementations of most tasks.
  */
 object KeyDefaults {
-
-    val SourceRootsJavaKotlin: BoundKeyValue<WSet<Path>> = {
-        val bases = Keys.sourceBases.get()
-        val roots = WMutableSet<Path>()
-        for (base in bases) {
-            roots.add(base / "kotlin")
-            roots.add(base / "java")
-        }
-        roots
-    }
-
-    val ResourceRoots: BoundKeyValue<WSet<Path>> = {
-        val bases = Keys.sourceBases.get()
-        val roots = WMutableSet<Path>()
-        for (base in bases) {
-            roots.add(base / "resources")
-        }
-        roots
-    }
 
     val SourceFiles: BoundKeyValue<WList<LocatedPath>> = {
         val roots = Keys.sourceRoots.get()

@@ -47,7 +47,6 @@ object Keys {
 
     val input by key<Input>("Provides access to user input, that can be programmatically pre-set")
 
-    val sourceBases by key<WSet<Path>>("Directory in which all source directories can be found (example: '/src/main')", defaultValue = wEmptySet())
     val sourceRoots by key<WSet<Path>>("Directories which are source roots for the project (example: '/src/main/java')", defaultValue = wEmptySet())
     val sourceExtensions by key<WSet<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)", defaultValue = wEmptySet())
     /**

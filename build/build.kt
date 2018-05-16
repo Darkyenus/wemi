@@ -61,6 +61,10 @@ val core:Project by project {
         }
     }
 
+    extend(compilingKotlin) {
+        compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
+    }
+
     extend(testing) {
         libraryDependencies add { JUnitAPI }
         libraryDependencies add { JUnitEngine }

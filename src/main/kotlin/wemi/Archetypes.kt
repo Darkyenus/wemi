@@ -2,6 +2,7 @@
 
 package wemi
 
+import path
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.JarMergeStrategyChooser
 import wemi.boot.WemiBuildFolder
@@ -9,7 +10,6 @@ import wemi.boot.WemiCacheFolder
 import wemi.boot.WemiRunningInInteractiveMode
 import wemi.collections.wEmptyList
 import wemi.collections.wEmptySet
-import wemi.collections.wMutableSetOf
 import wemi.collections.wSetOf
 import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
@@ -48,11 +48,9 @@ object Archetypes {
 
         Keys.buildDirectory set { WemiBuildFolder }
         Keys.cacheDirectory set { WemiCacheFolder }
-        Keys.sourceBases set { wMutableSetOf(Keys.projectRoot.get() / "src/main") }
-        // Source files and roots are set elsewhere
 
-        Keys.resourceRoots set KeyDefaults.ResourceRoots
-        Keys.resourceFiles set KeyDefaults.ResourceFiles
+        Keys.resourceRoots setToUnionOfSelfIn { Keys.compilingConfigurations.get() }
+        Keys.resourceFiles setToConcatenationOfSelfIn { Keys.compilingConfigurations.get() }
 
         Keys.sourceRoots setToUnionOfSelfIn { Keys.compilingConfigurations.get() }
         Keys.sourceFiles setToConcatenationOfSelfIn { Keys.compilingConfigurations.get() }
@@ -86,6 +84,11 @@ object Archetypes {
      * Implements basic key implementations for JVM that don't usually change.
      */
     val JVMBase by archetype(::Base) {
+        Keys.resourceRoots set { wSetOf(path("src/main/resources")) }
+        extend (Configurations.testing) {
+            Keys.resourceRoots add { path("src/test/resources") }
+        }
+
         Keys.repositories set { DefaultRepositories }
 
         Keys.javaHome set { wemi.run.JavaHome }
@@ -130,10 +133,7 @@ object Archetypes {
     val BlankJVMProject by archetype(::JVMBase) {
         Keys.internalClasspath set { wEmptyList() }
 
-        Keys.sourceBases set { wEmptySet() }
-
         Keys.resourceRoots set { wEmptySet() }
-        Keys.resourceFiles set { wEmptyList() }
     }
 
     /**

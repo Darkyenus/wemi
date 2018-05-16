@@ -136,8 +136,6 @@ val buildScript
 val input
     inline get() = wemi.Keys.input
 
-val sourceBases
-    inline get() = wemi.Keys.sourceBases
 val sourceRoots
     inline get() = wemi.Keys.sourceRoots
 val sourceExtensions
