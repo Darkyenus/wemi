@@ -27,9 +27,9 @@ private const val WemiVersion = "0.4-SNAPSHOT"
 /**
  * Wemi Build System core. Builds
  */
-val core:Project by project(path(".")) {
-    projectName set { "wemi" }
+val core:Project by project {
     projectGroup set { WemiGroup }
+    projectName set { "wemi" }
     projectVersion set { WemiVersion }
 
     kotlinVersion set { KotlinCompilerVersion.Version1_2_21 }

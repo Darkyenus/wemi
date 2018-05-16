@@ -4,6 +4,7 @@ import wemi.Archetypes
 import wemi.CACHE_FOR_RUN
 import wemi.Configurations
 import wemi.KeyCacheMode
+import wemi.boot.WemiRootFolder
 import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository
 import wemi.util.div as _div
@@ -78,7 +79,19 @@ inline fun <T> Collection<T>.toWSet() = this._toWSet()
 inline fun <T> Collection<T>.toWList() = this._toWList()
 
 // Path helpers
-inline fun path(path:String):Path = Paths.get(path)
+/**
+ * Construct a path, from given string, like with [Paths.get].
+ * If the resulting path is relative, make it absolute by resolving it on [WemiRootFolder].
+ * Resulting path is normalized (though [java.nio.file.Path.normalize]).
+ */
+fun path(path:String):Path {
+    val result = Paths.get(path)
+    if (result.isAbsolute) {
+        return result.normalize()
+    } else {
+        return WemiRootFolder.resolve(result).normalize()
+    }
+}
 inline operator fun URL.div(path: CharSequence): URL = this._div(path)
 inline operator fun Path.div(path: CharSequence): Path = this._div(path)
 inline operator fun CharSequence.div(path: CharSequence): StringBuilder = this._div(path)
