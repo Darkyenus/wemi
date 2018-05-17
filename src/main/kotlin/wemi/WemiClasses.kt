@@ -98,7 +98,7 @@ class Key<Value> internal constructor(
 class Configuration internal constructor(val name: String,
                                          val description: String,
                                          val parent: Configuration?)
-    : BindingHolder(), WithDescriptiveString, JsonWritable {
+    : BindingHolder(), JsonWritable {
 
     /**
      * @return [name]
@@ -107,10 +107,9 @@ class Configuration internal constructor(val name: String,
         return name
     }
 
-    /**
-     * @return [name] - [description]
-     */
-    override fun toDescriptiveAnsiString(): String = "${format(name, format = Format.Bold)} - \"$description\""
+    override fun toDescriptiveAnsiString(): String =
+            StringBuilder().format(format = Format.Bold).append(name)
+                    .format(Color.White).append(':').format().toString()
 
     override fun JsonWriter.write() {
         writeObject {
@@ -126,15 +125,19 @@ private val AnonymousConfigurationDescriptiveAnsiString = format("<anonymous>", 
  * A special version of [Configuration] that is anonymous and can be created at runtime, any time.
  * Unlike full configuration, does not have name, description, nor parent.
  *
+ * @param fromScope for debug only
  * @see [Scope.using] about creation of these
  */
-class AnonymousConfiguration @PublishedApi internal constructor() : BindingHolder(), WithDescriptiveString {
+class AnonymousConfiguration @PublishedApi internal constructor(private val fromScope:Scope) : BindingHolder() {
     /**
      * @return <anonymous>
      */
-    override fun toDescriptiveAnsiString(): String = AnonymousConfigurationDescriptiveAnsiString
+    override fun toDescriptiveAnsiString(): String =
+            StringBuilder().format(Color.White).append(fromScope)
+                    .append(".using(").format(format = Format.Bold)
+                    .append("<anonymous>:").format(Color.White).append(')').format().toString()
 
-    override fun toString(): String = "<anonymous>"
+    override fun toString(): String = "$fromScope.using(<anonymous>:)"
 }
 
 /**
@@ -149,10 +152,15 @@ class ConfigurationExtension internal constructor(
         @Suppress("MemberVisibilityCanBePrivate")
         val extending: Configuration,
         val from: BindingHolder) : BindingHolder() {
-    /**
-     * @return extend([extending]) from [from]
-     */
-    override fun toString(): String = "extend($extending) from $from"
+
+    override fun toDescriptiveAnsiString(): String {
+        return StringBuilder()
+                .format(format=Format.Bold).append(from.toDescriptiveAnsiString())
+                .format(Color.White).append(".extend(").format(format=Format.Bold).append(extending.toDescriptiveAnsiString())
+                .format(Color.White).append(") ").format().toString()
+    }
+
+    override fun toString(): String = "$from.extend($extending)"
 }
 
 /**
@@ -173,13 +181,9 @@ class Project internal constructor(val name: String, internal val projectRoot: P
     /**
      * @return [name] at [projectRoot]
      */
-    override fun toDescriptiveAnsiString(): String {
-        if (projectRoot == null) {
-            return "${format(name, format = Format.Bold)} without root"
-        } else {
-            return "${format(name, format = Format.Bold)} at $projectRoot"
-        }
-    }
+    override fun toDescriptiveAnsiString(): String =
+            StringBuilder().format(format = Format.Bold).append(name)
+                    .format(Color.White).append('/').format().toString()
 
     override fun JsonWriter.write() {
         writeValue(name, String::class.java)
@@ -330,11 +334,28 @@ class Project internal constructor(val name: String, internal val projectRoot: P
  * @param name used mostly for debugging
  * @see Archetypes for more info about this concept
  */
-class Archetype internal constructor(val name: String, val parent:Archetype?) : BindingHolder(), WithDescriptiveString {
+class Archetype internal constructor(val name: String, val parent:Archetype?) : BindingHolder() {
 
-    override fun toDescriptiveAnsiString(): String = format("$name Archetype", Color.White).toString()
+    override fun toDescriptiveAnsiString(): String {
+        val sb = StringBuilder()
+        if (parent != null) {
+            sb.append(Color.White).append('(')
+            val parentStack = ArrayList<Archetype>()
+            var parent = this.parent
+            while (parent != null) {
+                parentStack.add(parent)
+                parent = parent.parent
+            }
+            for (i in parentStack.indices.reversed()) {
+                sb.append(parentStack[i].name).append("//")
+            }
+            sb.append(')')
+        }
+        sb.format(format = Format.Bold).append(name).append("//").format()
+        return sb.toString()
+    }
 
-    override fun toString(): String = "$name Archetype"
+    override fun toString(): String = "$name//"
 }
 
 /**
@@ -478,7 +499,7 @@ class Scope internal constructor(
      */
     inline fun <Result> Scope.using(anonInitializer: AnonymousConfiguration.() -> Unit,
                                     action: Scope.() -> Result): Result {
-        val anonConfig = AnonymousConfiguration()
+        val anonConfig = AnonymousConfiguration(this)
         anonConfig.anonInitializer()
         // Locking is deferred to scopeFor because of visibility rules for inlined functions
         return scopeFor(anonConfig).action()
@@ -808,7 +829,7 @@ private val LOG: Logger = LoggerFactory.getLogger("BindingHolder")
  *
  * [BindingHolder] instances form building elements of a [Scope].
  */
-sealed class BindingHolder {
+sealed class BindingHolder : WithDescriptiveString {
 
     internal val binding = HashMap<Key<*>, BoundKeyValue<Any?>>()
     internal val modifierBindings = HashMap<Key<*>, ArrayList<BoundKeyValueModifier<Any?>>>()
@@ -1064,6 +1085,11 @@ sealed class BindingHolder {
             }
         }
     }
+
+    /**
+     * One line string, using only White foreground for non-important stuff and Bold for important stuff.
+     */
+    abstract override fun toDescriptiveAnsiString(): String
 }
 
 /**

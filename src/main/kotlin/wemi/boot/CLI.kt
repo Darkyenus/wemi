@@ -12,6 +12,7 @@ import wemi.util.*
 import java.io.IOException
 import java.io.PrintStream
 import java.nio.file.Path
+import java.util.*
 
 /**
  * Handles user interaction in standard (possibly interactive) mode
@@ -382,7 +383,7 @@ object CLI {
             null
         }
 
-        put("info") { task ->
+        put("inspect") { task ->
             for ((type, name) in task.input) {
                 if (type == "project" || (type == null && name.endsWith("/"))) {
                     val projectName = name.removeSuffix("/")
@@ -392,7 +393,7 @@ object CLI {
                         continue
                     }
 
-                    print(formatLabel("Project: "))
+                    print(formatLabel("Project Name: "))
                     println(formatValue(project.name))
                     print(formatLabel("At: "))
                     println(formatValue(project.projectRoot?.toString() ?: "<no root>"))
@@ -404,9 +405,13 @@ object CLI {
                         continue
                     }
 
-                    print(formatLabel("Configuration: "))
+                    print(formatLabel("Configuration Name: "))
                     println(formatValue(configuration.name))
                     println(format(configuration.description, Color.Black))
+                    if (configuration.parent != null) {
+                        print(formatLabel("Parent: "))
+                        println(formatValue(configuration.parent.name))
+                    }
                 } else if (type == "key" || (type == null && name.isNotEmpty() && name.last().isJavaIdentifierPart())) {
                     val key = AllKeys.findCaseInsensitive(name)
                     if (key == null) {
@@ -414,7 +419,7 @@ object CLI {
                         continue
                     }
 
-                    print(formatLabel("Key: "))
+                    print(formatLabel("Key Name: "))
                     println(formatValue(key.name))
                     println(format(key.description, Color.Black))
                     print(formatLabel("Default value: "))
@@ -426,6 +431,70 @@ object CLI {
                         for ((inputKey, description) in key.inputKeys) {
                             println(""+format(inputKey, format = Format.Bold)+": "+formatValue(description))
                         }
+                    }
+
+                    println(formatLabel("Known bindings in:"))
+
+                    val bindingHolders = LinkedHashSet<BindingHolder>()
+                    val modifierHolders = LinkedHashSet<BindingHolder>()
+
+                    fun exploreForHolders(holder:BindingHolder) {
+                        if (holder.binding.containsKey(key)) {
+                            bindingHolders.add(holder)
+                        }
+                        if (holder.modifierBindings.containsKey(key)) {
+                            modifierHolders.add(holder)
+                        }
+
+                        for (extension in holder.configurationExtensions.values) {
+                            exploreForHolders(extension)
+                        }
+                    }
+
+                    for (project in AllProjects.values) {
+                        for (holder in project.projectScope.scopeBindingHolders) {
+                            exploreForHolders(holder)
+                        }
+                    }
+                    for (configuration in AllConfigurations.values) {
+                        exploreForHolders(configuration)
+                    }
+
+                    fun showHolders(holder:Set<BindingHolder>) {
+                        val typeMap = TreeMap<Class<BindingHolder>, MutableList<BindingHolder>> { a, b ->
+                            a.name.compareTo(b.name)
+                        }
+                        holder.groupByTo(typeMap) { it.javaClass }
+
+                        val sb = StringBuilder()
+
+                        for ((bindingType, bindings) in typeMap) {
+                            sb.append("  ").format(Color.Blue).append(bindingType.simpleName)
+                                    .format(Color.Black).append(" (").append(bindings.size)
+                                    .append("):\n").format()
+
+                            for (binding in bindings) {
+                                sb.append("   ").append(binding.toDescriptiveAnsiString()).append('\n')
+                            }
+
+                            print(sb)
+                            sb.setLength(0)
+                        }
+
+                    }
+
+                    if (bindingHolders.isEmpty()) {
+                        println(formatLabel("No known value bindings"))
+                    } else {
+                        println(formatLabel("Known bindings in:"))
+                        showHolders(bindingHolders)
+                    }
+
+                    if (modifierHolders.isEmpty()) {
+                        println(formatLabel("No known modification bindings"))
+                    } else {
+                        println(formatLabel("Known modification bindings in:"))
+                        showHolders(modifierHolders)
                     }
                 }
             }
