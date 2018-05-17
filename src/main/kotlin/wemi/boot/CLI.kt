@@ -395,7 +395,7 @@ object CLI {
 
                     print(formatLabel("Project Name: "))
                     println(formatValue(project.name))
-                    print(formatLabel("At: "))
+                    print(formatLabel("  At: "))
                     println(formatValue(project.projectRoot?.toString() ?: "<no root>"))
                 } else if (type == "configuration" || (type == null && name.endsWith(":"))) {
                     val configurationName = name.removeSuffix(":")
@@ -407,9 +407,9 @@ object CLI {
 
                     print(formatLabel("Configuration Name: "))
                     println(formatValue(configuration.name))
-                    println(format(configuration.description, Color.Black))
+                    println("  \"${format(configuration.description, Color.Black)}\"")
                     if (configuration.parent != null) {
-                        print(formatLabel("Parent: "))
+                        print(formatLabel("  Parent: "))
                         println(formatValue(configuration.parent.name))
                     }
                 } else if (type == "key" || (type == null && name.isNotEmpty() && name.last().isJavaIdentifierPart())) {
@@ -421,19 +421,19 @@ object CLI {
 
                     print(formatLabel("Key Name: "))
                     println(formatValue(key.name))
-                    println(format(key.description, Color.Black))
-                    print(formatLabel("Default value: "))
-                    println(formatValue(if (key.hasDefaultValue) { key.defaultValue.toString() } else "<none>"))
-                    print(formatLabel("Cache mode: "))
-                    println(formatValue(key.cacheMode.toString()))
+                    println("  \"${format(key.description, Color.Black)}\"")
+                    if (key.hasDefaultValue) {
+                        print(formatLabel("  Default value: "))
+                        println(formatValue(key.defaultValue.toString()))
+                    }
+                    print(formatLabel("  Cache mode: "))
+                    println(formatValue(if (key.cacheMode == null) "<never cached>" else key.cacheMode.toString()))
                     if (key.inputKeys.isNotEmpty()) {
-                        println(formatLabel("Input keys:"))
+                        println(formatLabel("  Input keys:"))
                         for ((inputKey, description) in key.inputKeys) {
-                            println(""+format(inputKey, format = Format.Bold)+": "+formatValue(description))
+                            println("   "+format(inputKey, format = Format.Bold)+": "+formatValue(description))
                         }
                     }
-
-                    println(formatLabel("Known bindings in:"))
 
                     val bindingHolders = LinkedHashSet<BindingHolder>()
                     val modifierHolders = LinkedHashSet<BindingHolder>()
@@ -469,12 +469,12 @@ object CLI {
                         val sb = StringBuilder()
 
                         for ((bindingType, bindings) in typeMap) {
-                            sb.append("  ").format(Color.Blue).append(bindingType.simpleName)
-                                    .format(Color.Black).append(" (").append(bindings.size)
+                            sb.append("   ").format(Color.Blue).append(bindingType.simpleName)
+                                    .format(Color.White).append(" (").append(bindings.size)
                                     .append("):\n").format()
 
                             for (binding in bindings) {
-                                sb.append("   ").append(binding.toDescriptiveAnsiString()).append('\n')
+                                sb.append("    ").append(binding.toDescriptiveAnsiString()).append('\n')
                             }
 
                             print(sb)
@@ -484,18 +484,20 @@ object CLI {
                     }
 
                     if (bindingHolders.isEmpty()) {
-                        println(formatLabel("No known value bindings"))
+                        println(format("  No known value bindings", Color.White))
                     } else {
-                        println(formatLabel("Known bindings in:"))
+                        println(formatLabel("  Known bindings in:"))
                         showHolders(bindingHolders)
                     }
 
                     if (modifierHolders.isEmpty()) {
-                        println(formatLabel("No known modification bindings"))
+                        println(format("  No known modification bindings", Color.White))
                     } else {
-                        println(formatLabel("Known modification bindings in:"))
+                        println(formatLabel("  Known modification bindings in:"))
                         showHolders(modifierHolders)
                     }
+                } else {
+                    printWarning("inspect <project/, configuration:, key> - show known info about subject")
                 }
             }
 
@@ -558,7 +560,11 @@ object CLI {
         put("help") {
             println(formatLabel("Wemi $WemiVersion (Kotlin $WemiKotlinVersion)"))
             print(formatLabel("Commands: "))
-            println("exit, project <project>, projects [filter], configurations [filter], keys [filter], trace <task>, log <level>, help")
+            println(" exit, reload, help, log <level>")
+            println(" projects [filter], configurations [filter], keys [filter] - list available")
+            println(" project <project> - change current project")
+            println(" trace <task> - run given task and show a hierarchy of used keys")
+            println(" inspect <project/, configuration:, key> - show known info about subject")
             print(formatLabel("Keys: "))
             println("Configurations and projects hold values/behavior of keys. That can be mundane data like version of\n" +
                     "the project in 'projectVersion' key or complex operation, like compiling and running in 'run' key.\n" +

@@ -85,10 +85,14 @@ class WMutableList<T>:ArrayList<T>, WMutableCollection<T>, WList<T> {
 
 private object WEmptySet:Set<Nothing> by emptySet(), WSet<Nothing> {
     override fun toMutable(): WMutableSet<Nothing> = WMutableSet()
+
+    override fun toString(): String = "[]"
 }
 
 private object WEmptyList:List<Nothing> by emptyList(), WList<Nothing> {
     override fun toMutable(): WMutableList<Nothing> = WMutableList()
+
+    override fun toString(): String = "[]"
 }
 
 /**

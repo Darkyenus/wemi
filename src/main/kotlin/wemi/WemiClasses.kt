@@ -339,7 +339,7 @@ class Archetype internal constructor(val name: String, val parent:Archetype?) : 
     override fun toDescriptiveAnsiString(): String {
         val sb = StringBuilder()
         if (parent != null) {
-            sb.append(Color.White).append('(')
+            sb.format(Color.White).append('(')
             val parentStack = ArrayList<Archetype>()
             var parent = this.parent
             while (parent != null) {
@@ -1209,6 +1209,8 @@ interface KeyCacheMode<in Value> {
      * @return true if the cache should be used/kept, false if it should be discarded
      */
     fun Scope.isCacheValid(preEvaluation:Boolean, value:Value):Boolean
+
+    override fun toString():String
 }
 
 /**
@@ -1216,6 +1218,8 @@ interface KeyCacheMode<in Value> {
  */
 val CACHE_ALWAYS = object : KeyCacheMode<Any?> {
     override fun Scope.isCacheValid(preEvaluation: Boolean, value: Any?): Boolean = true
+
+    override fun toString(): String = "CACHE_ALWAYS"
 }
 
 /**
@@ -1225,5 +1229,7 @@ val CACHE_FOR_RUN = object : KeyCacheMode<Any?> {
     override fun Scope.isCacheValid(preEvaluation: Boolean, value: Any?): Boolean {
         return preEvaluation
     }
+
+    override fun toString(): String = "CACHE_FOR_RUN"
 }
 
