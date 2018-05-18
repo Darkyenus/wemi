@@ -49,8 +49,7 @@ object Archetypes {
         Keys.buildDirectory set { WemiBuildFolder }
         Keys.cacheDirectory set { WemiCacheFolder }
 
-        Keys.resourceRoots setToUnionOfSelfIn { Keys.compilingConfigurations.get() }
-        Keys.resourceFiles setToConcatenationOfSelfIn { Keys.compilingConfigurations.get() }
+        Keys.resourceFiles set KeyDefaults.ResourceFiles
 
         Keys.sourceRoots setToUnionOfSelfIn { Keys.compilingConfigurations.get() }
         Keys.sourceFiles setToConcatenationOfSelfIn { Keys.compilingConfigurations.get() }

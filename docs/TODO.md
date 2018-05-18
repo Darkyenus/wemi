@@ -1,5 +1,10 @@
 # Things to do next
 
+- When importing, as much keys as possible should be optional.
+	- allow import without any build scripts
+	- allow import without any modules
+	- don't require projectGroup!!!
+
 - Hotswapping jvm code:
 	- Test plugin and continue working on it
 
