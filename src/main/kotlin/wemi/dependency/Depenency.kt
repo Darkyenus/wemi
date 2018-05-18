@@ -395,7 +395,7 @@ class ResolvedDependency constructor(val id: DependencyId,
     override fun JsonWriter.write() {
         writeObject {
             field("id", id)
-            field("dependencies", dependencies)
+            fieldCollection("dependencies", dependencies)
             field("resolvedFrom", resolvedFrom)
             field("hasError", hasError)
             field("log", log.toString())

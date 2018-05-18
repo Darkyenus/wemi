@@ -101,13 +101,38 @@ private val SERIALIZERS = HashMap<Class<*>, JsonSerializer<*>>().apply {
 
 /**
  * Obtain serializer for given [type].
+ * Interfaces and superclasses are also searched, it is assumed that they can handle any subclass.
  * @throws JsonException when type has no serializer
  */
+private fun <T> serializerFor(type:Class<T>):JsonSerializer<T>? {
+    var searchedType:Class<*> = type
+    while (true) {
+        val base = getOrCreateSerializerFor(searchedType)
+        if (base != null) {
+            @Suppress("UNCHECKED_CAST")
+            return base as JsonSerializer<T>
+        }
+
+        for (i in searchedType.interfaces) {
+            val int = serializerFor(i) // Interfaces may extend interfaces...
+            @Suppress("UNCHECKED_CAST")
+            if (int != null) {
+                return int as JsonSerializer<T>
+            }
+        }
+
+        searchedType = searchedType.superclass ?: return null
+        if (searchedType == Object::class.java) {
+            return null
+        }
+    }
+}
+
 @Suppress("UNCHECKED_CAST")
-private fun <T> serializerFor(type:Class<T>):JsonSerializer<T> {
+private fun <T> getOrCreateSerializerFor(type:Class<T>):JsonSerializer<T>? {
     var serializer = SERIALIZERS[type]
     if (serializer == null) {
-        val jsonAnnotation = type.getAnnotation(Json::class.java) ?: throw JsonException("Type $type has no serializer")
+        val jsonAnnotation = type.getAnnotation(Json::class.java) ?: return null
 
         try {
             serializer = jsonAnnotation.serializer.java.newInstance()
@@ -251,7 +276,7 @@ fun <T> JsonValue?.to(type:Class<T>):T {
     }
 
     // Registered objects
-    return serializerFor(type).read(this)
+    return (serializerFor(type) ?: throw JsonException("Type $type has no serializer")).read(this)
 }
 
 /**
@@ -407,9 +432,23 @@ fun <T> JsonWriter.writeValue(value:T, type:Class<T>?) {
     }
 
     // Registered objects
-    serializerFor(valueType).apply {
+    serializerFor(valueType)?.apply {
         write(value)
+        return
     }
+
+    // Collections & Maps can be written, if type is not explicit
+    if (type == null && value is Collection<*>) {
+        writeCollection(null, value)
+        return
+    }
+    if (type == null && value is Map<*, *>) {
+        @Suppress("UNCHECKED_CAST")
+        writeMap(null, null, value as Map<Any?, Any?>)
+        return
+    }
+
+    throw JsonException("Type $valueType has no serializer")
 }
 
 /**

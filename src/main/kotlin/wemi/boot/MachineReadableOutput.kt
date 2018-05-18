@@ -1,6 +1,7 @@
 package wemi.boot
 
 import com.esotericsoftware.jsonbeans.JsonWriter
+import com.esotericsoftware.jsonbeans.OutputType
 import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.util.*
@@ -18,6 +19,7 @@ private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
  * May exit process if the task evaluation fails.
  */
 fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
+    LOG.info("> {}", task)
     if (task.isMachineReadableCommand) {
         when (task.key) {
             "version" -> {
@@ -77,7 +79,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
             }
         }
 
-        if ((task.flags and Task.FLAG_MACHINE_READABLE_OPTIONAL) != 0) {
+        if (task.isMachineReadableOptional) {
             machineReadablePrint(out, null)
             return
         }
@@ -112,7 +114,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
                 exitProcess(EXIT_CODE_MACHINE_OUTPUT_NO_KEY_ERROR)
             }
             TaskEvaluationStatus.NotAssigned -> {
-                if ((task.flags and Task.FLAG_MACHINE_READABLE_OPTIONAL) != 0) {
+                if (task.isMachineReadableOptional) {
                     machineReadablePrint(out, null)
                 } else {
                     val error = data as WemiException.KeyNotAssignedException
@@ -142,7 +144,10 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
 
 private fun machineReadablePrint(out: PrintStream, thing: Any?) {
     val writer = OutputStreamWriter(out)
-    writer.writeJson(thing, null)
+    val jsonWriter = JsonWriter(writer)
+    jsonWriter.setOutputType(OutputType.json)
+    jsonWriter.setQuoteLongValues(false)
+    jsonWriter.writeValue(thing, null)
     writer.append(0.toChar())
     writer.flush()
 }

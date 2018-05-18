@@ -42,7 +42,11 @@ class Task(
 
     internal val isMachineReadableCommand: Boolean
         get() = couldBeCommand
-                && (flags and FLAG_MACHINE_READABLE_COMMAND) == FLAG_MACHINE_READABLE_COMMAND
+                && (flags and FLAG_MACHINE_READABLE_COMMAND) != 0
+
+    internal val isMachineReadableOptional: Boolean
+        get() = couldBeCommand
+                && (flags and FLAG_MACHINE_READABLE_OPTIONAL) != 0
 
     internal val couldBeCommand: Boolean
         get() = project == null
@@ -139,7 +143,13 @@ class Task(
         for (configuration in configurations) {
             sb.append(configuration).append(CONFIGURATION_SEPARATOR)
         }
+        if (isMachineReadableCommand) {
+            sb.append('#')
+        }
         sb.append(key)
+        if (isMachineReadableOptional) {
+            sb.append('?')
+        }
 
         for ((k, v) in input) {
             sb.append(' ')
