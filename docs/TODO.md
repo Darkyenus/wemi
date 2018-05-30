@@ -1,5 +1,7 @@
 # Things to do next
 
+- Implement https://maven.apache.org/pom.html#Dependency_Management (Guava needs it)
+
 - When importing, as much keys as possible should be optional.
 	- allow import without any build scripts
 	- allow import without any modules
@@ -7,6 +9,12 @@
 
 - Hotswapping jvm code:
 	- Test plugin and continue working on it
+	- Set env variable or java property of the process that is being hotswapped and change it after every hotswap, so the process can reinitialize what is needed
+	- WEMI DOES NOT UNBIND!!!
+
+- Make jitpack builds work
+	- https://jitpack.io/docs/#publishing-on-jitpack
+	- https://jitpack.io/docs/BUILDING/#multi-module-projects
 
 - Add system of automatic MANIFEST.MF generation
 

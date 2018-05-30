@@ -1,4 +1,4 @@
-package hello;
+package basics;
 
 import java.util.Random;
 import org.slf4j.LoggerFactory;

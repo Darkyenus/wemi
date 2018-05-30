@@ -66,9 +66,9 @@ object Configurations {
 
     //region Compiling
     val compilingJava by configuration("Configuration layer used when compiling Java sources", compiling) {
-        Keys.sourceRoots set { wSetOf(path("src/main/java")) }
+        Keys.sourceRoots set { wSetOf(Keys.projectRoot.get() / "src/main/java") }
         extend (Configurations.testing) {
-            Keys.sourceRoots add { path("src/test/java") }
+            Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/java" }
         }
 
         Keys.sourceExtensions set { JavaSourceFileExtensions }
@@ -79,11 +79,11 @@ object Configurations {
     }
 
     val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
-        Keys.sourceRoots set { wSetOf(path("src/main/java")) }
-        Keys.sourceRoots set { wSetOf(path("src/main/kotlin")) }
+        Keys.sourceRoots set { wSetOf(Keys.projectRoot.get() / "src/main/java") }
+        Keys.sourceRoots set { wSetOf(Keys.projectRoot.get() / "src/main/kotlin") }
         extend (Configurations.testing) {
-            Keys.sourceRoots add { path("src/test/java") }
-            Keys.sourceRoots add { path("src/test/kotlin") }
+            Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/java" }
+            Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/kotlin" }
         }
         Keys.sourceExtensions set { KotlinSourceFileExtensions }
 
