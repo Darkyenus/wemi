@@ -35,7 +35,7 @@ fun findWemiLauncher(project:Project, wemiRootPath:String? = null):WemiLauncher?
 
 class WemiLauncher internal constructor(val file: String) {
 
-    fun createMachineReadableSession(javaExecutable: String, jvmOptions: Set<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>):WemiLauncherSession {
+    fun createMachineReadableResolverSession(javaExecutable: String, jvmOptions: Set<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>):WemiLauncherSession {
         val command = GeneralCommandLine()
         command.exePath = javaExecutable
         command.charset = Charsets.UTF_8
@@ -53,6 +53,7 @@ class WemiLauncher internal constructor(val file: String) {
 
         command.addParameter("--interactive")
         command.addParameter("--machine-readable-output")
+        command.addParameter("--allow-broken-build-scripts")
 
         return WemiLauncherSession(command, prefixConfigurations)
     }

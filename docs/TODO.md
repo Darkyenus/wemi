@@ -3,11 +3,6 @@
 - Implement https://maven.apache.org/pom.html#Dependency_Management (Guava needs it)
 	- Also look into <profiles>???
 
-- When importing, as much keys as possible should be optional.
-	- allow import without any build scripts
-	- allow import without any modules
-	- don't require projectGroup!!!
-
 - Hotswapping jvm code:
 	- Test plugin and continue working on it
 	- Set env variable or java property of the process that is being hotswapped and change it after every hotswap, so the process can reinitialize what is needed

@@ -45,8 +45,7 @@ class Task(
                 && (flags and FLAG_MACHINE_READABLE_COMMAND) != 0
 
     internal val isMachineReadableOptional: Boolean
-        get() = couldBeCommand
-                && (flags and FLAG_MACHINE_READABLE_OPTIONAL) != 0
+        get() = (flags and FLAG_MACHINE_READABLE_OPTIONAL) != 0
 
     internal val couldBeCommand: Boolean
         get() = project == null

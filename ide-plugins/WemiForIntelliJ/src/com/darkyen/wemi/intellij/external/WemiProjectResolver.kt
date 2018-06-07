@@ -78,7 +78,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             }
 
             val javaExecutable = if (settings.javaVmExecutable.isBlank()) "java" else settings.javaVmExecutable
-            session = launcher.createMachineReadableSession(javaExecutable, settings.vmOptions, settings.env, settings.isPassParentEnvs, prefixConfigurations)
+            session = launcher.createMachineReadableResolverSession(javaExecutable, settings.vmOptions, settings.env, settings.isPassParentEnvs, prefixConfigurations)
 
             // First request on session will be probably waiting for build scripts to compile
             listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Loading Wemi build scripts"))
@@ -133,7 +133,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             }
             projectMap
         }
-        val defaultProject = projects[session.string(null, task = "#defaultProject", includeUserConfigurations = false)] ?: run {
+        val defaultProject = projects[session.stringOrNull(null, task = "#defaultProject", includeUserConfigurations = false)] ?: run {
             // If there is no default project, pick any
             if (projects.isEmpty()) {
                 null
