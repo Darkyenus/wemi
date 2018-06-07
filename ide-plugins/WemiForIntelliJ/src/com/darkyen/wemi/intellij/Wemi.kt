@@ -15,6 +15,8 @@ val WemiBuildFileExtensions = listOf("kt")
 
 val WemiProjectSystemId = ProjectSystemId("WEMI", "Wemi")
 
+const val WemiBuildScriptProjectName = "wemi-build"
+
 const val WemiLauncherFileName = "wemi"
 
 /**

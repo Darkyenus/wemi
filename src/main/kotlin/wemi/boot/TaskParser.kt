@@ -431,10 +431,10 @@ object TaskParser : Parser {
             return true
         }
 
-        private fun matchSuffixedIdentifier(suffixToken: String, identifierType: TokenType): String? {
+        private fun matchSuffixedIdentifier(suffixToken: String, identifierType: TokenType, extraAllowedIdentifier:String? = null): String? {
             val mark = parsePosition
             val identifier = takeUpToSeparator(identifierType, null)
-            if (identifier == null || !identifier.isValidIdentifier()) {
+            if (identifier == null || (!identifier.isValidIdentifier() && identifier != extraAllowedIdentifier)) {
                 parsePosition = mark
                 return null
             }
@@ -454,7 +454,8 @@ object TaskParser : Parser {
             var flags = 0
 
             consumeWhitespaceParts()
-            val project = matchSuffixedIdentifier(PROJECT_SEPARATOR, TokenType.Project)
+            // Also allows Wemi build script meta-project name
+            val project = matchSuffixedIdentifier(PROJECT_SEPARATOR, TokenType.Project, WemiBuildScriptProjectName)
             consumeWhitespaceParts()
             val configurations = ArrayList<String>()
             while (true) {

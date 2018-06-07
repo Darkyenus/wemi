@@ -12,16 +12,12 @@ import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.dependency.DefaultExclusions
 import wemi.dependency.DependencyExclusion
-import wemi.plugin.PluginEnvironment
 import wemi.util.*
 import java.io.*
-import java.net.URL
-import java.net.URLClassLoader
 import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
-import java.util.*
 import kotlin.system.exitProcess
 
 private val LOG = LoggerFactory.getLogger("Main")
@@ -112,7 +108,9 @@ var WemiBuildFolder: Path = WemiRootFolder / "build"
 var WemiCacheFolder: Path = WemiBuildFolder / "cache"
     private set
 
-var WemiBuildScript: BuildScript? = null
+const val WemiBuildScriptProjectName = "wemi-build"
+
+lateinit var WemiBuildScriptProject:Project
     private set
 
 internal val MainThread = Thread.currentThread()
@@ -182,7 +180,7 @@ fun main(args: Array<String>) {
                     false, null) {
                 machineReadableOutput = true
             },
-            Option(null, "ignore-broken-build-scripts", "ignore build scripts which fail to compile",
+            Option(null, "allow-broken-build-scripts", "ignore build scripts which fail to compile and allow to run without them",
                     false, null) {
                 allowBrokenBuildScripts = true
             },
@@ -222,6 +220,7 @@ fun main(args: Array<String>) {
 
     WemiRunningInInteractiveMode = interactive
     LOG.trace("Starting Wemi from root: {}", WemiRootFolder)
+    PrettyPrinter.setApplicationRootDirectory(WemiRootFolder)
 
     // Setup logging
     TPLogger.setLogFunction(LogFunctionMultiplexer(
@@ -239,37 +238,25 @@ fun main(args: Array<String>) {
             ConsoleLogFunction(null, null)
     ))
 
-    val buildScript = prepareBuildScript(allowBrokenBuildScripts, interactive && !machineReadableOutput, cleanBuild)
+    var buildScriptProject = prepareBuildScriptProject(allowBrokenBuildScripts, interactive && !machineReadableOutput, cleanBuild)
 
-    // Load build files now
-    if (buildScript != null) {
-        PrettyPrinter.setApplicationRootDirectory(WemiRootFolder)
-        LOG.debug("Obtained build script {}", buildScript.info)
-
-        val urls = arrayOfNulls<URL>(1 + buildScript.info.externalClasspath.size)
-        urls[0] = buildScript.info.scriptJar.toUri().toURL()
-        var i = 1
-        for (file in buildScript.info.externalClasspath) {
-            urls[i++] = file.toUri().toURL()
-        }
-        val loader = URLClassLoader(urls, Magic.WemiDefaultClassLoader)
-        LOG.debug("Loading plugins...")
-        val pluginServiceLoader = ServiceLoader.load(PluginEnvironment::class.java, loader)
-        for (pluginService in pluginServiceLoader) {
-            LOG.debug("Loading plugin service {}", pluginService)
-
-            pluginService.initialize()
+    if (buildScriptProject == null) {
+        if (!allowBrokenBuildScripts) {
+            // Failure to prepare build script (already logged)
+            exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
         }
 
-        LOG.debug("Loading build...")
-        for (initClass in buildScript.info.initClasses) {
-            try {
-                Class.forName(initClass, true, loader)
-            } catch (e: Exception) {
-                LOG.warn("Failed to load build file class {} from {}", initClass, urls, e)
-            }
-        }
-        LOG.debug("Build file loaded")
+        buildScriptProject = createProjectFromBuildScriptInfo(null)
+        LOG.debug("Blank build file loaded")
+    }
+
+    // Load build script configuration
+    WemiBuildScriptProject = buildScriptProject
+    BuildScriptData.AllProjects[buildScriptProject.name] = buildScriptProject
+
+    val errors = buildScriptProject.evaluate { Keys.run.get() }
+    if (errors > 0 && !allowBrokenBuildScripts) {
+        exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
     }
 
     // - Ensure Configurations are loaded -
@@ -360,11 +347,12 @@ private fun TaskParser.PartitionedLine.machineReadableCheckErrors() {
     }
 }
 
-private fun prepareBuildScript(allowBrokenBuildScripts:Boolean, askUser:Boolean, cleanBuild:Boolean):BuildScriptCompiler? {
-    var buildScript:BuildScriptCompiler? = null
+private fun prepareBuildScriptProject(allowBrokenBuildScripts:Boolean, askUser:Boolean, cleanBuild:Boolean):Project? {
+    var preparedProject:Project? = null
 
-    var Break = false
     do {
+        var keepTrying = false
+
         val buildScriptSources = findBuildScriptSources(WemiBuildFolder)
         if (buildScriptSources.isEmpty()) {
             if (allowBrokenBuildScripts) {
@@ -372,59 +360,51 @@ private fun prepareBuildScript(allowBrokenBuildScripts:Boolean, askUser:Boolean,
                 break
             } else if (!askUser) {
                 LOG.error("No build script sources found in {}", WemiBuildFolder)
-                exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+                break
             } else {
-                if (buildScriptsBadAskIfReload("No build script sources found")) {
-                    continue
-                } else {
-                    exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
-                }
+                keepTrying = buildScriptsBadAskIfReload("No build script sources found")
+                continue
             }
         }
 
-        Break = directorySynchronized(WemiBuildFolder, {
+        preparedProject = directorySynchronized(WemiBuildFolder, {
             LOG.info("Waiting for lock on {}", WemiBuildFolder)
         }) {
-            val compiledBuildScript = getBuildScript(WemiCacheFolder, buildScriptSources, cleanBuild)
+            val buildScriptInfo = getBuildScript(WemiCacheFolder, buildScriptSources, cleanBuild)
 
-            if (compiledBuildScript == null) {
+            if (buildScriptInfo == null) {
                 if (allowBrokenBuildScripts) {
                     LOG.warn("Failed to prepare build script")
-                    true //break
                 } else if (!askUser) {
                     LOG.error("Failed to prepare build script")
-                    exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
                 } else {
-                    if (buildScriptsBadAskIfReload("Failed to prepare build script")) {
-                        false //continue
-                    } else {
-                        exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
-                    }
+                    keepTrying = buildScriptsBadAskIfReload("Failed to prepare build script")
                 }
+                null
             } else {
-                // WemiBuildScript must be initialized before compilation, because compiler may depend on it
-                WemiBuildScript = compiledBuildScript.info
-                if (compiledBuildScript.ensureCompiled()) {
-                    buildScript = compiledBuildScript
-                    true //break
-                } else if (allowBrokenBuildScripts) {
-                    LOG.warn("Build script failed to compile")
-                    true //break
-                } else if (!askUser) {
-                    LOG.error("Build script failed to compile")
-                    exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
-                } else {
-                    if (buildScriptsBadAskIfReload("Build script failed to compile")) {
-                        false //continue
+                LOG.debug("Obtained build script info {}", buildScriptInfo)
+
+                val project = createProjectFromBuildScriptInfo(buildScriptInfo)
+
+                try {
+                    project.evaluate { Keys.compile.get() }
+                    project
+                } catch (ce: WemiException.CompilationException) {
+                    if (allowBrokenBuildScripts) {
+                        LOG.warn("Build script failed to compile")
+                    } else if (!askUser) {
+                        LOG.error("Build script failed to compile")
                     } else {
-                        exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
+                        keepTrying = buildScriptsBadAskIfReload("Build script failed to compile")
                     }
+
+                    null
                 }
             }
         }
-    } while (!Break && buildScript == null)
+    } while (keepTrying)
 
-    return buildScript
+    return preparedProject
 }
 
 private fun buildScriptsBadAskIfReload(problem:String):Boolean {

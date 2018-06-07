@@ -1,6 +1,10 @@
 # Things to do next
 
+- `wemiBuildScript` configuration is used for downloading docs and sources in ide plugin
+- `#buildScript` machine command is used to access stuff, don't allow that
+
 - Implement https://maven.apache.org/pom.html#Dependency_Management (Guava needs it)
+	- Also look into <profiles>???
 
 - When importing, as much keys as possible should be optional.
 	- allow import without any build scripts
@@ -17,6 +21,8 @@
 	- https://jitpack.io/docs/BUILDING/#multi-module-projects
 
 - Add system of automatic MANIFEST.MF generation
+- In assembling, handle LIST files and signatures
+- Manifest files seem to have weird wrapping rules
 
 - Create system, to allow automatic caching of key results, when no input keys have changed.
 	- This will need good arbitrary object serialization/comparison - with files serialized as their file/directory/exist info + checksum of files

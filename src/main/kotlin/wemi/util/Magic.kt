@@ -51,4 +51,30 @@ object Magic {
      * Class loader with which Wemi core was loaded
      */
     internal val WemiDefaultClassLoader: ClassLoader = javaClass.classLoader
+
+    /**
+     * Transform the [fileNameWithoutExtension] into the name of class that will Kotlin compiler produce (without .class).
+     */
+    internal fun transformFileNameToKotlinClassName(fileNameWithoutExtension: String): String {
+        val sb = StringBuilder()
+        // If file name starts with digit, _ is prepended
+        if (fileNameWithoutExtension.isNotEmpty() && fileNameWithoutExtension[0] in '0'..'9') {
+            sb.append('_')
+        }
+        // Everything is valid java identifier
+        for (c in fileNameWithoutExtension) {
+            if (c.isJavaIdentifierPart()) {
+                sb.append(c)
+            } else {
+                sb.append("_")
+            }
+        }
+        // First letter is capitalized
+        if (sb.isNotEmpty()) {
+            sb[0] = sb[0].toUpperCase()
+        }
+        // Kt is appended
+        sb.append("Kt")
+        return sb.toString()
+    }
 }

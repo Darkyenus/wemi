@@ -33,7 +33,7 @@ public class Greeter {
      * @return personalized greeting
      */
     public String createGreeting(String name) {
-        final Random random = HelloWemiKt.getRandom();
+        final Random random = GreeterMainKt.getRandom();
         return this.greetings[random.nextInt(this.greetings.length)].replace("{}", name);
     }
 

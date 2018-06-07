@@ -10,7 +10,7 @@ import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.Configurations.publishing
 import wemi.assembly.*
-import wemi.boot.WemiBuildScript
+import wemi.boot.WemiBuildScriptProject
 import wemi.boot.WemiBundledLibrariesExclude
 import wemi.collections.WList
 import wemi.collections.WMutableList
@@ -479,7 +479,7 @@ object KeyDefaults {
 
             val externalClasspath = Keys.externalClasspath.get().map { it.classpathEntry }.distinct()
             val internalClasspath = Keys.internalClasspath.get().map { it.classpathEntry }.distinct()
-            val wemiClasspathEntry = WemiBuildScript!!.wemiLauncherJar
+            val wemiClasspathEntry = WemiBuildScriptProject.evaluate { Keys.unmanagedDependencies.get().first().classpathEntry }
 
             val classpathEntries = ArrayList<Path>(internalClasspath.size + externalClasspath.size + 1)
             classpathEntries.addAll(internalClasspath)

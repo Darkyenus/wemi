@@ -130,8 +130,6 @@ val projectRoot
     inline get() = wemi.Keys.projectRoot
 val buildDirectory
     inline get() = wemi.Keys.buildDirectory
-val buildScript
-    inline get() = wemi.Keys.buildScript
 
 val input
     inline get() = wemi.Keys.input

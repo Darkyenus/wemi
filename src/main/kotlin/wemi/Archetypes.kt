@@ -50,9 +50,7 @@ object Archetypes {
         Keys.cacheDirectory set { WemiCacheFolder }
 
         Keys.resourceFiles set KeyDefaults.ResourceFiles
-
-        Keys.sourceRoots setToUnionOfSelfIn { Keys.compilingConfigurations.get() }
-        Keys.sourceFiles setToConcatenationOfSelfIn { Keys.compilingConfigurations.get() }
+        Keys.sourceFiles set KeyDefaults.SourceFiles
 
         Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
@@ -87,6 +85,9 @@ object Archetypes {
         extend (Configurations.testing) {
             Keys.resourceRoots add { path("src/test/resources") }
         }
+
+        Keys.sourceRoots setToUnionOfSelfIn { Keys.compilingConfigurations.get() }
+        Keys.sourceFiles setToConcatenationOfSelfIn { Keys.compilingConfigurations.get() }
 
         Keys.repositories set { DefaultRepositories }
 
@@ -168,5 +169,4 @@ object Archetypes {
     }
 
     //endregion
-
 }

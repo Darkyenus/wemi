@@ -4,7 +4,6 @@ import wemi.assembly.AssemblyMapFilter
 import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.MergeStrategyChooser
 import wemi.assembly.RenameFunction
-import wemi.boot.BuildScript
 import wemi.collections.WList
 import wemi.collections.WSet
 import wemi.collections.wEmptyList
@@ -43,7 +42,6 @@ object Keys {
     val projectRoot by key<Path>("Root directory of the project")
     val buildDirectory by key<Path>("Directory with Wemi build scripts, directories with logs, cache, etc.")
     val cacheDirectory by key<Path>("Directory in which Wemi stores cache and processed data")
-    val buildScript by key<BuildScript>("Build script used to load this project")
 
     val input by key<Input>("Provides access to user input, that can be programmatically pre-set")
 

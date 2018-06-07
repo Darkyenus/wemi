@@ -53,26 +53,6 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
                 })
                 return
             }
-            "buildScript" -> {
-                machineReadablePrint(out, object : JsonWritable {
-
-                    override fun JsonWriter.write() {
-                        val buildFile = WemiBuildScript
-                        if (buildFile == null) {
-                            writeValue(null, null)
-                        } else {
-                            writeObject {
-                                field("buildFolder", WemiBuildFolder)
-                                field("cacheFolder", WemiCacheFolder)
-                                fieldCollection("sources", buildFile.sources)
-                                field("scriptJar", buildFile.scriptJar)
-                                fieldCollection("classpath", buildFile.externalClasspath)
-                            }
-                        }
-                    }
-                })
-                return
-            }
             "defaultProject" -> {
                 machineReadablePrint(out, CLI.findDefaultProject(Paths.get("."))?.name)
                 return

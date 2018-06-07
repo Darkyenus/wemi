@@ -122,12 +122,12 @@ object CLI {
         val allProjects = AllProjects
         when {
             allProjects.isEmpty() -> return null
-            allProjects.size == 1 -> return allProjects.values.first()
             else -> {
                 var closest: Project? = null
                 var closestDist = -1
                 projects@for (project in allProjects.values) {
                     when {
+                        project === WemiBuildScriptProject ||
                         project.projectRoot == null -> continue@projects
                         project.projectRoot == root -> return project
                         closest == null -> closest = project
@@ -146,6 +146,7 @@ object CLI {
                             }
                     }
                 }
+                LOG.trace("findDefaultProject({}) = {}", root, closest)
                 return closest
             }
         }

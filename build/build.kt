@@ -25,7 +25,7 @@ private const val WemiGroup = "com.darkyen.wemi"
 private const val WemiVersion = "0.4-SNAPSHOT"
 
 /**
- * Wemi Build System core. Builds
+ * Wemi Build System core
  */
 val core:Project by project {
     projectGroup set { WemiGroup }
@@ -63,6 +63,7 @@ val core:Project by project {
 
     extend(compilingKotlin) {
         compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
+        compilerOptions[KotlinCompilerFlags.incremental] = true
     }
 
     extend(testing) {

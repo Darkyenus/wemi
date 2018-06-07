@@ -3,6 +3,7 @@ package wemi.dependency
 import org.slf4j.LoggerFactory
 import wemi.util.directorySynchronized
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 
 /**
  * Provides entry points to the DependencyResolver API for resolving library dependencies.
@@ -20,6 +21,7 @@ object DependencyResolver {
      */
     internal fun resolveSingleDependency(dependencyId: DependencyId, repositories: RepositoryChain): ResolvedDependency {
         var log: StringBuilder? = null
+        val startTime = System.nanoTime()
 
         LOG.debug("Resolving {}", dependencyId)
 
@@ -31,7 +33,7 @@ object DependencyResolver {
             LOG.debug("Trying in {}", repository)
             val resolved = repository.resolveInRepository(dependencyId, repositories)
             if (!resolved.hasError) {
-                LOG.debug("Resolution success {}", resolved)
+                LOG.debug("Resolution success {} ({} ms)", resolved, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime))
                 return resolved
             } else {
                 val sb = log ?: StringBuilder()
@@ -65,7 +67,7 @@ object DependencyResolver {
         }
 
         // Fail
-        LOG.debug("Failed to resolve {}", dependencyId)
+        LOG.debug("Failed to resolve {} ({} ms)", dependencyId, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime))
         return ResolvedDependency(dependencyId, emptyList(), null, true, log ?: "no repositories to search in")
     }
 

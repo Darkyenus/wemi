@@ -2,21 +2,20 @@
 
 package wemi
 
-import WMutableList
 import configuration
-import path
 import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.KeyDefaults.inProjectDependencies
-import wemi.collections.WMutableSet
-import wemi.collections.wEmptyList
 import wemi.collections.wSetOf
 import wemi.compile.*
 import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.JavadocClassifier
 import wemi.dependency.Repository.M2.Companion.SourcesClassifier
 import wemi.test.JUnitPlatformLauncher
-import wemi.util.*
+import wemi.util.div
+import wemi.util.name
+import wemi.util.pathExtension
+import wemi.util.pathWithoutExtension
 
 /**
  * All default configurations
@@ -207,23 +206,5 @@ object Configurations {
             options.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005")
             options
         }
-    }
-
-    val wemiBuildScript by configuration("Setup with information about the build script " +
-            "(but not actually used for building the build script)") {
-        Keys.repositories set { WMutableSet(Keys.buildScript.get().repositories) }
-        Keys.libraryDependencies set { WMutableSet(Keys.buildScript.get().dependencies) }
-        Keys.externalClasspath set {
-            val files = WMutableList<LocatedPath>()
-            val buildScript = Keys.buildScript.get()
-            for (path in buildScript.externalClasspath) {
-                files.add(LocatedPath(path))
-            }
-            files
-        }
-        Keys.compilerOptions set { Keys.buildScript.get().buildFlags }
-        Keys.compile set { Keys.buildScript.get().scriptJar }
-        Keys.resourceFiles set { wEmptyList() }
-        Keys.sourceFiles set { Keys.buildScript.get().sources }
     }
 }

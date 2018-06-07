@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.external
 
+import com.darkyen.wemi.intellij.WemiBuildScriptProjectName
 import com.darkyen.wemi.intellij.WemiLauncherSession
 import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.importing.KotlinCompilerSettingsData
@@ -124,23 +125,39 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             projectNames ->
             val projectMap = mutableMapOf<String, WemiProjectData>()
             for (projectName in projectNames) {
+                // Build script project is handled differently
+                if (projectName == WemiBuildScriptProjectName) {
+                    continue
+                }
                 projectMap[projectName] = createWemiProjectData(session, projectName)
             }
             projectMap
         }
-        val defaultProject = projects[session.string(null, task = "#defaultProject", includeUserConfigurations = false)]!!
-
-        val projectDataNode = DataNode(ProjectKeys.PROJECT, ProjectData(WemiProjectSystemId, defaultProject.projectName, projectPath, projectPath), null)
-        // Java data
-        projectDataNode.createChild(JavaProjectData.KEY, defaultProject.javaProjectData())
-        // Kotlin data
-        val kotlinCompilerData = HashMap<String, JsonValue>()
-        session.jsonArray(defaultProject.projectName, task = "compilerOptions", configurations = *arrayOf("compilingKotlin")).forEach {
-            val key = it.getString("key")
-            val value = it.get("value")
-            kotlinCompilerData[key] = value
+        val defaultProject = projects[session.string(null, task = "#defaultProject", includeUserConfigurations = false)] ?: run {
+            // If there is no default project, pick any
+            if (projects.isEmpty()) {
+                null
+            } else {
+                projects.iterator().next().value
+            }
         }
-        projectDataNode.createChild(WEMI_KOTLIN_COMPILER_SETTINGS_KEY, KotlinCompilerSettingsData(kotlinCompilerData))
+
+        val projectDataNode = DataNode(ProjectKeys.PROJECT, ProjectData(WemiProjectSystemId, defaultProject?.projectName ?: File(projectPath).name, projectPath, projectPath), null)
+
+        // Pick sensible defaults from default project
+        if (defaultProject != null) {
+            // Java data
+            projectDataNode.createChild(JavaProjectData.KEY, defaultProject.javaProjectData())
+
+            // Kotlin data
+            val kotlinCompilerData = HashMap<String, JsonValue>()
+            session.jsonArray(defaultProject.projectName, task = "compilerOptions", configurations = *arrayOf("compilingKotlin")).forEach {
+                val key = it.getString("key")
+                val value = it.get("value")
+                kotlinCompilerData[key] = value
+            }
+            projectDataNode.createChild(WEMI_KOTLIN_COMPILER_SETTINGS_KEY, KotlinCompilerSettingsData(kotlinCompilerData))
+        }
 
         val projectModules = mutableMapOf<String, DataNode<ModuleData>>()
 
@@ -225,23 +242,16 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
         // Build scripts
         listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving build script modules"))
-        session.jsonObject(project = null, task = "#buildScript", includeUserConfigurations = false).let { buildScript ->
-            // Retrieve info
-            val buildFolder = buildScript.getString("buildFolder")
-            val projectsUnderBuildScript:Collection<String> = projects.keys
-            val name: String
-            if (projectsUnderBuildScript.isEmpty() || projectsUnderBuildScript.size > 2) {
-                name = "wemi-projects-build"
-            } else {
-                name = projectsUnderBuildScript.joinToString("-", postfix = "-build")
-            }
-            val classpath = buildScript.get("classpath").asStringArray().map { File(it) }
-            val scriptJar = buildScript.getString("scriptJar")
+        run {
+            val buildFolder = session.string(project = WemiBuildScriptProjectName, task = "projectRoot", includeUserConfigurations = false)
+
+            val classpath = session.jsonArray(project = WemiBuildScriptProjectName, task = "externalClasspath").map { it.locatedFileClasspathEntry() }
+            val cacheFolder = session.string(project = WemiBuildScriptProjectName, task = "cacheDirectory")
 
             // Module Data
-            val moduleData = ModuleData(name, WemiProjectSystemId, StdModuleTypes.JAVA.id, name, buildFolder, projectPath)
+            val moduleData = ModuleData(WemiBuildScriptProjectName, WemiProjectSystemId, StdModuleTypes.JAVA.id, WemiBuildScriptProjectName, buildFolder, projectPath)
             moduleData.isInheritProjectCompileOutputPath = false
-            moduleData.setCompileOutputPath(ExternalSystemSourceType.SOURCE, File(scriptJar).parent)
+            moduleData.setCompileOutputPath(ExternalSystemSourceType.SOURCE, cacheFolder)
             moduleData.targetCompatibility = "1.8" // Using kotlin, but just for some sensible defaults
             moduleData.sourceCompatibility = "1.8" // Using kotlin, but just for some sensible defaults
 
@@ -258,29 +268,23 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
             // Dependencies
             val unresolved = classpath.any { !it.exists() }
-            val libraryData = LibraryData(WemiProjectSystemId, "$name Classpath", unresolved)
+            val libraryData = LibraryData(WemiProjectSystemId, "$WemiBuildScriptProjectName Classpath", unresolved)
             // Classpath
             for (artifact in classpath) {
                 libraryData.addPath(LibraryPathType.BINARY, artifact.path)
             }
             // Sources and docs
-            if (projectsUnderBuildScript.isNotEmpty()) {
-                // We can download sources and docs only through other projects
-                //TODO This is slightly ugly
-                val projectToUseToDownloadSources = projectsUnderBuildScript.iterator().next()
-
-                if (settings.downloadSources) {
-                    for ((_, dependencies) in createWemiProjectDependencies(session, projectToUseToDownloadSources, "wemiBuildScript", "retrievingSources")) {
-                        for (dependency in dependencies) {
-                            libraryData.addPath(LibraryPathType.SOURCE, dependency.artifact.path)
-                        }
+            if (settings.downloadSources) {
+                for ((_, dependencies) in createWemiProjectDependencies(session, WemiBuildScriptProjectName, "retrievingSources")) {
+                    for (dependency in dependencies) {
+                        libraryData.addPath(LibraryPathType.SOURCE, dependency.artifact.path)
                     }
                 }
-                if (settings.downloadDocs) {
-                    for ((_, dependencies) in createWemiProjectDependencies(session, projectToUseToDownloadSources, "wemiBuildScript", "retrievingDocs")) {
-                        for (dependency in dependencies) {
-                            libraryData.addPath(LibraryPathType.DOC, dependency.artifact.path)
-                        }
+            }
+            if (settings.downloadDocs) {
+                for ((_, dependencies) in createWemiProjectDependencies(session, WemiBuildScriptProjectName, "retrievingDocs")) {
+                    for (dependency in dependencies) {
+                        libraryData.addPath(LibraryPathType.DOC, dependency.artifact.path)
                     }
                 }
             }
@@ -297,7 +301,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                         }
                         sb.append(".zip")
 
-                        val sourcesZip = Paths.get(scriptJar).parent.resolve(sb.toString())
+                        val sourcesZip = Paths.get(cacheFolder).resolve(sb.toString())
                         if (!Files.exists(sourcesZip)) {
                             Files.newOutputStream(sourcesZip).use { out ->
                                 file.getInputStream(sourceEntry).use { ins ->
@@ -341,7 +345,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         val javacOptions = session.jsonArray(projectName, task = "compilerOptions", configurations = *arrayOf("compilingJava"))
         return WemiProjectData(
                 projectName,
-                session.string(projectName, task = "projectName"),
+                session.stringOrNull(projectName, task = "projectName?") ?: projectName,
                 session.stringOrNull(projectName, task = "projectGroup?"),
                 session.stringOrNull(projectName, task = "projectVersion?"),
                 session.string(projectName, task = "projectRoot"),
@@ -352,7 +356,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     it.mapGet("targetVersion")?.asString() ?: ""
                 },
                 session.string(projectName, task = "outputClassesDirectory"),
-                session.string(projectName, configurations = *arrayOf("testing"), task = "outputClassesDirectory"),
+                session.stringOrNull(projectName, configurations = *arrayOf("testing"), task = "outputClassesDirectory?"),
                 session.stringArray(projectName, task = "sourceRoots"),
                 session.stringArray(projectName, task = "resourceRoots"),
                 session.stringArray(projectName, "testing", task = "sourceRoots"),
@@ -384,7 +388,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             }
 
             session.jsonArray(projectName, *config, task = "unmanagedDependencies").forEach {
-                val file = File(it.getString("root") ?: it.getString("file")).absoluteFile
+                val file = it.locatedFileClasspathEntry()
 
                 add(file.absolutePath, WemiLibraryDependency(file.name, file))
             }
@@ -503,7 +507,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             val javaSourceVersion:String,
             val javaTargetVersion:String,
             val classOutput:String,
-            val classOutputTesting:String,
+            val classOutputTesting: String?,
             sourceRoots:Array<String>,
             resourceRoots:Array<String>,
             sourceRootsTesting:Array<String>,
@@ -607,6 +611,10 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         fun WemiLauncherSession.jsonArray(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):JsonValue {
             return task(project = project, configurations = *configurations, task = task, includeUserConfigurations = includeUserConfigurations)
                     .data(JsonValue.ValueType.array)
+        }
+
+        fun JsonValue.locatedFileClasspathEntry():File {
+            return File(getString("root") ?: getString("file")).absoluteFile
         }
 
         fun JsonValue.mapGet(key:String):JsonValue? {
