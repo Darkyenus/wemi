@@ -1,8 +1,5 @@
 # Things to do next
 
-- `wemiBuildScript` configuration is used for downloading docs and sources in ide plugin
-- `#buildScript` machine command is used to access stuff, don't allow that
-
 - Implement https://maven.apache.org/pom.html#Dependency_Management (Guava needs it)
 	- Also look into <profiles>???
 

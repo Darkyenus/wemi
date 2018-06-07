@@ -54,59 +54,48 @@ class ProjectDelegate internal constructor(
  * @param initializer to populate the project's [BindingHolder] with bindings
  */
 fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRootUnique:Boolean = true, initializer: Project.() -> Unit):Project {
-    val usedRoot: Path?
+    val usedRoot = root?.toAbsolutePath()
+    if (usedRoot != null && !usedRoot.exists()) {
+        Files.createDirectories(usedRoot)
+    }
 
-    val buildScript = archetypes.size == 1 && archetypes[0] === wemi.boot.BuildScript
-
-    if (buildScript) {
-        // Skip checking
-        usedRoot = root
+    if (archetypes.isEmpty()) {
+        LOG.warn("Project {} is being created without any archetype. Such project won't have any functionality.", name)
     } else {
-        usedRoot = root?.toAbsolutePath()
-        if (usedRoot != null && !usedRoot.exists()) {
-            Files.createDirectories(usedRoot)
+        var baseArchetypeCount = 0
+        for (a in archetypes) {
+            var archetype = a
+            while (true) {
+                if (archetype === Archetypes.Base) {
+                    baseArchetypeCount++
+                }
+                archetype = archetype.parent ?: break
+            }
         }
 
-        if (archetypes.isEmpty()) {
-            LOG.warn("Project {} is being created without any archetype. Such project won't have any functionality.", name)
-        } else {
-            var baseArchetypeCount = 0
-            for (a in archetypes) {
-                var archetype = a
-                while (true) {
-                    if (archetype === Archetypes.Base) {
-                        baseArchetypeCount++
-                    }
-                    archetype = archetype.parent ?: break
-                }
-            }
-
-            if (baseArchetypeCount == 0) {
-                LOG.warn("Project {} is being created without any primary archetype.", name)
-            } else if (baseArchetypeCount > 1) {
-                LOG.warn("Project {} is being created with {} primary archetypes, there should be only one.", name, baseArchetypeCount)
-            }
+        if (baseArchetypeCount == 0) {
+            LOG.warn("Project {} is being created without any primary archetype.", name)
+        } else if (baseArchetypeCount > 1) {
+            LOG.warn("Project {} is being created with {} primary archetypes, there should be only one.", name, baseArchetypeCount)
         }
     }
 
     val project = Project(name, usedRoot, archetypes)
     // Not added to AllProjects, because build script project may be reloaded multiple times and only final version will be added
-    if (!buildScript) {
-        synchronized(BuildScriptData.AllProjects) {
-            for ((_, otherProject) in BuildScriptData.AllProjects) {
-                if (otherProject.name == name) {
-                    if (otherProject.projectRoot == null) {
-                        throw WemiException("Project named '$name' already exists (without root)")
-                    } else {
-                        throw WemiException("Project named '$name' already exists (at ${otherProject.projectRoot})")
-                    }
-                }
-                if (checkRootUnique && otherProject.projectRoot != null && Files.isSameFile(otherProject.projectRoot, usedRoot)) {
-                    LOG.warn("Project $name is at the same location as project ${otherProject.name}")
+    synchronized(BuildScriptData.AllProjects) {
+        for ((_, otherProject) in BuildScriptData.AllProjects) {
+            if (otherProject.name == name) {
+                if (otherProject.projectRoot == null) {
+                    throw WemiException("Project named '$name' already exists (without root)")
+                } else {
+                    throw WemiException("Project named '$name' already exists (at ${otherProject.projectRoot})")
                 }
             }
-            BuildScriptData.AllProjects.put(project.name, project)
+            if (checkRootUnique && otherProject.projectRoot != null && Files.isSameFile(otherProject.projectRoot, usedRoot)) {
+                LOG.warn("Project $name is at the same location as project ${otherProject.name}")
+            }
         }
+        BuildScriptData.AllProjects.put(project.name, project)
     }
     project.apply {
         Keys.projectName set { name }

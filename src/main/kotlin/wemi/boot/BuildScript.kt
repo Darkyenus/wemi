@@ -195,8 +195,9 @@ private fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
 }
 
 internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?): Project {
-    //TODO Inline here
-    return createProject(WemiBuildScriptProjectName, WemiBuildFolder, BuildScript) {
+    return Project(WemiBuildScriptProjectName, WemiBuildFolder, arrayOf(BuildScript)).apply {
+        Keys.projectName set { WemiBuildScriptProjectName }
+        Keys.projectRoot set { WemiBuildFolder }
 
         if (buildScriptInfo != null) {
             Keys.repositories set { WMutableSet(buildScriptInfo.repositories) }
@@ -233,6 +234,8 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
             Keys.internalClasspath set { wEmptyList() }
             Keys.run set { 0 }
         }
+
+        locked = true
     }
 }
 
