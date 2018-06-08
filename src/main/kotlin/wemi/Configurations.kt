@@ -78,8 +78,10 @@ object Configurations {
     }
 
     val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
-        Keys.sourceRoots set { wSetOf(Keys.projectRoot.get() / "src/main/java") }
-        Keys.sourceRoots set { wSetOf(Keys.projectRoot.get() / "src/main/kotlin") }
+        Keys.sourceRoots set {
+            val root = Keys.projectRoot.get()
+            wSetOf(root / "src/main/java", root / "src/main/kotlin")
+        }
         extend (Configurations.testing) {
             Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/java" }
             Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/kotlin" }

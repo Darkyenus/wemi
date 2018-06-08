@@ -202,14 +202,26 @@ This will change the querying order when evaluating `compiling:compiler` to firs
 and only then, if the key is not bound, check the original configuration.
 `extend`s, like `using`s, can be freely nested for even more specific overrides.
 
+Specific semantics of this are subtle, but usually intuitive.
+
 #### Querying order
 When key in scope is queried, configurations and project in the scope is searched for the value binding in a specified order.
-The order is:
-1. The rightmost configuration
-2. The rightmost configuration's parents, if it was an extension or configuration with a parent
-3. The second, third, etc. rightmost configurations and its parents, like steps 1., 2.
-4. The project
-5. Key's default value
+This order is created iteratively, each added layer (such as another `configuration:`) adds more binding holders
+to be considered before falling back to the order before layer was added (`Scope` has `parent` parameter).
+Root scope is always a scope of `Project`, constructed by:
+1. Bindings of project itself
+2. Bindings of topmost archetype, and others lower in priority, down to the base archetype
+	1. Bindings of archetype's parent and then its parent etc.
+
+Additional order after adding a configuration is:
+1. Check if the added configuration contains any extensions of configurations already in `Scope`
+	1. First recursively check if the extensions themselves have any applicable extensions and use them first
+2. Traverse down the existing scope, looking for extensions targeting currently added configuration
+	1. If there are any, search them for more specific extensions and add them as well, like in previous step
+	2. Repeat for added configuration's parents
+3. Search the added configuration itself
+4. Search parent scope, while there is a parent scope
+5. Check key's default value
 6. Fail
 
 When the binding is encountered, it is evaluated, returned and no more items in the order are checked.

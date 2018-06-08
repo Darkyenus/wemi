@@ -259,6 +259,9 @@ fun main(args: Array<String>) {
         exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
     }
 
+    // Process initializers
+    BuildScriptData.flushInitializers()
+
     // - Ensure Configurations are loaded -
     Configurations
     // ------------------------------------

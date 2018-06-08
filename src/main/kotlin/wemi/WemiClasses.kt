@@ -1,4 +1,4 @@
-@file:Suppress("unused", "MemberVisibilityCanPrivate", "MemberVisibilityCanBePrivate")
+@file:Suppress("MemberVisibilityCanPrivate", "MemberVisibilityCanBePrivate")
 
 package wemi
 
@@ -427,22 +427,40 @@ class Scope internal constructor(
         }
     }
 
+    private fun addReverseExtensions(to:ArrayList<BindingHolder>, of:BindingHolder) {
+        traverseHoldersBack { holderToBeExtended ->
+            if (holderToBeExtended !is Configuration) {
+                return@traverseHoldersBack
+            }
+            val extension = of.configurationExtensions[holderToBeExtended] ?: return@traverseHoldersBack
+
+            addReverseExtensions(to, extension)
+            to.add(extension)
+        }
+    }
+
     @PublishedApi
     internal fun scopeFor(configuration: Configuration): Scope {
         val scopes = configurationScopeCache
         synchronized(scopes) {
             return scopes.getOrPut(configuration) {
+                // Most significant holder first
                 val newScopeHolders = ArrayList<BindingHolder>()
 
+                // Add extensions in [configuration], which should be applied based on the content of this scope
+                addReverseExtensions(newScopeHolders, configuration)
+
+                // Now add scope holders from parents, while resolving other extensions
                 var conf = configuration
                 while (true) {
                     // Configuration may have been extended, add extensions
                     traverseHoldersBack { holder ->
-                        val extension = holder.configurationExtensions[conf]
-                        if (extension != null) {
-                            newScopeHolders.add(extension)
-                        }
+                        val extension = holder.configurationExtensions[configuration] ?: return@traverseHoldersBack
+                        // Does this extension contain more extensions that are now applicable?
+                        addReverseExtensions(newScopeHolders, extension)
+                        newScopeHolders.add(extension)
                     }
+
                     // Extensions added, now add the configuration itself
                     newScopeHolders.add(conf)
 

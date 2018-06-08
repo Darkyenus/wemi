@@ -13,11 +13,33 @@ import kotlin.reflect.KProperty0
 
 private val LOG = LoggerFactory.getLogger("Wemi")
 
+private typealias BindingHolderInitializer = () -> Unit
+
 /** Internal structure holding all loaded build script data. */
 internal object BuildScriptData {
     val AllProjects: MutableMap<String, Project> = Collections.synchronizedMap(mutableMapOf<String, Project>())
     val AllKeys: MutableMap<String, Key<Any>> = Collections.synchronizedMap(mutableMapOf<String, Key<Any>>())
     val AllConfigurations: MutableMap<String, Configuration> = Collections.synchronizedMap(mutableMapOf<String, Configuration>())
+
+    /**
+     * List of lazy initializers.
+     * Projects and configurations are initialized lazily, to allow cyclic dependencies.
+     */
+    var PendingInitializers = ArrayList<BindingHolderInitializer>()
+
+    fun flushInitializers() {
+        while (true) {
+            val initializerList = PendingInitializers
+            if (initializerList.isEmpty()) {
+                break
+            }
+            PendingInitializers = ArrayList()
+            LOG.debug("Flushing initializers")
+            for (function in initializerList) {
+                function()
+            }
+        }
+    }
 }
 
 /**
@@ -28,13 +50,25 @@ internal object BuildScriptData {
 class ProjectDelegate internal constructor(
         private val projectRoot: Path?,
         private val archetypes: Array<out Archetype>,
-        private val initializer: Project.() -> Unit
-) : ReadOnlyProperty<Any?, Project> {
+        private var initializer: (Project.() -> Unit)?
+) : ReadOnlyProperty<Any?, Project>, BindingHolderInitializer {
 
     private lateinit var project: Project
 
+    override fun invoke() {
+        val project = project
+        project.locked = false
+        try {
+            initializer!!.invoke(project)
+        } finally {
+            project.locked = true
+            initializer = null
+        }
+    }
+
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): ProjectDelegate {
-        this.project = createProject(property.name, projectRoot, *archetypes, checkRootUnique = true, initializer = initializer)
+        BuildScriptData.PendingInitializers.add(this)
+        this.project = createProject(property.name, projectRoot, *archetypes, checkRootUnique = true, initializer = null)
         return this
     }
 
@@ -47,13 +81,13 @@ class ProjectDelegate internal constructor(
  * Create project dynamically, like using the [ProjectDelegate], but without the need to create a separate variable
  * for each one.
  *
- * @param name of the project, must be unique
+ * @param name of the project, must be unique and valid Java-like identifier
  * @param root of the project
  * @param archetypes to apply, primary first
  * @param checkRootUnique if true, check if no other project is in the [root] and warn if so
- * @param initializer to populate the project's [BindingHolder] with bindings
+ * @param initializer to populate the project's [BindingHolder] with bindings (null is used only internally)
  */
-fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRootUnique:Boolean = true, initializer: Project.() -> Unit):Project {
+fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRootUnique:Boolean = true, initializer: (Project.() -> Unit)?):Project {
     val usedRoot = root?.toAbsolutePath()
     if (usedRoot != null && !usedRoot.exists()) {
         Files.createDirectories(usedRoot)
@@ -103,7 +137,7 @@ fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRoo
             Keys.projectRoot set { usedRoot }
         }
 
-        initializer()
+        initializer?.invoke(this)
         locked = true
     }
 
@@ -149,19 +183,43 @@ class KeyDelegate<Value> internal constructor(
 class ConfigurationDelegate internal constructor(
         private val description: String,
         private val parent: Configuration?,
-        private val initializer: Configuration.() -> Unit) : ReadOnlyProperty<Any?, Configuration> {
+        private var initializer: (Configuration.() -> Unit)?)
+    : ReadOnlyProperty<Any?, Configuration>, BindingHolderInitializer {
 
     private lateinit var configuration: Configuration
 
+    override fun invoke() {
+        val configuration = configuration
+        configuration.locked = false
+        try {
+            initializer!!.invoke(configuration)
+        } finally {
+            configuration.locked = true
+            initializer = null
+        }
+    }
+
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): ConfigurationDelegate {
-        this.configuration = createConfiguration(property.name, description, parent, initializer)
+        BuildScriptData.PendingInitializers.add(this)
+        this.configuration = createConfiguration(property.name, description, parent, null)
         return this
     }
 
     override fun getValue(thisRef: Any?, property: KProperty<*>): Configuration = configuration
 }
 
-fun createConfiguration(name:String, description: String, parent: Configuration?, initializer: Configuration.() -> Unit):Configuration {
+/**
+ * ADVANCED USERS ONLY!!! Use [ConfigurationDelegate] instead for most uses.
+ *
+ * Create configuration dynamically, like using the [ConfigurationDelegate], but without the need to create a separate variable
+ * for each one.
+ *
+ * @param name of the configuration, must be unique and valid Java-like identifier
+ * @param description of the configuration
+ * @param parent of the configuration
+ * @param initializer to populate the configuration's [BindingHolder] with bindings (null is used only internally)
+ */
+fun createConfiguration(name:String, description: String, parent: Configuration?, initializer: (Configuration.() -> Unit)?):Configuration {
     val configuration = Configuration(name, description, parent)
     synchronized(BuildScriptData.AllConfigurations) {
         val existing = BuildScriptData.AllConfigurations[configuration.name]
@@ -171,7 +229,7 @@ fun createConfiguration(name:String, description: String, parent: Configuration?
 
         BuildScriptData.AllConfigurations.put(configuration.name, configuration)
     }
-    configuration.initializer()
+    initializer?.invoke(configuration)
     configuration.locked = true
 
     return configuration
