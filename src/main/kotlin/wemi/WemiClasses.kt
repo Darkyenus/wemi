@@ -245,13 +245,6 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         internal val currentlyEvaluatingProjects = ArrayList<Project>()
 
         /**
-         * Keys evaluated in this evaluation block.
-         *
-         * Filled in [Scope.getKeyValue], cleared in [endEvaluate].
-         */
-        internal val currentEvaluationUsedKeys = ArrayList<Key<*>>()
-
-        /**
          * Prepare to evaluate some keys.
          * Must be closed with [endEvaluate].
          *
@@ -311,8 +304,6 @@ class Project internal constructor(val name: String, internal val projectRoot: P
                 currentlyEvaluatingProjects.clear()
 
                 // Cleanup used keys
-                currentEvaluationUsedKeys.clear()
-
                 val cleanupDuration = System.nanoTime() - cleanupStartTime
                 activeKeyEvaluationListener?.postEvaluationCleanup(purgedCount, cleanupDuration)
 
@@ -373,8 +364,7 @@ class Scope internal constructor(
 
     private val configurationScopeCache: MutableMap<Configuration, Scope> = java.util.HashMap()
 
-    private class CacheEntry<out Value>(val value:Value, val usedKeys:List<Key<*>>)
-    private var valueCache: MutableMap<Key<*>, CacheEntry<*>>? = null
+    private var valueCache: MutableMap<Key<*>, Any?>? = null
 
     private inline fun traverseHoldersBack(action: (BindingHolder) -> Unit) {
         var scope = this
@@ -399,32 +389,6 @@ class Scope internal constructor(
             }
         }
         return false
-    }
-
-    /**
-     * Returns validated value from cache or null if no such value from this scope exists.
-     */
-    private fun <Value> getCached(key: Key<Value>):CacheEntry<Value>? {
-        val cache = valueCache ?: return null
-        val entry = cache[key] ?: return null
-
-        @Suppress("UNCHECKED_CAST")
-        val cachedValue = entry.value as Value
-        // Small circus to force correct receivers without large amount of fuss
-        val cacheValid:Boolean = key.cacheMode!!.run { this@Scope.isCacheValid(true, cachedValue) }
-
-        if (cacheValid) {
-            @Suppress("UNCHECKED_CAST")
-            return entry as CacheEntry<Value>
-        } else {
-            // Remove cached value
-            if (cache.size == 1) {
-                valueCache = null
-            } else {
-                cache.remove(key)
-            }
-            return null
-        }
     }
 
     private fun addReverseExtensions(to:ArrayList<BindingHolder>, of:BindingHolder) {
@@ -523,57 +487,37 @@ class Scope internal constructor(
         return scopeFor(anonConfig).action()
     }
 
+    /**
+     * Returns validated value from cache or null if no such value from this scope exists.
+     */
+    private fun <Value> getCached(key: Key<Value>):Value? {
+        val cache = valueCache ?: return null
+        @Suppress("UNCHECKED_CAST")
+        val cachedValue:Value = cache[key] as Value? ?: return null
+
+        // Small circus to force correct receivers without large amount of fuss
+        if (key.cacheMode!!.run { isCacheValid(true, cachedValue) }) {
+            return cachedValue
+        } else {
+            // Remove cached value
+            cache.remove(key)
+            return null
+        }
+    }
+
     private fun <Value : Output, Output> getKeyValue(key: Key<Value>, otherwise: Output, useOtherwise: Boolean): Output {
         val listener = activeKeyEvaluationListener
-        val currentEvaluationUsedKeys = Project.currentEvaluationUsedKeys
 
         listener?.keyEvaluationStarted(this, key)
-        currentEvaluationUsedKeys.add(key)
-        val preEvaluationUsedKeysMark = currentEvaluationUsedKeys.size
 
         // Check the cache
         val cacheMode = key.cacheMode
         if (cacheMode != null) {
             // Search self
-            val selfCacheEntry = getCached(key)
-            if (selfCacheEntry != null) {
-                val cachedValue = selfCacheEntry.value
+            val cachedValue = getCached(key)
+            if (cachedValue != null) {
                 listener?.keyEvaluationSucceeded(key, this, null, cachedValue, null)
-                // And notify that we have used the keys (because technically, we sort of did, before)
-                currentEvaluationUsedKeys.addAll(selfCacheEntry.usedKeys)
                 return cachedValue
-            }
-
-            // Search parent scopes
-            var parentScope:Scope? = this.scopeParent
-            searchParents@
-            while (parentScope != null) {
-                // Does this scope contain searched key?
-                val parentCacheEntry = parentScope.getCached(key)
-                if (parentCacheEntry != null) {
-                    // It does, check if we can use it
-                    // That is, check all scopes, from this one to one above parentScope
-                    // and verify that they don't touch any usedKeys
-                    val usedKeys = parentCacheEntry.usedKeys
-
-                    var checkedScope:Scope = this
-                    do {
-                        if (checkedScope.modifiesKeys(key, usedKeys)) {
-                            // We cannot use that, so we can't use any cache from any parent
-                            break@searchParents
-                        }
-                        checkedScope = checkedScope.scopeParent!!
-                    } while (checkedScope != parentScope)
-
-                    // Use it!
-                    val cachedValue = parentCacheEntry.value
-                    listener?.keyEvaluationSucceeded(key, parentScope, null, cachedValue, null)
-                    // And notify that we have used the keys (because technically, we sort of did, before)
-                    currentEvaluationUsedKeys.addAll(usedKeys)
-                    return cachedValue
-                }
-
-                parentScope = parentScope.scopeParent
             }
         }
 
@@ -605,7 +549,6 @@ class Scope internal constructor(
                 val lazyValue = holder.binding[key] as BoundKeyValue<Value>?
                 if (lazyValue != null) {
                     // Unpack the value
-
                     try {
                         foundValue = lazyValue()
                     } catch (t:Throwable) {
@@ -650,40 +593,15 @@ class Scope internal constructor(
             var cachedIn:Scope? = null
             // First check if this key is cached and if it isn't default value
             if (cacheMode != null && !foundValueIsDefault) {
-                // Figure out used keys
-                val postEvaluationUsedKeysMark = currentEvaluationUsedKeys.size
-                val usedKeys: List<Key<*>>
-                if (preEvaluationUsedKeysMark == postEvaluationUsedKeysMark) {
-                    usedKeys = emptyList()
-                } else {
-                    val mutableUsedKeys = ArrayList<Key<*>>(postEvaluationUsedKeysMark - preEvaluationUsedKeysMark)
-                    for (i in preEvaluationUsedKeysMark until postEvaluationUsedKeysMark) {
-                        val k = currentEvaluationUsedKeys[i]
-                        if (!mutableUsedKeys.contains(k)) {
-                            mutableUsedKeys.add(k)
-                        }
-                    }
-                    usedKeys = mutableUsedKeys
-                }
+                cachedIn = this
 
-                // Figure out optimal scope for caching
-                // Optimal scope is the first parent scope that modifies the result of this evaluation.
-                // i.e. if this scope inherits all meaningful values for this key from parent scope,
-                // it makes more sense to cache it there
-                var optimalScope = this
-                while (!optimalScope.modifiesKeys(key, usedKeys)) {
-                    optimalScope = optimalScope.scopeParent ?: break
-                }
-
-                cachedIn = optimalScope
-
-                val cache = optimalScope.valueCache ?: run {
-                    val cache = HashMap<Key<*>, CacheEntry<*>>()
-                    optimalScope.valueCache = cache
+                val cache = valueCache ?: run {
+                    val cache = HashMap<Key<*>, Any?>()
+                    cachedIn.valueCache = cache
                     cache
                 }
 
-                cache[key] = CacheEntry(result, usedKeys)
+                cache[key] = result
             }
 
             listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, cachedIn)
