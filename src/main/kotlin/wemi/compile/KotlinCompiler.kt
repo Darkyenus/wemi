@@ -5,7 +5,6 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
 import wemi.boot.WemiBundledLibrariesExclude
-import wemi.collections.wSetOf
 import wemi.dependency.*
 import wemi.util.*
 import java.nio.file.Path
@@ -121,7 +120,7 @@ enum class KotlinCompilerVersion (
 /**
  * Valid Kotlin source file extensions.
  */
-val KotlinSourceFileExtensions = wSetOf("kt", "kts")
+val KotlinSourceFileExtensions = setOf("kt", "kts")
 
 /**
  * General Kotlin compiler flags.

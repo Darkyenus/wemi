@@ -853,12 +853,12 @@ sealed class BindingHolder : WithDescriptiveString {
      *
      * @see modify
      */
-    inline infix fun <Value, Collection : WCollection<Value>> Key<Collection>.add(crossinline additionalValue: BoundKeyValue<Value>) {
+    inline infix fun <Value, Coll : Collection<Value>> Key<Coll>.add(crossinline additionalValue: BoundKeyValue<Value>) {
         this.modify { collection ->
             val mutable = collection.toMutable()
             mutable.add(additionalValue())
             @Suppress("UNCHECKED_CAST")
-            mutable as Collection
+            mutable as Coll
         }
     }
 
@@ -867,28 +867,29 @@ sealed class BindingHolder : WithDescriptiveString {
      *
      * @see modify
      */
-    inline infix fun <Value, Collection : WCollection<Value>> Key<Collection>.addAll(crossinline additionalValues: BoundKeyValue<Iterable<Value>>) {
+    inline infix fun <Value, Coll : Collection<Value>> Key<Coll>.addAll(crossinline additionalValues: BoundKeyValue<Iterable<Value>>) {
         this.modify { collection ->
             val mutable = collection.toMutable()
             mutable.addAll(additionalValues())
             @Suppress("UNCHECKED_CAST")
-            mutable as Collection
+            mutable as Coll
         }
     }
 
     /**
      * Add a modifier that will remove the result of [valueToRemove] from the resulting collection.
      *
-     * Defined on [WSet] only, because operating on [WList] may have undesired effect of removing
+     * Defined on [Set] only, because operating on [List] may have undesired effect of removing
      * only one occurrence of [valueToRemove].
      *
      * @see modify
      */
-    inline infix fun <Value> Key<WSet<Value>>.remove(crossinline valueToRemove: BoundKeyValue<Value>) {
-        this.modify { collection: WSet<Value> ->
+    inline infix fun <Value, Coll : Set<Value>> Key<Coll>.remove(crossinline valueToRemove: BoundKeyValue<Value>) {
+        this.modify { collection ->
             val mutable = collection.toMutable()
             mutable.remove(valueToRemove())
-            mutable
+            @Suppress("UNCHECKED_CAST")
+            mutable as Coll
         }
     }
 
@@ -897,12 +898,12 @@ sealed class BindingHolder : WithDescriptiveString {
      *
      * @see modify
      */
-    inline infix fun <Value, Collection : WCollection<Value>> Key<Collection>.removeAll(crossinline valuesToRemove: BoundKeyValue<Iterable<Value>>) {
-        this.modify { collection: WCollection<Value> ->
+    inline infix fun <Value, Coll : Collection<Value>> Key<Coll>.removeAll(crossinline valuesToRemove: BoundKeyValue<Iterable<Value>>) {
+        this.modify { collection ->
             val mutable = collection.toMutable()
             mutable.removeAll(valuesToRemove())
             @Suppress("UNCHECKED_CAST")
-            mutable as Collection
+            mutable as Coll
         }
     }
     //endregion
@@ -983,11 +984,11 @@ sealed class BindingHolder : WithDescriptiveString {
     /**
      * Bind this key to values that itself holds, under given configurations.
      */
-    internal infix fun <Value> Key<WSet<Value>>.setToUnionOfSelfIn(configurations: Scope.()->Iterable<Configuration>) {
+    internal infix fun <Value> Key<Set<Value>>.setToUnionOfSelfIn(configurations: Scope.()->Iterable<Configuration>) {
         this set {
             val configurationsIter = configurations().iterator()
             if (!configurationsIter.hasNext()) {
-                wEmptySet()
+                emptySet()
             } else {
                 var result = using(configurationsIter.next()) { this@setToUnionOfSelfIn.get() }
                 while (configurationsIter.hasNext()) {
@@ -1003,11 +1004,11 @@ sealed class BindingHolder : WithDescriptiveString {
     /**
      * Bind this key to values that itself holds, under given configurations.
      */
-    internal infix fun <Value> Key<WList<Value>>.setToConcatenationOfSelfIn(configurations: Scope.()->Iterable<Configuration>) {
+    internal infix fun <Value> Key<List<Value>>.setToConcatenationOfSelfIn(configurations: Scope.()->Iterable<Configuration>) {
         this set {
             val configurationsIter = configurations().iterator()
             if (!configurationsIter.hasNext()) {
-                wEmptyList()
+                emptyList()
             } else {
                 var result = using(configurationsIter.next()) { this@setToConcatenationOfSelfIn.get() }
                 while (configurationsIter.hasNext()) {

@@ -4,7 +4,7 @@ import com.esotericsoftware.jsonbeans.JsonValue
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
 import wemi.*
-import wemi.collections.*
+import wemi.collections.WMutableList
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags
@@ -67,7 +67,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
 
     val resultJar = cacheFolder / "build.jar"
     val buildScriptInfoFile = cacheFolder / "build-info.json"
-    val buildScriptInfo = BuildScriptInfo(resultJar, buildScriptSources.map { LocatedPath(it) }.toWList())
+    val buildScriptInfo = BuildScriptInfo(resultJar, buildScriptSources.map { LocatedPath(it) })
 
     var recompileReason = ""
 
@@ -200,8 +200,8 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
         Keys.projectRoot set { WemiBuildFolder }
 
         if (buildScriptInfo != null) {
-            Keys.repositories set { WMutableSet(buildScriptInfo.repositories) }
-            Keys.libraryDependencies set { WMutableSet(buildScriptInfo.dependencies) }
+            Keys.repositories set { buildScriptInfo.repositories }
+            Keys.libraryDependencies set { buildScriptInfo.dependencies }
             Keys.unmanagedDependencies set {
                 val dependencies = WMutableList<LocatedPath>()
                 for (unmanagedDependency in buildScriptInfo.unmanagedDependencies) {
@@ -231,7 +231,7 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
                 return@set resultJar
             }
         } else {
-            Keys.internalClasspath set { wEmptyList() }
+            Keys.internalClasspath set { emptyList() }
             Keys.run set { 0 }
         }
 
@@ -250,7 +250,7 @@ class BuildScriptInfo internal constructor(
         /** jar to which the build script has been compiled */
         val scriptJar: Path,
         /** source files, from which the build script is compiled */
-        val sources: WList<LocatedPath>) : JsonReadable, JsonWritable {
+        val sources: List<LocatedPath>) : JsonReadable, JsonWritable {
 
     private val _repositories = HashSet<Repository>()
     private val _dependencies = HashSet<Dependency>()

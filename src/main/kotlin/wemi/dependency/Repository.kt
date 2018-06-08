@@ -4,8 +4,6 @@ import com.esotericsoftware.jsonbeans.JsonException
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
-import wemi.collections.WSet
-import wemi.collections.wSetOf
 import wemi.publish.InfoNode
 import wemi.util.*
 import wemi.util.Json
@@ -390,4 +388,4 @@ val Jitpack = Repository.M2("jitpack", URL("https://jitpack.io/"), LocalM2Reposi
  * @see MavenCentral
  * @see LocalM2Repository (included as cache of [MavenCentral])
  */
-val DefaultRepositories: WSet<Repository> = wSetOf(MavenCentral)
+val DefaultRepositories:Set<Repository> = setOf(MavenCentral)

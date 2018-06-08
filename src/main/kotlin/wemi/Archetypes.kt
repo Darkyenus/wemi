@@ -8,9 +8,6 @@ import wemi.assembly.JarMergeStrategyChooser
 import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiCacheFolder
 import wemi.boot.WemiRunningInInteractiveMode
-import wemi.collections.wEmptyList
-import wemi.collections.wEmptySet
-import wemi.collections.wSetOf
 import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
 import wemi.dependency.LocalM2Repository
@@ -81,7 +78,7 @@ object Archetypes {
      * Implements basic key implementations for JVM that don't usually change.
      */
     val JVMBase by archetype(::Base) {
-        Keys.resourceRoots set { wSetOf(path("src/main/resources")) }
+        Keys.resourceRoots set { setOf(path("src/main/resources")) }
         extend (Configurations.testing) {
             Keys.resourceRoots add { path("src/test/resources") }
         }
@@ -131,16 +128,16 @@ object Archetypes {
      * Those can serve as an aggregation of dependencies or as a Maven-like parent projects.
      */
     val BlankJVMProject by archetype(::JVMBase) {
-        Keys.internalClasspath set { wEmptyList() }
+        Keys.internalClasspath set { emptyList() }
 
-        Keys.resourceRoots set { wEmptySet() }
+        Keys.resourceRoots set { emptySet() }
     }
 
     /**
      * Primary archetype for projects that use pure Java.
      */
     val JavaProject by archetype(::JVMBase) {
-        Keys.compilingConfigurations set { wSetOf(Configurations.compilingJava) }
+        Keys.compilingConfigurations set { setOf(Configurations.compilingJava) }
 
         Keys.compile set KeyDefaults.CompileJava
 
@@ -155,7 +152,7 @@ object Archetypes {
      * Primary archetype for projects that use Java and Kotlin.
      */
     val JavaKotlinProject by archetype(::JVMBase) {
-        Keys.compilingConfigurations set { wSetOf(Configurations.compilingJava, Configurations.compilingKotlin) }
+        Keys.compilingConfigurations set { setOf(Configurations.compilingJava, Configurations.compilingKotlin) }
 
         Keys.libraryDependencies add { kotlinDependency("stdlib") }
         Keys.compile set KeyDefaults.CompileJavaKotlin

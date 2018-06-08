@@ -12,7 +12,6 @@ import wemi.Configurations.publishing
 import wemi.assembly.*
 import wemi.boot.WemiBuildScriptProject
 import wemi.boot.WemiBundledLibrariesExclude
-import wemi.collections.WList
 import wemi.collections.WMutableList
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
@@ -51,7 +50,7 @@ import kotlin.collections.LinkedHashSet
  */
 object KeyDefaults {
 
-    val SourceFiles: BoundKeyValue<WList<LocatedPath>> = {
+    val SourceFiles: BoundKeyValue<List<LocatedPath>> = {
         val roots = Keys.sourceRoots.get()
         val extensions = Keys.sourceExtensions.get()
         val result = WMutableList<LocatedPath>()
@@ -63,7 +62,7 @@ object KeyDefaults {
         result
     }
 
-    val ResourceFiles: BoundKeyValue<WList<LocatedPath>> = {
+    val ResourceFiles: BoundKeyValue<List<LocatedPath>> = {
         val roots = Keys.resourceRoots.get()
         val result = WMutableList<LocatedPath>()
 
@@ -114,7 +113,7 @@ object KeyDefaults {
     }
 
     private val ClasspathResolution_LOG = LoggerFactory.getLogger("ClasspathResolution")
-    val ExternalClasspath: BoundKeyValue<WList<LocatedPath>> = {
+    val ExternalClasspath: BoundKeyValue<List<LocatedPath>> = {
         val result = WMutableList<LocatedPath>()
 
         val resolved = Keys.resolvedLibraryDependencies.get()
@@ -139,7 +138,7 @@ object KeyDefaults {
         result
     }
 
-    val InternalClasspath: BoundKeyValue<WList<LocatedPath>> = {
+    val InternalClasspath: BoundKeyValue<List<LocatedPath>> = {
         val compiled = Keys.compile.get()
         val resources = Keys.resourceFiles.get()
 
@@ -415,7 +414,7 @@ object KeyDefaults {
         }
     }
 
-    val RunOptions: BoundKeyValue<WList<String>> = {
+    val RunOptions: BoundKeyValue<List<String>> = {
         val options = WMutableList<String>()
         options.add("-ea")
         val debugPort = System.getenv("WEMI_RUN_DEBUG_PORT")?.toIntOrNull()
@@ -658,7 +657,7 @@ object KeyDefaults {
         }
     }
 
-    val ArchiveJavadocOptions: BoundKeyValue<WList<String>> = {
+    val ArchiveJavadocOptions: BoundKeyValue<List<String>> = {
         using(archiving) {
             val options = WMutableList<String>()
 

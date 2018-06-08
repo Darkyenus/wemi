@@ -6,7 +6,7 @@ import configuration
 import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.KeyDefaults.inProjectDependencies
-import wemi.collections.wSetOf
+import wemi.collections.toMutable
 import wemi.compile.*
 import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.JavadocClassifier
@@ -65,7 +65,7 @@ object Configurations {
 
     //region Compiling
     val compilingJava by configuration("Configuration layer used when compiling Java sources", compiling) {
-        Keys.sourceRoots set { wSetOf(Keys.projectRoot.get() / "src/main/java") }
+        Keys.sourceRoots set { setOf(Keys.projectRoot.get() / "src/main/java") }
         extend (Configurations.testing) {
             Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/java" }
         }
@@ -80,7 +80,7 @@ object Configurations {
     val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
         Keys.sourceRoots set {
             val root = Keys.projectRoot.get()
-            wSetOf(root / "src/main/java", root / "src/main/kotlin")
+            setOf(root / "src/main/java", root / "src/main/kotlin")
         }
         extend (Configurations.testing) {
             Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/java" }

@@ -14,8 +14,6 @@ import wemi.kotlinDependency as _kotlinDependency
 import wemi.dependency.dependency as _dependency
 import wemi.test.JUnitAPI as _JUnitAPI
 import wemi.test.JUnitEngine as _JUnitEngine
-import wemi.collections.toWSet as _toWSet
-import wemi.collections.toWList as _toWList
 
 /*
  * Types and values that should be visible in build scripts without any explicit imports
@@ -31,13 +29,6 @@ typealias Repository = wemi.dependency.Repository
 typealias ProjectId = wemi.dependency.DependencyId
 typealias ProjectDependency = wemi.dependency.Dependency
 typealias ProjectExclusion = wemi.dependency.DependencyExclusion
-
-typealias WCollection<T> = wemi.collections.WCollection<T>
-typealias WSet<T> = wemi.collections.WSet<T>
-typealias WList<T> = wemi.collections.WList<T>
-typealias WMutableCollection<T> = wemi.collections.WMutableCollection<T>
-typealias WMutableSet<T> = wemi.collections.WMutableSet<T>
-typealias WMutableList<T> = wemi.collections.WMutableList<T>
 
 typealias Path = java.nio.file.Path
 
@@ -67,16 +58,6 @@ inline fun dependency(project:Project, aggregate:Boolean, vararg configurations:
 
 @Deprecated("User version with explicit aggregate=true parameter.")
 inline fun dependency(project:Project, vararg configurations:Configuration) = _dependency(project, true, *configurations)
-
-// WCollection
-inline fun <T> wEmptySet() = wemi.collections.wEmptySet<T>()
-inline fun <T> wEmptyList() = wemi.collections.wEmptyList<T>()
-inline fun <T> wSetOf(vararg items:T) = wemi.collections.wSetOf(*items)
-inline fun <T> wMutableSetOf(vararg items:T) = wemi.collections.wMutableSetOf(*items)
-inline fun <T> wListOf(vararg items:T) = wemi.collections.wListOf(*items)
-inline fun <T> wMutableListOf(vararg items:T) = wemi.collections.wMutableListOf(*items)
-inline fun <T> Collection<T>.toWSet() = this._toWSet()
-inline fun <T> Collection<T>.toWList() = this._toWList()
 
 // Path helpers
 /**

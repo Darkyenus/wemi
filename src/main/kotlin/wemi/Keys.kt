@@ -4,10 +4,6 @@ import wemi.assembly.AssemblyMapFilter
 import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.MergeStrategyChooser
 import wemi.assembly.RenameFunction
-import wemi.collections.WList
-import wemi.collections.WSet
-import wemi.collections.wEmptyList
-import wemi.collections.wEmptySet
 import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion
@@ -45,35 +41,35 @@ object Keys {
 
     val input by key<Input>("Provides access to user input, that can be programmatically pre-set")
 
-    val sourceRoots by key<WSet<Path>>("Directories which are source roots for the project (example: '/src/main/java')", defaultValue = wEmptySet())
-    val sourceExtensions by key<WSet<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)", defaultValue = wEmptySet())
+    val sourceRoots by key<Set<Path>>("Directories which are source roots for the project (example: '/src/main/java')", defaultValue = emptySet())
+    val sourceExtensions by key<Set<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)", defaultValue = emptySet())
     /**
      * By default returns all source files. To retrieve only those files that belong to one particular language,
      * use language configuration, for example [wemi.Configurations.compilingJava].
      * Under [wemi.Configurations.testing] contains test sources as well (in addition to normal sources).
      */
-    val sourceFiles by key<WList<LocatedPath>>("Files to be compiled. Usually derived from sourceRoots and sourceExtensions. Maps source root -> source files", defaultValue = wEmptyList())
-    val resourceRoots by key<WSet<Path>>("Directories which are resource roots for the project (example: '/src/main/resources')", defaultValue = wEmptySet())
-    val resourceFiles by key<WList<LocatedPath>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files", defaultValue = wEmptyList())
+    val sourceFiles by key<List<LocatedPath>>("Files to be compiled. Usually derived from sourceRoots and sourceExtensions. Maps source root -> source files", defaultValue = emptyList())
+    val resourceRoots by key<Set<Path>>("Directories which are resource roots for the project (example: '/src/main/resources')", defaultValue = emptySet())
+    val resourceFiles by key<List<LocatedPath>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files", defaultValue = emptyList())
 
     /**
      * Used to generalize keys like [sourceFiles] or [sourceExtensions] to union of distinct subsets.
      * Is typically not used to implement the compilation itself, as it usually needs specialized inter-operation of languages.
      */
-    val compilingConfigurations by key<WSet<Configuration>>("Configurations that are used when compiling the sources, such as `compilingJava`.", defaultValue = wEmptySet())
+    val compilingConfigurations by key<Set<Configuration>>("Configurations that are used when compiling the sources, such as `compilingJava`.", defaultValue = emptySet())
 
-    val repositories by key<WSet<Repository>>("Repositories to be used when resolving dependencies", defaultValue = wEmptySet())
+    val repositories by key<Set<Repository>>("Repositories to be used when resolving dependencies", defaultValue = emptySet())
     val repositoryChain by key<RepositoryChain>("ADVANCED - Resolved repository chain from 'repositories'")
-    val libraryDependencies by key<WSet<Dependency>>("Libraries that the project depends on", defaultValue = wEmptySet())
+    val libraryDependencies by key<Set<Dependency>>("Libraries that the project depends on", defaultValue = emptySet())
     val libraryDependencyProjectMapper by key<(Dependency) -> Dependency>("Function applied to ProjectDependencies encountered while resolving. Used for example when retrieving sources.", defaultValue = { it })
     val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved ->
         resolved.value.prettyPrint(null)
     }, cacheMode = CACHE_ALWAYS)
-    val unmanagedDependencies by key<WList<LocatedPath>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = wEmptyList())
-    val projectDependencies by key<WSet<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = wEmptySet())
+    val unmanagedDependencies by key<List<LocatedPath>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = emptyList())
+    val projectDependencies by key<Set<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = emptySet())
 
-    val externalClasspath by key<WList<LocatedPath>>("Classpath, externally obtained elements from external sources, i.e. library dependencies, external classpath of all project dependencies and internal classpath of non-aggregate dependencies", defaultValue = wEmptyList())
-    val internalClasspath by key<WList<LocatedPath>>("Classpath, internally created elements, i.e. compiled sources and resources, including those of aggregate project dependencies", defaultValue = wEmptyList())
+    val externalClasspath by key<List<LocatedPath>>("Classpath, externally obtained elements from external sources, i.e. library dependencies, external classpath of all project dependencies and internal classpath of non-aggregate dependencies", defaultValue = emptyList())
+    val internalClasspath by key<List<LocatedPath>>("Classpath, internally created elements, i.e. compiled sources and resources, including those of aggregate project dependencies", defaultValue = emptyList())
 
     val clean by key<Int>("Clean compile directories and internal cache, returns approximate amount of items cleaned", cacheMode = null)
 
@@ -90,8 +86,8 @@ object Keys {
 
     val mainClass by key<String>("Main class of the project")
     val runDirectory by key<Path>("Initial working directory of the project launched by 'run'")
-    val runOptions by key<WList<String>>("Options given to 'java' when running the project", defaultValue = wEmptyList())
-    val runArguments by key<WList<String>>("Options given to the application when running the project", defaultValue = wEmptyList())
+    val runOptions by key<List<String>>("Options given to 'java' when running the project", defaultValue = emptyList())
+    val runArguments by key<List<String>>("Options given to the application when running the project", defaultValue = emptyList())
     val run by key<Int>("Compile and run the project, return exit code", cacheMode = null)
     val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code", cacheMode = null, inputKeys = arrayOf("main" to "Main class to run"))
 
@@ -99,7 +95,7 @@ object Keys {
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it.prettyPrint() })
 
     val archiveOutputFile by key<Path>("File to which archive should be saved to")
-    val archiveJavadocOptions by key<WList<String>>("Options when archiving Javadoc")
+    val archiveJavadocOptions by key<List<String>>("Options when archiving Javadoc")
     val archiveDokkaOptions by key<DokkaOptions>("Options when archiving Dokka")
     val archiveDokkaInterface by key<DokkaInterface>("Dokka instance used when creating documentation", cacheMode = CACHE_ALWAYS)
     val archive by key<Path?>("Archive project's output and return path to the created file, if any")
@@ -109,7 +105,7 @@ object Keys {
     /**
      * @see wemi.publish.artifacts preferred method for adding to this list.
      */
-    val publishArtifacts by key<WList<ArtifactEntry>>("Artifacts that should get published", defaultValue = wEmptyList())
+    val publishArtifacts by key<List<ArtifactEntry>>("Artifacts that should get published", defaultValue = emptyList())
     val publish by key<URI>("Publish archives to 'publishRepository' and return the URI to where it was published")
 
     val assemblyMergeStrategy by key<MergeStrategyChooser>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
