@@ -69,7 +69,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         return node
     }
 
-    override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value, cachedIn: Scope?) {
+    override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value, cached: Boolean) {
         val node = popAndIndent()
         val keyData = node.value
         val h = keyData.heading
@@ -90,12 +90,8 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
                 }
                 evaluations++
 
-                if (cachedIn != null) {
-                    h.format(Color.White).append(" and ").format(Color.Magenta, format = Format.Bold).append("cached")
-                    if (cachedIn !== keyData.fromScope) {
-                        h.append(" in ").append(cachedIn)
-                    }
-                    h.format()
+                if (cached) {
+                    h.format(Color.White).append(" and ").format(Color.Magenta, format = Format.Bold).append("cached").format()
                     cacheWrites++
                 }
             }

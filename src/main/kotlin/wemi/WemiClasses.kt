@@ -516,7 +516,7 @@ class Scope internal constructor(
             // Search self
             val cachedValue = getCached(key)
             if (cachedValue != null) {
-                listener?.keyEvaluationSucceeded(key, this, null, cachedValue, null)
+                listener?.keyEvaluationSucceeded(key, this, null, cachedValue, false)
                 return cachedValue
             }
         }
@@ -589,22 +589,20 @@ class Scope internal constructor(
                 throw t
             }
 
-            // Store in cache
-            var cachedIn:Scope? = null
-            // First check if this key is cached and if it isn't default value
+            // Store in cache if this key is cached and if it isn't default value
             if (cacheMode != null && !foundValueIsDefault) {
-                cachedIn = this
-
                 val cache = valueCache ?: run {
                     val cache = HashMap<Key<*>, Any?>()
-                    cachedIn.valueCache = cache
+                    this.valueCache = cache
                     cache
                 }
 
                 cache[key] = result
+                listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, true)
+            } else {
+                listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, false)
             }
 
-            listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, cachedIn)
             return result
         }
 
@@ -1091,13 +1089,13 @@ interface WemiKeyEvaluationListener {
      * @param bindingFoundInScope scope in which the binding of this key has been found, null if default value
      * @param bindingFoundInHolder holder in [bindingFoundInScope] in which the key binding has been found (null if from cache)
      * @param result that has been used, may be null if caller considers null
-     * @param cachedIn scope to which the [result] has been saved to, if any
+     * @param cached true if the result has been cached
      */
     fun <Value>keyEvaluationSucceeded(key: Key<Value>,
                                       bindingFoundInScope: Scope?,
                                       bindingFoundInHolder: BindingHolder?,
                                       result: Value,
-                                      cachedIn: Scope?)
+                                      cached: Boolean)
 
     /**
      * Evaluation of key on top of key evaluation stack has failed, because the key has no binding, nor default value.
