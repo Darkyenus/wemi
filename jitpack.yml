@@ -4,6 +4,6 @@ jdk:
   - oraclejdk8
 install:
    - echo "Running a custom install command to build Wemi"
-   - java -jar wemi --log=trace "core/jitpackBuild:publish; pluginJvmHotswap/jitpackBuild:publish"
+   - java -jar wemi --log=trace "pluginJvmHotswap/jitpackBuild:publish"
 env:
    WEMI_COLOR: "false"
