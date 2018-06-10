@@ -1,5 +1,8 @@
 .DS_Store
 .idea
 target/
-build/
+**/build/cache/
+**/build/logs/
+**/build/*.jar
+**/build/assembly/
 /classes
