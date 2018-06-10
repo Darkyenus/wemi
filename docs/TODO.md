@@ -1,8 +1,12 @@
 # Things to do next
 
-- Implement https://maven.apache.org/pom.html#Dependency_Management (Guava needs it)
-	- Also look into <profiles>???
-	- https://www.davidjhay.com/maven-dependency-management/
+- Maven dependency resolution improvements:
+	- <profiles> support
+		- https://dzone.com/articles/maven-profile-best-practices
+		- https://blog.gradle.org/maven-pom-profiles
+	- Transitive dependencies are not yet affected by dependencyManagement
+		- https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management
+		- https://www.davidjhay.com/maven-dependency-management/
 
 - Hotswapping jvm code:
 	- Test plugin and continue working on it
