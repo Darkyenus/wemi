@@ -4,4 +4,6 @@ jdk:
   - oraclejdk8
 install:
    - echo "Running a custom install command to build Wemi"
-   - java -jar wemi core/publish pluginJvmHotswap/publish
+   - java -jar wemi "core/publish; pluginJvmHotswap/publish"
+env:
+   WEMI_COLOR: "false"
