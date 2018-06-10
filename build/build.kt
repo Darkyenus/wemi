@@ -211,4 +211,16 @@ val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
     }
 }
 
+val jitpackBuild by configuration("Used when building for Jitpack") {
+    if (System.getenv("JITPACK") != "true") {
+        System.err.println("Using jitpackBuild but environment variables are probably not set!")
+    } else {
+        for ((key, value) in System.getenv()) {
+            System.err.println("%10s: %s".format(key, value))
+        }
+    }
 
+    projectGroup modify { System.getenv("GROUP") ?: it }
+    projectName modify { System.getenv("ARTIFACT") ?: it }
+    projectVersion modify { System.getenv("VERSION") ?: it }
+}
