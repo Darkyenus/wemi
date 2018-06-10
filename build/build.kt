@@ -220,6 +220,7 @@ val jitpackBuild by configuration("Used when building for Jitpack") {
 
         projectGroup modify { System.getenv("GROUP") ?: it }
         // Artifact name must be static
+        projectName modify { System.getenv("ARTIFACT") ?: it }
         projectVersion modify { System.getenv("VERSION") ?: it }
     }
 }
