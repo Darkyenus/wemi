@@ -211,20 +211,11 @@ data class DependencyExclusion(val group: String, val name: String, val version:
 /**
  * Exclusions used by default by [Dependency].
  *
- * Filters those that are what Maven considers optional, or in provided, test or system scope.
+ * Filters those that are what Maven considers optional.
  */
 val DefaultExclusions = listOf(
         DependencyExclusion("*", "*", "*", mapOf(
                 Repository.M2.Optional to "true"
-        )),
-        DependencyExclusion("*", "*", "*", mapOf(
-                Repository.M2.Scope to "provided"
-        )),
-        DependencyExclusion("*", "*", "*", mapOf(
-                Repository.M2.Scope to "test"
-        )),
-        DependencyExclusion("*", "*", "*", mapOf(
-                Repository.M2.Scope to "system"
         ))
 )
 

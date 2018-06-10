@@ -2,6 +2,7 @@
 
 - Implement https://maven.apache.org/pom.html#Dependency_Management (Guava needs it)
 	- Also look into <profiles>???
+	- https://www.davidjhay.com/maven-dependency-management/
 
 - Hotswapping jvm code:
 	- Test plugin and continue working on it
@@ -19,6 +20,7 @@
 - Create system, to allow automatic caching of key results, when no input keys have changed.
 	- This will need good arbitrary object serialization/comparison - with files serialized as their file/directory/exist info + checksum of files
 	- Maybe not serialization, just checksuming... interface Checksumable { String checksum() } ?
+	- Source code change detection and caching (Check if worth it)
 
 - Allow to build IntelliJ plugins: https://github.com/JetBrains/gradle-intellij-plugin
 
@@ -28,8 +30,6 @@
 	- Kotlin JS
 
 - Android/MOE/RoboVM/TeaVM plugins
-
-- Source code change detection and caching (Check if worth it)
 
 - Maven parallel repository resolution
 

@@ -4,7 +4,7 @@ val hello by project {
     projectName set { "hello" }
     projectVersion set { "1.0-SNAPSHOT" }
 
-    //libraryDependencies add { dependency("com.google.guava:guava:25.1-jre") }
+    libraryDependencies add { dependency("com.google.guava:guava:25.1-jre") }
 
     mainClass set { "hello.HelloWemiKt" }
 }

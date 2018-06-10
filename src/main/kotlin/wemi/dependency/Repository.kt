@@ -106,9 +106,9 @@ sealed class Repository(val name: String) {
         private fun publishLocked(metadata: InfoNode, artifacts: List<Pair<Path, String?>>):URI {
             val path = directoryPath() ?: throw UnsupportedOperationException("Can't publish to non-local repository")
 
-            val groupId = metadata.findChild("groupId")?.text ?: throw IllegalArgumentException("Metadata is missing a groupId:\n"+metadata)
-            val artifactId = metadata.findChild("artifactId")?.text ?: throw IllegalArgumentException("Metadata is missing a artifactId:\n"+metadata)
-            val version = metadata.findChild("version")?.text ?: throw IllegalArgumentException("Metadata is missing a version:\n"+metadata)
+            val groupId = metadata.findChild("groupId")?.text ?: throw IllegalArgumentException("Metadata is missing a groupId:\n$metadata")
+            val artifactId = metadata.findChild("artifactId")?.text ?: throw IllegalArgumentException("Metadata is missing a artifactId:\n$metadata")
+            val version = metadata.findChild("version")?.text ?: throw IllegalArgumentException("Metadata is missing a version:\n$metadata")
 
             val snapshot = version.endsWith("-SNAPSHOT")
 

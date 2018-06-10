@@ -20,17 +20,17 @@ import kotlin.collections.HashMap
 /**
  * Manages resolution of dependencies through [Repository.M2] Maven repository.
  *
- * Maven repository layout is described here:
- * https://cwiki.apache.org/confluence/display/MAVENOLD/Repository+Layout+-+Final
+ * Maven repository layout is described
+ * [here](https://cwiki.apache.org/confluence/display/MAVENOLD/Repository+Layout+-+Final).
  */
 internal object Maven2 {
 
     private val LOG = LoggerFactory.getLogger(Maven2::class.java)
 
-    private val PomFile = ArtifactKey<Path>("pomFile", true)
-    private val PomData = ArtifactKey<ByteArray>("pomData", false)
-    private val PomKey = ArtifactKey<Pom>("pom", false)
-    private val PomUrlKey = ArtifactKey<URL>("pomUrl", true)
+    private val KPomFile = ArtifactKey<Path>("pomFile", true)
+    private val KPomData = ArtifactKey<ByteArray>("pomData", false)
+    private val KPom = ArtifactKey<Pom>("pom", false)
+    private val KPomUrl = ArtifactKey<URL>("pomUrl", true)
 
     fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository.M2, chain: RepositoryChain): ResolvedDependency {
 
@@ -40,7 +40,7 @@ internal object Maven2 {
         }
 
         val resolvedPom = retrievePom(dependencyId, repository, chain)
-        val pom = resolvedPom.getKey(PomKey) ?:
+        val pom = resolvedPom.getKey(KPom) ?:
                 return ResolvedDependency(dependencyId, emptyList(), repository, true,
                         "Failed to resolve pom: " + resolvedPom.log)
 
@@ -66,7 +66,7 @@ internal object Maven2 {
                     }
                 }
 
-                return ResolvedDependency(dependencyId, pom.dependencies, repository, file == null).apply {
+                return ResolvedDependency(dependencyId, pom.effectiveDependencies(), repository, file == null).apply {
                     this.artifact = file
                     this.artifactData = data
 
@@ -74,11 +74,16 @@ internal object Maven2 {
             }
             else -> {
                 LOG.warn("Unsupported packaging {} of {}", packaging, dependencyId)
-                return ResolvedDependency(dependencyId, pom.dependencies, repository, true)
+                return ResolvedDependency(dependencyId, pom.effectiveDependencies(), repository, true)
             }
         }
     }
 
+    /**
+     * Contains raw data from a Pom file.
+     * Note that when accessing some fields, it is also necessary to check the parent if not set.
+     * Inherited elements: https://maven.apache.org/pom.html#Inheritance
+     */
     private data class Pom(
             var groupId: String? = null,
             var artifactId: String? = null,
@@ -87,7 +92,9 @@ internal object Maven2 {
             val properties: MutableMap<String, String> = HashMap()
     ) {
 
+        var parent:Pom? = null
         val dependencies = ArrayList<Dependency>()
+        val dependencyManagement = ArrayList<Dependency>()
 
         private fun String.translate(): String {
             if (!startsWith("\${", ignoreCase = false) || !endsWith('}', ignoreCase = false)) {
@@ -95,10 +102,16 @@ internal object Maven2 {
             }
 
             val key = substring(2, length - 1)
-            val explicitKey = properties[key]
-            if (explicitKey != null) {
-                LOG.debug("Unreliable Pom resolution: property '{}' resolved through explicit properties to '{}'", key, explicitKey)
-                return explicitKey
+            var explicitValuePom = this@Pom
+            var explicitValue: String?
+            do {
+                explicitValue = explicitValuePom.properties[key]
+                explicitValuePom = explicitValuePom.parent ?: break
+            } while (explicitValue == null)
+
+            if (explicitValue != null) {
+                LOG.debug("Unreliable Pom resolution: property '{}' resolved through explicit properties to '{}'", key, explicitValue)
+                return explicitValue
             }
 
             val envPrefix = "env."
@@ -144,50 +157,112 @@ internal object Maven2 {
             return this
         }
 
-        fun applyProperties() {
+        private fun Dependency.translate():Dependency {
+            val (dependencyId, exclusions) = this
+
+            val translatedDependencyId = DependencyId(
+                    dependencyId.group.translate(),
+                    dependencyId.name.translate(),
+                    dependencyId.version.translate(),
+                    dependencyId.preferredRepository,
+                    dependencyId.attributes.mapValues { it.value.translate() }
+            )
+
+            val translatedExclusions = exclusions.map { exclusion ->
+                DependencyExclusion(exclusion.group.translate(),
+                        exclusion.name.translate(),
+                        exclusion.version.translate(),
+                        exclusion.attributes.mapValues { it.value.translate() })
+            }
+
+            return Dependency(translatedDependencyId, translatedExclusions)
+        }
+
+        fun translateWithProperties() {
             groupId = groupId?.translate()
             artifactId = artifactId?.translate()
             version = version?.translate()
             packaging = packaging.translate()
 
-            for (i in dependencies.indices) {
-                val (dependencyId, exclusions) = dependencies[i]
-
-                val translatedDependencyId = DependencyId(
-                        dependencyId.group.translate(),
-                        dependencyId.name.translate(),
-                        dependencyId.version.translate(),
-                        dependencyId.preferredRepository,
-                        dependencyId.attributes.mapValues { it.value.translate() }
-                )
-
-                val translatedExclusions = exclusions.map { exclusion ->
-                    DependencyExclusion(exclusion.group.translate(),
-                            exclusion.name.translate(),
-                            exclusion.version.translate(),
-                            exclusion.attributes.mapValues { it.value.translate() })
-                }
-
-                dependencies[i] = Dependency(translatedDependencyId, translatedExclusions)
-            }
+            dependencies.replaceAll { it.translate() }
+            dependencyManagement.replaceAll { it.translate() }
         }
 
-        fun assignParent(parent: Pom) {
-            if (groupId == null) {
-                groupId = parent.groupId
-            }
-            if (version == null) {
-                version = parent.version
-            }
-            if (!parent.dependencies.isEmpty()) {
-                // TODO Remove duplicates?
-                dependencies.addAll(parent.dependencies)
-            }
-            for ((property, value) in parent.properties) {
-                if (!properties.contains(property)) {
-                    properties[property] = value
+        /**
+         * Resolves against dependencyManagement.
+         * http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management
+         */
+        private fun resolve(dependency:Dependency):Dependency {
+            var pom = this@Pom
+            while (true) {
+                checkTemplate@for (templateDep in pom.dependencyManagement) {
+                    // Check if dependency is full subset of templateDep, and use templateDep instead if it is
+                    // At least groupId, artifactId, type and classifier must all match to consider for replacement
+                    val depId = dependency.dependencyId
+                    val tempDepId = templateDep.dependencyId
+                    if (depId.group == tempDepId.group
+                            && depId.name == tempDepId.name
+                            && depId.attribute(Repository.M2.Type) == tempDepId.attribute(Repository.M2.Type)
+                            && depId.attribute(Repository.M2.Classifier) == tempDepId.attribute(Repository.M2.Classifier)
+                            && (depId.version.isBlank() || depId.version == tempDepId.version)) {
+                        // Check for full attribute subset
+                        for ((attrKey, attrValue) in depId.attributes) {
+                            if (tempDepId.attribute(attrKey) != attrValue) {
+                                continue@checkTemplate
+                            }
+                        }
+                        // Check for full exclusions subset
+                        if (!templateDep.exclusions.containsAll(dependency.exclusions)) {
+                            continue@checkTemplate
+                        }
+
+                        // Matches
+                        LOG.trace("Dependency {} replaced with {} from dependencyManagement", dependency, templateDep)
+                        return templateDep
+                    }
                 }
+                pom = pom.parent ?: break
             }
+            return dependency
+        }
+
+        /**
+         * Retrieves dependencies that usage of this POM mandates.
+         * Handles things like dependencyManagement correctly, but not on transitive dependencies,
+         * as that is handled in higher layer of dependency resolution process.
+         *
+         * TODO: dependencyManagement of transitive dependencies is not handled to be Maven-like
+         */
+        fun effectiveDependencies():List<Dependency> {
+            val dependencies = ArrayList<Dependency>()
+
+            var pom = this
+            while (true) {
+                for (dependency in pom.dependencies) {
+                    val resolved = pom.resolve(dependency)
+
+                    // Check if the scope it is in is transitive
+                    // https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope
+                    val scope = resolved.dependencyId.attribute(Repository.M2.Scope)?.toLowerCase()
+                    when (scope) {
+                        "compile", "runtime" -> {
+                            // Kept
+                            dependencies.add(resolved)
+                        }
+                        "provided", "test", "system" -> {
+                            // Omitted
+                            LOG.trace("Dependency {} of {} omitted", dependency, this)
+                        }
+                        else -> {
+                            // Illegal
+                            LOG.warn("Illegal scope of {} in {}", dependency, this)
+                        }
+                    }
+                }
+                pom = pom.parent ?: break
+            }
+
+            return dependencies
         }
     }
 
@@ -316,28 +391,20 @@ internal object Maven2 {
         return Pair(response.body, retrievedFile)
     }
 
-    private fun retrievePom(dependencyId: DependencyId, repository: Repository.M2, chain: RepositoryChain): ResolvedDependency {
-        return doRetrieveUntranslatedPom(dependencyId.pomPath(), dependencyId, repository, chain).apply {
-            getKey(PomKey)?.applyProperties()
-        }
-    }
-
-    /**
-     * To be called only from [retrievePom].
-     *
-     * Returned Pom may contain untranslated properties
-     */
-    private fun doRetrieveUntranslatedPom(pomPath: String, dependencyId: DependencyId, repository: Repository.M2, chain: RepositoryChain): ResolvedDependency {
+    private fun retrievePom(dependencyId:DependencyId,
+                            repository: Repository.M2,
+                            chain: RepositoryChain,
+                            pomPath:String = pomPath(dependencyId.group, dependencyId.name, dependencyId.version)): ResolvedDependency {
         // Create path to pom
         val pomUrl = repository.url / pomPath
         LOG.trace("Retrieving pom at '{}' in {} for {}", pomPath, repository, dependencyId)
         val (pomData, pomFile) = retrieveFile(pomPath, repository)
         if (pomData == null) {
-            return ResolvedDependency(dependencyId, emptyList(), repository, true).apply {
+            return ResolvedDependency(dependencyId, emptyList(), repository, true, "File not retrieved").apply {
                 if (pomFile != null) {
-                    putKey(PomFile, pomFile)
+                    putKey(KPomFile, pomFile)
                 }
-                putKey(PomUrlKey, pomUrl)
+                putKey(KPomUrl, pomUrl)
             }
         }
         val pom = Pom()
@@ -352,10 +419,10 @@ internal object Maven2 {
             LOG.warn("Error during parsing {}", pomUrl, se)
             return ResolvedDependency(dependencyId, emptyList(), repository, true, "Malformed xml").apply {
                 if (pomFile != null) {
-                    putKey(PomFile, pomFile)
+                    putKey(KPomFile, pomFile)
                 }
-                putKey(PomData, pomData)
-                putKey(PomUrlKey, pomUrl)
+                putKey(KPomData, pomData)
+                putKey(KPomUrl, pomUrl)
             }
         }
 
@@ -371,7 +438,7 @@ internal object Maven2 {
                 // Create new pom-path
                 val parentPomPath = (pomPath.dropLastWhile { c -> c != '/' } / pomBuilder.parentRelativePath).toString()
                 LOG.trace("Retrieving parent pom of '{}' from relative '{}'", pomPath, parentPomPath)
-                parent = doRetrieveUntranslatedPom(parentPomPath, parentPomId, repository, chain)
+                parent = retrievePom(parentPomId, repository, chain, parentPomPath)
             }
 
             if (parent == null || parent.hasError) {
@@ -379,24 +446,57 @@ internal object Maven2 {
                 parent = DependencyResolver.resolveSingleDependency(parentPomId, chain)
             }
 
-            val parentPom = parent.getKey(PomKey)
+            val parentPom = parent.getKey(KPom)
             if (parent.hasError || parentPom == null) {
                 LOG.warn("Pom at '{}' in {} claims to have a parent, but it has not been found (resolved to {})", pomPath, repository, parent)
             } else {
                 if (!parentPom.packaging.equals("pom", ignoreCase = true)) {
                     LOG.warn("Parent of '{}' in {} has parent with invalid packaging {} (expected 'pom')", pomPath, repository, parentPom.packaging)
                 }
-                pom.assignParent(parentPom)
+                pom.parent = parentPom
+            }
+        }
+
+        pom.translateWithProperties()
+
+        // Resolve <dependencyManagement> <scope>import
+        // http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope
+        //TODO Untested, no known project that uses it
+        pom.dependencyManagement.let { dependencyManagement ->
+            var i = 0
+            while (i < dependencyManagement.size) {
+                val dep = dependencyManagement[i].dependencyId
+                if (!dep.attribute(Repository.M2.Type).equals("pom", ignoreCase = true)
+                        || !dep.attribute(Repository.M2.Scope).equals("import", ignoreCase = true)) {
+                    i++
+                    continue
+                }
+
+                LOG.trace("Resolving dependencyManagement import {} in '{}'", dep, pomPath)
+                val importPom = retrievePom(dep, repository, chain)
+                if (importPom.hasError) {
+                    LOG.warn("dependencyManagement import in {} of {} failed: '{}'", pomPath, dep, importPom.log)
+                }
+
+                dependencyManagement.removeAt(i)
+                val imported = importPom.getKey(KPom)?.dependencyManagement
+                if (imported != null && imported.isNotEmpty()) {
+                    LOG.trace("dependencyManagement of {} imported {} from {}", pomPath, imported, dep)
+
+                    // Specification says, that it should be replaced
+                    dependencyManagement.addAll(i, imported)
+                    i += imported.size
+                }
             }
         }
 
         return ResolvedDependency(dependencyId, emptyList(), repository, false).apply {
             if (pomFile != null) {
-                putKey(PomFile, pomFile)
+                putKey(KPomFile, pomFile)
             }
-            putKey(PomData, pomData)
-            putKey(PomUrlKey, pomUrl)
-            putKey(PomKey, pom)
+            putKey(KPomData, pomData)
+            putKey(KPomUrl, pomUrl)
+            putKey(KPom, pom)
         }
     }
 
@@ -411,8 +511,8 @@ internal object Maven2 {
         private var lastDependencyGroupId = ""
         private var lastDependencyArtifactId = ""
         private var lastDependencyVersion = ""
-        private var lastDependencyExclusions = mutableListOf<DependencyExclusion>()
-        private var lastDependencyAttributes = mutableMapOf<DependencyAttribute, String>()
+        private var lastDependencyExclusions = ArrayList<DependencyExclusion>()
+        private var lastDependencyAttributes = HashMap<DependencyAttribute, String>()
 
         private var lastDependencyExclusionGroupId = ""
         private var lastDependencyExclusionArtifactId = ""
@@ -444,7 +544,7 @@ internal object Maven2 {
             // Version
             if (atElement(ModelVersion)) {
                 if (characters().trim() != SupportedModelVersion) {
-                    throw SAXException("Unsupported modelVersion: " + elementCharacters)
+                    throw SAXException("Unsupported modelVersion: $elementCharacters")
                 }
             }
 
@@ -474,42 +574,53 @@ internal object Maven2 {
                 hasParent = true
             }
 
-            // Dependencies
-            else if (atElement(DependencyGroupId)) {
+            // Dependencies (normal and dependencyManagement)
+            else if (atElement(DependencyGroupId) || atElement(DependencyManagementGroupId)) {
                 lastDependencyGroupId = characters()
-            } else if (atElement(DependencyArtifactId)) {
+            } else if (atElement(DependencyArtifactId) || atElement(DependencyManagementArtifactId)) {
                 lastDependencyArtifactId = characters()
-            } else if (atElement(DependencyVersion)) {
+            } else if (atElement(DependencyVersion) || atElement(DependencyManagementVersion)) {
                 lastDependencyVersion = characters()
-            } else if (atElement(DependencyClassifier)) {
+            } else if (atElement(DependencyClassifier) || atElement(DependencyManagementClassifier)) {
                 lastDependencyAttributes[Repository.M2.Classifier] = characters()
-            } else if (atElement(DependencyOptional)) {
+            } else if (atElement(DependencyOptional) || atElement(DependencyManagementOptional)) {
                 lastDependencyAttributes[Repository.M2.Optional] = characters()
-            } else if (atElement(DependencyScope)) {
+            } else if (atElement(DependencyScope) || atElement(DependencyManagementScope)) {
                 lastDependencyAttributes[Repository.M2.Scope] = characters()
-            } else if (atElement(DependencyType)) {
+            } else if (atElement(DependencyType) || atElement(DependencyManagementType)) {
                 lastDependencyAttributes[Repository.M2.Type] = characters()
             } else if (atElement(Dependency)) {
                 val projectId = DependencyId(lastDependencyGroupId, lastDependencyArtifactId, lastDependencyVersion, attributes = lastDependencyAttributes)
+                val pomDependency = Dependency(projectId, lastDependencyExclusions)
+                pom.dependencies.add(pomDependency)
+
                 lastDependencyGroupId = ""
                 lastDependencyArtifactId = ""
                 lastDependencyVersion = ""
-                lastDependencyAttributes = mutableMapOf()
+                lastDependencyAttributes = HashMap()
 
+                lastDependencyExclusions = ArrayList()
+            } else if (atElement(DependencyManagementDependency)) {
+                val projectId = DependencyId(lastDependencyGroupId, lastDependencyArtifactId, lastDependencyVersion, attributes = lastDependencyAttributes)
                 val pomDependency = Dependency(projectId, lastDependencyExclusions)
-                lastDependencyExclusions = mutableListOf()
+                pom.dependencyManagement.add(pomDependency)
 
-                pom.dependencies.add(pomDependency)
+                lastDependencyGroupId = ""
+                lastDependencyArtifactId = ""
+                lastDependencyVersion = ""
+                lastDependencyAttributes = HashMap()
+
+                lastDependencyExclusions = ArrayList()
             }
 
-            //Dependency exclusions
-            else if (atElement(DependencyExclusionGroupId)) {
+            // Dependency (management) exclusions
+            else if (atElement(DependencyExclusionGroupId) || atElement(DependencyManagementExclusionGroupId)) {
                 lastDependencyExclusionGroupId = characters()
-            } else if (atElement(DependencyExclusionArtifactId)) {
+            } else if (atElement(DependencyExclusionArtifactId) || atElement(DependencyManagementExclusionArtifactId)) {
                 lastDependencyExclusionArtifactId = characters()
-            } else if (atElement(DependencyExclusionVersion)) {
+            } else if (atElement(DependencyExclusionVersion) || atElement(DependencyManagementExclusionVersion)) {
                 lastDependencyExclusionVersion = characters()
-            } else if (atElement(DependencyExclusion)) {
+            } else if (atElement(DependencyExclusion) || atElement(DependencyManagementExclusion)) {
                 lastDependencyExclusions.add(DependencyExclusion(
                         lastDependencyExclusionGroupId, lastDependencyExclusionArtifactId, lastDependencyExclusionVersion))
                 lastDependencyExclusionGroupId = ""
@@ -539,6 +650,7 @@ internal object Maven2 {
             } else if (atElement(RepoLayout)) {
 
             } else if (atElement(Repo)) {
+                //TODO Add support
                 LOG.debug("Pom at {} uses custom repositories, which are not supported yet", pomUrl)
             }
 
@@ -584,10 +696,25 @@ internal object Maven2 {
             val DependencyScope = arrayOf("project", "dependencies", "dependency", "scope")
             val DependencyType = arrayOf("project", "dependencies", "dependency", "type")
 
+            val DependencyManagementDependency = arrayOf("project", "dependencyManagement", "dependencies", "dependency")
+            val DependencyManagementGroupId = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "groupId")
+            val DependencyManagementArtifactId = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "artifactId")
+            val DependencyManagementVersion = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "version")
+            val DependencyManagementClassifier = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "classifier")
+            val DependencyManagementOptional = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "optional")
+            val DependencyManagementScope = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "scope")
+            val DependencyManagementType = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "type")
+
             val DependencyExclusion = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion")
             val DependencyExclusionGroupId = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion", "groupId")
             val DependencyExclusionArtifactId = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion", "artifactId")
             val DependencyExclusionVersion = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion", "version")
+
+            val DependencyManagementExclusion = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "exclusions", "exclusion")
+            val DependencyManagementExclusionGroupId = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "exclusions", "exclusion", "groupId")
+            val DependencyManagementExclusionArtifactId = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "exclusions", "exclusion", "artifactId")
+            val DependencyManagementExclusionVersion = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "exclusions", "exclusion", "version")
+
 
             val Property = arrayOf("project", "properties")
 
@@ -599,10 +726,6 @@ internal object Maven2 {
             val RepoUrl = arrayOf("project", "repositories", "repository", "url")
             val RepoLayout = arrayOf("project", "repositories", "repository", "layout")
         }
-    }
-
-    private fun DependencyId.pomPath(): String {
-        return Maven2.pomPath(group, name, version)
     }
 
     private fun DependencyId.artifactPath(extension: String): String {
