@@ -1,8 +1,9 @@
-.DS_Store
-.idea
-target/
-**/build/cache/
-**/build/logs/
+
+# Wemi supporting folders
+**/build/*/
+
+# Wemi result jars
 **/build/*.jar
-**/build/assembly/
+
+# IDE
 /classes
