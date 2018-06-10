@@ -83,9 +83,9 @@ private val LOG = LoggerFactory.getLogger("Directives")
  *
  * Directives are file annotations from Directives file, such as [BuildDependency].
  *
- * Matches: `@file:<wemi.boot.>BuildAnnotation(...)`
+ * Matches: `@file:<wemi.boot.>BuildAnnotation(...)` optionally with trailing line comment
  */
-private val DirectiveRegex = "\\s*@file\\s*:\\s*(?:wemi\\s*\\.\\s*boot\\s*\\.\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\((.*)\\)\\s*".toRegex()
+private val DirectiveRegex = "\\s*@file\\s*:\\s*(?:wemi\\s*\\.\\s*boot\\s*\\.\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\((.*)\\)\\s*(?://)?.*".toRegex()
 
 /**
  * Matches single, optionally named, argument, passed into the [DirectiveRegex] constructor.
