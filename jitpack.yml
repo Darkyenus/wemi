@@ -3,7 +3,6 @@
 jdk:
   - oraclejdk8
 install:
-   - java -jar wemi "pluginJvmHotswap/jitpackBuild:publish"
-   - cp -a jitpack-out/ ~/.m2/repository/
+   - java -jar wemi "pluginJvmHotswap/jitpackBuild:publish" && cp -a jitpack-out/ ~/.m2/repository/
 env:
    WEMI_COLOR: "false"
