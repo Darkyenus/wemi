@@ -19,6 +19,8 @@ import java.util.ArrayList;
  */
 public class AgentMain {
 
+    private static final String HOTSWAP_ITERATION_PROPERTY = "wemi.hotswap.iteration";
+
     /**
      * Called as an entry-point by JVM when attached at startup, with -javaagent switch.
      */
@@ -45,18 +47,18 @@ public class AgentMain {
 
     private static void initialize(String argumentArgs, final Instrumentation inst){
         final int port = Integer.parseInt(argumentArgs);
+        System.setProperty(HOTSWAP_ITERATION_PROPERTY, "0");
 
         final Thread changeThread = new Thread("Hotswap listening thread"){
             @Override
             public void run() {
-                try {
-                    final Socket socket = new Socket(InetAddress.getLoopbackAddress(), port);
-
+                try (final Socket socket = new Socket(InetAddress.getLoopbackAddress(), port)) {
                     log("Attached and listening on port "+port);
 
                     final DataInputStream in = new DataInputStream(socket.getInputStream());
 
                     ArrayList<ClassDefinition> pendingChanges = new ArrayList<>();
+                    int iteration = 0;
 
                     while(socket.isConnected() && !socket.isClosed()){
                         final String fileString;
@@ -80,6 +82,7 @@ public class AgentMain {
                         } else {
                             try {
                                 inst.redefineClasses(pendingChanges.toArray(new ClassDefinition[0]));
+                                System.setProperty(HOTSWAP_ITERATION_PROPERTY, Integer.toString(++iteration));
                             } catch (ClassNotFoundException e) {
                                 log("Class for redefinition not found", e);
                             } catch (UnmodifiableClassException e) {
@@ -89,10 +92,6 @@ public class AgentMain {
                             }
                         }
                     }
-
-                    try {
-                        socket.close();
-                    } catch (Exception ignored) {}
                 } catch (IOException e) {
                     log("Hotswap listening thread crashed", e);
                 }

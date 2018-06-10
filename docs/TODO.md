@@ -10,8 +10,6 @@
 
 - Hotswapping jvm code:
 	- Test plugin and continue working on it
-	- Set env variable or java property of the process that is being hotswapped and change it after every hotswap, so the process can reinitialize what is needed
-	- WEMI DOES NOT UNBIND!!!
 
 - Make jitpack builds work
 	- https://jitpack.io/docs/#publishing-on-jitpack

@@ -14,7 +14,6 @@ class JvmHotswapPluginEnvironment : PluginEnvironment {
 
         Archetypes::JVMBase.inject {
             JvmHotswap.runHotswap set JvmHotswap.Defaults.RunHotswap
-            JvmHotswap.hotswapAgentPort set { 5015 }
         }
     }
 

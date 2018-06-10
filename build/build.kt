@@ -188,8 +188,8 @@ fun createKotlinCompilerProject(version:String):Project {
  */
 @Suppress("unused")
 val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
-    projectName set { "wemi-plugin-jvm-hotswap" }
     projectGroup set { WemiGroup }
+    projectName set { "wemi-plugin-jvm-hotswap" }
     projectVersion set { WemiVersion }
 
     extend(compiling) {
