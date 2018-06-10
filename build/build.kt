@@ -213,15 +213,13 @@ val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
 }
 
 val jitpackBuild by configuration("Used when building for Jitpack") {
-    if (System.getenv("JITPACK") != "true") {
-        System.err.println("Using jitpackBuild but environment variables are probably not set!")
-    } else {
+    if (System.getenv("JITPACK") == "true") {
         for ((key, value) in System.getenv()) {
             System.err.println("%20s: %s".format(key, value))
         }
-    }
 
-    projectGroup modify { System.getenv("GROUP") ?: it }
-    // Artifact name must be static
-    projectVersion modify { System.getenv("VERSION") ?: it }
+        projectGroup modify { System.getenv("GROUP") ?: it }
+        // Artifact name must be static
+        projectVersion modify { System.getenv("VERSION") ?: it }
+    }
 }
