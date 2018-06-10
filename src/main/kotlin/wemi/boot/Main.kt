@@ -392,13 +392,21 @@ private fun prepareBuildScriptProject(allowBrokenBuildScripts:Boolean, askUser:B
                 try {
                     project.evaluate { Keys.compile.get() }
                     project
-                } catch (ce: WemiException.CompilationException) {
-                    if (allowBrokenBuildScripts) {
-                        LOG.warn("Build script failed to compile")
-                    } else if (!askUser) {
-                        LOG.error("Build script failed to compile")
+                } catch (ce: WemiException) {
+                    val message = ce.message
+                    if (ce.showStacktrace || message == null || message.isBlank()) {
+                        LOG.error("Build script failed to compile", ce)
                     } else {
-                        keepTrying = buildScriptsBadAskIfReload("Build script failed to compile")
+                        LOG.error("Build script failed to compile: {}", message)
+                        LOG.debug("Build script failed to compile due to", ce)
+                    }
+
+                    if (!allowBrokenBuildScripts) {
+                        if (!askUser) {
+                            LOG.error("Build script failed to compile")
+                        } else {
+                            keepTrying = buildScriptsBadAskIfReload("Build script failed to compile")
+                        }
                     }
 
                     null
