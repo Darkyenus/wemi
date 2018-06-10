@@ -10,6 +10,7 @@ import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinCompilerVersion
 import wemi.createProject
 import wemi.dependency.JCenter
+import wemi.dependency.Jitpack
 import wemi.publish.InfoNode
 import wemi.util.*
 import java.nio.file.Files
@@ -29,14 +30,14 @@ private const val WemiVersion = "0.4-SNAPSHOT"
  */
 val core:Project by project {
     projectGroup set { WemiGroup }
-    projectName set { "wemi" }
+    projectName set { "wemi-core" }
     projectVersion set { WemiVersion }
 
     kotlinVersion set { KotlinCompilerVersion.Version1_2_21 }
 
     mainClass set { "wemi.boot.MainKt" }
 
-    repositories add { repository("jitpack", "https://jitpack.io") }
+    repositories add { Jitpack }
 
     libraryDependencies set { wSetOf(
             kotlinDependency("stdlib"),
@@ -216,11 +217,11 @@ val jitpackBuild by configuration("Used when building for Jitpack") {
         System.err.println("Using jitpackBuild but environment variables are probably not set!")
     } else {
         for ((key, value) in System.getenv()) {
-            System.err.println("%10s: %s".format(key, value))
+            System.err.println("%20s: %s".format(key, value))
         }
     }
 
     projectGroup modify { System.getenv("GROUP") ?: it }
-    projectName modify { System.getenv("ARTIFACT") ?: it }
+    // Artifact name must be static
     projectVersion modify { System.getenv("VERSION") ?: it }
 }

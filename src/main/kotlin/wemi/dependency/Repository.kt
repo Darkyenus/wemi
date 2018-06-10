@@ -130,6 +130,7 @@ sealed class Repository(val name: String) {
                     checksumFile.checkValidForPublish(snapshot)
 
                     checksumFile.writeText(createHashSum(digest, publishedName))
+                    LOG.debug("Publishing metadata {} to {}", checksum, checksumFile)
                 }
             }
 
@@ -164,7 +165,10 @@ sealed class Repository(val name: String) {
                     checksumFile.checkValidForPublish(snapshot)
 
                     checksumFile.writeText(createHashSum(digest, publishedName))
+                    LOG.debug("Publishing {} {} to {}", publishedArtifact, checksum, checksumFile)
                 }
+
+                LOG.info("Published {} with {} checksum(s)", publishedArtifact, checksums.size)
             }
 
             return pomPath.parent.toUri()
