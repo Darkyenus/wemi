@@ -3,11 +3,12 @@ import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.Keys
 import wemi.assembly.AssemblyOperation
+import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.MergeStrategy
 import wemi.boot.WemiCacheFolder
+import wemi.collections.WMutableList
 import wemi.compile.KotlinCompilerFlags
-import wemi.compile.KotlinCompilerVersion
 import wemi.createProject
 import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
@@ -36,7 +37,7 @@ val core:Project by project {
 
     repositories add { Jitpack }
 
-    libraryDependencies set { wSetOf(
+    libraryDependencies set { setOf(
             kotlinDependency("stdlib"),
             kotlinDependency("reflect"),
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
@@ -95,9 +96,9 @@ val core:Project by project {
                     asOp.addSource(file, true, false)
                 }
 
-                asOp.assembly({ MergeStrategy.Deduplicate }, DefaultRenameFunction, sourcePath, byteArrayOf(), false)
+                asOp.assembly({ MergeStrategy.Deduplicate }, DefaultRenameFunction, DefaultAssemblyMapFilter, sourcePath, byteArrayOf(), false)
 
-                LocatedFile(sourcePath)
+                LocatedPath(sourcePath)
             }
         }
     }
@@ -162,7 +163,13 @@ fun createKotlinCompilerProject(version:String):Project {
     return createProject(projectName.toString(), path("src/main-kotlinc/$version"), Archetypes.JavaKotlinProject) {
 
         extendMultiple(compilingJava, compilingKotlin) {
-            sourceRoots set { wSetOf(projectRoot.get() / "src") }
+            sourceRoots set { setOf(projectRoot.get() / "src") }
+        }
+
+        //TODO Remove, workaround for 0.4 bug
+        resourceRoots set { emptySet() }
+        extend(testing) {
+            resourceRoots set { emptySet() }
         }
 
         extend(compilingKotlin) {
@@ -170,10 +177,10 @@ fun createKotlinCompilerProject(version:String):Project {
         }
 
         projectDependencies set {
-            wSetOf(dependency(core, false))
+            setOf(dependency(core, false))
         }
 
-        libraryDependencies set { wSetOf(
+        libraryDependencies set { setOf(
                 dependency("org.jetbrains.kotlin", "kotlin-compiler", version),
                 dependency("org.slf4j", "slf4j-api", "1.7.25")
         ) }
@@ -188,6 +195,12 @@ val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
     projectGroup set { WemiGroup }
     projectName set { "wemi-plugin-jvm-hotswap" }
     projectVersion set { WemiVersion }
+
+    //TODO Remove, workaround for 0.4 bug
+    resourceRoots set { setOf(projectRoot.get() / "src/main/resources") }
+    extend(testing) {
+        resourceRoots set { emptySet() }
+    }
 
     extend(compiling) {
         projectDependencies add { dependency(core, false) }

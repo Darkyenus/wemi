@@ -1,5 +1,6 @@
 ![WEMI Build System](docs/logo_doc.svg)  
 *Wonders Expeditiously, Mundane Instantly*
+[![](https://jitpack.io/v/Darkyenus/wemi.svg)](https://jitpack.io/#Darkyenus/wemi)
 
 Build system aimed at those, who don't want to be limited nor slowed down by their tools.
 Key features:

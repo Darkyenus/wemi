@@ -2,7 +2,6 @@
 
 package wemi
 
-import path
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.JarMergeStrategyChooser
 import wemi.boot.WemiBuildFolder
@@ -78,9 +77,9 @@ object Archetypes {
      * Implements basic key implementations for JVM that don't usually change.
      */
     val JVMBase by archetype(::Base) {
-        Keys.resourceRoots set { setOf(path("src/main/resources")) }
+        Keys.resourceRoots set { setOf(Keys.projectRoot.get() / "src/main/resources") }
         extend (Configurations.testing) {
-            Keys.resourceRoots add { path("src/test/resources") }
+            Keys.resourceRoots add { Keys.projectRoot.get() / "src/test/resources" }
         }
 
         Keys.sourceRoots setToUnionOfSelfIn { Keys.compilingConfigurations.get() }

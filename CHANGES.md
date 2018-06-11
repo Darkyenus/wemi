@@ -1,4 +1,5 @@
 # 0.5
+- Fix `resourceRoots` not being set according to `projectRoot`
 
 # 0.4 2018-06-12
 - Add hotswap plugin
