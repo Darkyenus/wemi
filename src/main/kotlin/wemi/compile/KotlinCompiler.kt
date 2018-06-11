@@ -55,20 +55,10 @@ enum class KotlinCompilerVersion (
         /** Dependencies needed to load [implementationClassName]. */
         private val compilerDependency:Collection<Dependency>) : JsonWritable {
 
-    Version1_1_4_3(
-            "1.1.4-3",
-            "wemi.compile.impl.KotlinCompilerImpl1_1_4_3",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.4-3"), WemiBundledLibrariesExclude))
-    ),
     Version1_1_61(
             "1.1.61",
             "wemi.compile.impl.KotlinCompilerImpl1_1_61",
             listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.61"), WemiBundledLibrariesExclude))
-    ),
-    Version1_2_20(
-            "1.2.20",
-            "wemi.compile.impl.KotlinCompilerImpl1_2_20",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.20"), WemiBundledLibrariesExclude))
     ),
     Version1_2_21(
             "1.2.21",

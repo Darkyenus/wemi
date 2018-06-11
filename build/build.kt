@@ -16,9 +16,7 @@ import wemi.util.*
 import java.nio.file.Files
 
 val CompilerProjects = listOf(
-        createKotlinCompilerProject("1.1.4-3"),
         createKotlinCompilerProject("1.1.61"),
-        createKotlinCompilerProject("1.2.20"),
         createKotlinCompilerProject("1.2.21"),
         createKotlinCompilerProject("1.2.41")
 )
@@ -33,8 +31,6 @@ val core:Project by project {
     projectGroup set { WemiGroup }
     projectName set { "wemi-core" }
     projectVersion set { WemiVersion }
-
-    kotlinVersion set { KotlinCompilerVersion.Version1_2_21 }
 
     mainClass set { "wemi.boot.MainKt" }
 
