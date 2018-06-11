@@ -221,8 +221,8 @@ val jitpackBuild by configuration("Used when building for Jitpack") {
 
     publishRepository set { repository("local", path("jitpack-out").toUri().toURL().toString()) }
 
-    projectGroup modify { System.getenv("GROUP") ?: it }
+    //projectGroup modify { System.getenv("GROUP") ?: it }
     // Artifact name must be static
-    projectName modify { System.getenv("ARTIFACT") ?: it }
+    //projectName modify { System.getenv("ARTIFACT") ?: it }
     projectVersion modify { System.getenv("VERSION") ?: it }
 }
