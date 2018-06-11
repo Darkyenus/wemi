@@ -187,7 +187,6 @@ fun createKotlinCompilerProject(version:String):Project {
 /**
  * Plugin for hotswapping JVM code at runtime.
  */
-@Suppress("unused")
 val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
     projectGroup set { WemiGroup }
     projectName set { "wemi-plugin-jvm-hotswap" }
@@ -213,16 +212,9 @@ val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
 }
 
 val jitpackBuild by configuration("Used when building for Jitpack") {
-    if (System.getenv("JITPACK") == "true") {
-        for ((key, value) in System.getenv()) {
-            System.err.println("%20s: %s".format(key, value))
-        }
-    }
-
+    // See jitpack.yml
     publishRepository set { repository("local", path("jitpack-out").toUri().toURL().toString()) }
 
-    //projectGroup modify { System.getenv("GROUP") ?: it }
-    // Artifact name must be static
-    //projectName modify { System.getenv("ARTIFACT") ?: it }
+    // For clarity, use the version Jitpack expects
     projectVersion modify { System.getenv("VERSION") ?: it }
 }

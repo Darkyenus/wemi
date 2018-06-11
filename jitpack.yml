@@ -1,11 +1,11 @@
 # See https://jitpack.io/docs/BUILDING/
 
+# Need to publish to a local directory first and then copy the results over to the ~/.m2/repo,
+# for Jitpack to detect it as artifacts.
 jdk:
   - oraclejdk8
 install:
    - java -jar wemi "core/jitpackBuild:publish ; pluginJvmHotswap/jitpackBuild:publish"
-   - cp -va jitpack-out/* ~/.m2/repository/
-   - ls -R ~/.m2/repository/com/darkyen/
-   - ls -R ~/.m2/repository/com/github/Darkyenus/
+   - cp -a jitpack-out/* ~/.m2/repository/
 env:
    WEMI_COLOR: "false"
