@@ -1,7 +1,7 @@
 @file:BuildDependencyRepository("jitpack", "https://jitpack.io")
 @file:BuildDependency("com.github.esotericsoftware:jsonbeans:0.9")
 
-@file:BuildDependency("com.github.Darkyenus", "wemi", "707a992761")//TODO Experimental
+@file:BuildDependency("com.darkyen.wemi", "wemi-plugin-jvm-hotswap", "cd036c9a8d")//TODO Experimental
 
 import wemi.Configurations.compilingKotlin
 import wemi.compile.JavaCompilerFlags

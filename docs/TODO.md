@@ -11,13 +11,9 @@
 - Hotswapping jvm code:
 	- Test plugin and continue working on it
 
-- Make jitpack builds work
-	- https://jitpack.io/docs/#publishing-on-jitpack
-	- https://jitpack.io/docs/BUILDING/#multi-module-projects
-
-- Add system of automatic MANIFEST.MF generation
 - In assembling, handle LIST files and signatures
-- Manifest files seem to have weird wrapping rules
+- Add system of automatic MANIFEST.MF generation
+	- Manifest files seem to have weird wrapping rules
 
 - Create system, to allow automatic caching of key results, when no input keys have changed.
 	- This will need good arbitrary object serialization/comparison - with files serialized as their file/directory/exist info + checksum of files

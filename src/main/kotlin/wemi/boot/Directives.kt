@@ -3,6 +3,7 @@
 package wemi.boot
 
 import org.slf4j.LoggerFactory
+import wemi.WemiVersion
 import java.io.BufferedReader
 
 /**
@@ -20,9 +21,11 @@ internal annotation class DirectiveFields(val value:Array<String>)
  *
  * **NOTE**: These annotations are not parsed by the Kotlin compiler, but by Wemi itself.
  * This places some constraints on their use:
- * - annotations MUST be placed one per line, with nothing else on the line, except for surrounding whitespace
+ * - annotations MUST be placed one per line, with nothing else on the line,
+ *      except for any surrounding whitespace and trailing line comment
  * - single annotation MUST NOT be split across multiple lines
- * - annotations MUST have constructors which contain only plain string arguments, without any escapes
+ * - annotations MUST have constructors which contain only plain string arguments, without any (complex) escapes,
+ *      except for variable "WemiVersion"
  * - annotation constructors MAY contain valid name tags (they will be used to detect argument reordering)
  *
  * @param groupOrFull of the artifact coordinate OR full "group:name:version" for compact form
@@ -91,7 +94,7 @@ private val DirectiveRegex = "\\s*@file\\s*:\\s*(?:wemi\\s*\\.\\s*boot\\s*\\.\\s
  * Matches single, optionally named, argument, passed into the [DirectiveRegex] constructor.
  * Also parses some escape sequences that may appear in the string.
  */
-private val DirectiveConstructorPartRegex = "\\s*(?:([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*)?\"((?:\\\\[tnr\"'\\\\]|[^\"])*)\"\\s*,?".toRegex()
+private val DirectiveConstructorPartRegex = "\\s*(?:([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*)?(\"(?:\\\\[tnr\"'\\\\]|[^\"])*\"|[a-zA-Z_][a-zA-Z0-9_]*)\\s*,?".toRegex()
 
 /**
  * Read [source] as Kotlin file, that may optionally contain [directives] file annotations.
@@ -131,13 +134,27 @@ internal fun parseFileDirectives(source: BufferedReader, directives:Array<Class<
             expectedParameterStart = parameter.range.endInclusive + 1
 
             val name = parameter.groupValues[1]
-            val value = parameter.groupValues[2]
-                    .replace("\\t", "\t")
-                    .replace("\\n", "\n")
-                    .replace("\\r", "\r")
-                    .replace("\\\"", "\"")
-                    .replace("\\'", "'")
-                    .replace("\\\\", "\\")
+            val value = parameter.groupValues[2].let { value ->
+                if (value.length >= 2 && value.startsWith('"')) {
+                    value.substring(1, value.length - 1)
+                            .replace("\\t", "\t")
+                            .replace("\\n", "\n")
+                            .replace("\\r", "\r")
+                            .replace("\\\"", "\"")
+                            .replace("\\'", "'")
+                            .replace("\\\\", "\\")
+                } else {
+                    val wemiVersionName = ::WemiVersion.name
+                    if (value == wemiVersionName) {
+                        WemiVersion
+                    } else {
+                        LOG.warn("{}:{} Invalid directive annotation - unrecognized parameter '{}', only strings and '{}' allowed", source, line, value, wemiVersionName)
+                        return false
+                    }
+                }
+
+            }
+
 
             if (name.isEmpty()) {
                 if (parameterIndex == -1) {
@@ -146,7 +163,6 @@ internal fun parseFileDirectives(source: BufferedReader, directives:Array<Class<
                 }
                 directiveConstructorValues[parameterIndex++] = value
             } else {
-                @Suppress("UNUSED_VALUE")//TODO Remove when bug in plugin flow analyser is fixed
                 parameterIndex = -1
                 val index = directiveClassFieldNames.indexOf(name)
                 if (index < 0) {
