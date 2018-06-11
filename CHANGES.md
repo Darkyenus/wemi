@@ -1,8 +1,8 @@
-# 0.4 2018-06-11
+# 0.4 2018-06-12
+- Add hotswap plugin
 - Add `Lines` and `UniqueLines` MergeStrategy
 - Add `assemblyMapFilter` key for more fine-grained control over assembled files
 - Improve `keys`, `configurations` and `projects` commands by adding a filter parameter to them
-- Add hotswap plugin
 - Add `inspect` command for checking detailed information about keys, including where it is bound, configurations and projects
 - Fix launcher script to be valid bash by requiring bash instead of sh
 - Internal refactorings, some mildly breaking to build scripts
