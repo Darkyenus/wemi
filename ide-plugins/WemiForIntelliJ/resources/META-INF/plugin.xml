@@ -19,6 +19,8 @@
       0.4
       <ul>
         <li>Compatibility with Wemi 0.4</li>
+        <li>Project importing is now possible even with no/broken build scripts</li>
+        <li>Bug-fixes</li>
       </ul>
       0.3
       <ul>

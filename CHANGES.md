@@ -1,5 +1,7 @@
 # 0.4 2018-06-12
 - Add hotswap plugin
+- Add support for Kotlin 1.2.41
+- Remove support for Kotlin 1.1.3-4 and 1.2.20
 - Add `Lines` and `UniqueLines` MergeStrategy
 - Add `assemblyMapFilter` key for more fine-grained control over assembled files
 - Improve `keys`, `configurations` and `projects` commands by adding a filter parameter to them
