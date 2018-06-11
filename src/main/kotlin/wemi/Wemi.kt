@@ -11,7 +11,7 @@ import kotlin.reflect.jvm.isAccessible
 const val WemiVersion = "0.4-SNAPSHOT"
 
 /** Version of Kotlin used for build scripts */
-val WemiKotlinVersion = KotlinCompilerVersion.Version1_2_21
+val WemiKotlinVersion = KotlinCompilerVersion.Version1_2_41
 
 /** Immutable view into the list of loaded [Project]s. */
 val AllProjects: Map<String, Project>

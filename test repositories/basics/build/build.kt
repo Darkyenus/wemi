@@ -26,8 +26,6 @@ val basics by project {
 
     repositories add { repository("jitpack", "https://jitpack.io") }
 
-    kotlinVersion set { wemi.compile.KotlinCompilerVersion.Version1_2_21 }
-
     libraryDependencies add { dependency("org.slf4j:slf4j-api:1.7.22") }
     libraryDependencies add { dependency("com.github.Darkyenus:tproll:v1.2.4") }
     libraryDependencies add { dependency("com.h2database:h2:1.4.196") }
