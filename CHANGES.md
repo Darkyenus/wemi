@@ -1,5 +1,18 @@
-# 0.4
+# 0.4 2018-06-11
 - Add `Lines` and `UniqueLines` MergeStrategy
+- Add `assemblyMapFilter` key for more fine-grained control over assembled files
+- Improve `keys`, `configurations` and `projects` commands by adding a filter parameter to them
+- Add hotswap plugin
+- Add `inspect` command for checking detailed information about keys, including where it is bound, configurations and projects
+- Fix launcher script to be valid bash by requiring bash instead of sh
+- Internal refactorings, some mildly breaking to build scripts
+	- WCollections no longer needed, used only internally
+	- Build script is now exposed as project, not configuration
+- Build script directives are now annotation based, instead of line command based
+- Harden key binding resolution and fix result caching by simplifying it
+- Importing to IDE is now possible even with no/broken build scripts
+- Partial support of <dependencyManagement> of Maven poms
+- Buildable using jitpack.io (see jitpack.yml for use in your own projects)
 
 # 0.3 2018-04-08
 - **Change CLI options to follow GNU standard, including long/short options and `--help`/`--version` convention.**

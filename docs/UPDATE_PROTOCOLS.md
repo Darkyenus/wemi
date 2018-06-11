@@ -2,7 +2,7 @@
 
 # Wemi Version update
 1. Change versions in
-	- [BuildScript](../build/build.wemi.kt)
+	- [BuildScript](../build/build.kt)
 	- [Wemi](../src/main/kotlin/wemi/Wemi.kt)
 	- [IDEA plugin](../ide-plugins/WemiForIntelliJ/resources/META-INF/plugin.xml)
 2. Update changes in
@@ -14,7 +14,7 @@
 6. Update wemi used by Wemi, update build script, if needed, commit and push
 
 # New Kotlin Version
-1. Add it to [CompilerProjects in build script](../build/build.wemi.kt)
+1. Add it to [CompilerProjects in build script](../build/build.kt)
 2. Create relevant [plugin interface project](../src/main-kotlinc)
 3. Add it to [KotlinCompilerVersion enum](../src/main/kotlin/wemi/compile/KotlinCompiler.kt)
 4. Consider bumping up the [WemiKotlinVersion used for build scripts](../src/main/kotlin/wemi/Wemi.kt).
