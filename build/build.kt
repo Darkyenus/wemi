@@ -126,6 +126,8 @@ val core:Project by project {
                 "2017"
                 )
     }
+
+    run set { println("This is not a good idea"); -1 }
 }
 
 fun setupSharedPublishMetadata(metadata:InfoNode, name:String, description:String, inceptionYear:String): InfoNode {

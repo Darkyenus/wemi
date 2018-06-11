@@ -5,9 +5,10 @@ but watches for changes to sources and automatically recompiles when something c
 into the running process.
 
 ```kotlin
+// Add before imports
+@file:BuildDependencyRepository("jitpack", "https://jitpack.io/")
 @file:BuildDependency("com.darkyen.wemi", "wemi-plugin-jvm-hotswap", WemiVersion)
 ```
-TODO: Not published anywhere yet
 
 ## How it works
 - `wemiplugin.jvmhotswap.Keys.runHotswap`
