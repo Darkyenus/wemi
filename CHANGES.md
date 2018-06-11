@@ -1,3 +1,5 @@
+# 0.5
+
 # 0.4 2018-06-12
 - Add hotswap plugin
 - Add support for Kotlin 1.2.41
