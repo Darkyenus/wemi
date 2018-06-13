@@ -96,6 +96,18 @@ internal object Maven2 {
         val dependencies = ArrayList<Dependency>()
         val dependencyManagement = ArrayList<Dependency>()
 
+        private inline fun <T> get(getter:Pom.()->T?):T? {
+            var pom = this
+            while (true) {
+                val element = pom.getter()
+                if (element == null) {
+                    pom = pom.parent ?: return null
+                } else {
+                    return element
+                }
+            }
+        }
+
         private fun String.translate(): String {
             if (!startsWith("\${", ignoreCase = false) || !endsWith('}', ignoreCase = false)) {
                 return this
@@ -129,9 +141,9 @@ internal object Maven2 {
             if (key.startsWith("project.")) {
                 val project = when (key) {
                     "project.modelVersion" -> SupportedModelVersion
-                    "project.groupId" -> groupId ?: ""
-                    "project.artifactId" -> artifactId ?: ""
-                    "project.version" -> version ?: ""
+                    "project.groupId" -> get { groupId } ?: ""
+                    "project.artifactId" -> get { artifactId } ?: ""
+                    "project.version" -> get { version } ?: ""
                     "project.packaging" -> packaging
                     else -> {
                         LOG.warn("Unreliable Pom resolution: property '{}' not resolved - this project.* property is not supported", key)
