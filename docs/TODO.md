@@ -1,5 +1,7 @@
 # Things to do next
 
+- Remove as much exceptions from the project as possible
+
 - Maven dependency resolution improvements:
 	- <profiles> support
 		- https://dzone.com/articles/maven-profile-best-practices
@@ -7,9 +9,6 @@
 	- Transitive dependencies are not yet affected by dependencyManagement
 		- https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management
 		- https://www.davidjhay.com/maven-dependency-management/
-
-- Hotswapping jvm code:
-	- Test plugin and continue working on it
 
 - In assembling, handle LIST files and signatures
 - Add system of automatic MANIFEST.MF generation

@@ -12,21 +12,24 @@ class WemiExecutionSettings(val wemiLauncher: String,
                             val javaVmExecutable:String,
                             val downloadDocs:Boolean,
                             val downloadSources:Boolean,
-                            val prefixConfigurations:String,
-                            val projectName:String?) : ExternalSystemExecutionSettings() {
+                            private val prefixConfigurations:String,
+                            val projectName:String?,
+                            val allowBrokenBuildScripts:Boolean) : ExternalSystemExecutionSettings() {
 
     constructor(wemiLauncher: WemiLauncher,
                 javaVmExecutable: String,
                 downloadDocs: Boolean,
                 downloadSources: Boolean,
                 prefixConfigurations: String,
-                projectName: String?):this(
+                projectName: String?,
+                allowBrokenBuildScripts:Boolean):this(
             wemiLauncher.file,
             javaVmExecutable,
             downloadDocs,
             downloadSources,
             prefixConfigurations,
-            projectName)
+            projectName,
+            allowBrokenBuildScripts)
 
     val launcher:WemiLauncher
         get() = WemiLauncher(wemiLauncher)

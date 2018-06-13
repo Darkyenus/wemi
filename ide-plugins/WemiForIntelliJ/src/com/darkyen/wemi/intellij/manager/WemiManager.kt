@@ -95,7 +95,10 @@ class WemiManager : ExternalSystemUiAware,
                     projectSettings?.downloadDocs ?: true,
                     projectSettings?.downloadSources ?: true,
                     projectSettings?.prefixConfigurations ?: "",
-                    null //TODO
+                    null, //TODO
+                    // Broken scripts are allowed only on first project import,
+                    // this seems to be a good heuristic to detect that
+                    projectSettings?.modules?.isEmpty() ?: true
                     )
         }
     }
