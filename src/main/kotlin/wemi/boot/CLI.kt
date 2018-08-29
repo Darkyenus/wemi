@@ -427,8 +427,6 @@ object CLI {
                         print(formatLabel("  Default value: "))
                         println(formatValue(key.defaultValue.toString()))
                     }
-                    print(formatLabel("  Cache mode: "))
-                    println(formatValue(if (key.cacheMode == null) "<never cached>" else key.cacheMode.toString()))
                     if (key.inputKeys.isNotEmpty()) {
                         println(formatLabel("  Input keys:"))
                         for ((inputKey, description) in key.inputKeys) {

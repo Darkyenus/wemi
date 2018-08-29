@@ -67,11 +67,10 @@ private val NO_INPUT_KEYS = emptyArray<Pair<InputKey, InputKeyDescription>>()
  * @param defaultValue of the key, used when no binding exists. NOTE: Default value is NOT LAZY like standard binding!
  *          This same instance will be returned on each return, in every scope, so it MUST be immutable!
  *          Recommended to be used only for keys of [Collection]s with empty immutable default.
- * @param cacheMode describes how the key's evaluation result should be cached, null if it should not be cached
  * @param inputKeys
  */
-fun <Value> key(description: String, defaultValue: Value, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
-    return KeyDelegate(description, true, defaultValue, cacheMode, inputKeys, prettyPrinter)
+fun <Value> key(description: String, defaultValue: Value, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+    return KeyDelegate(description, true, defaultValue, inputKeys, prettyPrinter)
 }
 
 /**
@@ -79,8 +78,8 @@ fun <Value> key(description: String, defaultValue: Value, cacheMode: KeyCacheMod
  *
  * @see [key] with default value for exact documentation
  */
-fun <Value> key(description: String, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
-    return KeyDelegate(description, false, null, cacheMode, inputKeys, prettyPrinter)
+fun <Value> key(description: String, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+    return KeyDelegate(description, false, null, inputKeys, prettyPrinter)
 }
 
 /**
@@ -204,5 +203,5 @@ fun repository(name: String, url: String, checksum: Repository.M2.Checksum = Rep
  * - And more, see http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.jetbrains.kotlin%22
  */
 fun Scope.kotlinDependency(name: String): Dependency {
-    return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-" + name, Keys.kotlinVersion.get().string, MavenCentral))
+    return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-$name", Keys.kotlinVersion.get().string, MavenCentral))
 }

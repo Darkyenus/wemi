@@ -38,15 +38,11 @@ class Key<Value> internal constructor(
          */
         internal val defaultValue: Value?,
         /**
-         * Mode in which the result of this key's evaluation should be cached by the scope in which it was evaluated.
-         */
-        internal val cacheMode: KeyCacheMode<Value>?,
-        /**
          * Input keys that are used by this key.
          * Used only for documentation and CLI purposes (autocomplete).
          * @see [Input]
          */
-        internal val inputKeys:Array<Pair<InputKey, InputKeyDescription>>,
+        internal val inputKeys: Array<Pair<InputKey, InputKeyDescription>>,
         /**
          * Optional function that can convert the result of this key's evaluation to a more readable
          * or more informative string.
@@ -85,7 +81,6 @@ class Key<Value> internal constructor(
             field("name", name)
             field("description", description)
             field("hasDefaultValue", hasDefaultValue)
-            field("cached", cacheMode != null)
         }
     }
 }
@@ -225,7 +220,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
      * Keys can be evaluated only inside the [action].
      *
      * @param configurations that should be applied to this [Project]'s [Scope] before [action] is run in it.
-     *          It is equivalent to calling [Scope.using] directly in the [action], but more efficient.
+     *          It is equivalent to calling [Scope.using] directly in the [action], but more convenient.
      */
     inline fun <Result> evaluate(vararg configurations:Configuration, action:Scope.()->Result):Result {
         try {
@@ -248,7 +243,6 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         @Volatile
         private var currentlyEvaluatingThread:Thread? = null
         private var currentlyEvaluatingNestLevel = 0
-        internal val currentlyEvaluatingProjects = ArrayList<Project>()
 
         /**
          * Prepare to evaluate some keys.
@@ -274,11 +268,6 @@ class Project internal constructor(val name: String, internal val projectRoot: P
                 }
             }
 
-            // Add project, whose scope's cache will be cleared later
-            if (!currentlyEvaluatingProjects.contains(project)) {
-                currentlyEvaluatingProjects.add(project)
-            }
-
             // Prepare scope to use
             var scope = project.projectScope
             if (configurationsArray != null) {
@@ -300,19 +289,6 @@ class Project internal constructor(val name: String, internal val projectRoot: P
             currentlyEvaluatingNestLevel--
             assert(currentlyEvaluatingNestLevel >= 0)
             if (currentlyEvaluatingNestLevel == 0) {
-                // Time to cleanup the cache
-                val cleanupStartTime = System.nanoTime()
-                var purgedCount = 0
-
-                for (project in currentlyEvaluatingProjects) {
-                    purgedCount += project.projectScope.cleanCache(false)
-                }
-                currentlyEvaluatingProjects.clear()
-
-                // Cleanup used keys
-                val cleanupDuration = System.nanoTime() - cleanupStartTime
-                activeKeyEvaluationListener?.postEvaluationCleanup(purgedCount, cleanupDuration)
-
                 // Release the thread lock
                 synchronized(this@Companion) {
                     assert(currentlyEvaluatingThread == Thread.currentThread())
@@ -370,31 +346,12 @@ class Scope internal constructor(
 
     private val configurationScopeCache: MutableMap<Configuration, Scope> = java.util.HashMap()
 
-    private var valueCache: MutableMap<Key<*>, Any?>? = null
-
     private inline fun traverseHoldersBack(action: (BindingHolder) -> Unit) {
         var scope = this
         while (true) {
             scope.scopeBindingHolders.forEach(action)
             scope = scope.scopeParent ?: break
         }
-    }
-
-    private fun modifiesKeys(key:Key<*>, keys: Collection<Key<*>>):Boolean {
-        //TODO This may be slow
-        for (holder in scopeBindingHolders) {
-            val keyBindings = holder.binding
-            val keyModifiers = holder.modifierBindings
-            if (keyBindings.containsKey(key) || keyModifiers.containsKey(key)) {
-                return true
-            }
-            for (k in keys) {
-                if (keyBindings.containsKey(k) || keyModifiers.containsKey(k)) {
-                    return true
-                }
-            }
-        }
-        return false
     }
 
     private fun addReverseExtensions(to:ArrayList<BindingHolder>, of:BindingHolder) {
@@ -497,48 +454,19 @@ class Scope internal constructor(
         return scopeFor(anonConfig).action()
     }
 
-    /**
-     * Returns validated value from cache or null if no such value from this scope exists.
-     */
-    private fun <Value> getCached(key: Key<Value>):Value? {
-        val cache = valueCache ?: return null
-        @Suppress("UNCHECKED_CAST")
-        val cachedValue:Value = cache[key] as Value? ?: return null
-
-        // Small circus to force correct receivers without large amount of fuss
-        if (key.cacheMode!!.run { isCacheValid(true, cachedValue) }) {
-            return cachedValue
-        } else {
-            // Remove cached value
-            cache.remove(key)
-            return null
-        }
-    }
-
     private fun <Value : Output, Output> getKeyValue(key: Key<Value>, otherwise: Output, useOtherwise: Boolean): Output {
         val listener = activeKeyEvaluationListener
 
         listener?.keyEvaluationStarted(this, key)
 
-        // Check the cache
-        val cacheMode = key.cacheMode
-        if (cacheMode != null) {
-            // Search self
-            val cachedValue = getCached(key)
-            if (cachedValue != null) {
-                listener?.keyEvaluationSucceeded(key, this, null, cachedValue, false)
-                return cachedValue
-            }
-        }
-
-        // Nothing found in cache, evaluate
+        // Evaluate
         var foundValue: Value? = key.defaultValue
         var foundValueValid = key.hasDefaultValue
-        var foundValueIsDefault = true
         var holderOfFoundValue:BindingHolder? = null
         val allModifiersReverse: ArrayList<BoundKeyValueModifier<Value>> = ArrayList()
 
         var scope: Scope? = this
+        var cached = false
 
         searchForValue@ while (scope != null) {
             // Retrieve the holder
@@ -556,11 +484,11 @@ class Scope internal constructor(
                     }
                 }
 
-                val lazyValue = holder.binding[key] as BoundKeyValue<Value>?
-                if (lazyValue != null) {
+                val boundValue = holder.binding[key] as BoundKeyValue<Value>?
+                if (boundValue != null) {
                     // Unpack the value
                     try {
-                        foundValue = lazyValue()
+                        foundValue = boundValue()
                     } catch (t:Throwable) {
                         try {
                             listener?.keyEvaluationFailedByError(t, true)
@@ -570,9 +498,12 @@ class Scope internal constructor(
                         throw t
                     }
 
+                    if (boundValue is CachedBoundValue) {
+                        cached = true
+                    }
+
                     holderOfFoundValue = holder
                     foundValueValid = true
-                    foundValueIsDefault = false
                     break@searchForValue
                 }
             }
@@ -588,7 +519,6 @@ class Scope internal constructor(
             try {
                 for (i in allModifiersReverse.indices.reversed()) {
                     result = allModifiersReverse[i].invoke(this, result)
-                    foundValueIsDefault = false
                 }
             } catch (t:Throwable) {
                 try {
@@ -599,19 +529,8 @@ class Scope internal constructor(
                 throw t
             }
 
-            // Store in cache if this key is cached and if it isn't default value
-            if (cacheMode != null && !foundValueIsDefault) {
-                val cache = valueCache ?: run {
-                    val cache = HashMap<Key<*>, Any?>()
-                    this.valueCache = cache
-                    cache
-                }
-
-                cache[key] = result
-                listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, true)
-            } else {
-                listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, false)
-            }
+            // Done
+            listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, cached)
 
             return result
         }
@@ -663,56 +582,17 @@ class Scope internal constructor(
     }
 
     /**
-     * Forget cached values, that would be removed after the full task evaluation.
-     *
-     * This is useful when key binding wants to emulate launching given key repeatedly,
-     * for example when compiling the same code multiple times.
-     *
-     * @param thisScopeTreeOnly if only scopes of this scope tree should be cleared,
-     * or (false) if all evaluation roots should get cleared.
-     */
-    fun cleanEvaluationCache(thisScopeTreeOnly:Boolean) {
-        if (thisScopeTreeOnly) {
-            var scope = this
-            while (true) {
-                scope = scope.scopeParent ?: break
-            }
-            scope.cleanCache(false)
-        } else {
-            for (project in Project.currentlyEvaluatingProjects) {
-                project.projectScope.cleanCache(false)
-            }
-        }
-    }
-
-    /**
      * Forget cached values stored in this and descendant caches.
      *
      * @return amount of values forgotten
-     * @see Key.cacheMode
      */
-    internal fun cleanCache(everything:Boolean): Int {
-        var sum = configurationScopeCache.values.sumBy { it.cleanCache(everything) }
-        val valueCache = valueCache
+    internal fun cleanCache(): Int {
+        var sum = configurationScopeCache.values.sumBy { it.cleanCache() }
 
-        if (valueCache == null || valueCache.isEmpty()) {
-            return sum
-        }
-
-        if (everything) {
-            sum += valueCache.size
-            this.valueCache = null
-        } else {
-            val iterator = valueCache.entries.iterator()
-            while (iterator.hasNext()) {
-                val (key, value) = iterator.next()
-
-                @Suppress("UNCHECKED_CAST")
-                val cacheMode: KeyCacheMode<Any?> = key.cacheMode as KeyCacheMode<Any?>
-                val cacheValid = cacheMode.run { isCacheValid(false, value) }
-
-                if (!cacheValid) {
-                    iterator.remove()
+        for (holder in scopeBindingHolders) {
+            for (value in holder.binding.values) {
+                if (value is CachedBoundValue) {
+                    value.clearCache()
                     sum++
                 }
             }
@@ -1127,14 +1007,6 @@ interface WemiKeyEvaluationListener {
      * @param fromKey if true, the evaluation of key threw the exception, if false it was one of the modifiers
      */
     fun keyEvaluationFailedByError(exception:Throwable, fromKey:Boolean)
-
-    /**
-     * [Project.evaluate] has ended and cached values were cleaned
-     *
-     * @param valuesCleaned how many items were purged from cache
-     * @param durationNs how many nanoseconds did the cleaning take
-     */
-    fun postEvaluationCleanup(valuesCleaned:Int, durationNs:Long)
 }
 
 /**
@@ -1161,7 +1033,7 @@ interface KeyCacheMode<in Value> {
 /**
  * Special [BoundKeyValue] for values that should be evaluated only once per whole binding,
  * regardless of Scope. Use only for values with no dependencies on any modifiable input.
- * @see Lazy for values that are in this nature, but their computation is not trivial
+ * @see LazyStatic for values that are in this nature, but their computation is not trivial
  */
 class Static<Value>(private val value:Value) : (Scope) -> Value {
     override fun invoke(ignored: Scope): Value = value
@@ -1171,7 +1043,7 @@ class Static<Value>(private val value:Value) : (Scope) -> Value {
  * Special [BoundKeyValue] for values that should be evaluated only once, but lazily.
  * Similar to [Static] in nature of supported values.
  */
-class Lazy<Value>(generator:()->Value) : (Scope) -> Value {
+class LazyStatic<Value>(generator:()->Value) : (Scope) -> Value {
     private var generator:(()->Value)? = generator
     private var cachedValue:Value? = null
 
@@ -1188,6 +1060,122 @@ class Lazy<Value>(generator:()->Value) : (Scope) -> Value {
         }
         return value
     }
+}
+
+interface CachedBoundValue {
+    fun clearCache()
+}
+
+class CachedBy<Value, By>(private val byKey:Key<By>, private val valueProducer:(By)->Value) : (Scope) -> Value {
+
+    private val cache = ArrayMap<By, Value>()
+
+    override fun invoke(scope: Scope): Value {
+        val byValue = scope.run {
+            byKey.get()
+        }
+
+        return cache.getOrPut(byValue) {
+            valueProducer(byValue)
+        }
+    }
+}
+
+class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value) : (Scope) -> Value {
+
+    internal val cacheByScope = HashMap<Scope, CacheEntry<*>>()
+
+    override fun invoke(scope: Scope): Value {
+        return valueProducer.invoke(CachedEvaluation(scope, cacheByScope))
+    }
+
+    @CacheDsl
+    class CachedEvaluation<Value> internal constructor(private val scope:Scope, private val cacheByScope:MutableMap<Scope, CacheEntry<*>>) {
+
+        private val cacheEntry = CacheEntry<Value>()
+
+        /** @see Scope.get */
+        fun <Value> Key<Value>.get(): Value {
+            return scope.run {
+                this@get.get().also {
+                    cacheEntry.usedKey(this@get, it)
+                }
+            }
+        }
+
+        /** @see Scope.getOrElse */
+        fun <Value : Else, Else> Key<Value>.getOrElse(unset: Else): Else {
+            return scope.run {
+                this@getOrElse.getOrElse(unset).also {
+                    cacheEntry.usedKey(this@getOrElse, it)
+                }
+            }
+        }
+
+        /** @see Scope.getOrNull */
+        fun <Value> Key<Value>.getOrNull(): Value? {
+            return scope.run {
+                this@getOrNull.getOrNull().also {
+                    cacheEntry.usedKey(this@getOrNull, it)
+                }
+            }
+        }
+
+        /**
+         * Looks at values currently bound and
+         */
+        @PublishedApi
+        internal fun getCachedResult():Any? {
+            for (value in cacheByScope.values) {
+                if (value == cacheEntry) {
+                    return value.cachedValue
+                }
+            }
+            return EvaluatingCached
+        }
+
+        @PublishedApi
+        internal fun cacheResult(newResultToCache:Value) {
+            cacheEntry.cachedValue = newResultToCache
+            cacheByScope[scope] = cacheEntry
+        }
+
+        inline fun produce(producer:EvaluatingCached.()->Value):Value {
+            val cachedResult = getCachedResult()
+            if (cachedResult !== EvaluatingCached) {
+                @Suppress("UNCHECKED_CAST")
+                return cachedResult as Value
+            }
+
+            val newResult = producer.invoke(EvaluatingCached)
+            cacheResult(newResult)
+            return newResult
+        }
+    }
+
+    internal class CacheEntry<Value> : ArrayMap<Key<*>, Any?>() {
+        var cachedValue:Value? = null
+
+        fun usedKey(key: Key<*>, value: Any?) {
+            when (value is List<*>) {
+
+            }
+
+            this[key] = value
+        }
+    }
+
+    @Retention(AnnotationRetention.SOURCE)
+    @Target(AnnotationTarget.CLASS, AnnotationTarget.TYPE)
+    @DslMarker
+    private annotation class CacheDsl
+
+    /**
+     * Special receiver used in [CachedEvaluation.produce] to disallow accessing [CachedEvaluation.get] methods.
+     */
+    /* Also used as an unique value returned by [CachedEvaluation.getCachedResult] to signify that cache is empty. */
+    @CacheDsl
+    object EvaluatingCached
 }
 
 /**

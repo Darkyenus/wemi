@@ -202,7 +202,7 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
         if (buildScriptInfo != null) {
             Keys.repositories set Static(buildScriptInfo.repositories)
             Keys.libraryDependencies set Static(buildScriptInfo.dependencies)
-            Keys.unmanagedDependencies set Lazy {
+            Keys.unmanagedDependencies set LazyStatic {
                 val dependencies = WMutableList<LocatedPath>()
                 for (unmanagedDependency in buildScriptInfo.unmanagedDependencies) {
                     dependencies.add(LocatedPath(unmanagedDependency))

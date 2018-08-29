@@ -84,11 +84,16 @@ object KeyDefaults {
         }
 
 
-    val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<DependencyId, ResolvedDependency>>> = {
+    val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<DependencyId, ResolvedDependency>>> = Cached {
         val repositories = Keys.repositoryChain.get()
-        val resolved = mutableMapOf<DependencyId, ResolvedDependency>()
-        val complete = DependencyResolver.resolve(resolved, Keys.libraryDependencies.get(), repositories, Keys.libraryDependencyProjectMapper.get())
-        Partial(resolved, complete)
+        val libraryDependencies = Keys.libraryDependencies.get()
+        val libraryDependencyProjectMapper = Keys.libraryDependencyProjectMapper.get()
+
+        produce {
+            val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
+            val complete = DependencyResolver.resolve(resolved, libraryDependencies, repositories, libraryDependencyProjectMapper)
+            Partial(resolved, complete)
+        }
     }
 
     private val ResolveProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
@@ -169,7 +174,7 @@ object KeyDefaults {
         }
 
         for ((_, project) in AllProjects) {
-            clearedCount += project.projectScope.cleanCache(true)
+            clearedCount += project.projectScope.cleanCache()
         }
 
         clearedCount
@@ -637,8 +642,7 @@ object KeyDefaults {
      * When java is run from "jre" part of the JDK install, "tools.jar" is not in the classpath by default.
      * This can locate the tools.jar in [Keys.javaHome] for explicit loading.
      */
-    private fun Scope.jdkToolsJar():Path? {
-        val javaHome = Keys.javaHome.get()
+    private fun jdkToolsJar(javaHome:Path):Path? {
         return javaHome.resolve("lib/tools.jar").takeIf { it.exists() }
                 ?: (if (javaHome.name == "jre") javaHome.resolve("../lib/tools.jar").takeIf { it.exists() } else null)
     }
@@ -708,7 +712,7 @@ object KeyDefaults {
             fileManager.setLocation(DocumentationTool.Location.DOCUMENTATION_OUTPUT, listOf(javadocOutput.toFile()))
 
             // Try to specify doclet path explicitly
-            val toolsJar = jdkToolsJar()
+            val toolsJar = jdkToolsJar(Keys.javaHome.get())
 
             if (toolsJar != null) {
                 fileManager.setLocation(DocumentationTool.Location.DOCLET_PATH, listOf(toolsJar.toFile()))
@@ -783,11 +787,11 @@ object KeyDefaults {
 
     private val DokkaFatJar = listOf(Dependency(DependencyId("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", JCenter), WemiBundledLibrariesExclude))
 
-    val ArchiveDokkaInterface: BoundKeyValue<DokkaInterface> = {
+    val ArchiveDokkaInterface: BoundKeyValue<DokkaInterface> = CachedBy(Keys.javaHome) { javaHome ->
         val artifacts = DependencyResolver.resolveArtifacts(DokkaFatJar, emptyList())?.toMutableList()
                 ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
-        jdkToolsJar()?.let { artifacts.add(it) }
+        jdkToolsJar(javaHome)?.let { artifacts.add(it) }
 
         ARCHIVE_DOKKA_LOG.trace("Classpath for Dokka: {}", artifacts)
 

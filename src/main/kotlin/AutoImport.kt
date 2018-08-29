@@ -1,9 +1,7 @@
 @file:Suppress("NOTHING_TO_INLINE", "unused")
 
 import wemi.Archetypes
-import wemi.CACHE_FOR_RUN
 import wemi.Configurations
-import wemi.KeyCacheMode
 import wemi.boot.WemiRootFolder
 import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository
@@ -39,8 +37,8 @@ val WemiVersion
 inline fun project(vararg archetypes: Archetype = arrayOf(Archetypes.DefaultArchetype), noinline initializer: Project.() -> Unit) = wemi.project(path("."), archetypes = *archetypes, initializer = initializer)
 inline fun project(projectRoot: Path? = path("."), vararg archetypes: Archetype = arrayOf(Archetypes.DefaultArchetype), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, *archetypes, initializer = initializer)
 
-inline fun <Value> key(description: String, defaultValue: Value, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN) = wemi.key(description, defaultValue, cacheMode)
-inline fun <Value> key(description: String, cacheMode: KeyCacheMode<Value>? = CACHE_FOR_RUN) = wemi.key(description, cacheMode)
+inline fun <Value> key(description: String, defaultValue: Value) = wemi.key(description, defaultValue)
+inline fun <Value> key(description: String) = wemi.key<Value>(description)
 
 inline fun configuration(description: String, parent: Configuration? = null, noinline initializer: Configuration.() -> Unit) = wemi.configuration(description, parent, initializer)
 

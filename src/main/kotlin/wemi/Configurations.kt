@@ -88,7 +88,7 @@ object Configurations {
         }
         Keys.sourceExtensions set Static(KotlinSourceFileExtensions)
 
-        Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance() }
+        Keys.kotlinCompiler set CachedBy(Keys.kotlinVersion){ it.compilerInstance() }
         Keys.compilerOptions modify {
             it.apply {
                 set(KotlinCompilerFlags.moduleName, Keys.projectName.get())

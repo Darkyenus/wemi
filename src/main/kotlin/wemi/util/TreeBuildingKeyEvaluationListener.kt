@@ -152,25 +152,6 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         keyData.endTimeAndAppendTiming(node)
     }
 
-    override fun postEvaluationCleanup(valuesCleaned: Int, durationNs: Long) {
-        val value = KeyData()
-        value.heading.format(Color.Blue).append(valuesCleaned).append(" value")
-        if (valuesCleaned != 1) {
-            value.heading.append('s')
-        }
-        value.heading.append(" purged during post evaluation cleanup")
-
-        val ms = TimeUnit.NANOSECONDS.toMillis(durationNs)
-        value.durationMs = ms
-        if (ms > 0) {
-            value.heading.format(Color.Cyan).append(" in ").appendTimeDuration(ms)
-        }
-
-        value.heading.format()
-
-        (stack.peekLast() ?: roots).add(TreeNode(value))
-    }
-
     fun appendResultTo(sb: StringBuilder) {
         printTree(roots, sb) { out ->
             out.append(this.heading)

@@ -89,7 +89,7 @@ object Archetypes {
 
         Keys.javaHome set Static(wemi.run.JavaHome)
         Keys.javaExecutable set { javaExecutable(Keys.javaHome.get()) }
-        Keys.javaCompiler set { ToolProvider.getSystemJavaCompiler() }
+        Keys.javaCompiler set LazyStatic { ToolProvider.getSystemJavaCompiler() }
 
         //Keys.mainClass TODO Detect main class?
         Keys.runOptions set KeyDefaults.RunOptions
