@@ -4,7 +4,7 @@ import com.esotericsoftware.jsonbeans.JsonException
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
-import wemi.collections.TinyMap
+import wemi.collections.ArrayMap
 import wemi.dependency.ArtifactKey.Companion.ArtifactData
 import wemi.dependency.ArtifactKey.Companion.ArtifactFile
 import wemi.util.*
@@ -265,7 +265,7 @@ data class Dependency(val dependencyId: DependencyId, val exclusions: List<Depen
  * @see ArtifactData
  */
 @Suppress("unused")// T is used only in syntax
-class ArtifactKey<T>(val name: String, val printOut: Boolean) {
+class ArtifactKey<T>(val name: String, internal val printOut: Boolean) {
 
     override fun toString(): String = name
 
@@ -300,7 +300,9 @@ class ResolvedDependency constructor(val id: DependencyId,
                               val resolvedFrom: Repository?,
                               val hasError: Boolean,
                               val log: CharSequence = "")
-    : TinyMap<ArtifactKey<*>, Any>(), JsonWritable {
+    : JsonWritable {
+
+    private val artifacts = ArrayMap<ArtifactKey<*>, Any>()
 
     /**
      * Path to the artifact. Convenience accessor.
@@ -360,7 +362,7 @@ class ResolvedDependency constructor(val id: DependencyId,
      */
     fun <T> getKey(key: ArtifactKey<T>): T? {
         @Suppress("UNCHECKED_CAST")
-        return super.get(key) as T?
+        return artifacts[key] as T?
     }
 
     /**
@@ -370,7 +372,7 @@ class ResolvedDependency constructor(val id: DependencyId,
      */
     fun <T> putKey(key: ArtifactKey<T>, value: T): T? {
         @Suppress("UNCHECKED_CAST")
-        return super.put(key, value as Any) as T?
+        return artifacts.put(key, value as Any) as T?
     }
 
     /**
@@ -380,7 +382,7 @@ class ResolvedDependency constructor(val id: DependencyId,
      */
     fun <T> removeKey(key: ArtifactKey<T>): T? {
         @Suppress("UNCHECKED_CAST")
-        return super.remove(key) as T?
+        return artifacts.remove(key) as T?
     }
 
     override fun JsonWriter.write() {
@@ -391,7 +393,7 @@ class ResolvedDependency constructor(val id: DependencyId,
             field("hasError", hasError)
             field("log", log.toString())
             name("data").writeArray {
-                forEachEntry { key, value ->
+                artifacts.forEachEntry { key, value ->
                     writeObject {
                         field("name", key.name)
                         if (key.printOut) {
@@ -404,7 +406,7 @@ class ResolvedDependency constructor(val id: DependencyId,
     }
 
     override fun toString(): String {
-        return "ResolvedDependency(id=$id, data=${super.filteredToString { k, _ -> k.printOut }}, dependencies=$dependencies, resolvedFrom=$resolvedFrom, hasError=$hasError, log=$log)"
+        return "ResolvedDependency(id=$id, data=${artifacts.filteredToString { k, _ -> k.printOut }}, dependencies=$dependencies, resolvedFrom=$resolvedFrom, hasError=$hasError, log=$log)"
     }
 
 

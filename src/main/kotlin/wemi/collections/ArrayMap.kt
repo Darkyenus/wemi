@@ -1,24 +1,22 @@
 package wemi.collections
 
+import javax.naming.OperationNotSupportedException
+
 /**
  * Extra-memory-lightweight implementation of [MutableMap] interface.
- *
- * To be used as a superclass for objects that wish to store a map with minimum overhead and provide a custom
- * access API for it.
- *
  * Has almost zero overhead, single allocation when first value is entered.
  *
- * NOT SUITABLE IF EXPECTED AMOUNT OF VALUES > 20
+ * All operations are O(n), NOT SUITABLE IF EXPECTED AMOUNT OF VALUES > 10!
  */
 @Suppress("unused")
-open class TinyMap<K, V> {
+open class ArrayMap<K, V> : MutableMap<K, V> {
 
     private var size2: Int = 0
 
     /**
      * Amount of keys in the map
      */
-    val size: Int
+    override val size: Int
         get() = size2 ushr 1
 
     /**
@@ -26,7 +24,8 @@ open class TinyMap<K, V> {
      */
     private var keysValues: Array<Any?> = EMPTY_ARRAY
 
-    private fun indexOf(key: K): Int {
+    @PublishedApi
+    internal fun indexOf(key: K): Int {
         var i = 0
         val size2 = size2
         val keysValues = this.keysValues
@@ -63,11 +62,11 @@ open class TinyMap<K, V> {
         return keysValues
     }
 
-    protected fun containsKey(key: K): Boolean {
+    override fun containsKey(key: K): Boolean {
         return indexOf(key) >= 0
     }
 
-    protected fun containsValue(value: V): Boolean {
+    override fun containsValue(value: V): Boolean {
         var i = 0
         val size2 = size2
         val keysValues = this.keysValues
@@ -80,21 +79,37 @@ open class TinyMap<K, V> {
         return false
     }
 
-    protected operator fun get(key: K): V? {
+    override operator fun get(key: K): V? {
         val index = indexOf(key)
         if (index >= 0) {
-            @Suppress("UNCHECKED_CAST")
-            return keysValues[index + 1] as V?
+            return getExisting(index)
         } else {
             return null
         }
     }
 
-    protected fun isEmpty(): Boolean {
+    @PublishedApi
+    internal fun getExisting(validIndex:Int):V {
+        @Suppress("UNCHECKED_CAST")
+        return keysValues[validIndex + 1] as V
+    }
+
+    inline fun getOrPut(key:K, put:()->V):V {
+        val index = indexOf(key)
+        if (index >= 0) {
+            return getExisting(index)
+        } else {
+            val newValue = put()
+            putNew(key, newValue)
+            return newValue
+        }
+    }
+
+    override fun isEmpty(): Boolean {
         return size == 0
     }
 
-    protected fun clear() {
+    override fun clear() {
         var i = size2 - 1
         size2 = 0
         val keysValues = this.keysValues
@@ -104,7 +119,7 @@ open class TinyMap<K, V> {
         }
     }
 
-    protected fun put(key: K, value: V): V? {
+    override fun put(key: K, value: V): V? {
         val index = indexOf(key)
         if (index >= 0) {
             val old = keysValues[index + 1]
@@ -113,14 +128,19 @@ open class TinyMap<K, V> {
             return old as V?
         }
 
+        putNew(key, value)
+        return null
+    }
+
+    @PublishedApi
+    internal fun putNew(key:K, value:V) {
         val keysValues = ensureCapacity(1)
         keysValues[size2] = key
         keysValues[size2 + 1] = value
         size2 += 2
-        return null
     }
 
-    protected fun putAll(from: Map<out K, V>) {
+    override fun putAll(from: Map<out K, V>) {
         ensureCapacity(from.size)
 
         for ((key, value) in from.entries) {
@@ -136,7 +156,7 @@ open class TinyMap<K, V> {
         }
     }
 
-    protected fun remove(key: K): V? {
+    override fun remove(key: K): V? {
         val index = indexOf(key)
         if (index < 0) {
             return null
@@ -156,7 +176,7 @@ open class TinyMap<K, V> {
         return oldValue as V?
     }
 
-    protected fun forEachEntry(action: ((K, V) -> Unit)) {
+    fun forEachEntry(action: ((K, V) -> Unit)) {
         var i = 0
         val size2 = size2
         val keysValues = this.keysValues
@@ -171,12 +191,24 @@ open class TinyMap<K, V> {
         }
     }
 
+    @Deprecated("not supported")
+    override val entries: MutableSet<MutableMap.MutableEntry<K, V>>
+        get() = throw OperationNotSupportedException()
+
+    @Deprecated("not supported")
+    override val keys: MutableSet<K>
+        get() = throw OperationNotSupportedException()
+
+    @Deprecated("not supported")
+    override val values: MutableCollection<V>
+        get() = throw OperationNotSupportedException()
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
 
         @Suppress("UNCHECKED_CAST")
-        other as TinyMap<Any?, Any?>
+        other as ArrayMap<Any?, Any?>
 
         val size2 = size2
         if (size2 != other.size2) return false

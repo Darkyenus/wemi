@@ -91,7 +91,7 @@ class TinyMapTests {
     fun memory() {
         val baseline = measureMemory { Object() }
 
-        val emptyTiny = measureMemory { TinyMap<String, String>() }
+        val emptyTiny = measureMemory { ArrayMap<String, String>() }
         val emptyJava = measureMemory { HashMap<String, String>() }
 
         val oneTiny = measureMemory { CheckedTinyMap<String, String>().apply {
@@ -141,7 +141,7 @@ class TinyMapTests {
         println("\tJava: $tenJava b")
     }
 
-    private class CheckedTinyMap<K, V> : TinyMap<K, V>() {
+    private class CheckedTinyMap<K, V> : ArrayMap<K, V>() {
 
         init {
             assertEquals(size, 0)
