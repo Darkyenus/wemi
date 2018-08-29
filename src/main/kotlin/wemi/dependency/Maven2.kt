@@ -68,7 +68,12 @@ internal object Maven2 {
 
                 return ResolvedDependency(dependencyId, pom.effectiveDependencies(), repository, file == null).apply {
                     this.artifact = file
-                    this.artifactData = data
+                    if (file == null) {
+                        // Do not store artifact's data, unless strictly necessary.
+                        // Storing it always would only create a memory leak, as the value is rarely used,
+                        // can always be lazily loaded and the size of all dependencies can be quite big.
+                        this.artifactData = data
+                    }
 
                 }
             }

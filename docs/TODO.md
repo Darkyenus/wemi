@@ -2,9 +2,7 @@
 
 - Explicit cache system
 
-- System for static (non-lazy) values
-
-- Do not keep around the data content of downloaded libraries after their caching, creates a memory leak
+- Streamline local dependency retrieval, no need to keep it all in memory, possibility to compute hashes during download
 
 - Consider using https://github.com/Kotlin/KEEP/blob/master/proposals/scripting-support.md
 
