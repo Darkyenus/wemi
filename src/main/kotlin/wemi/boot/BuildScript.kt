@@ -196,20 +196,20 @@ private fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
 
 internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?): Project {
     return Project(WemiBuildScriptProjectName, WemiBuildFolder, arrayOf(BuildScript)).apply {
-        Keys.projectName set { WemiBuildScriptProjectName }
-        Keys.projectRoot set { WemiBuildFolder }
+        Keys.projectName set Static(WemiBuildScriptProjectName)
+        Keys.projectRoot set Static(WemiBuildFolder)
 
         if (buildScriptInfo != null) {
-            Keys.repositories set { buildScriptInfo.repositories }
-            Keys.libraryDependencies set { buildScriptInfo.dependencies }
-            Keys.unmanagedDependencies set {
+            Keys.repositories set Static(buildScriptInfo.repositories)
+            Keys.libraryDependencies set Static(buildScriptInfo.dependencies)
+            Keys.unmanagedDependencies set Lazy {
                 val dependencies = WMutableList<LocatedPath>()
                 for (unmanagedDependency in buildScriptInfo.unmanagedDependencies) {
                     dependencies.add(LocatedPath(unmanagedDependency))
                 }
                 dependencies
             }
-            Keys.sourceFiles set { buildScriptInfo.sources }
+            Keys.sourceFiles set Static(buildScriptInfo.sources)
 
             Keys.compile set {
                 val resultJar = buildScriptInfo.scriptJar
@@ -231,8 +231,8 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
                 return@set resultJar
             }
         } else {
-            Keys.internalClasspath set { emptyList() }
-            Keys.run set { 0 }
+            Keys.internalClasspath set Static(emptyList())
+            Keys.run set Static(0)
         }
 
         locked = true
@@ -355,12 +355,12 @@ class BuildScriptInfo internal constructor(
  */
 internal val BuildScript by archetype(Archetypes::Base) {
 
-    Keys.compilerOptions set {
+    Keys.compilerOptions set Static (
         CompilerFlags().also {
             it[KotlinCompilerFlags.moduleName] = WemiBuildScriptProjectName
             it[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
         }
-    }
+    )
 
     Keys.run set {
         // Load build script configuration

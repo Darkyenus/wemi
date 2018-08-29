@@ -40,10 +40,10 @@ object Archetypes {
      * Implements basic key implementations that don't usually change.
      */
     val Base by archetype {
-        Keys.input set { InputBase(WemiRunningInInteractiveMode) }
+        Keys.input set Static(InputBase(WemiRunningInInteractiveMode))
 
-        Keys.buildDirectory set { WemiBuildFolder }
-        Keys.cacheDirectory set { WemiCacheFolder }
+        Keys.buildDirectory set Static(WemiBuildFolder)
+        Keys.cacheDirectory set Static(WemiCacheFolder)
 
         Keys.resourceFiles set KeyDefaults.ResourceFiles
         Keys.sourceFiles set KeyDefaults.SourceFiles
@@ -87,7 +87,7 @@ object Archetypes {
 
         Keys.repositories set { DefaultRepositories }
 
-        Keys.javaHome set { wemi.run.JavaHome }
+        Keys.javaHome set Static(wemi.run.JavaHome)
         Keys.javaExecutable set { javaExecutable(Keys.javaHome.get()) }
         Keys.javaCompiler set { ToolProvider.getSystemJavaCompiler() }
 
@@ -102,7 +102,7 @@ object Archetypes {
         Keys.archiveOutputFile set { Keys.buildDirectory.get() / "${Keys.projectName.get()}-${Keys.projectVersion.get()}.jar" }
 
         Keys.publishMetadata set KeyDefaults.PublishModelM2
-        Keys.publishRepository set { LocalM2Repository }
+        Keys.publishRepository set Static(LocalM2Repository)
         Keys.publishArtifacts addAll { artifacts(null, true, true) }
         Keys.publish set KeyDefaults.PublishM2
 
@@ -127,16 +127,16 @@ object Archetypes {
      * Those can serve as an aggregation of dependencies or as a Maven-like parent projects.
      */
     val BlankJVMProject by archetype(::JVMBase) {
-        Keys.internalClasspath set { emptyList() }
+        Keys.internalClasspath set Static(emptyList())
 
-        Keys.resourceRoots set { emptySet() }
+        Keys.resourceRoots set Static(emptySet())
     }
 
     /**
      * Primary archetype for projects that use pure Java.
      */
     val JavaProject by archetype(::JVMBase) {
-        Keys.compilingConfigurations set { setOf(Configurations.compilingJava) }
+        Keys.compilingConfigurations set Static(setOf(Configurations.compilingJava))
 
         Keys.compile set KeyDefaults.CompileJava
 
@@ -151,7 +151,7 @@ object Archetypes {
      * Primary archetype for projects that use Java and Kotlin.
      */
     val JavaKotlinProject by archetype(::JVMBase) {
-        Keys.compilingConfigurations set { setOf(Configurations.compilingJava, Configurations.compilingKotlin) }
+        Keys.compilingConfigurations set Static(setOf(Configurations.compilingJava, Configurations.compilingKotlin))
 
         Keys.libraryDependencies add { kotlinDependency("stdlib") }
         Keys.compile set KeyDefaults.CompileJavaKotlin

@@ -70,7 +70,7 @@ object Configurations {
             Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/java" }
         }
 
-        Keys.sourceExtensions set { JavaSourceFileExtensions }
+        Keys.sourceExtensions set Static(JavaSourceFileExtensions)
 
         Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
         Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
@@ -86,7 +86,7 @@ object Configurations {
             Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/java" }
             Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/kotlin" }
         }
-        Keys.sourceExtensions set { KotlinSourceFileExtensions }
+        Keys.sourceExtensions set Static(KotlinSourceFileExtensions)
 
         Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance() }
         Keys.compilerOptions modify {
@@ -139,12 +139,12 @@ object Configurations {
     //region IDE configurations
     val retrievingSources by configuration("Used to retrieve sources") {
         val mapper = classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier)
-        Keys.libraryDependencyProjectMapper set { mapper }
+        Keys.libraryDependencyProjectMapper set Static(mapper)
     }
 
     val retrievingDocs by configuration("Used to retrieve documentation") {
         val mapper = classifierAppendingLibraryDependencyProjectMapper(JavadocClassifier)
-        Keys.libraryDependencyProjectMapper set { mapper }
+        Keys.libraryDependencyProjectMapper set Static(mapper)
     }
     //endregion
 

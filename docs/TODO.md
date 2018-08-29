@@ -1,6 +1,12 @@
 # Things to do next
 
-- Remove as much exceptions from the project as possible
+- Explicit cache system
+
+- System for static (non-lazy) values
+
+- Do not keep around the data content of downloaded libraries after their caching, creates a memory leak
+
+- Consider using https://github.com/Kotlin/KEEP/blob/master/proposals/scripting-support.md
 
 - Maven dependency resolution improvements:
 	- <profiles> support

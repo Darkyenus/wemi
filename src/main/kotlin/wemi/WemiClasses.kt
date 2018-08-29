@@ -20,6 +20,8 @@ typealias InputKeyDescription = String
 class Key<Value> internal constructor(
         /**
          * Name of the key. Specified by the variable name this key was declared at.
+         * Uniquely describes the key.
+         * Having two separate key instances with same name has undefined behavior and will lead to problems.
          */
         val name: String,
         /**
@@ -51,7 +53,7 @@ class Key<Value> internal constructor(
          *
          * Called when the key is evaluated in CLI top level.
          */
-        internal val prettyPrinter: ((Value) -> CharSequence)?) : WithDescriptiveString, JsonWritable {
+        internal val prettyPrinter: ((Value) -> CharSequence)?) : WithDescriptiveString, JsonWritable, Comparable<Key<*>> {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -73,6 +75,10 @@ class Key<Value> internal constructor(
      * Returns [name] - [description]
      */
     override fun toDescriptiveAnsiString(): String = "${format(name, format = Format.Bold)} - $description"
+
+    override fun compareTo(other: Key<*>): Int {
+        return this.name.compareTo(other.name)
+    }
 
     override fun JsonWriter.write() {
         writeObject {
@@ -447,6 +453,7 @@ class Scope internal constructor(
     /**
      * Run the [action] in a scope, which is created by layering [configurations] over this [Scope].
      */
+    @Suppress("unused")
     inline fun <Result> Scope.using(vararg configurations: Configuration, action: Scope.() -> Result): Result {
         var scope = this
         for (configuration in configurations) {
@@ -458,6 +465,7 @@ class Scope internal constructor(
     /**
      * Run the [action] in a scope, which is created by layering [configurations] over this [Scope].
      */
+    @Suppress("unused")
     inline fun <Result> Scope.using(configurations: Collection<Configuration>, action: Scope.() -> Result): Result {
         var scope = this
         for (configuration in configurations) {
@@ -469,6 +477,7 @@ class Scope internal constructor(
     /**
      * Run the [action] in a scope, which is created by layering [configuration] over this [Scope].
      */
+    @Suppress("unused")
     inline fun <Result> Scope.using(configuration: Configuration, action: Scope.() -> Result): Result {
         return scopeFor(configuration).action()
     }
@@ -479,6 +488,7 @@ class Scope internal constructor(
      *
      * @param anonInitializer initializer of the anonymous scope. Works exactly like standard [Configuration] initializer
      */
+    @Suppress("unused")
     inline fun <Result> Scope.using(anonInitializer: AnonymousConfiguration.() -> Unit,
                                     action: Scope.() -> Result): Result {
         val anonConfig = AnonymousConfiguration(this)
@@ -1146,6 +1156,38 @@ interface KeyCacheMode<in Value> {
     fun Scope.isCacheValid(preEvaluation:Boolean, value:Value):Boolean
 
     override fun toString():String
+}
+
+/**
+ * Special [BoundKeyValue] for values that should be evaluated only once per whole binding,
+ * regardless of Scope. Use only for values with no dependencies on any modifiable input.
+ * @see Lazy for values that are in this nature, but their computation is not trivial
+ */
+class Static<Value>(private val value:Value) : (Scope) -> Value {
+    override fun invoke(ignored: Scope): Value = value
+}
+
+/**
+ * Special [BoundKeyValue] for values that should be evaluated only once, but lazily.
+ * Similar to [Static] in nature of supported values.
+ */
+class Lazy<Value>(generator:()->Value) : (Scope) -> Value {
+    private var generator:(()->Value)? = generator
+    private var cachedValue:Value? = null
+
+    override fun invoke(scope: Scope): Value {
+        val generator = this.generator
+        val value:Value
+        @Suppress("UNCHECKED_CAST")
+        if (generator != null) {
+            value = generator.invoke()
+            this.cachedValue = value
+            this.generator = null
+        } else {
+            value = this.cachedValue as Value
+        }
+        return value
+    }
 }
 
 /**

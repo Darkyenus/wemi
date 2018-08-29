@@ -132,9 +132,9 @@ fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRoo
         BuildScriptData.AllProjects.put(project.name, project)
     }
     project.apply {
-        Keys.projectName set { name }
+        Keys.projectName set Static(name)
         if (usedRoot != null) {
-            Keys.projectRoot set { usedRoot }
+            Keys.projectRoot set Static(usedRoot)
         }
 
         initializer?.invoke(this)

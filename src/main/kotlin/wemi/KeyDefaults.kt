@@ -457,7 +457,7 @@ object KeyDefaults {
                 ?: throw WemiException("Main class not specified", showStacktrace = false)
 
         using({
-            Keys.mainClass.set { mainClass }
+            Keys.mainClass set Static(mainClass)
         }) {
             Keys.run.get()
         }
