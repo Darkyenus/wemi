@@ -508,12 +508,20 @@ object CLI {
 
             val tasks = task.inputs("task")
             if (tasks.isEmpty()) {
-                printWarning("trace <task> - trace task invocation")
+                printWarning("trace [values=true/false] <task> - trace task invocation")
             } else {
                 val sb = StringBuilder()
 
                 val printValues = BooleanValidator(task.firstInput("values", false) ?: "").use({it}, {true})
+                val repeatCount = IntValidator(task.firstInput("times", false) ?: "").use({it}, {1})
                 val treePrintingListener = TreeBuildingKeyEvaluationListener(printValues)
+
+                for (cycle in 1 until repeatCount) {
+                    for (taskText in tasks) {
+                        evaluateLine(taskText)
+                    }
+                    println("${if(WemiUnicodeOutputSupported) "🐾" else "#"} ${format("Repeat cycle $cycle done", format = Format.Bold)}")
+                }
 
                 for (taskText in tasks) {
                     useKeyEvaluationListener(treePrintingListener) {
