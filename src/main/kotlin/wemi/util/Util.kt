@@ -8,25 +8,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 
-/**
- * Find the value:[V] that corresponds to the [key].
- * If [key] directly is not in the map, search the map once again, but ignore case.
- *
- * @return null if key not found
- */
-fun <V> Map<String, V>.findCaseInsensitive(key: String): V? {
-    synchronized(this) {
-        return getOrElse(key) {
-            for ((k, v) in this) {
-                if (key.equals(k, ignoreCase = true)) {
-                    return v
-                }
-            }
-            return null
-        }
-    }
-}
-
+//region StringBuilder enhancements
 /**
  * Format given [ms] duration as a human readable duration string.
  *
@@ -172,7 +154,83 @@ fun StringBuilder.appendPadded(number:Int, width:Int, padding:Char):StringBuilde
     }
     return this
 }
+//endregion
 
+//region Pretty printing
+private fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
+    if (value is WithDescriptiveString) {
+        val valueText = value.toDescriptiveAnsiString()
+        if (valueText.contains(ANSI_ESCAPE)) {
+            this.append(valueText)
+        } else {
+            this.format(Color.Blue).append(valueText).format()
+        }
+    } else {
+        this.format(Color.Blue)
+        PrettyPrinter.append(this, value)
+        if (value is Function<*>) {
+            val javaClass = value.javaClass
+            this.format(Color.White).append(" (").append(javaClass.name).append(')')
+        } else if (value is Path || value is LocatedPath) {
+            val path = value as? Path ?: (value as LocatedPath).file
+
+            if (Files.isRegularFile(path)) {
+                try {
+                    val size = Files.size(path)
+                    this.format(Color.White).append(" (").appendByteSize(size).append(')')
+                } catch (ignored:Exception) {}
+            }
+        }
+        this.format()
+    }
+    return this
+}
+
+private val APPEND_KEY_RESULT_LOG = LoggerFactory.getLogger("AppendKeyResult")
+
+/**
+ * Append the [value] formatted like the result of the [key] and newline.
+ */
+fun <Value> StringBuilder.appendKeyResultLn(key: Key<Value>, value:Value) {
+    val prettyPrinter = key.prettyPrinter
+
+    if (prettyPrinter != null) {
+        val printed: CharSequence? =
+                try {
+                    prettyPrinter(value)
+                } catch (e: Exception) {
+                    APPEND_KEY_RESULT_LOG.warn("Pretty-printer for {} failed", key, e)
+                    null
+                }
+
+        if (printed != null) {
+            this.append(printed)
+            return
+        }
+    }
+
+    when (value) {
+        null, Unit -> {
+            this.append('\n')
+        }
+        is Collection<*> -> {
+            for ((i, item) in value.withIndex()) {
+                this.format(Color.White).append(i+1).append(": ").format().appendPrettyValue(item).append('\n')
+            }
+        }
+        is Array<*> -> {
+            for ((i, item) in value.withIndex()) {
+                this.format(Color.White).append(i+1).append(": ").format().appendPrettyValue(item).append('\n')
+            }
+        }
+        else -> {
+            this.appendPrettyValue(value).append('\n')
+        }
+    }
+}
+//endregion
+
+//region Codepoints
 /**
  * Represents index into the [CharSequence].
  */
@@ -217,7 +275,9 @@ inline fun CharSequence.forCodePoints(action: (cp:CodePoint) -> Unit) {
         action(cp)
     }
 }
+//endregion
 
+//region File names
 /**
  * @return true if this [CodePoint] is regarded as safe to appear inside a file name,
  * for no particular, general file system.
@@ -258,25 +318,9 @@ fun CharSequence.toSafeFileName(replacement: Char): CharSequence {
         this
     }
 }
+//endregion
 
-/**
- * @return true if the string is a valid identifier, using Java identifier rules
- */
-fun String.isValidIdentifier(): Boolean {
-    if (isEmpty()) {
-        return false
-    }
-    if (!this[0].isJavaIdentifierStart()) {
-        return false
-    }
-    for (i in 1..lastIndex) {
-        if (!this[i].isJavaIdentifierPart()) {
-            return false
-        }
-    }
-    return true
-}
-
+//region TreePrinting
 /**
  * Print pretty, human readable ASCII tree, that starts at given [roots].
  *
@@ -370,8 +414,10 @@ class TreeNode<T>(val value: T) : ArrayList<TreeNode<T>>() {
         return find(value) ?: (TreeNode(value).also { add(it) })
     }
 }
+//endregion
 
-const val ANSI_ESCAPE = '\u001B'
+//region Ansi Formatting
+private const val ANSI_ESCAPE = '\u001B'
 
 /**
  * Format given char sequence using supplied parameters.
@@ -425,77 +471,44 @@ enum class Format(internal val number: Int) {
     Bold(1), // Label or Prompt
     Underline(4), // Input
 }
+//endregion
 
-private fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
-    if (value is WithDescriptiveString) {
-        val valueText = value.toDescriptiveAnsiString()
-        if (valueText.contains(ANSI_ESCAPE)) {
-            this.append(valueText)
-        } else {
-            this.format(Color.Blue).append(valueText).format()
-        }
-    } else {
-        this.format(Color.Blue)
-        PrettyPrinter.append(this, value)
-        if (value is Function<*>) {
-            val javaClass = value.javaClass
-            this.format(Color.White).append(" (").append(javaClass.name).append(')')
-        } else if (value is Path || value is LocatedPath) {
-            val path = value as? Path ?: (value as LocatedPath).file
-
-            if (Files.isRegularFile(path)) {
-                try {
-                    val size = Files.size(path)
-                    this.format(Color.White).append(" (").appendByteSize(size).append(')')
-                } catch (ignored:Exception) {}
+//region Miscellaneous
+/**
+ * Find the value:[V] that corresponds to the [key].
+ * If [key] directly is not in the map, search the map once again, but ignore case.
+ *
+ * @return null if key not found
+ */
+internal fun <V> Map<String, V>.findCaseInsensitive(key: String): V? {
+    synchronized(this) {
+        return getOrElse(key) {
+            for ((k, v) in this) {
+                if (key.equals(k, ignoreCase = true)) {
+                    return v
+                }
             }
+            return null
         }
-        this.format()
     }
-    return this
 }
 
-private val APPEND_KEY_RESULT_LOG = LoggerFactory.getLogger("AppendKeyresult")
-
 /**
- * Append the [value] formatted like the result of the [key] and newline.
+ * @return true if the string is a valid identifier, using Java identifier rules
  */
-fun <Value> StringBuilder.appendKeyResultLn(key: Key<Value>, value:Value) {
-    val prettyPrinter = key.prettyPrinter
-
-    if (prettyPrinter != null) {
-        val printed: CharSequence? =
-                try {
-                    prettyPrinter(value)
-                } catch (e: Exception) {
-                    APPEND_KEY_RESULT_LOG.warn("Pretty-printer for {} failed", key, e)
-                    null
-                }
-
-        if (printed != null) {
-            this.append(printed)
-            return
+internal fun String.isValidIdentifier(): Boolean {
+    if (isEmpty()) {
+        return false
+    }
+    if (!this[0].isJavaIdentifierStart()) {
+        return false
+    }
+    for (i in 1..lastIndex) {
+        if (!this[i].isJavaIdentifierPart()) {
+            return false
         }
     }
-
-    when (value) {
-        null, Unit -> {
-            this.append('\n')
-        }
-        is Collection<*> -> {
-            for ((i, item) in value.withIndex()) {
-                this.format(Color.White).append(i+1).append(": ").format().appendPrettyValue(item).append('\n')
-            }
-        }
-        is Array<*> -> {
-            for ((i, item) in value.withIndex()) {
-                this.format(Color.White).append(i+1).append(": ").format().appendPrettyValue(item).append('\n')
-            }
-        }
-        else -> {
-            this.appendPrettyValue(value).append('\n')
-        }
-    }
+    return true
 }
 
 /**
@@ -503,13 +516,18 @@ fun <Value> StringBuilder.appendKeyResultLn(key: Key<Value>, value:Value) {
  *
  * @return N or null if invalid
  */
-fun parseJavaVersion(version:String?):Int? {
+internal fun parseJavaVersion(version:String?):Int? {
     return version?.removePrefix("1.")?.toIntOrNull()
 }
 
+/**
+ * Adds all items from [items] to receiver, like [MutableList.addAll], but in reverse orded.
+ * `internal` because not generic.
+ */
 internal fun <T> ArrayList<T>.addAllReversed(items:ArrayList<T>) {
     ensureCapacity(items.size)
     for (i in items.indices.reversed()) {
         add(items[i])
     }
 }
+//endregion
