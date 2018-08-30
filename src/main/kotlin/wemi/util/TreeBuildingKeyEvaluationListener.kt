@@ -7,6 +7,7 @@ import wemi.WemiKeyEvaluationListener
 import wemi.boot.CLI
 import java.util.*
 import java.util.concurrent.TimeUnit
+import kotlin.collections.ArrayList
 
 /**
  * [WemiKeyEvaluationListener] that stores relevant information about key evaluation and then
@@ -39,6 +40,14 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         stack.addLast(node)
     }
 
+    override fun keyEvaluationFeature(feature: String) {
+        stack.peekLast().value.features().add(feature)
+        when (feature) {
+            WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE -> cacheReads++
+            WemiKeyEvaluationListener.FEATURE_WRITTEN_TO_CACHE -> cacheWrites++
+        }
+    }
+
     override fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder: BindingHolder, amount: Int) {
         val keyData = stack.peekLast().value
 
@@ -69,32 +78,44 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         return node
     }
 
-    override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value, cached: Boolean) {
+    override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value) {
         val node = popAndIndent()
         val keyData = node.value
         val h = keyData.heading
         h.append(CLI.ICON_SUCCESS).format(Color.White).append(" from ")
         when {
-            bindingFoundInScope == null -> h.format(foreground = Color.Magenta).append("default value").format()
-            bindingFoundInHolder == null -> {
-                h.format(Color.Magenta).append("cache")
-                        .format(Color.White).append(" in ")
-                        .format().append(bindingFoundInScope)
-                cacheReads++
-            }
-            else -> {
+            bindingFoundInScope == null && bindingFoundInHolder == null ->
+                h.format(foreground = Color.Magenta).append("default value").format()
+            bindingFoundInScope != null && bindingFoundInHolder != null -> {
                 h.format().append(bindingFoundInScope)
                 if (bindingFoundInScope.scopeBindingHolders.last() !== bindingFoundInHolder) {
                     // Specify which holder only if it isn't nominal
                     h.format(Color.White).append(" in ").format(format = Format.Underline).append(bindingFoundInHolder).format()
                 }
                 evaluations++
-
-                if (cached) {
-                    h.format(Color.White).append(" and ").format(Color.Magenta, format = Format.Bold).append("cached").format()
-                    cacheWrites++
-                }
             }
+            else -> {
+                // This is unexpected...
+                h.format().append(bindingFoundInScope).append(" - ").append(bindingFoundInHolder)
+            }
+        }
+
+        keyData.features?.let { features ->
+            if (features.isEmpty()) {
+                return@let
+            }
+
+            h.append(' ').format(Color.Magenta)
+            var first = true
+            for (feature in features) {
+                if (first) {
+                    first = false
+                } else {
+                    h.format().append(", ").format(Color.Magenta)
+                }
+                h.append(feature)
+            }
+            h.format()
         }
 
         if (printValues) {
@@ -181,6 +202,8 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
 
         var body: StringBuilder? = null
 
+        var features: ArrayList<String>? = null
+
         var fromScope:Scope? = null
 
         var exception: Throwable? = null
@@ -209,6 +232,15 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
                 body = b
             }
             return b
+        }
+
+        fun features(): ArrayList<String> {
+            var f = features
+            if (f == null) {
+                f = ArrayList()
+                features = f
+            }
+            return f
         }
 
     }

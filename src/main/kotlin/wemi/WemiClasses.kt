@@ -466,7 +466,6 @@ class Scope internal constructor(
         val allModifiersReverse: ArrayList<BoundKeyValueModifier<Value>> = ArrayList()
 
         var scope: Scope? = this
-        var cached = false
 
         searchForValue@ while (scope != null) {
             // Retrieve the holder
@@ -476,12 +475,7 @@ class Scope internal constructor(
                 if (holderModifiers != null && holderModifiers.isNotEmpty()) {
                     listener?.keyEvaluationHasModifiers(scope, holder, holderModifiers.size)
 
-                    allModifiersReverse.ensureCapacity(holderModifiers.size)
-                    var i = holderModifiers.size - 1
-                    while (i >= 0) {
-                        allModifiersReverse.add(holderModifiers[i])
-                        i--
-                    }
+                    allModifiersReverse.addAllReversed(holderModifiers)
                 }
 
                 val boundValue = holder.binding[key] as BoundKeyValue<Value>?
@@ -498,12 +492,8 @@ class Scope internal constructor(
                         throw t
                     }
 
-                    if (boundValue is CachedBoundValue) {
-                        cached = true
-                    }
-
-                    holderOfFoundValue = holder
                     foundValueValid = true
+                    holderOfFoundValue = holder
                     break@searchForValue
                 }
             }
@@ -530,7 +520,7 @@ class Scope internal constructor(
             }
 
             // Done
-            listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result, cached)
+            listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result)
 
             return result
         }
@@ -972,21 +962,28 @@ interface WemiKeyEvaluationListener {
      */
     fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder:BindingHolder, amount:Int)
 
+    /**
+     * Called when evaluation of key on top of the key evaluation stack used some special feature,
+     * such as retrieval from cache.
+     *
+     * @param feature short uncapitalized human readable description of the feature, for example "from cache"
+     * @see FEATURE_READ_FROM_CACHE
+     * @see FEATURE_WRITTEN_TO_CACHE
+     */
+    fun keyEvaluationFeature(feature:String)
 
     /**
      * Evaluation of key on top of key evaluation stack has been successful.
      *
      * @param key that just finished executing, same as the one from [keyEvaluationStarted]
      * @param bindingFoundInScope scope in which the binding of this key has been found, null if default value
-     * @param bindingFoundInHolder holder in [bindingFoundInScope] in which the key binding has been found (null if from cache)
-     * @param result that has been used, may be null if caller considers null
-     * @param cached true if the result has been cached
+     * @param bindingFoundInHolder holder in [bindingFoundInScope] in which the key binding has been found, null if default value
+     * @param result that has been used, may be null if caller considers null valid
      */
     fun <Value>keyEvaluationSucceeded(key: Key<Value>,
                                       bindingFoundInScope: Scope?,
                                       bindingFoundInHolder: BindingHolder?,
-                                      result: Value,
-                                      cached: Boolean)
+                                      result: Value)
 
     /**
      * Evaluation of key on top of key evaluation stack has failed, because the key has no binding, nor default value.
@@ -1007,27 +1004,13 @@ interface WemiKeyEvaluationListener {
      * @param fromKey if true, the evaluation of key threw the exception, if false it was one of the modifiers
      */
     fun keyEvaluationFailedByError(exception:Throwable, fromKey:Boolean)
-}
 
-/**
- * Controls caching of [Key]s evaluated values in [Scope]s.
- *
- * Cache does not last through multiple Wemi runs.
- */
-interface KeyCacheMode<in Value> {
-    /**
-     * Check if the cached value is still valid.
-     *
-     * Called on two occasions:
-     * 1. Before deciding to use the cached value ([preEvaluation] = `true`)
-     * 2. After the top level key evaluation is complete ([preEvaluation] = `false`)
-     *
-     * @param value that is cached
-     * @return true if the cache should be used/kept, false if it should be discarded
-     */
-    fun Scope.isCacheValid(preEvaluation:Boolean, value:Value):Boolean
-
-    override fun toString():String
+    companion object {
+        /** [keyEvaluationFeature] to signify that this value has been read from cache */
+        const val FEATURE_READ_FROM_CACHE = "from cache"
+        /** [keyEvaluationFeature] to signify that this value has not been found in cache, but was stored there for later use */
+        const val FEATURE_WRITTEN_TO_CACHE = "to cache"
+    }
 }
 
 /**
@@ -1036,7 +1019,10 @@ interface KeyCacheMode<in Value> {
  * @see LazyStatic for values that are in this nature, but their computation is not trivial
  */
 class Static<Value>(private val value:Value) : (Scope) -> Value {
-    override fun invoke(ignored: Scope): Value = value
+    override fun invoke(ignored: Scope): Value {
+        activeKeyEvaluationListener?.keyEvaluationFeature("static")
+        return value
+    }
 }
 
 /**
@@ -1055,7 +1041,9 @@ class LazyStatic<Value>(generator:()->Value) : (Scope) -> Value {
             value = generator.invoke()
             this.cachedValue = value
             this.generator = null
+            activeKeyEvaluationListener?.keyEvaluationFeature("first lazy static")
         } else {
+            activeKeyEvaluationListener?.keyEvaluationFeature("lazy static")
             value = this.cachedValue as Value
         }
         return value
@@ -1066,7 +1054,7 @@ interface CachedBoundValue {
     fun clearCache()
 }
 
-class CachedBy<Value, By>(private val byKey:Key<By>, private val valueProducer:(By)->Value) : (Scope) -> Value {
+class CachedBy<Value, By>(private val byKey:Key<By>, private val valueProducer:(By)->Value) : (Scope) -> Value, CachedBoundValue {
 
     private val cache = ArrayMap<By, Value>()
 
@@ -1075,18 +1063,36 @@ class CachedBy<Value, By>(private val byKey:Key<By>, private val valueProducer:(
             byKey.get()
         }
 
-        return cache.getOrPut(byValue) {
+        var createdNew = false
+        val result = cache.getOrPut(byValue) {
+            createdNew = true
             valueProducer(byValue)
         }
+
+        if (!createdNew) {
+            activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE)
+        } else {
+            activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_WRITTEN_TO_CACHE)
+        }
+
+        return result
+    }
+
+    override fun clearCache() {
+        cache.clear()
     }
 }
 
-class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value) : (Scope) -> Value {
+class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value) : (Scope) -> Value, CachedBoundValue {
 
     internal val cacheByScope = HashMap<Scope, CacheEntry<*>>()
 
     override fun invoke(scope: Scope): Value {
         return valueProducer.invoke(CachedEvaluation(scope, cacheByScope))
+    }
+
+    override fun clearCache() {
+        cacheByScope.clear()
     }
 
     @CacheDsl
@@ -1128,6 +1134,7 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
         internal fun getCachedResult():Any? {
             for (value in cacheByScope.values) {
                 if (value == cacheEntry) {
+                    activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE)
                     return value.cachedValue
                 }
             }
@@ -1138,6 +1145,7 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
         internal fun cacheResult(newResultToCache:Value) {
             cacheEntry.cachedValue = newResultToCache
             cacheByScope[scope] = cacheEntry
+            activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_WRITTEN_TO_CACHE)
         }
 
         inline fun produce(producer:EvaluatingCached.()->Value):Value {
@@ -1157,9 +1165,7 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
         var cachedValue:Value? = null
 
         fun usedKey(key: Key<*>, value: Any?) {
-            when (value is List<*>) {
-
-            }
+            // TODO(jp): Special handling of File and Path and collections of them
 
             this[key] = value
         }
@@ -1177,24 +1183,3 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
     @CacheDsl
     object EvaluatingCached
 }
-
-/**
- * This cache is always valid
- */
-val CACHE_ALWAYS = object : KeyCacheMode<Any?> {
-    override fun Scope.isCacheValid(preEvaluation: Boolean, value: Any?): Boolean = true
-
-    override fun toString(): String = "CACHE_ALWAYS"
-}
-
-/**
- * This cache is valid for the duration of the top-level key evaluation
- */
-val CACHE_FOR_RUN = object : KeyCacheMode<Any?> {
-    override fun Scope.isCacheValid(preEvaluation: Boolean, value: Any?): Boolean {
-        return preEvaluation
-    }
-
-    override fun toString(): String = "CACHE_FOR_RUN"
-}
-

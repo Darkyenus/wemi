@@ -104,22 +104,22 @@ fun StringBuilder.appendByteSize(bytes: Long): StringBuilder {
     val R = 2
     var relevant = R
 
-    if ((tera > 1L || relevant < R) && relevant > 0) {
+    if ((tera > 0L || relevant < R) && relevant > 0) {
         append(tera).append(" TB ")
         relevant--
     }
 
-    if ((giga > 1L || relevant < R) && relevant > 0) {
+    if ((giga > 0L || relevant < R) && relevant > 0) {
         append(giga).append(" GB ")
         relevant--
     }
 
-    if ((mega > 1L || relevant < R) && relevant > 0) {
+    if ((mega > 0L || relevant < R) && relevant > 0) {
         append(mega).append(" MB ")
         relevant--
     }
 
-    if ((kilo > 1L || relevant < R) && relevant > 0) {
+    if ((kilo > 0L || relevant < R) && relevant > 0) {
         append(kilo).append(" kB ")
         relevant--
     }
@@ -505,4 +505,11 @@ fun <Value> StringBuilder.appendKeyResultLn(key: Key<Value>, value:Value) {
  */
 fun parseJavaVersion(version:String?):Int? {
     return version?.removePrefix("1.")?.toIntOrNull()
+}
+
+internal fun <T> ArrayList<T>.addAllReversed(items:ArrayList<T>) {
+    ensureCapacity(items.size)
+    for (i in items.indices.reversed()) {
+        add(items[i])
+    }
 }
