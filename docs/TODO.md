@@ -1,7 +1,5 @@
 # Things to do next
 
-- Explicit cache system
-
 - Streamline local dependency retrieval, no need to keep it all in memory, possibility to compute hashes during download
 
 - Consider using https://github.com/Kotlin/KEEP/blob/master/proposals/scripting-support.md

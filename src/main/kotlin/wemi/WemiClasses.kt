@@ -5,11 +5,14 @@ package wemi
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import wemi.collections.*
+import wemi.collections.ArrayMap
+import wemi.collections.toMutable
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
 import wemi.util.*
+import java.io.File
 import java.nio.file.Path
+import java.util.*
 
 typealias InputKey = String
 typealias InputKeyDescription = String
@@ -582,7 +585,7 @@ class Scope internal constructor(
         for (holder in scopeBindingHolders) {
             for (value in holder.binding.values) {
                 if (value is CachedBoundValue) {
-                    value.clearCache()
+                    value.cleanCache()
                     sum++
                 }
             }
@@ -1050,10 +1053,12 @@ class LazyStatic<Value>(generator:()->Value) : (Scope) -> Value {
     }
 }
 
+/** Bound values that cache their content should implement this interface to let `clean` command clean it. */
 interface CachedBoundValue {
-    fun clearCache()
+    fun cleanCache()
 }
 
+/** Specialization of [Cached] for single value input. */
 class CachedBy<Value, By>(private val byKey:Key<By>, private val valueProducer:(By)->Value) : (Scope) -> Value, CachedBoundValue {
 
     private val cache = ArrayMap<By, Value>()
@@ -1078,69 +1083,78 @@ class CachedBy<Value, By>(private val byKey:Key<By>, private val valueProducer:(
         return result
     }
 
-    override fun clearCache() {
+    override fun cleanCache() {
         cache.clear()
     }
 }
 
+/** BoundValue that is cached, based on used inputs. Value calculated for  */
 class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value) : (Scope) -> Value, CachedBoundValue {
 
-    internal val cacheByScope = HashMap<Scope, CacheEntry<*>>()
+    internal val cacheByScope = WeakHashMap<Scope, CacheEntry<*>>()
 
     override fun invoke(scope: Scope): Value {
         return valueProducer.invoke(CachedEvaluation(scope, cacheByScope))
     }
 
-    override fun clearCache() {
+    override fun cleanCache() {
         cacheByScope.clear()
     }
 
     @CacheDsl
-    class CachedEvaluation<Value> internal constructor(private val scope:Scope, private val cacheByScope:MutableMap<Scope, CacheEntry<*>>) {
+    class CachedEvaluation<Value> internal constructor(
+            @PublishedApi internal val scope:Scope,
+            private val cacheByScope:MutableMap<Scope, CacheEntry<*>>) {
 
         private val cacheEntry = CacheEntry<Value>()
 
-        /** @see Scope.get */
-        fun <Value> Key<Value>.get(): Value {
-            return scope.run {
-                this@get.get().also {
-                    cacheEntry.usedKey(this@get, it)
-                }
+        /** Obtain value bound to key, [wrapValueForCache] and remember it through [inputValueUsed]. */
+        inline fun <Value> use(obtain:Scope.() -> Value):Value {
+            return useAs(obtain, ::wrapValueForCache)
+        }
+
+        inline fun <Value> useAs(obtain:Scope.() -> Value, wrap:(Value) -> Any?):Value {
+            val value = scope.run(obtain)
+            inputValueUsed(wrap(value))
+            return value
+        }
+
+        fun wrapValueForCache(value:Any?):Any? {
+            return when (value) {
+                is Path ->
+                    PathCacheEntry(value)
+                is File ->
+                    PathCacheEntry(value)
+                is LocatedPath ->
+                    PathCacheEntry(value)
+                is List<*> ->
+                    value.map(::wrapValueForCache)
+                is Set<*> ->
+                    value.mapTo(HashSet(), ::wrapValueForCache)
+                else ->
+                    value
             }
         }
 
-        /** @see Scope.getOrElse */
-        fun <Value : Else, Else> Key<Value>.getOrElse(unset: Else): Else {
-            return scope.run {
-                this@getOrElse.getOrElse(unset).also {
-                    cacheEntry.usedKey(this@getOrElse, it)
-                }
-            }
+        /** Manually put input value to cache key list.*/
+        fun inputValueUsed(value:Any?) {
+            cacheEntry.add(value)
         }
 
-        /** @see Scope.getOrNull */
-        fun <Value> Key<Value>.getOrNull(): Value? {
-            return scope.run {
-                this@getOrNull.getOrNull().also {
-                    cacheEntry.usedKey(this@getOrNull, it)
-                }
-            }
-        }
-
-        /**
-         * Looks at values currently bound and
-         */
+        /** Returns cached value that corresponds to given inputs, or [EvaluatingCached] if no such cached value found. */
         @PublishedApi
         internal fun getCachedResult():Any? {
             for (value in cacheByScope.values) {
                 if (value == cacheEntry) {
                     activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE)
+                    cacheByScope[scope] = value
                     return value.cachedValue
                 }
             }
             return EvaluatingCached
         }
 
+        /** After [cacheResult] returned [EvaluatingCached] and new value was evaluated */
         @PublishedApi
         internal fun cacheResult(newResultToCache:Value) {
             cacheEntry.cachedValue = newResultToCache
@@ -1148,6 +1162,8 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
             activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_WRITTEN_TO_CACHE)
         }
 
+        /** Return what [producer] returns, unless it was already evaluated for these inputs,
+         * in which case return that previous result and don't evaluate anything. */
         inline fun produce(producer:EvaluatingCached.()->Value):Value {
             val cachedResult = getCachedResult()
             if (cachedResult !== EvaluatingCached) {
@@ -1161,13 +1177,32 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
         }
     }
 
-    internal class CacheEntry<Value> : ArrayMap<Key<*>, Any?>() {
+    internal class CacheEntry<Value> : ArrayList<Any?>() {
         var cachedValue:Value? = null
+    }
 
-        fun usedKey(key: Key<*>, value: Any?) {
-            // TODO(jp): Special handling of File and Path and collections of them
+    /** Object representing a snapshot of Path, based on time of last modification.  */
+    class PathCacheEntry private constructor(val path:Path, val lastModified:Long) {
+        constructor (path:Path) : this(path, path.lastModified.toMillis())
+        constructor (file:File) : this(file.toPath(), file.lastModified())
+        constructor (located:LocatedPath) : this(located.file)
 
-            this[key] = value
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as PathCacheEntry
+
+            if (path != other.path) return false
+            if (lastModified != other.lastModified) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = path.hashCode()
+            result = 31 * result + lastModified.hashCode()
+            return result
         }
     }
 
@@ -1177,7 +1212,7 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
     private annotation class CacheDsl
 
     /**
-     * Special receiver used in [CachedEvaluation.produce] to disallow accessing [CachedEvaluation.get] methods.
+     * Special receiver used in [CachedEvaluation.produce] to disallow accessing [CachedEvaluation.use] methods.
      */
     /* Also used as an unique value returned by [CachedEvaluation.getCachedResult] to signify that cache is empty. */
     @CacheDsl

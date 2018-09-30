@@ -85,9 +85,9 @@ object KeyDefaults {
 
 
     val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<DependencyId, ResolvedDependency>>> = Cached {
-        val repositories = Keys.repositoryChain.get()
-        val libraryDependencies = Keys.libraryDependencies.get()
-        val libraryDependencyProjectMapper = Keys.libraryDependencyProjectMapper.get()
+        val repositories = use { Keys.repositoryChain.get() }
+        val libraryDependencies = use { Keys.libraryDependencies.get() }
+        val libraryDependencyProjectMapper = use { Keys.libraryDependencyProjectMapper.get() }
 
         produce {
             val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
