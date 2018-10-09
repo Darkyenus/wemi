@@ -2,6 +2,10 @@
 
 - Streamline local dependency retrieval, no need to keep it all in memory, possibility to compute hashes during download
 
+- When Kotlin multiplatform projects are standardized, consider rewriting compiler facade from maven plugin
+https://github.com/JetBrains/kotlin/tree/master/libraries/tools/kotlin-maven-plugin/src/main/java/org/jetbrains/kotlin/maven
+Currently, maven does not support multiplatform projects, so doing it now is futile.
+
 - Consider using https://github.com/Kotlin/KEEP/blob/master/proposals/scripting-support.md
 
 - Maven dependency resolution improvements:
