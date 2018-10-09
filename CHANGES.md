@@ -1,5 +1,10 @@
 # 0.5
+- Add support for Kotlin 1.2.71
 - Fix `resourceRoots` not being set according to `projectRoot`
+- Fix Maven dependency resolution not considering parent poms
+- Initial import into IntelliJ will succeed even when build scripts are broken
+- Rewritten how internal cache system works
+	- Now caching is explicit
 
 # 0.4 2018-06-12
 - Add hotswap plugin

@@ -11,6 +11,7 @@ import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
 import wemi.util.*
 import java.io.File
+import java.lang.ref.SoftReference
 import java.nio.file.Path
 import java.util.*
 
@@ -1019,6 +1020,12 @@ interface WemiKeyEvaluationListener {
 /**
  * Special [BoundKeyValue] for values that should be evaluated only once per whole binding,
  * regardless of Scope. Use only for values with no dependencies on any modifiable input.
+ *
+ * Example:
+ * ```kotlin
+ * projectName set Static("MyProject")
+ * ```
+ *
  * @see LazyStatic for values that are in this nature, but their computation is not trivial
  */
 class Static<Value>(private val value:Value) : (Scope) -> Value {
@@ -1031,6 +1038,11 @@ class Static<Value>(private val value:Value) : (Scope) -> Value {
 /**
  * Special [BoundKeyValue] for values that should be evaluated only once, but lazily.
  * Similar to [Static] in nature of supported values.
+ *
+ * Example:
+ * ```kotlin
+ * heavyResource set LazyStatic { createHeavyResource() }
+ * ```
  */
 class LazyStatic<Value>(generator:()->Value) : (Scope) -> Value {
     private var generator:(()->Value)? = generator
@@ -1058,7 +1070,14 @@ interface CachedBoundValue {
     fun cleanCache()
 }
 
-/** Specialization of [Cached] for single value input. */
+/** Specialization of [Cached] for single value input, with values cached per input.
+ * Do not use when many different temporary inputs are expected, as it may cause a memory leak.
+ *
+ * Example:
+ * ```kotlin
+ * kotlinCompiler set CachedBy(kotlinVersion) { version -> createKotlinCompilerForVersion(version) }
+ * ```
+ */
 class CachedBy<Value, By>(private val byKey:Key<By>, private val valueProducer:(By)->Value) : (Scope) -> Value, CachedBoundValue {
 
     private val cache = ArrayMap<By, Value>()
@@ -1088,10 +1107,34 @@ class CachedBy<Value, By>(private val byKey:Key<By>, private val valueProducer:(
     }
 }
 
-/** BoundValue that is cached, based on used inputs. Value calculated for  */
+/** BoundValue that is cached based on used inputs.
+ *
+ * Inputs + result is stored per scope. When [Cached] is queried for a value, all stored inputs from all scopes
+ * are checked for a match. If one is found, that value is returned. Otherwise a new value is generated
+ * and stored for later use.
+ *
+ * [valueProducer] is not called with [Scope], so it is not possible to directly [Scope.get].
+ * This is intentional, as the retrieval should happen inside [CachedEvaluation.use], so that [Cached] may capture its inputs.
+ *
+ * Then, when result is to be produced, it should be done so through [CachedEvaluation.produce].
+ *
+ * Example:
+ * ```kotlin
+ * expensiveOperation set Cached {
+ *      // Code here always happens
+ *      val someFiles = use { inputFiles.get() }
+ *      val option = use { expensiveOperationOptions.get() }
+ *
+ *      produce {
+ *          // Code here happens only when inputs retrieved through `use` before were not seen yet
+ *          performExpensiveOperation(someFiles, option)
+ *      }
+ * }
+ * ```
+ */
 class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value) : (Scope) -> Value, CachedBoundValue {
 
-    internal val cacheByScope = WeakHashMap<Scope, CacheEntry<*>>()
+    internal val cacheByScope = WeakHashMap<Scope, SoftReference<CacheEntry<*>>>()
 
     override fun invoke(scope: Scope): Value {
         return valueProducer.invoke(CachedEvaluation(scope, cacheByScope))
@@ -1104,21 +1147,32 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
     @CacheDsl
     class CachedEvaluation<Value> internal constructor(
             @PublishedApi internal val scope:Scope,
-            private val cacheByScope:MutableMap<Scope, CacheEntry<*>>) {
+            private val cacheByScope:MutableMap<Scope, SoftReference<CacheEntry<*>>>) {
 
         private val cacheEntry = CacheEntry<Value>()
 
-        /** Obtain value bound to key, [wrapValueForCache] and remember it through [inputValueUsed]. */
+        /** Obtain value bound to key in [obtain] and return it.
+         * Same value is also wrapped with [wrapValueForCache] and remembered through [inputValueUsed].
+         * @see useAs */
         inline fun <Value> use(obtain:Scope.() -> Value):Value {
             return useAs(obtain, ::wrapValueForCache)
         }
 
+        /** Obtain value bound to key in [obtain] and return it.
+         * Same value is also wrapped with [wrap] and remembered through [inputValueUsed].
+         * The wrapping is done to add additional comparison logic to used types.
+         * @see use
+         * @see wrapValueForCache for wrapping rationale */
         inline fun <Value> useAs(obtain:Scope.() -> Value, wrap:(Value) -> Any?):Value {
             val value = scope.run(obtain)
             inputValueUsed(wrap(value))
             return value
         }
 
+        /** Wrap the value to be more useful when comparing old inputs to new inputs.
+         *
+         * Current implementation only wraps instances of [Path], [File] and [LocatedPath] (and their [List]s and [Set]s)
+         * into [PathCacheEntry], so that when file changes, equal [Path] instances won't equal anymore. */
         fun wrapValueForCache(value:Any?):Any? {
             return when (value) {
                 is Path ->
@@ -1136,7 +1190,9 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
             }
         }
 
-        /** Manually put input value to cache key list.*/
+        /** Manually put input value to cache key list.
+         * Used internally by [use] methods, but may be also used when the inputs do not come from the key system.
+         * (Though something like `val envInput = use { readInputFile() }`) would be also valid. */
         fun inputValueUsed(value:Any?) {
             cacheEntry.add(value)
         }
@@ -1144,10 +1200,11 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
         /** Returns cached value that corresponds to given inputs, or [EvaluatingCached] if no such cached value found. */
         @PublishedApi
         internal fun getCachedResult():Any? {
-            for (value in cacheByScope.values) {
+            for (valueReference in cacheByScope.values) {
+                val value = valueReference.get() ?: continue
                 if (value == cacheEntry) {
                     activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE)
-                    cacheByScope[scope] = value
+                    cacheByScope[scope] = valueReference
                     return value.cachedValue
                 }
             }
@@ -1158,7 +1215,7 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
         @PublishedApi
         internal fun cacheResult(newResultToCache:Value) {
             cacheEntry.cachedValue = newResultToCache
-            cacheByScope[scope] = cacheEntry
+            cacheByScope[scope] = SoftReference<CacheEntry<*>>(cacheEntry)
             activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_WRITTEN_TO_CACHE)
         }
 
@@ -1206,6 +1263,8 @@ class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value)
         }
     }
 
+    /** Used to prevent accidentally accessing wrong scopes when evaluating cached keys.
+     * @see EvaluatingCached */
     @Retention(AnnotationRetention.SOURCE)
     @Target(AnnotationTarget.CLASS, AnnotationTarget.TYPE)
     @DslMarker
