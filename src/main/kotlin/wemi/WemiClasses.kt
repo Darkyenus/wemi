@@ -870,14 +870,14 @@ sealed class BindingHolder : WithDescriptiveString {
      */
     internal infix fun <Value> Key<Set<Value>>.setToUnionOfSelfIn(configurations: Scope.()->Iterable<Configuration>) {
         this set {
-            val configurationsIter = configurations().iterator()
-            if (!configurationsIter.hasNext()) {
+            val configurationsIt = configurations().iterator()
+            if (!configurationsIt.hasNext()) {
                 emptySet()
             } else {
-                var result = using(configurationsIter.next()) { this@setToUnionOfSelfIn.get() }
-                while (configurationsIter.hasNext()) {
+                var result = using(configurationsIt.next()) { this@setToUnionOfSelfIn.get() }
+                while (configurationsIt.hasNext()) {
                     val mutableResult = result.toMutable()
-                    mutableResult.addAll(using(configurationsIter.next()) { this@setToUnionOfSelfIn.get() })
+                    mutableResult.addAll(using(configurationsIt.next()) { this@setToUnionOfSelfIn.get() })
                     result = mutableResult
                 }
                 result
@@ -890,14 +890,14 @@ sealed class BindingHolder : WithDescriptiveString {
      */
     internal infix fun <Value> Key<List<Value>>.setToConcatenationOfSelfIn(configurations: Scope.()->Iterable<Configuration>) {
         this set {
-            val configurationsIter = configurations().iterator()
-            if (!configurationsIter.hasNext()) {
+            val configurationsIt = configurations().iterator()
+            if (!configurationsIt.hasNext()) {
                 emptyList()
             } else {
-                var result = using(configurationsIter.next()) { this@setToConcatenationOfSelfIn.get() }
-                while (configurationsIter.hasNext()) {
+                var result = using(configurationsIt.next()) { this@setToConcatenationOfSelfIn.get() }
+                while (configurationsIt.hasNext()) {
                     val mutableResult = result.toMutable()
-                    mutableResult.addAll(using(configurationsIter.next()) { this@setToConcatenationOfSelfIn.get() })
+                    mutableResult.addAll(using(configurationsIt.next()) { this@setToConcatenationOfSelfIn.get() })
                     result = mutableResult
                 }
                 result
@@ -1134,7 +1134,7 @@ class CachedBy<Value, By>(private val byKey:Key<By>, private val valueProducer:(
  */
 class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value) : (Scope) -> Value, CachedBoundValue {
 
-    internal val cacheByScope = WeakHashMap<Scope, SoftReference<CacheEntry<*>>>()
+    internal val cacheByScope = HashMap<Scope, SoftReference<CacheEntry<*>>>()
 
     override fun invoke(scope: Scope): Value {
         return valueProducer.invoke(CachedEvaluation(scope, cacheByScope))
