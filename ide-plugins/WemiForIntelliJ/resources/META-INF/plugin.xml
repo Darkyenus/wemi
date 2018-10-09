@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.darkyen.wemi.intellij</id>
     <name>WEMI</name>
-    <version>0.5-SNAPSHOT</version>
+    <version>0.5</version>
     <vendor email="darkyenus@gmail.com" url="http://darkyenus.github.io">Jan Polák</vendor>
 
     <description><![CDATA[
@@ -19,6 +19,7 @@
       0.5
       <ul>
         <li>Compatibility with Wemi 0.5</li>
+        <li>Initial import should succeed even when build scripts are broken</li>
       </ul>
       0.4
       <ul>

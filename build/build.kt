@@ -24,7 +24,7 @@ val CompilerProjects = listOf(
 )
 
 private const val WemiGroup = "com.darkyen.wemi"
-private const val WemiVersion = "0.5-SNAPSHOT"
+private const val WemiVersion = "0.5"
 
 /**
  * Wemi Build System core
