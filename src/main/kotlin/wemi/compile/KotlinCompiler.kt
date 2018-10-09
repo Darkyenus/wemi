@@ -126,7 +126,7 @@ val KotlinSourceFileExtensions = setOf("kt", "kts")
  * General Kotlin compiler flags.
  */
 object KotlinCompilerFlags {
-    val customFlags = CompilerFlag<Collection<String>>("customFlags", "Custom flags to be parsed by the Kotlin compiler CLI")
+    val customFlags = CompilerFlag<List<String>>("customFlags", "Custom flags to be parsed by the Kotlin compiler CLI")
 
     /* Descriptions and most names taken from the Kotlin at https://github.com/JetBrains/kotlin under Apache 2 license */
 
@@ -137,8 +137,8 @@ object KotlinCompilerFlags {
 
     val incremental = CompilerFlag<Boolean>("incremental", "Compile incrementally")
 
-    val pluginOptions = CompilerFlag<Collection<String>>("pluginOptions", "Pass an option to a plugin")
-    val pluginClasspath = CompilerFlag<Collection<String>>("pluginClasspath", "Load plugins from the given classpath")
+    val pluginOptions = CompilerFlag<List<String>>("pluginOptions", "Pass an option to a plugin")
+    val pluginClasspath = CompilerFlag<List<String>>("pluginClasspath", "Load plugins from the given classpath")
 }
 
 /**

@@ -6,6 +6,7 @@ import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import wemi.collections.ArrayMap
+import wemi.collections.WMutableList
 import wemi.collections.toMutable
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
@@ -797,7 +798,7 @@ sealed class BindingHolder : WithDescriptiveString {
      * @see BindingHolder.plusAssign
      * @see BindingHolder.minusAssign
      */
-    operator fun <Type> Key<CompilerFlags>.get(flag: CompilerFlag<Collection<Type>>): CompilerFlagKeySetting<Collection<Type>> {
+    operator fun <Type> Key<CompilerFlags>.get(flag: CompilerFlag<List<Type>>): CompilerFlagKeySetting<List<Type>> {
         return CompilerFlagKeySetting(this, flag)
     }
 
@@ -832,10 +833,12 @@ sealed class BindingHolder : WithDescriptiveString {
      *
      * @see modify
      */
-    operator fun <Type> CompilerFlagKeySetting<Collection<Type>>.plusAssign(value: Type) {
+    operator fun <Type> CompilerFlagKeySetting<List<Type>>.plusAssign(value: Type) {
         key.modify { flags: CompilerFlags ->
             flags[flag].let {
-                flags[flag] = if (it == null) listOf(value) else it + value
+                val mutable = it?.toMutable() ?: WMutableList()
+                mutable.add(value)
+                flags[flag] = mutable
             }
             flags
         }
@@ -848,10 +851,16 @@ sealed class BindingHolder : WithDescriptiveString {
      * @see modify
      */
     @Suppress("MemberVisibilityCanPrivate")
-    operator fun <Type> CompilerFlagKeySetting<Collection<Type>>.minusAssign(value: Type) {
+    operator fun <Type> CompilerFlagKeySetting<List<Type>>.minusAssign(value: Type) {
         key.modify { flags: CompilerFlags ->
             flags[flag]?.let {
-                flags[flag] = it - value
+                if (it.size == 1 && it[0] == value) {
+                    flags.unset(flag)
+                } else {
+                    val mutable = it.toMutable()
+                    mutable.remove(value)
+                    flags[flag] = mutable
+                }
             }
             flags
         }

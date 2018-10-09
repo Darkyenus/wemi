@@ -2,6 +2,9 @@ package wemi.compile.impl
 
 import org.jetbrains.kotlin.build.JvmSourceRoot
 import org.jetbrains.kotlin.cli.common.ExitCode
+import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
+import org.jetbrains.kotlin.cli.common.arguments.parseCommandLineArguments
+import org.jetbrains.kotlin.cli.common.arguments.validateArguments
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
@@ -19,9 +22,7 @@ import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.internal.MessageLocation
 import wemi.compile.internal.render
-import wemi.util.LocatedPath
-import wemi.util.absolutePath
-import wemi.util.copyRecursively
+import wemi.util.*
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -73,8 +74,7 @@ internal class KotlinCompilerImpl1_2_71 : KotlinCompiler {
 
     override fun compileJVM(sources: Collection<LocatedPath>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
         val messageCollector = createLoggingMessageCollector(logger, loggerMarker)
-        val compiler = K2JVMCompiler()
-        val args = compiler.createArguments()
+        val args = K2JVMCompilerArguments()
 
         // Prepare defaults for later check
         val originalJvmTarget = args.jvmTarget
@@ -83,7 +83,12 @@ internal class KotlinCompilerImpl1_2_71 : KotlinCompiler {
 
         // Load free args
         flags.use(KotlinCompilerFlags.customFlags) {
-            compiler.parseArguments(it.toTypedArray(), args)
+            // Based on org.jetbrains.kotlin.cli.common.CLITool.parseArguments
+            parseCommandLineArguments(it, args)
+            val message = validateArguments(args.errors)
+            if (message != null) {
+                throw IllegalArgumentException(message)
+            }
         }
 
         // Check that free args did not modify anything
@@ -151,34 +156,35 @@ internal class KotlinCompilerImpl1_2_71 : KotlinCompiler {
 
         val exitCode: ExitCode
         if (incremental) {
+            // Based on org.jetbrains.kotlin.incremental.IncrementalJvmCompilerRunner.makeIncrementally
             val cachedOutput = cacheFolder!!.resolve("output")
             Files.createDirectories(cachedOutput)
             args.destination = cachedOutput.absolutePath
 
             val kotlincCache = cacheFolder.resolve("kotlinc-cache")
             Files.createDirectories(kotlincCache)
-            val kotlincCacheFile = kotlincCache.toFile()
+            val kotlincCachesDir = kotlincCache.toFile()
 
-            val versions = commonCacheVersionsManagers(kotlincCacheFile, true) + standaloneCacheVersionManager(kotlincCacheFile, true)
-            val buildHistoryFile = kotlincCache.resolve("build-history.bin").toFile()
+            val buildHistoryFile = File(kotlincCachesDir, "build-history.bin")
 
             exitCode = withIC {
-                val compilerRunner = IncrementalJvmCompilerRunner(
-                        kotlincCacheFile,
-                        sources.mapNotNull {
-                            val root = it.root
-                            if (root != null) {
-                                JvmSourceRoot(root.toFile(), null)
-                            } else {
-                                null
-                            }
-                        }.toSet(),
+                val versions = commonCacheVersionsManagers(kotlincCachesDir, true) + standaloneCacheVersionManager(kotlincCachesDir, true)
+
+                val compiler = IncrementalJvmCompilerRunner(
+                        kotlincCachesDir,
+                        sources.asSequence()
+                                .mapNotNull { it.root }
+                                .map {JvmSourceRoot(it.toFile(), null)}
+                                .toSet(),
                         versions,
                         object : ICReporter {
                             override fun report(message: () -> String) {
-                                logger.debug(loggerMarker, "IC: {}", message())
+                                if (logger.isDebugEnabled(loggerMarker)) {
+                                    logger.debug(loggerMarker, "IC: {}", message())
+                                }
                             }
                         },
+                        // Use precise setting in case of non-Gradle build
                         usePreciseJavaTracking = true,
                         // Directories that we want deleted on full rebuild
                         // https://github.com/JetBrains/kotlin/commit/30d0cc3a34fdfc15debcd5c9eb4b009d7c1df624
@@ -186,17 +192,17 @@ internal class KotlinCompilerImpl1_2_71 : KotlinCompiler {
                         buildHistoryFile = buildHistoryFile,
                         modulesApiHistory = EmptyModulesApiHistory
                 )
-                compilerRunner.compile(sources.map { it.file.toFile() }, args, messageCollector, providedChangedFiles = null)
+                compiler.compile(sources.map { it.file.toFile() }, args, messageCollector, providedChangedFiles = null)
             }
 
             if (exitCode == ExitCode.OK) {
-                // Copy kotlin output to real output
+                // Copy kotlin output to real output,
                 cachedOutput.copyRecursively(destination)
             }
         } else {
             args.destination = destination.absolutePath
             args.freeArgs = sources.map { it.file.absolutePath }
-            exitCode = compiler.exec(messageCollector, Services.EMPTY, args)
+            exitCode = K2JVMCompiler().exec(messageCollector, Services.EMPTY, args)
         }
 
         // Done

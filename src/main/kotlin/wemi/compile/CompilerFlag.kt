@@ -40,6 +40,10 @@ class CompilerFlags : JsonWritable {
         map[flag] = value
     }
 
+    fun <T> unset(flag: CompilerFlag<T>) {
+        map.remove(flag)
+    }
+
     /** Get the value associated with given flag */
     operator fun <T> get(flag: CompilerFlag<T>): T? {
         @Suppress("UNCHECKED_CAST")
