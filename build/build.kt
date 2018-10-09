@@ -13,7 +13,8 @@ import wemi.createProject
 import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
 import wemi.publish.InfoNode
-import wemi.util.*
+import wemi.util.LocatedPath
+import wemi.util.executable
 import java.nio.file.Files
 
 val CompilerProjects = listOf(
@@ -169,12 +170,6 @@ fun createKotlinCompilerProject(version:String):Project {
             sourceRoots set { setOf(projectRoot.get() / "src") }
         }
 
-        //TODO Remove, workaround for 0.4 bug
-        resourceRoots set { emptySet() }
-        extend(testing) {
-            resourceRoots set { emptySet() }
-        }
-
         extend(compilingKotlin) {
             compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
         }
@@ -198,12 +193,6 @@ val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
     projectGroup set { WemiGroup }
     projectName set { "wemi-plugin-jvm-hotswap" }
     projectVersion set { WemiVersion }
-
-    //TODO Remove, workaround for 0.4 bug
-    resourceRoots set { setOf(projectRoot.get() / "src/main/resources") }
-    extend(testing) {
-        resourceRoots set { emptySet() }
-    }
 
     extend(compiling) {
         projectDependencies add { dependency(core, false) }
