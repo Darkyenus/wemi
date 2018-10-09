@@ -1,4 +1,4 @@
-# 0.5
+# 0.5 2018-10-09
 - Add support for Kotlin 1.2.71
 - Fix `resourceRoots` not being set according to `projectRoot`
 - Fix Maven dependency resolution not considering parent poms
