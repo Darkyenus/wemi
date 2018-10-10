@@ -50,11 +50,9 @@ object CLI {
         terminal
     }
 
-    private val MessageDisplay: CliStatusDisplay by lazy { CliStatusDisplay(Terminal) }
+    internal val MessageDisplay: CliStatusDisplay by lazy { CliStatusDisplay(Terminal) }
 
-    /**
-     * Line reader used when awaiting tasks.
-     */
+    /** Line reader used when awaiting tasks. */
     private val TaskLineReader: LineReaderImpl by lazy {
         (LineReaderBuilder.builder()
                 .appName("Wemi")
@@ -68,11 +66,8 @@ object CLI {
         }
     }
 
-    /**
-     * Line reader used when reading user input.
-     *
-     * History should be set separately.
-     */
+    /** Line reader used when reading user input.
+     * History should be set separately.*/
     internal val InputLineReader: LineReaderImpl by lazy {
         (LineReaderBuilder.builder()
                 .appName("Wemi")

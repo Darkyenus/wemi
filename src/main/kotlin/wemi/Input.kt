@@ -26,7 +26,9 @@ internal class InputBase(private val interactive: Boolean) : Input() {
                     val previousHistory = history
                     try {
                         history = SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key))
-                        readLine("${format(description, format = Format.Bold)} (${format(key, Color.White)}): ")
+                        CLI.MessageDisplay.withStatus(false) {
+                            readLine("${format(description, format = Format.Bold)} (${format(key, Color.White)}): ")
+                        }
                     } finally {
                         history = previousHistory
                     }
@@ -240,7 +242,7 @@ fun <Result> Scope.withInput(vararg freeInput: String, action: Scope.() -> Resul
  * configuration in [Scope] stack.
  *
  * This can specify free and non-free inputs at the same time.
- * Those input pairs with null keys are treated as free input.
+ * Input pairs with null keys are treated as free input.
  *
  * @see [Scope.using]
  * @see [withInput]
