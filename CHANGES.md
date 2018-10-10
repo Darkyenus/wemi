@@ -1,3 +1,7 @@
+# 0.6
+- Fix kotlin 1.2.71 incremental compilation
+- Add "key trace" status line to the UI 
+
 # 0.5 2018-10-09
 - Add support for Kotlin 1.2.71
 - Fix `resourceRoots` not being set according to `projectRoot`
