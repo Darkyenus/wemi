@@ -39,6 +39,7 @@ val core:Project by project {
 
     repositories add { Jitpack }
 
+    val JLineVersion = "3.3.0"
     libraryDependencies set { setOf(
             kotlinDependency("stdlib"),
             kotlinDependency("reflect"),
@@ -46,7 +47,9 @@ val core:Project by project {
             dependency("com.github.Darkyenus", "tproll", "v1.2.6"),
             dependency("com.github.Darkyenus", "DaveWebb", "v1.2"),
             dependency("com.github.EsotericSoftware", "jsonbeans", "0.9"),
-            dependency("org.jline", "jline", "3.3.0")
+            dependency("org.jline", "jline-terminal", JLineVersion),
+            dependency("org.jline", "jline-terminal-jansi", JLineVersion),
+            dependency("org.jline", "jline-reader", JLineVersion)
         ) }
 
     // Compile-only (provided) libraries

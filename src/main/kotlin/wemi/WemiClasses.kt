@@ -920,27 +920,21 @@ sealed class BindingHolder : WithDescriptiveString {
     abstract override fun toDescriptiveAnsiString(): String
 }
 
-/**
- * @see useKeyEvaluationListener
- */
+/** @see useKeyEvaluationListener */
 @Volatile
 private var activeKeyEvaluationListener:WemiKeyEvaluationListener? = null
 
-/**
- * Execute [action] with [listener] set to listen to any key evaluations that are done during this time.
- *
- * Only one listener may be active at any time.
- */
+/** Execute [action] with [listener] set to listen to any key evaluations that are done during this time. */
 fun <Result>useKeyEvaluationListener(listener: WemiKeyEvaluationListener, action:()->Result):Result {
-    if (activeKeyEvaluationListener != null) {
-        throw WemiException("Failed to apply KeyEvaluationListener, someone already has listener applied")
-    }
+    val oldListener = activeKeyEvaluationListener
+    val usedListener =
+            if (oldListener == null) listener else WemiKeyEvaluationListenerSplitter(oldListener, listener)
     try {
-        activeKeyEvaluationListener = listener
+        activeKeyEvaluationListener = usedListener
         return action()
     } finally {
-        assert(activeKeyEvaluationListener === listener) { "Someone has applied different listener during action()!" }
-        activeKeyEvaluationListener = null
+        assert(activeKeyEvaluationListener === usedListener) { "Someone has applied different listener during action()!" }
+        activeKeyEvaluationListener = oldListener
     }
 }
 
@@ -964,7 +958,7 @@ interface WemiKeyEvaluationListener {
      * @param fromScope in which scope is the binding being searched from
      * @param key that is being evaluated
      */
-    fun keyEvaluationStarted(fromScope: Scope, key: Key<*>)
+    fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {}
 
     /**
      * Called when evaluation of key on top of the key evaluation stack will use some modifiers, if it succeeds.
@@ -973,7 +967,7 @@ interface WemiKeyEvaluationListener {
      * @param modifierFromHolder in which holder inside the [modifierFromScope] the modifier has been found
      * @param amount of modifiers added from this scope-holder
      */
-    fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder:BindingHolder, amount:Int)
+    fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder:BindingHolder, amount:Int) {}
 
     /**
      * Called when evaluation of key on top of the key evaluation stack used some special feature,
@@ -983,7 +977,7 @@ interface WemiKeyEvaluationListener {
      * @see FEATURE_READ_FROM_CACHE
      * @see FEATURE_WRITTEN_TO_CACHE
      */
-    fun keyEvaluationFeature(feature:String)
+    fun keyEvaluationFeature(feature:String) {}
 
     /**
      * Evaluation of key on top of key evaluation stack has been successful.
@@ -996,7 +990,7 @@ interface WemiKeyEvaluationListener {
     fun <Value>keyEvaluationSucceeded(key: Key<Value>,
                                       bindingFoundInScope: Scope?,
                                       bindingFoundInHolder: BindingHolder?,
-                                      result: Value)
+                                      result: Value) {}
 
     /**
      * Evaluation of key on top of key evaluation stack has failed, because the key has no binding, nor default value.
@@ -1004,7 +998,7 @@ interface WemiKeyEvaluationListener {
      * @param withAlternative user supplied alternative will be used if true (passed in [alternativeResult]),
      *                          [wemi.WemiException.KeyNotAssignedException] will be thrown if false
      */
-    fun keyEvaluationFailedByNoBinding(withAlternative:Boolean, alternativeResult:Any?)
+    fun keyEvaluationFailedByNoBinding(withAlternative:Boolean, alternativeResult:Any?) {}
 
     /**
      * Evaluation of key or one of the modifiers has thrown an exception.
@@ -1016,13 +1010,48 @@ interface WemiKeyEvaluationListener {
      * @param exception that was thrown
      * @param fromKey if true, the evaluation of key threw the exception, if false it was one of the modifiers
      */
-    fun keyEvaluationFailedByError(exception:Throwable, fromKey:Boolean)
+    fun keyEvaluationFailedByError(exception:Throwable, fromKey:Boolean) {}
 
     companion object {
         /** [keyEvaluationFeature] to signify that this value has been read from cache */
         const val FEATURE_READ_FROM_CACHE = "from cache"
         /** [keyEvaluationFeature] to signify that this value has not been found in cache, but was stored there for later use */
         const val FEATURE_WRITTEN_TO_CACHE = "to cache"
+    }
+}
+
+private class WemiKeyEvaluationListenerSplitter(
+        private val first:WemiKeyEvaluationListener,
+        private val second:WemiKeyEvaluationListener) : WemiKeyEvaluationListener {
+
+    override fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {
+        first.keyEvaluationStarted(fromScope, key)
+        second.keyEvaluationStarted(fromScope, key)
+    }
+
+    override fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder: BindingHolder, amount: Int) {
+        first.keyEvaluationHasModifiers(modifierFromScope, modifierFromHolder, amount)
+        second.keyEvaluationHasModifiers(modifierFromScope, modifierFromHolder, amount)
+    }
+
+    override fun keyEvaluationFeature(feature: String) {
+        first.keyEvaluationFeature(feature)
+        second.keyEvaluationFeature(feature)
+    }
+
+    override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value) {
+        first.keyEvaluationSucceeded(key, bindingFoundInScope, bindingFoundInHolder, result)
+        second.keyEvaluationSucceeded(key, bindingFoundInScope, bindingFoundInHolder, result)
+    }
+
+    override fun keyEvaluationFailedByNoBinding(withAlternative: Boolean, alternativeResult: Any?) {
+        first.keyEvaluationFailedByNoBinding(withAlternative, alternativeResult)
+        second.keyEvaluationFailedByNoBinding(withAlternative, alternativeResult)
+    }
+
+    override fun keyEvaluationFailedByError(exception: Throwable, fromKey: Boolean) {
+        first.keyEvaluationFailedByError(exception, fromKey)
+        second.keyEvaluationFailedByError(exception, fromKey)
     }
 }
 

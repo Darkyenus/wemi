@@ -6,6 +6,8 @@ import org.jline.reader.impl.DefaultParser
 import org.jline.reader.impl.LineReaderImpl
 import org.jline.terminal.Terminal
 import org.jline.terminal.TerminalBuilder
+import org.jline.utils.AttributedStringBuilder
+import org.jline.utils.AttributedStyle
 import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.util.*
@@ -47,6 +49,8 @@ object CLI {
 
         terminal
     }
+
+    private val MessageDisplay: CliStatusDisplay by lazy { CliStatusDisplay(Terminal) }
 
     /**
      * Line reader used when awaiting tasks.
@@ -104,55 +108,6 @@ object CLI {
     }
 
     /**
-     * Currently selected default project in interactive CLI
-     */
-    private var defaultProject: Project? = null
-        set(value) {
-            if (value != null) {
-                print(formatLabel("Project: "))
-                println(formatValue(value.name))
-            }
-            field = value
-        }
-
-    /**
-     * Find what should be the default project, assuming Wemi is launched from the given [root] path
-     */
-    internal fun findDefaultProject(root: Path): Project? {
-        val allProjects = AllProjects
-        when {
-            allProjects.isEmpty() -> return null
-            else -> {
-                var closest: Project? = null
-                var closestDist = -1
-                projects@for (project in allProjects.values) {
-                    when {
-                        project === WemiBuildScriptProject ||
-                        project.projectRoot == null -> continue@projects
-                        project.projectRoot == root -> return project
-                        closest == null -> closest = project
-                        else -> // Compare how close they are!
-                            try {
-                                if (closestDist == -1) {
-                                    closestDist = root.relativize(closest.projectRoot).nameCount
-                                }
-                                val projectDist = root.relativize(project.projectRoot).nameCount
-                                if (projectDist < closestDist) {
-                                    closest = project
-                                    closestDist = projectDist
-                                }
-                            } catch (_: IllegalArgumentException) {
-                                //May happen if projects are on different roots, but lets not deal with that.
-                            }
-                    }
-                }
-                LOG.trace("findDefaultProject({}) = {}", root, closest)
-                return closest
-            }
-        }
-    }
-
-    /**
      * Initialize CLI.
      * Needed before any IO operations are done through [CLI].
      */
@@ -164,14 +119,20 @@ object CLI {
             defaultProject = shouldBeDefault
         }
 
-        val out = Terminal.writer()
-        System.setOut(PrintStream(object : LineReadingOutputStream(onLineRead = { line -> out.append(line) }) {
-            override fun flush() {
-                super.flush()
-                out.flush()
-            }
-        }, true))
+        System.setOut(PrintStream(MessageDisplay, true))
     }
+
+    /**
+     * Currently selected default project in interactive CLI
+     */
+    private var defaultProject: Project? = null
+        set(value) {
+            if (value != null) {
+                print(formatLabel("Project: "))
+                println(formatValue(value.name))
+            }
+            field = value
+        }
 
     /**
      * Format given text like it is a label.
@@ -229,7 +190,57 @@ object CLI {
         }
     }
 
-    private val KEY_EVALUATION_PREFIX = formatLabel(if (WemiUnicodeOutputSupported) "→ " else "# ")
+    private val KeyEvaluationStatusListener = object : WemiKeyEvaluationListener {
+
+        private val STATUS_PREFIX = if (WemiUnicodeOutputSupported) "• " else "# "
+        private val STATUS_INFIX = if (WemiUnicodeOutputSupported) " ‣ " else " > "
+        private val STATUS_META_STYLE = AttributedStyle.BOLD.foreground(AttributedStyle.GREEN)
+        private val STATUS_CONTENT_STYLE = AttributedStyle.DEFAULT.underline()
+
+        private val messageBuilder = AttributedStringBuilder()
+        private val stack = ArrayList<Int>()
+        private val importantPrefix:Int
+
+        init {
+            messageBuilder.style(STATUS_META_STYLE)
+            messageBuilder.append(STATUS_PREFIX)
+            importantPrefix = messageBuilder.length
+        }
+
+        override fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {
+            stack.add(messageBuilder.length)
+            if (stack.size > 1) {
+                messageBuilder.style(STATUS_META_STYLE)
+                messageBuilder.append(STATUS_INFIX)
+            }
+            messageBuilder.style(STATUS_CONTENT_STYLE)
+            messageBuilder.append(key.name)
+            update()
+        }
+
+        private fun pop() {
+            if (stack.size > 0) {
+                messageBuilder.setLength(stack.removeAt(stack.size - 1))
+                update()
+            }
+        }
+
+        private fun update() {
+            MessageDisplay.setMessage(messageBuilder.toAttributedString(), importantPrefix)
+        }
+
+        override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value) {
+            pop()
+        }
+
+        override fun keyEvaluationFailedByNoBinding(withAlternative: Boolean, alternativeResult: Any?) {
+            pop()
+        }
+
+        override fun keyEvaluationFailedByError(exception: Throwable, fromKey: Boolean) {
+            pop()
+        }
+    }
 
     /**
      * Evaluates the key or command and prints human readable, formatted output.
@@ -243,12 +254,12 @@ object CLI {
             }
         }
 
-        // TODO Ideally, this would get rewritten with Done message if nothing was written between them
-        print(KEY_EVALUATION_PREFIX)
-        println(formatInput(task.key))
-
         val beginTime = System.currentTimeMillis()
-        val keyEvaluationResult = task.evaluateKey(defaultProject)
+        val keyEvaluationResult = useKeyEvaluationListener(KeyEvaluationStatusListener) {
+            MessageDisplay.withStatus(true) {
+                task.evaluateKey(defaultProject)
+            }
+        }
         val (key, data, status) = keyEvaluationResult
         val duration = System.currentTimeMillis() - beginTime
 

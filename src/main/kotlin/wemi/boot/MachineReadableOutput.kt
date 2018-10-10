@@ -54,7 +54,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
                 return
             }
             "defaultProject" -> {
-                machineReadablePrint(out, CLI.findDefaultProject(Paths.get("."))?.name)
+                machineReadablePrint(out, findDefaultProject(Paths.get("."))?.name)
                 return
             }
         }

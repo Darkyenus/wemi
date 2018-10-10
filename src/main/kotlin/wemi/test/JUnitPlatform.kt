@@ -92,21 +92,25 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
 
     var outputJson = ""
 
-    val stdout = LineReadingOutputStream { line ->
-        if (line.startsWith(TEST_LAUNCHER_OUTPUT_PREFIX)) {
-            outputJson = line.substring(TEST_LAUNCHER_OUTPUT_PREFIX.length)
-            LOG.trace("Test process returned json: {}", outputJson)
-        } else {
+    val stdout = object : LineReadingOutputStream() {
+        override fun onLineRead(line: CharSequence) {
+            if (line.startsWith(TEST_LAUNCHER_OUTPUT_PREFIX)) {
+                outputJson = line.substring(TEST_LAUNCHER_OUTPUT_PREFIX.length)
+                LOG.trace("Test process returned json: {}", outputJson)
+            } else {
+                val trimmedLine = line.dropLastWhile { it.isWhitespace() }
+                if (trimmedLine.isNotEmpty()) {
+                    TEST_OUTPUT_LOG.info("{}", trimmedLine)
+                }
+            }
+        }
+    }
+    val stderr = object : LineReadingOutputStream() {
+        override fun onLineRead(line: CharSequence) {
             val trimmedLine = line.dropLastWhile { it.isWhitespace() }
             if (trimmedLine.isNotEmpty()) {
                 TEST_OUTPUT_LOG.info("{}", trimmedLine)
             }
-        }
-    }
-    val stderr = LineReadingOutputStream { line ->
-        val trimmedLine = line.dropLastWhile { it.isWhitespace() }
-        if (trimmedLine.isNotEmpty()) {
-            TEST_OUTPUT_LOG.info("{}", trimmedLine)
         }
     }
 

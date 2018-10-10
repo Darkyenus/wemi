@@ -38,7 +38,7 @@ fun readFully(into: OutputStream, stream: InputStream, buffer: ByteArray = ByteA
  *
  * [close] to obtain the last line without ending '\n'.
  */
-open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private val onLineRead: (CharSequence) -> Unit) : OutputStream() {
+abstract class LineReadingOutputStream(charset: Charset = Charsets.UTF_8) : OutputStream() {
 
     private val decoder: CharsetDecoder = charset.newDecoder()
             .onMalformedInput(CodingErrorAction.REPLACE)
@@ -51,6 +51,14 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
     init {
         inputBuffer.clear()
         outputBuffer.clear()
+    }
+
+    protected abstract fun onLineRead(line:CharSequence)
+
+    /** Called when [flush] is called and the buffer contains some characters.
+     * @return true when [characters] were consumed, they will not appear in the line in next [onLineRead]. False to ignore the flush. */
+    protected open fun onCharactersFlushed(characters:CharSequence):Boolean {
+        return false
     }
 
     private fun flushLine() {
@@ -104,6 +112,13 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
             offset += toConsume
             remaining -= toConsume
             decode(false)
+        }
+    }
+
+    override fun flush() {
+        super.flush()
+        if (outputSB.isNotEmpty() && onCharactersFlushed(outputSB)) {
+            outputSB.setLength(0)
         }
     }
 
