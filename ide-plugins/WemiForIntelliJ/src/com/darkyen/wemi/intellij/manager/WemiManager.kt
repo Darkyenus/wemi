@@ -90,7 +90,7 @@ class WemiManager : ExternalSystemUiAware,
 
 
             WemiExecutionSettings(
-                    findWemiLauncher(project, pair.second) ?: throw RuntimeException("Project $project does not have a Wemi launcher!"),
+                    findWemiLauncher(project) ?: throw RuntimeException("Project $project does not have a Wemi launcher!"),
                     javaVmExecutablePath,
                     projectSettings?.downloadDocs ?: true,
                     projectSettings?.downloadSources ?: true,

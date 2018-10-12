@@ -4,6 +4,7 @@ import com.darkyen.wemi.intellij.WemiLauncher
 import com.darkyen.wemi.intellij.execution.WemiRunConfiguration
 import com.intellij.openapi.externalSystem.model.settings.ExternalSystemExecutionSettings
 import com.intellij.openapi.util.Key
+import java.nio.file.Paths
 
 /**
  * Settings to be used when invoking the wemi(.jar) file for information retrieval or other requests.
@@ -23,7 +24,7 @@ class WemiExecutionSettings(val wemiLauncher: String,
                 prefixConfigurations: String,
                 projectName: String?,
                 allowBrokenBuildScripts:Boolean):this(
-            wemiLauncher.file,
+            wemiLauncher.file.toString(),
             javaVmExecutable,
             downloadDocs,
             downloadSources,
@@ -32,7 +33,7 @@ class WemiExecutionSettings(val wemiLauncher: String,
             allowBrokenBuildScripts)
 
     val launcher:WemiLauncher
-        get() = WemiLauncher(wemiLauncher)
+        get() = WemiLauncher(Paths.get(wemiLauncher))
 
     var deferDebugToWemi:Boolean? = null
 

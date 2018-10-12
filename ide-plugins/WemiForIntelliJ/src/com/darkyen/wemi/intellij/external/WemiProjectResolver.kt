@@ -152,7 +152,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             // Kotlin data
             val kotlinCompilerData = HashMap<String, JsonValue>()
             session.jsonArray(defaultProject.projectName, task = "compilerOptions", configurations = *arrayOf("compilingKotlin")).forEach {
-                val key = it.getString("key")
+                val key = it.getString("key")!!
                 val value = it.get("value")
                 kotlinCompilerData[key] = value
             }
@@ -196,11 +196,11 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         for (project in projects.values) {
             // We currently only process projects and ignore configurations because there is no way to map that
             val compiling = session.task(project.projectName, "compiling", task = "projectDependencies")
-                    .data(JsonValue.ValueType.array).map { it.getString("project") }
+                    .data(JsonValue.ValueType.array).map { it.getString("project")!! }
             val running = session.task(project.projectName, "running", task = "projectDependencies")
-                    .data(JsonValue.ValueType.array).map { it.getString("project") }
+                    .data(JsonValue.ValueType.array).map { it.getString("project")!! }
             val testing = session.task(project.projectName, "testing", task = "projectDependencies")
-                    .data(JsonValue.ValueType.array).map { it.getString("project") }
+                    .data(JsonValue.ValueType.array).map { it.getString("project")!! }
 
             val all = LinkedHashSet<String>(compiling)
             all.addAll(running)
@@ -233,8 +233,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         // Tasks
         listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving tasks"))
         for (task in session.jsonArray(project = null, task = "#keysWithDescription", includeUserConfigurations = false)) {
-            val taskName = task.getString("name")
-            val taskDescription = task.getString("description")
+            val taskName = task.getString("name")!!
+            val taskDescription = task.getString("description")!!
             val taskData = TaskData(WemiProjectSystemId, taskName, projectPath, taskDescription)
             // (also group can be set here, but we don't have any groups yet)
             projectDataNode.createChild(ProjectKeys.TASK, taskData)
@@ -245,7 +245,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         run {
             val buildFolder = session.string(project = WemiBuildScriptProjectName, task = "projectRoot", includeUserConfigurations = false)
 
-            val classpath = session.jsonArray(project = WemiBuildScriptProjectName, task = "externalClasspath").map { it.locatedFileClasspathEntry() }
+            val classpath = session.jsonArray(project = WemiBuildScriptProjectName, task = "externalClasspath").map { it.locatedFileOrPathClasspathEntry() }
             val cacheFolder = session.string(project = WemiBuildScriptProjectName, task = "cacheDirectory")
 
             // Module Data
@@ -372,14 +372,14 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
 
         try {
-            session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies").get("value").forEach {
-                val projectId = it.get("key")
-                val artifact = it.get("value")?.get("data")?.find { it.getString("name") == "artifactFile" }?.getString("value") ?: return@forEach
+            session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies").get("value").forEach { resolvedValue ->
+                val projectId = resolvedValue.get("key")
+                val artifact = resolvedValue.get("value")?.get("data")?.find { it.getString("name") == "artifactFile" }?.get("value")?.asString() ?: return@forEach
 
-                val group = projectId.getString("group")
-                val name = projectId.getString("name")
-                val version = projectId.getString("version")
-                val classifier = projectId.get("attributes").find { it.getString("key") == "m2-classifier" }?.getString("value") ?: ""
+                val group = projectId.getString("group")!!
+                val name = projectId.getString("name")!!
+                val version = projectId.getString("version")!!
+                val classifier = projectId.get("attributes").find { it.getString("key") == "m2-classifier" }?.get("value")?.asString() ?: ""
 
                 add("$group:$name:$version",
                         WemiLibraryDependency(
@@ -388,7 +388,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             }
 
             session.jsonArray(projectName, *config, task = "unmanagedDependencies").forEach {
-                val file = it.locatedFileClasspathEntry()
+                val file = it.locatedFileOrPathClasspathEntry()
 
                 add(file.absolutePath, WemiLibraryDependency(file.name, file))
             }
@@ -613,8 +613,12 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     .data(JsonValue.ValueType.array)
         }
 
-        fun JsonValue.locatedFileClasspathEntry():File {
-            return File(getString("root") ?: getString("file")).absoluteFile
+        fun JsonValue.locatedFileOrPathClasspathEntry():File {
+            return if (this.type() == JsonValue.ValueType.stringValue) {
+                return File(asString())
+            } else {
+                File(get("root")?.asString() ?: getString("file")!!)
+            }.absoluteFile
         }
 
         fun JsonValue.mapGet(key:String):JsonValue? {

@@ -69,6 +69,14 @@
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
 
+        <action id="com.darkyen.wemi.intellij.importing.ConvertProjectAction"
+                class="com.darkyen.wemi.intellij.importing.ConvertProjectAction"
+                text="Convert to Wemi Project"
+                description="Convert project from different or not build system to Wemi"
+                icon="WemiIcons.ACTION">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+
         <action id="com.darkyen.wemi.intellij.importing.ReloadProjectAction"
                 class="com.darkyen.wemi.intellij.importing.ReloadProjectAction"
                 text="Reload Wemi Project"

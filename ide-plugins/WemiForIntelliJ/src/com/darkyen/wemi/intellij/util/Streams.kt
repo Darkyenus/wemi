@@ -4,6 +4,10 @@ package com.darkyen.wemi.intellij.util
  *
  */
 
+import com.intellij.openapi.util.SystemInfo
+import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.newvfs.ArchiveFileSystem
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
@@ -11,6 +15,8 @@ import java.nio.CharBuffer
 import java.nio.charset.Charset
 import java.nio.charset.CharsetDecoder
 import java.nio.charset.CodingErrorAction
+import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  * Stream utilities
@@ -116,4 +122,27 @@ open class LineReadingOutputStream(charset: Charset = Charsets.UTF_8, private va
         decode(true)
         flushLine()
     }
+}
+
+fun VirtualFile?.toPath(): Path? {
+    val localPath = this?.let { wrappedFile ->
+        val wrapFileSystem = wrappedFile.fileSystem
+        if (wrapFileSystem is ArchiveFileSystem) {
+            wrapFileSystem.getLocalByEntry(wrappedFile)
+        } else {
+            wrappedFile
+        }
+    }
+
+    if (localPath?.isInLocalFileSystem != true) {
+        return null
+    }
+
+    // Based on LocalFileSystemBase.java
+    var path = localPath.path
+    if (StringUtil.endsWithChar(path, ':') && path.length == 2 && SystemInfo.isWindows) {
+        path += "/"
+    }
+
+    return Paths.get(path)
 }

@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.importing
 
+import com.darkyen.wemi.intellij.WemiBuildDirectoryName
 import com.darkyen.wemi.intellij.WemiLauncherFileName
 import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.file.isWemiLauncher
@@ -32,13 +33,13 @@ class WemiProjectImportProvider(builder: ImportFromWemiControlBuilder)
                 return this
             }
             // Ok, no launcher, but maybe build has some build scripts?
-            val buildFolder = this.findChild("build")
+            val buildFolder = this.findChild(WemiBuildDirectoryName)
             if (buildFolder != null && buildFolder.children.any { it.isWemiScriptSource() }) {
                 return this
             }
 
             // Maybe this is the build folder?
-            if (this.name.equals("build", ignoreCase = true) && children.any { it.isWemiScriptSource() }) {
+            if (this.name.equals(WemiBuildDirectoryName, ignoreCase = true) && children.any { it.isWemiScriptSource() }) {
                 return this.parent
             }
         } else {
@@ -50,7 +51,7 @@ class WemiProjectImportProvider(builder: ImportFromWemiControlBuilder)
             // Maybe this is one of wemi sources?
             if (this.isWemiScriptSource()) {
                 val buildFolder = this.parent
-                if (buildFolder.name.equals("build", ignoreCase = true)) {
+                if (buildFolder.name.equals(WemiBuildDirectoryName, ignoreCase = true)) {
                     return buildFolder.parent
                 }
             }

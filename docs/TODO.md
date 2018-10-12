@@ -1,7 +1,5 @@
 # Things to do next
 
-- IDE: Add "convert to wemi" button
-
 - Streamline local dependency retrieval, no need to keep it all in memory, possibility to compute hashes during download
 
 - When Kotlin multiplatform projects are standardized, consider rewriting compiler facade from maven plugin

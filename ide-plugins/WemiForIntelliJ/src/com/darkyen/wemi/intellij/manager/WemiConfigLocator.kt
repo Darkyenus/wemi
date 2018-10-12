@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.manager
 
+import com.darkyen.wemi.intellij.WemiBuildDirectoryName
 import com.darkyen.wemi.intellij.WemiLauncherFileName
 import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.file.isWemiScriptSource
@@ -28,7 +29,7 @@ class WemiConfigLocator : ExternalSystemConfigLocator {
             result.add(wemi)
         }
 
-        val build = projectRoot.findChild("build") ?: return result
+        val build = projectRoot.findChild(WemiBuildDirectoryName) ?: return result
         for (child in build.children) {
             if (child.isWemiScriptSource()) {
                 result.add(child)
@@ -39,7 +40,7 @@ class WemiConfigLocator : ExternalSystemConfigLocator {
     }
 
     override fun adjust(configPath: VirtualFile): VirtualFile? {
-        val build = configPath.findChild("build")
+        val build = configPath.findChild(WemiBuildDirectoryName)
         if (build != null) {
             for (child in build.children) {
                 if (child.isWemiScriptSource()) {

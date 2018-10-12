@@ -1,6 +1,7 @@
 package com.darkyen.wemi.intellij
 
 import com.darkyen.wemi.intellij.util.readFully
+import com.darkyen.wemi.intellij.util.toPath
 import com.esotericsoftware.jsonbeans.JsonReader
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.execution.configurations.GeneralCommandLine
@@ -8,6 +9,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.externalSystem.model.ProjectSystemId
 import com.intellij.openapi.project.Project
 import java.io.*
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 // Must be a subset of Kotlin file extensions
@@ -19,21 +22,19 @@ const val WemiBuildScriptProjectName = "wemi-build"
 
 const val WemiLauncherFileName = "wemi"
 
-/**
- * Finds project's Wemi launcher, if present.
- *
- * This is not a "fast" operation.
- */
-fun findWemiLauncher(project:Project, wemiRootPath:String? = null):WemiLauncher? {
-    val baseFile = File(project.basePath ?: wemiRootPath ?: return null)
-    val wemiJar = File(baseFile, WemiLauncherFileName)
+const val WemiBuildDirectoryName = "build"
 
-    if (!wemiJar.isFile) return null
+/** Finds project's Wemi launcher, if present.
+ * Should be fairly cheap. */
+fun findWemiLauncher(project:Project):WemiLauncher? {
+    val wemiJar = project.baseDir?.toPath()?.resolve(WemiLauncherFileName)?.toAbsolutePath() ?: return null
 
-    return WemiLauncher(wemiJar.absolutePath)
+    if (!Files.isRegularFile(wemiJar)) return null
+
+    return WemiLauncher(wemiJar)
 }
 
-class WemiLauncher internal constructor(val file: String) {
+class WemiLauncher internal constructor(val file: Path) {
 
     fun createMachineReadableResolverSession(javaExecutable: String, jvmOptions: Set<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>, allowBrokenBuildScripts:Boolean):WemiLauncherSession {
         val command = GeneralCommandLine()
@@ -42,13 +43,13 @@ class WemiLauncher internal constructor(val file: String) {
         command.environment.putAll(env)
         command.environment["WEMI_COLOR"] = "false"
         command.environment["WEMI_UNICODE"] = "true"
-        command.workDirectory = File(file).parentFile
+        command.workDirectory = file.parent.toFile()
         command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
         jvmOptions.forEach {
             command.addParameter(it)
         }
         command.addParameter("-jar")
-        command.addParameter(file)
+        command.addParameter(file.toString())
         command.isRedirectErrorStream = false
 
         command.addParameter("--interactive")
@@ -67,13 +68,13 @@ class WemiLauncher internal constructor(val file: String) {
         command.environment.putAll(env)
         command.environment["WEMI_COLOR"] = "true"
         command.environment["WEMI_UNICODE"] = "true"
-        command.workDirectory = File(file).parentFile
+        command.workDirectory = file.parent.toFile()
         command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
         jvmOptions.forEach {
             command.addParameter(it)
         }
         command.addParameter("-jar")
-        command.addParameter(file)
+        command.addParameter(file.toString())
         command.isRedirectErrorStream = false
 
         command.addParameters(tasks)

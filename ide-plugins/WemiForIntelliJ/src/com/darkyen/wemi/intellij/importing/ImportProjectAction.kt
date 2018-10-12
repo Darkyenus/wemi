@@ -9,7 +9,6 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.Project
 import icons.WemiIcons
-import java.io.File
 
 /**
  * Action to import the project.
@@ -28,7 +27,7 @@ class ImportProjectAction : AnAction("Import Wemi Project",
 
         val launcher = findWemiLauncher(project)
         if (launcher == null) {
-            //TODO show some dialog to create wemi project or info about that... dunno
+            e.presentation.isEnabledAndVisible = false
             return
         }
 
@@ -37,7 +36,10 @@ class ImportProjectAction : AnAction("Import Wemi Project",
 
     override fun update(e: AnActionEvent) {
         val project = e.project
-        e.presentation.isEnabledAndVisible = project != null && canOfferImportOfUnlinkedProject(project)
+        e.presentation.isEnabledAndVisible =
+                project != null
+                && canOfferImportOfUnlinkedProject(project)
+                && findWemiLauncher(project) != null
     }
 
     companion object {
@@ -55,8 +57,8 @@ class ImportProjectAction : AnAction("Import Wemi Project",
         fun importUnlinkedProject(project: Project, launcher: WemiLauncher) {
             val importBuilder = ImportFromWemiControlBuilder()
 
-            val projectDirectory = File(launcher.file).parentFile
-            val wizard = AddModuleWizard(project, projectDirectory.absolutePath, WemiProjectImportProvider(importBuilder))
+            val projectDirectory = launcher.file.parent
+            val wizard = AddModuleWizard(project, projectDirectory.toString(), WemiProjectImportProvider(importBuilder))
             if (wizard.stepCount <= 0 || wizard.showAndGet()) {
                 ImportModuleAction.createFromWizard(project, wizard)
             }

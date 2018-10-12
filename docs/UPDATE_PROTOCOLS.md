@@ -10,6 +10,8 @@
     - [IDEA plugin changelog](../ide-plugins/WemiForIntelliJ/resources/META-INF/plugin.xml)
 3. Create and push git commit
 4. Create github release, with binary builds of IDEA plugin and wemi itself
+	1. ./wemi assembly
+	2. WemiForIntelliJ jar (must be done second so that it can bundle wemi binary through symlink)
 5. Create commit that changes versions to <NEXT_VERSION>-SNAPSHOT
 6. Update wemi used by Wemi, update build script, if needed, commit and push
 

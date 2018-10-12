@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.file
 
+import com.darkyen.wemi.intellij.WemiBuildDirectoryName
 import com.darkyen.wemi.intellij.WemiBuildFileExtensions
 import com.darkyen.wemi.intellij.WemiLauncherFileName
 import com.intellij.openapi.vfs.VirtualFile
@@ -24,7 +25,7 @@ internal fun VirtualFile?.isWemiScriptSource(deepCheck:Boolean = false):Boolean 
 
     if (deepCheck) {
         val buildDirectory = this.parent ?: return false
-        if (!buildDirectory.name.equals("build", ignoreCase = true)) {
+        if (!buildDirectory.name.equals(WemiBuildDirectoryName, ignoreCase = true)) {
             return false
         }
         val projectDirectory = buildDirectory.parent ?: return false
@@ -54,7 +55,7 @@ internal fun Path?.isWemiScriptSource(deepCheck:Boolean = false):Boolean {
 
     if (deepCheck) {
         val buildDirectory = this.parent ?: return false
-        if (buildDirectory.fileName?.toString()?.equals("build", ignoreCase = true) != true) {
+        if (buildDirectory.fileName?.toString()?.equals(WemiBuildDirectoryName, ignoreCase = true) != true) {
             return false
         }
         val projectDirectory = buildDirectory.parent ?: return false

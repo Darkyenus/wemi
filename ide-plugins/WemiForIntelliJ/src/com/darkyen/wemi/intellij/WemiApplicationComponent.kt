@@ -4,10 +4,8 @@ import com.darkyen.wemi.intellij.file.WemiLauncherFileType
 import com.intellij.openapi.components.ApplicationComponent
 import com.intellij.openapi.externalSystem.util.ExternalSystemConstants.USE_IN_PROCESS_COMMUNICATION_REGISTRY_KEY_SUFFIX
 import com.intellij.openapi.fileTypes.ExactFileNameMatcher
-import com.intellij.openapi.fileTypes.ExtensionFileNameMatcher
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.util.registry.Registry
-import org.jetbrains.kotlin.idea.KotlinFileType
 
 /**
  * Application component for the Wemi plugin.
