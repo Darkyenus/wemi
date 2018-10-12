@@ -77,6 +77,14 @@
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
 
+        <action id="com.darkyen.wemi.intellij.importing.InstallWemiLauncherAction"
+                class="com.darkyen.wemi.intellij.importing.InstallWemiLauncherAction"
+                text="(Re)install Wemi launcher"
+                description="Place plugin's 'wemi' launcher file into the project's root, updating the existing one"
+                icon="WemiIcons.ACTION">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+
         <action id="com.darkyen.wemi.intellij.importing.ReloadProjectAction"
                 class="com.darkyen.wemi.intellij.importing.ReloadProjectAction"
                 text="Reload Wemi Project"

@@ -38,41 +38,9 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
             return
         }
 
-        val wemiBinaryStream = this.javaClass.classLoader.getResourceAsStream("wemi-binary")
-        if (wemiBinaryStream == null) {
-            LOG.error("wemi-binary resource does not exist")
-            WemiNotificationGroup.showBalloon(project,
-                    "Could not convert to Wemi",
-                    "Plugin installation is corrupted",
-                    NotificationType.ERROR)
-            return
-        }
+        val (projectBasePath, wemiLauncher) = InstallWemiLauncherAction
+                .reinstallWemiLauncher(project, "Could not convert to Wemi") ?: return
 
-        val projectBaseDir = project.baseDir
-        val projectBasePath = projectBaseDir?.toPath()
-        val wemiLauncherPath = projectBasePath?.resolve(WemiLauncherFileName)?.toAbsolutePath() ?: run {
-            LOG.error("Project $project does not have baseDir convertible to Path")
-            WemiNotificationGroup.showBalloon(project,
-                    "Could not convert to Wemi",
-                    "Project's directory is in a strange place",
-                    NotificationType.ERROR)
-            return
-        }
-
-        try {
-            Files.newOutputStream(wemiLauncherPath).use { wemiFile ->
-                wemiBinaryStream.use { wemiBinary ->
-                    wemiBinary.copyTo(wemiFile)
-                }
-            }
-        } catch (e:Exception) {
-            LOG.error("Failed to copy Wemi binary to $wemiLauncherPath", e)
-            WemiNotificationGroup.showBalloon(project,
-                    "Could not convert to Wemi",
-                    "Failed to create \"wemi\" file",
-                    NotificationType.ERROR)
-            return
-        }
 
         val buildDirectory = projectBasePath.resolve(WemiBuildDirectoryName)
         try {
@@ -100,8 +68,8 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
             }
         }
 
-        projectBaseDir.refresh(true, true)
-        importUnlinkedProject(project, WemiLauncher(wemiLauncherPath))
+        project.baseDir?.refresh(true, true)
+        importUnlinkedProject(project, wemiLauncher)
     }
 
     private fun createBuildScript(file: Path, projectRoot:Path, project:Project) {
