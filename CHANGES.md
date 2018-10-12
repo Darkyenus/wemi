@@ -1,6 +1,9 @@
 # 0.6
 - Fix kotlin 1.2.71 incremental compilation
-- Add "key trace" status line to the UI 
+- Add "key trace" status line to the UI
+- IDE: Add "convert to Wemi" action 
+- IDE: Add "(re)install Wemi launcher" action 
+- IDE: Show what is Wemi doing during import (which task is running)
 
 # 0.5 2018-10-09
 - Add support for Kotlin 1.2.71

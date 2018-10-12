@@ -7,6 +7,9 @@ import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.externalSystem.model.ProjectSystemId
+import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
+import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationEvent
+import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
 import com.intellij.openapi.project.Project
 import java.io.*
 import java.nio.file.Files
@@ -36,7 +39,7 @@ fun findWemiLauncher(project:Project):WemiLauncher? {
 
 class WemiLauncher internal constructor(val file: Path) {
 
-    fun createMachineReadableResolverSession(javaExecutable: String, jvmOptions: Set<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>, allowBrokenBuildScripts:Boolean):WemiLauncherSession {
+    fun createMachineReadableResolverSession(javaExecutable: String, jvmOptions: Set<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>, allowBrokenBuildScripts:Boolean, tracker:ExternalStatusTracker?):WemiLauncherSession {
         val command = GeneralCommandLine()
         command.exePath = javaExecutable
         command.charset = Charsets.UTF_8
@@ -58,10 +61,10 @@ class WemiLauncher internal constructor(val file: Path) {
             command.addParameter("--allow-broken-build-scripts")
         }
 
-        return WemiLauncherSession(command, prefixConfigurations)
+        return WemiLauncherSession(command, prefixConfigurations, tracker)
     }
 
-    fun createTaskSession(javaExecutable: String, jvmOptions: Set<String>, env: Map<String, String>, inheritEnv: Boolean, tasks: List<String>):WemiLauncherSession {
+    fun createTaskSession(javaExecutable: String, jvmOptions: Set<String>, env: Map<String, String>, inheritEnv: Boolean, tasks: List<String>, tracker:ExternalStatusTracker?):WemiLauncherSession {
         val command = GeneralCommandLine()
         command.exePath = javaExecutable
         command.charset = Charsets.UTF_8
@@ -79,20 +82,43 @@ class WemiLauncher internal constructor(val file: Path) {
 
         command.addParameters(tasks)
 
-        return WemiLauncherSession(command)
+        return WemiLauncherSession(command, tracker = tracker)
     }
 }
 
-class WemiLauncherSession(private val commandLine: GeneralCommandLine, private val prefixConfigurations: Array<String> = emptyArray()) {
+class ExternalStatusTracker(val id:ExternalSystemTaskId, val listener:ExternalSystemTaskNotificationListener) {
+
+    private fun updateListenerStatus() {
+        val message = task?.let { "$stage - $it" } ?: stage
+        listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, message))
+    }
+
+    var stage:String = "Initialized"
+        set(value) {
+            if (field != value) {
+                field = value
+                updateListenerStatus()
+            }
+        }
+
+    var task:CharSequence? = null
+        set(value) {
+            if (field != value) {
+                field = value
+                updateListenerStatus()
+            }
+        }
+
+}
+
+class WemiLauncherSession(
+        private val commandLine: GeneralCommandLine,
+        private val prefixConfigurations: Array<String> = emptyArray(),
+        val tracker: ExternalStatusTracker?) {
 
     private var process = SessionProcess(commandLine)
 
     fun task(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):Result {
-        if (process.isDead()) {
-            process.close()
-            process = SessionProcess(commandLine)
-        }
-
         val taskPath = StringBuilder()
         if (project != null) {
             taskPath.append(project).append('/')
@@ -107,15 +133,26 @@ class WemiLauncherSession(private val commandLine: GeneralCommandLine, private v
         }
         taskPath.append(task)
 
-        val taskData = ByteArrayOutputStream()
-        val taskOutput = ByteArrayOutputStream()
-        val taskResult = process.task(taskPath, taskData, taskOutput)
+        try {
+            if (process.isDead()) {
+                tracker?.task = "Restarting..."
+                process.close()
+                process = SessionProcess(commandLine)
+            }
 
-        val jsonReader = JsonReader()
-        val jsonString = taskData.contentToString()
-        val json = jsonReader.parse(jsonString)
+            tracker?.task = taskPath
+            val taskData = ByteArrayOutputStream()
+            val taskOutput = ByteArrayOutputStream()
+            val taskResult = process.task(taskPath, taskData, taskOutput)
 
-        return Result(statusForNumber(taskResult), json, taskOutput.contentToString())
+            val jsonReader = JsonReader()
+            val jsonString = taskData.contentToString()
+            val json = jsonReader.parse(jsonString)
+
+            return Result(statusForNumber(taskResult), json, taskOutput.contentToString())
+        } finally {
+            tracker?.task = null
+        }
     }
 
     fun readOutputInteractive(stdout:OutputStream, stderr:OutputStream, input: InputStream) {

@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.external
 
+import com.darkyen.wemi.intellij.ExternalStatusTracker
 import com.darkyen.wemi.intellij.WemiBuildScriptProjectName
 import com.darkyen.wemi.intellij.WemiLauncherSession
 import com.darkyen.wemi.intellij.WemiProjectSystemId
@@ -19,7 +20,6 @@ import com.intellij.openapi.externalSystem.model.ExternalSystemException
 import com.intellij.openapi.externalSystem.model.ProjectKeys
 import com.intellij.openapi.externalSystem.model.project.*
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
-import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationEvent
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
 import com.intellij.openapi.externalSystem.model.task.TaskData
 import com.intellij.openapi.externalSystem.service.project.ExternalSystemProjectResolver
@@ -62,6 +62,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                                     settings: WemiExecutionSettings?,
                                     listener: ExternalSystemTaskNotificationListener): DataNode<ProjectData>? {
         var beingThrown:Throwable? = null
+        val tracker = ExternalStatusTracker(id, listener)
 
         var session: WemiLauncherSession? = null
         try {
@@ -69,7 +70,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 taskThreadBinding.put(id, Thread.currentThread())
             }
 
-            listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Creating session"))
+            tracker.stage = "Creating session"
             val launcher = (settings ?: return null).launcher
 
             var prefixConfigurations = settings.prefixConfigurationsArray()
@@ -78,15 +79,17 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             }
 
             val javaExecutable = if (settings.javaVmExecutable.isBlank()) "java" else settings.javaVmExecutable
-            session = launcher.createMachineReadableResolverSession(javaExecutable, settings.vmOptions, settings.env, settings.isPassParentEnvs, prefixConfigurations, settings.allowBrokenBuildScripts)
+            session = launcher.createMachineReadableResolverSession(
+                    javaExecutable, settings.vmOptions, settings.env, settings.isPassParentEnvs,
+                    prefixConfigurations, settings.allowBrokenBuildScripts, tracker)
 
             // First request on session will be probably waiting for build scripts to compile
-            listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Loading Wemi build scripts"))
+            tracker.stage = "Loading Wemi build scripts"
             val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
             LOG.info("Wemi version is $wemiVersion")
 
             @Suppress("UnnecessaryVariable") // Creates place for breakpoint
-            val resolvedProject = resolveProjectInfo(id, session, projectPath, settings, listener, wemiVersion)
+            val resolvedProject = resolveProjectInfo(session, projectPath, settings, tracker, wemiVersion)
             return resolvedProject
         } catch (se:WemiSessionException) {
             LOG.warn("WemiSessionException encountered while resolving", se)
@@ -114,13 +117,12 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
     }
 
-    private fun resolveProjectInfo(id: ExternalSystemTaskId,
-                                   session: WemiLauncherSession,
+    private fun resolveProjectInfo(session: WemiLauncherSession,
                                    projectPath: String,
                                    settings: WemiExecutionSettings,
-                                   listener: ExternalSystemTaskNotificationListener,
-                                   wemiVersion:String): DataNode<ProjectData> {
-        listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving project list"))
+                                   tracker: ExternalStatusTracker,
+                                   wemiVersion: String): DataNode<ProjectData> {
+        tracker.stage = "Resolving project list"
         val projects = session.stringArray(project = null, task = "#projects", includeUserConfigurations = false).let {
             projectNames ->
             val projectMap = mutableMapOf<String, WemiProjectData>()
@@ -164,7 +166,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         val libraryBank = WemiLibraryDependencyBank()
 
         for (project in projects.values) {
-            listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving project "+project.projectName))
+            tracker.stage = "Resolving project "+project.projectName
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, project.moduleData(projectPath))
             moduleNode.createChild(ProjectKeys.CONTENT_ROOT, project.contentRoot())
             moduleNode.createChild(WEMI_MODULE_DATA_KEY, WemiModuleComponentData(WemiModuleType.PROJECT))
@@ -231,7 +233,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
 
         // Tasks
-        listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving tasks"))
+        tracker.stage = "Resolving tasks"
         for (task in session.jsonArray(project = null, task = "#keysWithDescription", includeUserConfigurations = false)) {
             val taskName = task.getString("name")!!
             val taskDescription = task.getString("description")!!
@@ -241,7 +243,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
 
         // Build scripts
-        listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolving build script modules"))
+        tracker.stage = "Resolving build script modules"
         run {
             val buildFolder = session.string(project = WemiBuildScriptProjectName, task = "projectRoot", includeUserConfigurations = false)
 
@@ -334,10 +336,10 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
 
         // Apply library bank to create libraries
-        listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Setting dependencies"))
+        tracker.stage = "Setting dependencies"
         libraryBank.apply(projectDataNode, projectModules)
 
-        listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, "Resolved!"))
+        tracker.stage = "Resolved!"
         return projectDataNode
     }
 

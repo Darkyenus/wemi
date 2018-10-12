@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.external
 
+import com.darkyen.wemi.intellij.ExternalStatusTracker
 import com.darkyen.wemi.intellij.WemiLauncherSession
 import com.darkyen.wemi.intellij.execution.WemiRunConfiguration
 import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
@@ -37,6 +38,8 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                               jvmAgentSetup: String?,
                               listener: ExternalSystemTaskNotificationListener) {
         var beingThrown:Throwable? = null
+        val tracker = ExternalStatusTracker(id, listener)
+        tracker.stage = "Executing"
 
         var session: WemiLauncherSession? = null
         try {
@@ -75,8 +78,8 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
             val prefixConfigurations = settings.prefixConfigurationsArray()
             val tasks = taskNames.map {
                 val sb = StringBuilder()
-                settings.projectName?.let {
-                    sb.append(it).append('/')
+                settings.projectName?.let { projectName ->
+                    sb.append(projectName).append('/')
                 }
                 for (prefixConfiguration in prefixConfigurations) {
                     sb.append(prefixConfiguration).append(':')
@@ -86,7 +89,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
             }
 
             val javaExecutable = if (settings.javaVmExecutable.isBlank()) "java" else settings.javaVmExecutable
-            session = launcher.createTaskSession(javaExecutable, vmOptions, env, settings.isPassParentEnvs, tasks)
+            session = launcher.createTaskSession(javaExecutable, vmOptions, env, settings.isPassParentEnvs, tasks, tracker)
 
             val stdout = LineReadingOutputStream { line -> listener.onTaskOutput(id, line.toString(), true) }
             val stderr = LineReadingOutputStream { line -> listener.onTaskOutput(id, line.toString(), false) }
