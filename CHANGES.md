@@ -1,3 +1,5 @@
+# 0.7
+
 # 0.6 2018-10-21
 - Fix kotlin 1.2.71 incremental compilation
 - Add "key trace" status line to the UI
