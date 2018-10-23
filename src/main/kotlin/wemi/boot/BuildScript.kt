@@ -156,8 +156,30 @@ private fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
         return wemiLauncherFile
     }
     // We have create a link to/copy of the launcher file somewhere and name it with .jar
-    val linked = cacheFolder / "wemi.jar"
+    val wemiJarPrefix = "wemi-jar-link-"
 
+    val linked = cacheFolder / "$wemiJarPrefix$WemiVersion${
+        if (WemiVersion.endsWith("-SNAPSHOT")) "-${wemiLauncherFile.lastModified.toMillis()}" else ""
+        }.jar"
+
+    // Delete old links
+    for (path in Files.list(cacheFolder)) {
+        if (!path.isRegularFile() || path == linked) {
+            continue
+        }
+        val name = path.name
+        if (!name.pathHasExtension("jar") || !name.startsWith(wemiJarPrefix)) {
+            continue
+        }
+
+        try {
+            Files.deleteIfExists(path)
+        } catch (e : Exception) {
+            LOG.warn("Failed to delete old wemi jar link \"{}\"", path, e)
+        }
+    }
+
+    // Create new link file
     if (Files.exists(linked) && Files.exists(wemiLauncherFile.toRealPath())
             && (Files.isSameFile(linked, wemiLauncherFile) // If link
             || Files.getLastModifiedTime(wemiLauncherFile) < Files.getLastModifiedTime(linked) // If copy
