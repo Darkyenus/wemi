@@ -4,6 +4,7 @@ package wemi
 
 import configuration
 import wemi.KeyDefaults.ArchiveDummyDocumentation
+import wemi.KeyDefaults.classifierAppendingClasspathModifier
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.KeyDefaults.inProjectDependencies
 import wemi.collections.toMutable
@@ -137,14 +138,16 @@ object Configurations {
     //endregion
 
     //region IDE configurations
+    private
+
     val retrievingSources by configuration("Used to retrieve sources") {
-        val mapper = classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier)
-        Keys.libraryDependencyProjectMapper set Static(mapper)
+        Keys.libraryDependencyProjectMapper set Static(classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier))
+        Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(SourcesClassifier)
     }
 
     val retrievingDocs by configuration("Used to retrieve documentation") {
-        val mapper = classifierAppendingLibraryDependencyProjectMapper(JavadocClassifier)
-        Keys.libraryDependencyProjectMapper set Static(mapper)
+        Keys.libraryDependencyProjectMapper set Static(classifierAppendingLibraryDependencyProjectMapper(JavadocClassifier))
+        Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(JavadocClassifier)
     }
     //endregion
 

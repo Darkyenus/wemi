@@ -73,15 +73,50 @@ object KeyDefaults {
         result
     }
 
-    /**
-     * Create value for [Keys.libraryDependencyProjectMapper] that appends given classifier to sources.
-     */
+    /** Create value for [Keys.libraryDependencyProjectMapper] that appends given classifier to sources. */
     fun classifierAppendingLibraryDependencyProjectMapper(appendClassifier:String):(Dependency) -> Dependency = {
         (projectId, exclusions): Dependency ->
             val classifier = joinClassifiers(projectId.attribute(Repository.M2.Classifier), appendClassifier)!!
             val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (Repository.M2.Classifier to classifier))
             Dependency(sourcesProjectId, exclusions)
         }
+
+    /** Create BoundKeyValueModifier which takes a list of classpath entries (.jars or folders),
+     * appends given classifier to each one and filters out only files that exist.
+     * For example, `library.jar` could be translated to `library-sources.jar` with `"sources"` classifier. */
+    fun classifierAppendingClasspathModifier(appendClassifier:String):BoundKeyValueModifier<List<LocatedPath>> = { originalList ->
+        originalList.mapNotNull { originalLocatedPath ->
+            val originalPath = originalLocatedPath.classpathEntry
+
+            val originalName = originalPath.name
+            val extension = originalName.pathExtension()
+            val newName = if (originalPath.isDirectory() || extension.isEmpty()) {
+                "$originalName-$appendClassifier"
+            } else {
+                "${originalName.pathWithoutExtension()}-$appendClassifier.$extension"
+            }
+            val newFile = originalPath.resolveSibling(newName)
+            if (newFile.exists()) {
+                // There indeed is a valid path here
+                if (originalLocatedPath.root == null) {
+                    // Original LocatedPath was simple
+                    LocatedPath(originalPath)
+                } else {
+                    val newResolvedFile = newFile.resolve(originalLocatedPath.root.relativize(originalLocatedPath.file))
+                    if (newResolvedFile.exists()) {
+                        // We can fully reconstruct the tree
+                        LocatedPath(newFile, newResolvedFile)
+                    } else {
+                        // It is not possible to reconstruct the tree, but we can keep the root
+                        LocatedPath(newFile)
+                    }
+                }
+            } else {
+                // Translation is possible, but the file does not exist
+                null
+            }
+        }
+    }
 
 
     val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<DependencyId, ResolvedDependency>>> = Cached {

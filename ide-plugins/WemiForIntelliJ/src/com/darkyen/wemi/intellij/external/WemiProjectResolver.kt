@@ -84,7 +84,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     prefixConfigurations, settings.allowBrokenBuildScripts, tracker)
 
             // First request on session will be probably waiting for build scripts to compile
-            tracker.stage = "Loading Wemi build scripts"
+            tracker.stage = "Loading build scripts"
             val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
             LOG.info("Wemi version is $wemiVersion")
 
