@@ -24,12 +24,15 @@ internal object BuildScriptData {
     /**
      * List of lazy initializers.
      * Projects and configurations are initialized lazily, to allow cyclic dependencies.
+     *
+     * When null, startup initialization has already been done and further initializations should happen eagerly.
      */
-    var PendingInitializers = ArrayList<BindingHolderInitializer>()
+    var PendingInitializers:ArrayList<BindingHolderInitializer>? = ArrayList()
+        private set
 
     fun flushInitializers() {
         while (true) {
-            val initializerList = PendingInitializers
+            val initializerList = PendingInitializers ?: return
             if (initializerList.isEmpty()) {
                 break
             }
@@ -39,6 +42,7 @@ internal object BuildScriptData {
                 function()
             }
         }
+        PendingInitializers = null
     }
 }
 
@@ -67,8 +71,8 @@ class ProjectDelegate internal constructor(
     }
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): ProjectDelegate {
-        BuildScriptData.PendingInitializers.add(this)
         this.project = createProject(property.name, projectRoot, *archetypes, checkRootUnique = true, initializer = null)
+        BuildScriptData.PendingInitializers?.add(this) ?: this()
         return this
     }
 
@@ -199,8 +203,8 @@ class ConfigurationDelegate internal constructor(
     }
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): ConfigurationDelegate {
-        BuildScriptData.PendingInitializers.add(this)
         this.configuration = createConfiguration(property.name, description, parent, null)
+        BuildScriptData.PendingInitializers?.add(this) ?: this()
         return this
     }
 
