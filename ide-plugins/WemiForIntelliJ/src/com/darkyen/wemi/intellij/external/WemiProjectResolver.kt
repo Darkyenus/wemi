@@ -296,14 +296,36 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 ZipFile(wemiLauncherFile).use { file ->
                     val sourceEntry = file.getEntry("source.zip")
                     if (sourceEntry != null) {
+                        val extractedSourcesPrefix = "wemi-extracted-sources-"
+                        val extractedSourcesExtension = ".zip"
+
                         val sb = StringBuilder()
-                        sb.append("wemi-extracted-sources-").append(wemiVersion)
+                        sb.append(extractedSourcesPrefix).append(wemiVersion)
                         if (wemiVersion.endsWith("-SNAPSHOT")) {
                             sb.append('-').append(wemiLauncherFile.lastModified())
                         }
-                        sb.append(".zip")
+                        sb.append(extractedSourcesExtension)
 
-                        val sourcesZip = Paths.get(cacheFolder).resolve(sb.toString())
+                        val cacheFolderPath = Paths.get(cacheFolder)
+                        val sourcesZip = cacheFolderPath.resolve(sb.toString())
+                        // Delete all old extracted sources
+                        for (path in Files.list(cacheFolderPath)) {
+                            if (!Files.isRegularFile(path) || path == sourcesZip) {
+                                continue
+                            }
+                            val name = path.fileName.toString()
+                            if (!name.startsWith(extractedSourcesPrefix) || !name.endsWith(extractedSourcesExtension)) {
+                                continue
+                            }
+
+                            try {
+                                Files.deleteIfExists(path)
+                            } catch (e:Exception) {
+                                LOG.warn("Attempted to delete old extracted sources \"$path\", but failed", e)
+                            }
+                        }
+
+                        // Extract new sources, if needed
                         if (!Files.exists(sourcesZip)) {
                             Files.newOutputStream(sourcesZip).use { out ->
                                 file.getInputStream(sourceEntry).use { ins ->
