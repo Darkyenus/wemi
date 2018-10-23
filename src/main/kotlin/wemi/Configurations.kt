@@ -138,8 +138,6 @@ object Configurations {
     //endregion
 
     //region IDE configurations
-    private
-
     val retrievingSources by configuration("Used to retrieve sources") {
         Keys.libraryDependencyProjectMapper set Static(classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier))
         Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(SourcesClassifier)
