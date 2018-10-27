@@ -336,10 +336,10 @@ class AssemblyOperation : Closeable {
             }
         }
 
-        if (hasError) {
-            return null
+        return if (hasError) {
+            null
         } else {
-            return assemblySources
+            assemblySources
         }
     }
 

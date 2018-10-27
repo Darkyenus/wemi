@@ -310,11 +310,10 @@ fun <M : MutableMap<K, V>, K, V> JsonValue?.toMap(keyType:Class<K>, valueType:Cl
         return
     }
 
-    val shortForm:Boolean
-    if (isArray) {
-        shortForm = false
+    val shortForm:Boolean = if (isArray) {
+        false
     } else if (keyType == String::class.java && isObject) {
-        shortForm = true
+        true
     } else {
         throw JsonException("Can't read map of $keyType -> $valueType from $this")
     }

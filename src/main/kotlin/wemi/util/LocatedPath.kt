@@ -42,22 +42,16 @@ class LocatedPath(
      * Path to the file from root, *without* leading '/', including the file name
      */
     val path: String
-        get() {
-            if (root == null) {
-                return file.name
-            } else {
-                return root.relativize(file).toString()
-            }
-        }
+        get() = root?.relativize(file)?.toString() ?: file.name
 
     val classpathEntry: Path
         get() = root ?: file
 
     override fun toString(): String {
-        if (root == null) {
-            return file.absolutePath
+        return if (root == null) {
+            file.absolutePath
         } else {
-            return "${root.absolutePath}//$path"
+            "${root.absolutePath}//$path"
         }
     }
 

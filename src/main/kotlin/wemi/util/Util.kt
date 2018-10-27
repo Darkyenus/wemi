@@ -15,22 +15,22 @@ import java.util.*
  * Example output: "1 day 5 minutes 33 seconds 0 ms"
  */
 fun StringBuilder.appendTimeDuration(ms: Long): StringBuilder {
-    val Second = 1000
-    val Minute = Second * 60
-    val Hour = Minute * 60
-    val Day = Hour * 24
+    val SECOND = 1000
+    val MINUTE = SECOND * 60
+    val HOUR = MINUTE * 60
+    val DAY = HOUR * 24
 
     val result = this
     var remaining = ms
 
-    val days = remaining / Day
-    remaining %= Day
-    val hours = remaining / Hour
-    remaining %= Hour
-    val minutes = remaining / Minute
-    remaining %= Minute
-    val seconds = remaining / Second
-    remaining %= Second
+    val days = remaining / DAY
+    remaining %= DAY
+    val hours = remaining / HOUR
+    remaining %= HOUR
+    val minutes = remaining / MINUTE
+    remaining %= MINUTE
+    val seconds = remaining / SECOND
+    remaining %= SECOND
 
     if (days == 1L) {
         result.append("1 day ")
@@ -67,21 +67,21 @@ fun StringBuilder.appendTimeDuration(ms: Long): StringBuilder {
  * Example output: "1 day 5 minutes 33 seconds 0 ms"
  */
 fun StringBuilder.appendByteSize(bytes: Long): StringBuilder {
-    val Kilo = 1000L
-    val Mega = 1000_000L
-    val Giga = 1000_000_000L
-    val Tera = 1000_000_000_000L
+    val KILO = 1000L
+    val MEGA = 1000_000L
+    val GIGA = 1000_000_000L
+    val TERA = 1000_000_000_000L
 
     var remaining = bytes
 
-    val tera = remaining / Tera
-    remaining %= Tera
-    val giga = remaining / Giga
-    remaining %= Giga
-    val mega = remaining / Mega
-    remaining %= Mega
-    val kilo = remaining / Kilo
-    remaining %= Kilo
+    val tera = remaining / TERA
+    remaining %= TERA
+    val giga = remaining / GIGA
+    remaining %= GIGA
+    val mega = remaining / MEGA
+    remaining %= MEGA
+    val kilo = remaining / KILO
+    remaining %= KILO
 
     val R = 2
     var relevant = R
@@ -521,7 +521,7 @@ internal fun parseJavaVersion(version:String?):Int? {
 }
 
 /**
- * Adds all items from [items] to receiver, like [MutableList.addAll], but in reverse orded.
+ * Adds all items from [items] to receiver, like [MutableList.addAll], but in reverse order.
  * `internal` because not generic.
  */
 internal fun <T> ArrayList<T>.addAllReversed(items:ArrayList<T>) {

@@ -192,11 +192,11 @@ object DependencyResolver {
         val directoriesToLock = repositories.mapNotNull { it.cache?.directoryToLock() }.distinct()
 
         fun <Result> locked(level:Int, action:()->Result):Result {
-            if (level == directoriesToLock.size) {
-                return action()
+            return if (level == directoriesToLock.size) {
+                action()
             } else {
                 val directory = directoriesToLock[level]
-                return directorySynchronized(directory, {
+                directorySynchronized(directory, {
                     // On wait
                     LOG.info("Waiting for lock on {}", directory)
                 }) {

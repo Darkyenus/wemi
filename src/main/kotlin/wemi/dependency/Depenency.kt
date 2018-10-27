@@ -246,10 +246,10 @@ data class Dependency(val dependencyId: DependencyId, val exclusions: List<Depen
         override fun read(value: JsonValue): Dependency {
             val id = value.field<DependencyId>("id")
             val exclusionsJson = value.get("exclusions")
-            if (exclusionsJson == null) {
-                return Dependency(id)
+            return if (exclusionsJson == null) {
+                Dependency(id)
             } else {
-                return Dependency(id, exclusionsJson.toCollection(DependencyExclusion::class.java, ArrayList()))
+                Dependency(id, exclusionsJson.toCollection(DependencyExclusion::class.java, ArrayList()))
             }
         }
     }

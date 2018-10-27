@@ -82,12 +82,12 @@ sealed class Repository(val name: String) {
         override fun publish(metadata: InfoNode, artifacts: List<Pair<Path, String?>>): URI {
             val lock = directoryToLock()
 
-            if (lock != null) {
-                return directorySynchronized(lock) {
+            return if (lock != null) {
+                directorySynchronized(lock) {
                     publishLocked(metadata, artifacts)
                 }
             } else {
-                return publishLocked(metadata, artifacts)
+                publishLocked(metadata, artifacts)
             }
         }
 
@@ -207,10 +207,10 @@ sealed class Repository(val name: String) {
              * Concatenate two classifiers.
              */
             internal fun joinClassifiers(first:String?, second:String?):String? {
-                when {
-                    first == null -> return second
-                    second == null -> return first
-                    else -> return "$first-$second"
+                return when {
+                    first == null -> second
+                    second == null -> first
+                    else -> "$first-$second"
                 }
             }
 

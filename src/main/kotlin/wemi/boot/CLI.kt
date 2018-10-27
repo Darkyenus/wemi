@@ -360,11 +360,10 @@ object CLI {
 
         fun printLabeled(label: String, items: Map<String, WithDescriptiveString>, task:Task) {
             val filter = task.firstInput("filter", true)
-            val found:Collection<WithDescriptiveString>
-            if (filter == null) {
-                found = items.values
+            val found:Collection<WithDescriptiveString> = if (filter == null) {
+                items.values
             } else {
-                found = items.entries.mapNotNull {(k, v) ->
+                items.entries.mapNotNull {(k, v) ->
                     if (k.contains(filter, ignoreCase = true)) {
                         v
                     } else null

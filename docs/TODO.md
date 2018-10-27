@@ -3,8 +3,6 @@
 - WEMI IS COMPILED MULTIPLE TIMES!!! cache compile!
 	- Warnings in EnclaveCL
 
-- Make sure that we really don't need ./wemi as .jar and remove that one method
-
 - Test everything, especially javadoc/dokka/tests/plugins
 
 - Add shutdown hook to reset CLI (that could help with missing cursor)

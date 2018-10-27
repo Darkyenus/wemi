@@ -395,17 +395,17 @@ object TaskParser : Parser {
                 partsUntil = parsePosition
             }
 
-            when {
+            return when {
                 partsFrom == partsUntil ->
-                    return null
+                    null
                 partsFrom + 1 == partsUntil ->
-                    return parts[partsFrom].text
+                    parts[partsFrom].text
                 else -> {
                     val sb = StringBuilder()
                     for (i in partsFrom until partsUntil) {
                         sb.append(parts[i].text)
                     }
-                    return sb.toString()
+                    sb.toString()
                 }
             }
         }
@@ -439,11 +439,11 @@ object TaskParser : Parser {
                 return null
             }
             consumeWhitespaceParts()
-            if (matchSeparator(suffixToken)) {
-                return identifier
+            return if (matchSeparator(suffixToken)) {
+                identifier
             } else {
                 parsePosition = mark
-                return null
+                null
             }
         }
 

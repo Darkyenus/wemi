@@ -2,17 +2,16 @@
 
 import wemi.Archetypes
 import wemi.Configurations
-import wemi.boot.Main
 import wemi.boot.WemiRootFolder
 import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository
-import wemi.util.div as _div
 import java.net.URL
 import java.nio.file.Paths
-import wemi.kotlinDependency as _kotlinDependency
 import wemi.dependency.dependency as _dependency
+import wemi.kotlinDependency as _kotlinDependency
 import wemi.test.JUnitAPI as _JUnitAPI
 import wemi.test.JUnitEngine as _JUnitEngine
+import wemi.util.div as _div
 
 /*
  * Types and values that should be visible in build scripts without any explicit imports
@@ -69,10 +68,10 @@ inline fun dependency(project:Project, vararg configurations:Configuration) = _d
  */
 fun path(path:String):Path {
     val result = Paths.get(path)
-    if (result.isAbsolute) {
-        return result.normalize()
+    return if (result.isAbsolute) {
+        result.normalize()
     } else {
-        return WemiRootFolder.resolve(result).normalize()
+        WemiRootFolder.resolve(result).normalize()
     }
 }
 inline operator fun URL.div(path: CharSequence): URL = this._div(path)

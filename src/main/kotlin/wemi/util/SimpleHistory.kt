@@ -311,10 +311,10 @@ internal class SimpleHistory(private val path: Path?) : History {
          * @param inputKey or null if free input
          */
         internal fun inputHistoryName(inputKey:String?):String {
-            if (inputKey == null) {
-                return "input"
+            return if (inputKey == null) {
+                "input"
             } else {
-                return "input.$inputKey"
+                "input.$inputKey"
             }
         }
 

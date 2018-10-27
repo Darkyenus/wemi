@@ -62,14 +62,12 @@ fun URL.toPath(): Path? {
             return null
         }
 
-        val url: URL
-
-        if (protocol == "jar") {
+        val url: URL = if (protocol == "jar") {
             // This is how JDK does it: java.net.JarURLConnection.parseSpecs
-            url = URL(file.substring(0, file.lastIndexOf("!/")))
+            URL(file.substring(0, file.lastIndexOf("!/")))
         } else {
             // Strip host, authority, etc.
-            url = URL(protocol, null, file)
+            URL(protocol, null, file)
         }
 
         return if (url.protocol == "file") {

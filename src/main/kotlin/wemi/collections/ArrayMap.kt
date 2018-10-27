@@ -81,10 +81,10 @@ open class ArrayMap<K, V> : MutableMap<K, V> {
 
     override operator fun get(key: K): V? {
         val index = indexOf(key)
-        if (index >= 0) {
-            return getExisting(index)
+        return if (index >= 0) {
+            getExisting(index)
         } else {
-            return null
+            null
         }
     }
 
@@ -96,12 +96,12 @@ open class ArrayMap<K, V> : MutableMap<K, V> {
 
     inline fun getOrPut(key:K, put:()->V):V {
         val index = indexOf(key)
-        if (index >= 0) {
-            return getExisting(index)
+        return if (index >= 0) {
+            getExisting(index)
         } else {
             val newValue = put()
             putNew(key, newValue)
-            return newValue
+            newValue
         }
     }
 

@@ -41,12 +41,12 @@ object MatchUtils {
                 val match = if (s0[i0 - 1] == s1[i1 - 1]) 0 else replaceCost
 
                 // computing cost for each transformation
-                val cost_insert = cost[i0] + insertCost //          \/
-                val cost_replace = cost[i0 - 1] + match //          _|
-                val cost_delete = newCost[i0 - 1] + deleteCost //   >
+                val itemInsertCost = cost[i0] + insertCost //          \/
+                val itemReplaceCost = cost[i0 - 1] + match //          _|
+                val itemDeleteCost = newCost[i0 - 1] + deleteCost //   >
 
                 // keep minimum cost
-                newCost[i0] = min(cost_insert, cost_delete, cost_replace)
+                newCost[i0] = min(itemInsertCost, itemDeleteCost, itemReplaceCost)
             }
 
             // swap cost/newCost arrays

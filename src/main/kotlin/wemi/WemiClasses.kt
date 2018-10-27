@@ -125,8 +125,6 @@ class Configuration internal constructor(val name: String,
     }
 }
 
-private val AnonymousConfigurationDescriptiveAnsiString = format("<anonymous>", format = Format.Bold).toString()
-
 /**
  * A special version of [Configuration] that is anonymous and can be created at runtime, any time.
  * Unlike full configuration, does not have name, description, nor parent.

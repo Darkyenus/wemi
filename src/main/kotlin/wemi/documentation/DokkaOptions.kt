@@ -44,10 +44,10 @@ class DokkaOptions {
      */
     class SourceLinkMapItem(val dir: Path, val url: String, val urlSuffix:String? = null) {
         override fun toString(): String {
-            if (urlSuffix != null) {
-                return "$dir to $url (with suffix '$urlSuffix')"
+            return if (urlSuffix != null) {
+                "$dir to $url (with suffix '$urlSuffix')"
             } else {
-                return "$dir to $url"
+                "$dir to $url"
             }
         }
     }
@@ -124,10 +124,10 @@ class DokkaOptions {
      */
     class ExternalDocumentation(val url:String, val packageListUrl:String? = null) {
         override fun toString(): String {
-            if (packageListUrl != null) {
-                return url
+            return if (packageListUrl != null) {
+                url
             } else {
-                return "$url (packageList at $packageListUrl)"
+                "$url (packageList at $packageListUrl)"
             }
         }
     }

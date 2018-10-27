@@ -116,10 +116,10 @@ internal object TaskCompleter : Completer {
         val separator = words.getOrNull(inputIndex - 1)
         val inputKey = words.getOrNull(inputIndex - 2)
 
-        if (separator == null || separator == TaskParser.INPUT_SEPARATOR) {
-            return inputKey
+        return if (separator == null || separator == TaskParser.INPUT_SEPARATOR) {
+            inputKey
         } else {
-            return null
+            null
         }
     }
 

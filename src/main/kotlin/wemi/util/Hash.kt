@@ -124,15 +124,15 @@ fun parseHashSum(content:CharSequence):List<Pair<ByteArray, String>> {
                     }
             STATUS_READING_TYPE -> {
                 when (cp) {
-                    ' '.toInt(), '*'.toInt(), '?'.toInt(), '^'.toInt() ->
+                    ' '.toInt(), '*'.toInt(), '?'.toInt(), '^'.toInt() -> {
                         // Valid hash modes
-                        status = STATUS_READING_FILENAME
+                    }
                     else -> {
                         //Unknown hash mode, probably part of the file-name
                         fileName.appendCodePoint(cp)
-                        status = STATUS_READING_FILENAME
                     }
                 }
+                status = STATUS_READING_FILENAME
             }
             STATUS_READING_FILENAME ->
                     when {

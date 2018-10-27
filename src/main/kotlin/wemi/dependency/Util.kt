@@ -20,9 +20,9 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
     Missing ❓
     Already shown ⤴
      */
-    val StatusNormal: Byte = 0
-    val StatusNotResolved: Byte = 1
-    val StatusCyclic: Byte = 2
+    val STATUS_NORMAL: Byte = 0
+    val STATUS_NOT_RESOLVED: Byte = 1
+    val STATUS_CYCLIC: Byte = 2
 
     class NodeData(val dependencyId: DependencyId, var status: Byte)
 
@@ -30,7 +30,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
 
     // Build nodes
     for (depId in keys) {
-        nodes[depId] = TreeNode(NodeData(depId, StatusNormal))
+        nodes[depId] = TreeNode(NodeData(depId, STATUS_NORMAL))
     }
 
     // Connect nodes (even with cycles)
@@ -39,7 +39,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
         this@prettyPrint[depId]?.dependencies?.forEach { dep ->
             var nodeToConnect = nodes[dep.dependencyId]
             if (nodeToConnect == null) {
-                nodeToConnect = TreeNode(NodeData(dep.dependencyId, StatusNotResolved))
+                nodeToConnect = TreeNode(NodeData(dep.dependencyId, STATUS_NOT_RESOLVED))
                 notResolvedNodes.add(nodeToConnect)
             }
             node.add(nodeToConnect)
@@ -53,7 +53,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
 
     fun liftNode(dependencyId: DependencyId): TreeNode<NodeData> {
         // Lift what was asked
-        val liftedNode = remainingNodes.remove(dependencyId) ?: return TreeNode(NodeData(dependencyId, StatusCyclic))
+        val liftedNode = remainingNodes.remove(dependencyId) ?: return TreeNode(NodeData(dependencyId, STATUS_CYCLIC))
         val resultNode = TreeNode(liftedNode.value)
         // Lift all dependencies too and return them in the result node
         for (dependencyNode in liftedNode) {
@@ -68,8 +68,8 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
     explicitRoots?.forEach { root ->
         val liftedNode = liftNode(root)
         // Check for nodes that are in explicitRoots but were never resolved to begin with
-        if (liftedNode.value.status == StatusCyclic && !this.containsKey(liftedNode.value.dependencyId)) {
-            liftedNode.value.status = StatusNotResolved
+        if (liftedNode.value.status == STATUS_CYCLIC && !this.containsKey(liftedNode.value.dependencyId)) {
+            liftedNode.value.status = STATUS_NOT_RESOLVED
         }
         roots.add(liftedNode)
     }
@@ -110,7 +110,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
             else -> result.append(CLI.ICON_SUCCESS)
         }
 
-        if (status == StatusCyclic) {
+        if (status == STATUS_CYCLIC) {
             result.append(CLI.ICON_SEE_ABOVE)
         } else {
             val resolvedFrom = resolved?.resolvedFrom
