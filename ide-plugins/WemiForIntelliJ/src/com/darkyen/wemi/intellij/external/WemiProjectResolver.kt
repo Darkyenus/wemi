@@ -1,15 +1,13 @@
 package com.darkyen.wemi.intellij.external
 
-import com.darkyen.wemi.intellij.ExternalStatusTracker
-import com.darkyen.wemi.intellij.WemiBuildScriptProjectName
-import com.darkyen.wemi.intellij.WemiLauncherSession
-import com.darkyen.wemi.intellij.WemiProjectSystemId
+import com.darkyen.wemi.intellij.*
 import com.darkyen.wemi.intellij.importing.KotlinCompilerSettingsData
 import com.darkyen.wemi.intellij.importing.WEMI_KOTLIN_COMPILER_SETTINGS_KEY
 import com.darkyen.wemi.intellij.importing.WEMI_MODULE_DATA_KEY
 import com.darkyen.wemi.intellij.importing.WemiModuleComponentData
 import com.darkyen.wemi.intellij.module.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
+import com.darkyen.wemi.intellij.util.deleteRecursively
 import com.darkyen.wemi.intellij.util.digestToHexString
 import com.darkyen.wemi.intellij.util.update
 import com.esotericsoftware.jsonbeans.JsonValue
@@ -89,7 +87,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             LOG.info("Wemi version is $wemiVersion")
 
             @Suppress("UnnecessaryVariable") // Creates place for breakpoint
-            val resolvedProject = resolveProjectInfo(session, projectPath, settings, tracker, wemiVersion)
+            val resolvedProject = resolveProjectInfo(session, projectPath, settings, tracker)
             return resolvedProject
         } catch (se:WemiSessionException) {
             LOG.warn("WemiSessionException encountered while resolving", se)
@@ -120,8 +118,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
     private fun resolveProjectInfo(session: WemiLauncherSession,
                                    projectPath: String,
                                    settings: WemiExecutionSettings,
-                                   tracker: ExternalStatusTracker,
-                                   wemiVersion: String): DataNode<ProjectData> {
+                                   tracker: ExternalStatusTracker): DataNode<ProjectData> {
         tracker.stage = "Resolving project list"
         val projects = session.stringArray(project = null, task = "#projects", includeUserConfigurations = false).let {
             projectNames ->
@@ -243,12 +240,16 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
 
         // Build scripts
-        tracker.stage = "Resolving build script modules"
+        tracker.stage = "Resolving build script module"
         run {
             val buildFolder = session.string(project = WemiBuildScriptProjectName, task = "projectRoot", includeUserConfigurations = false)
 
             val classpath = session.jsonArray(project = WemiBuildScriptProjectName, task = "externalClasspath").map { it.locatedFileOrPathClasspathEntry() }
             val cacheFolder = session.string(project = WemiBuildScriptProjectName, task = "cacheDirectory")
+            val libFolderPath = Paths.get(cacheFolder).resolve("wemi-libs-ide")
+            // Ensure that it is empty so that we don't accumulate old libs
+            libFolderPath.deleteRecursively()
+            Files.createDirectories(libFolderPath)
 
             // Module Data
             val moduleData = ModuleData(WemiBuildScriptProjectName, WemiProjectSystemId, StdModuleTypes.JAVA.id, WemiBuildScriptProjectName, buildFolder, projectPath)
@@ -273,7 +274,19 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             val libraryData = LibraryData(WemiProjectSystemId, "$WemiBuildScriptProjectName Classpath", unresolved)
             // Classpath
             for (artifact in classpath) {
-                libraryData.addPath(LibraryPathType.BINARY, artifact.path)
+                var affectiveArtifact = artifact.toPath()
+                if (artifact.name.equals(WemiLauncherFileName, true)) {
+                    // Copy it, because IntelliJ does not recognize files without extension
+                    val link = libFolderPath.resolve("wemi.jar")
+                    try {
+                        Files.createSymbolicLink(link, affectiveArtifact)
+                    } catch (e:Exception) {
+                        LOG.info("Failed to soft link wemi, copying instead", e)
+                        Files.copy(affectiveArtifact, link)
+                    }
+                    affectiveArtifact = link
+                }
+                libraryData.addPath(LibraryPathType.BINARY, affectiveArtifact.toAbsolutePath().toString())
             }
             // Sources and docs
             if (settings.downloadSources) {
@@ -296,52 +309,14 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 ZipFile(wemiLauncherFile).use { file ->
                     val sourceEntry = file.getEntry("source.zip")
                     if (sourceEntry != null) {
-                        val extractedSourcesPrefix = "wemi-extracted-sources-"
-                        val extractedSourcesExtension = ".zip"
+                        val sourcesPath = libFolderPath.resolve("wemi-source.jar")
 
-                        val sb = StringBuilder()
-                        sb.append(extractedSourcesPrefix).append(wemiVersion)
-                        if (wemiVersion.endsWith("-SNAPSHOT")) {
-                            sb.append('-').append(wemiLauncherFile.lastModified())
-                        }
-                        sb.append(extractedSourcesExtension)
-
-                        val cacheFolderPath = Paths.get(cacheFolder)
-                        val sourcesZip = cacheFolderPath.resolve(sb.toString())
-                        // Delete all old extracted sources
-                        for (path in Files.list(cacheFolderPath)) {
-                            if (!Files.isRegularFile(path) || path == sourcesZip) {
-                                continue
-                            }
-                            val name = path.fileName.toString()
-                            if (!name.startsWith(extractedSourcesPrefix) || !name.endsWith(extractedSourcesExtension)) {
-                                continue
-                            }
-
-                            try {
-                                Files.deleteIfExists(path)
-                            } catch (e:Exception) {
-                                LOG.warn("Attempted to delete old extracted sources \"$path\", but failed", e)
-                            }
+                        // Extract sources
+                        file.getInputStream(sourceEntry).use { ins ->
+                            Files.copy(ins, sourcesPath)
                         }
 
-                        // Extract new sources, if needed
-                        if (!Files.exists(sourcesZip)) {
-                            Files.newOutputStream(sourcesZip).use { out ->
-                                file.getInputStream(sourceEntry).use { ins ->
-                                    val buffer = ByteArray(Math.min(4096L, sourceEntry.size).toInt())
-                                    while (true) {
-                                        val read = ins.read(buffer)
-                                        if (read == -1) {
-                                            break
-                                        }
-                                        out.write(buffer, 0, read)
-                                    }
-                                }
-                            }
-                        }
-
-                        libraryData.addPath(LibraryPathType.SOURCE, sourcesZip.toAbsolutePath().toString())
+                        libraryData.addPath(LibraryPathType.SOURCE, sourcesPath.toAbsolutePath().toString())
                     }
                 }
             } catch (e:Exception) {

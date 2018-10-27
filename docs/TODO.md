@@ -1,8 +1,7 @@
 # Things to do next
 
-- WEMI IS COMPILED MULTIPLE TIMES!!!
-
-- Fix IntelliJ plugin to handle new bundling
+- WEMI IS COMPILED MULTIPLE TIMES!!! cache compile!
+	- Warnings in EnclaveCL
 
 - Make sure that we really don't need ./wemi as .jar and remove that one method
 
@@ -15,7 +14,21 @@
 
 - Investigate how to launch directly, not through reflection, so that stack traces are not polluted.
 
+- Fatjars in Java 9+ ?
+	- Put all libraries in separate packages?
+
+- Automated tests
+
+- Ensure that test classpath is not polluted by double classes
+
 - Dynamic "what test is executing right now?", or maybe even results as they come in
+
+- Ensure that javac does not get unnecessary output directories, like headers
+
+- FIX CLEAN TASK, move all compile folders to extra folder and let clean delete it whole, or maybe even some sort of
+	"folders to not delete on clean" system, this would be nice. Some sort of -- prefix to not delete?
+
+- Explain why dokka is in its own project: because I suspect that it bundles its own kotlin stdlib and I don't want that to pollute everything (oh and make sure that that cursed fatjar never gets added to IDE dependencies!!!)
 
 - Streamline local dependency retrieval, no need to keep it all in memory, possibility to compute hashes during download
 
@@ -36,6 +49,9 @@ Currently, maven does not support multiplatform projects, so doing it now is fut
 - In assembling, handle LIST files and signatures
 - Add system of automatic MANIFEST.MF generation
 	- Manifest files seem to have weird wrapping rules
+	- What we have now is inconsistent with build.kt
+
+- Code generation system from build, then get rid of duplicate WemiSettings place
 
 - Create system, to allow automatic caching of key results, when no input keys have changed.
 	- This will need good arbitrary object serialization/comparison - with files serialized as their file/directory/exist info + checksum of files
