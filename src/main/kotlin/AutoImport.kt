@@ -2,6 +2,7 @@
 
 import wemi.Archetypes
 import wemi.Configurations
+import wemi.boot.Main
 import wemi.boot.WemiRootFolder
 import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository

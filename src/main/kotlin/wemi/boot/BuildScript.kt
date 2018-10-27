@@ -67,7 +67,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
 
     val resultJar = cacheFolder / "build.jar"
     val buildScriptInfoFile = cacheFolder / "build-info.json"
-    val buildScriptInfo = BuildScriptInfo(resultJar, buildScriptSources.map { LocatedPath(it) })
+    val buildScriptInfo = BuildScriptInfo(resultJar, buildScriptSources.map { LocatedPath(it) }, WemiRuntimeClasspath)
 
     var recompileReason = ""
 
@@ -133,7 +133,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
     if (recompile) {
         LOG.info("Compiling build script: {}", recompileReason)
         resultJar.deleteRecursively()
-        buildScriptInfo.resolve(cacheFolder)
+        buildScriptInfo.resolve()
 
         try {
             Files.newBufferedWriter(buildScriptInfoFile, Charsets.UTF_8).use {
@@ -149,6 +149,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
     return buildScriptInfo
 }
 
+// TODO(jp): Delete unused
 private fun wemiLauncherFileWithJarExtension(cacheFolder: Path): Path {
     val wemiLauncherFile = Magic.WemiLauncherFile
     if (wemiLauncherFile.name.endsWith(".jar", ignoreCase = true) || wemiLauncherFile.isDirectory()) {
@@ -272,7 +273,9 @@ class BuildScriptInfo internal constructor(
         /** jar to which the build script has been compiled */
         val scriptJar: Path,
         /** source files, from which the build script is compiled */
-        val sources: List<LocatedPath>) : JsonReadable, JsonWritable {
+        val sources: List<LocatedPath>,
+        /** Jars with wemi, kotlin runtime, etc. */
+        private val runtimeClasspath: List<Path>) : JsonReadable, JsonWritable {
 
     private val _repositories = HashSet<Repository>()
     private val _dependencies = HashSet<Dependency>()
@@ -326,13 +329,12 @@ class BuildScriptInfo internal constructor(
         }
     }
 
-    internal fun resolve(cacheFolder:Path):Boolean {
+    internal fun resolve():Boolean {
         _repositories.clear()
         _dependencies.clear()
         _unmanagedDependencies.clear()
 
-        // Wemi also contains Kotlin runtime
-        _unmanagedDependencies.add(wemiLauncherFileWithJarExtension(cacheFolder))
+        _unmanagedDependencies.addAll(runtimeClasspath)
         _repositories.addAll(DefaultRepositories)
 
         for (sourceFile in sources) {

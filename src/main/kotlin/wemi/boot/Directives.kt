@@ -61,7 +61,7 @@ annotation class BuildDependencyRepository(val name:String, val url:String)
  * Build script file annotation, which adds a given file to the build script's classpath.
  *
  * @param file path to the classpath file (typically .jar) or directory.
- * Absolute or relative to the [wemi.boot.WemiRootFolder] (=project's root directory)
+ * Absolute or relative to the [wemi.boot.Main.getRootFolder] (=project's root directory)
  * @see BuildDependency for important notes about build-script directive annotations
  * @see wemi.Keys.externalClasspath key, which stores raw classpath dependencies of built projects
  */

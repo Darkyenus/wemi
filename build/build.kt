@@ -15,6 +15,8 @@ import wemi.dependency.Jitpack
 import wemi.publish.InfoNode
 import wemi.util.LocatedPath
 import wemi.util.executable
+import wemi.util.*
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
 val CompilerProjects = listOf(
@@ -24,8 +26,8 @@ val CompilerProjects = listOf(
         createKotlinCompilerProject("1.2.71")
 )
 
-private const val WemiGroup = "com.darkyen.wemi"
-private const val WemiVersion = "0.7-SNAPSHOT"
+const val WemiGroup = "com.darkyen.wemi"
+const val WemiVersion = "0.7-SNAPSHOT"
 
 /**
  * Wemi Build System core
@@ -35,14 +37,12 @@ val core:Project by project {
     projectName set { "wemi-core" }
     projectVersion set { WemiVersion }
 
-    mainClass set { "wemi.boot.MainKt" }
+    mainClass set { "wemi.boot.PreMain" }
 
     repositories add { Jitpack }
 
     val JLineVersion = "3.3.0"
     libraryDependencies set { setOf(
-            kotlinDependency("stdlib"),
-            kotlinDependency("reflect"),
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
             dependency("com.github.Darkyenus", "tproll", "v1.2.6"),
             dependency("com.github.Darkyenus", "DaveWebb", "v1.2"),
@@ -54,14 +54,10 @@ val core:Project by project {
 
     // Compile-only (provided) libraries
     extend(compiling) {
+        projectDependencies add { dependency(kotlinStdlib, true) }
         libraryDependencies add {
             /* Used ONLY in wemi.test.forked.TestLauncher */
             dependency("org.junit.platform", "junit-platform-launcher", "1.0.2")
-        }
-
-        libraryDependencies add {
-            /* Used only in wemi.document.DokkaInterface */
-            wemi.dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", preferredRepository = JCenter)
         }
     }
 
@@ -78,7 +74,7 @@ val core:Project by project {
     extend(assembling) {
         // Add all compiler frontends to the internal classpath
         internalClasspath modify { cp ->
-            val cpWithCompilers = WMutableList(cp)
+            val cpWithCompilers = WMutableList(cp) // TODO(jp): cp.toMutable()
 
             for (p in CompilerProjects) {
                 p.evaluate {
@@ -86,6 +82,8 @@ val core:Project by project {
                 }
             }
 
+            cpWithCompilers.addAll(dokkaInterfaceImplementation.evaluate { internalClasspath.get() })
+            
             cpWithCompilers
         }
 
@@ -105,6 +103,31 @@ val core:Project by project {
 
                 LocatedPath(sourcePath)
             }
+        }
+
+        // Add kotlin stdlib as a bundled jar
+        resourceFiles modify { oldResourceFiles ->
+            val newResourceFiles = WMutableList(oldResourceFiles)
+
+            val libraryList = StringBuilder()
+
+            val links = Files.createTempDirectory("wemi-links") // TODO Not needed in next version because internal resources wont get flattened
+            for (stdlibJar in kotlinStdlib.evaluate{ externalClasspath.get() }) {
+                val jarEntry = stdlibJar.classpathEntry
+                val zipEntry = links / "${jarEntry.name.pathWithoutExtension()}.zip"
+                Files.createSymbolicLink(zipEntry, jarEntry)
+                newResourceFiles.add(LocatedPath(zipEntry))
+
+                libraryList.append(zipEntry.name).append('\n')
+            }
+
+            val librariesPath = links / "libraries"
+            Files.newBufferedWriter(librariesPath, StandardCharsets.UTF_8).use {
+                it.append(libraryList)
+            }
+            newResourceFiles.add(LocatedPath(librariesPath))
+
+            newResourceFiles
         }
     }
 
@@ -189,32 +212,32 @@ fun createKotlinCompilerProject(version:String):Project {
     }
 }
 
-/**
- * Plugin for hotswapping JVM code at runtime.
- */
-val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
-    projectGroup set { WemiGroup }
-    projectName set { "wemi-plugin-jvm-hotswap" }
-    projectVersion set { WemiVersion }
+val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
+    extendMultiple(compilingJava, compilingKotlin) {
+        sourceRoots set { setOf(projectRoot.get() / "src") }
+    }
+
+    extend(compilingKotlin) {
+        compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
+    }
+
+    projectDependencies set {
+        setOf(dependency(core, false))
+    }
 
     extend(compiling) {
-        projectDependencies add { dependency(core, false) }
-    }
-
-    extend(testing) {
-        libraryDependencies add { JUnitAPI }
-        libraryDependencies add { JUnitEngine }
-    }
-
-    publishMetadata modify { metadata ->
-        setupSharedPublishMetadata(
-                metadata,
-                "Wemi Plugin: JVM Hotswap",
-                "Adds JVM code hotswap integration for Wemi Build System",
-                "2018"
-        )
+        libraryDependencies add {
+            /* Used only in wemi.document.DokkaInterface */
+            wemi.dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", preferredRepository = JCenter)
+        }
     }
 }
+
+val kotlinStdlib by project(wemi.Archetypes.BlankJVMProject) {
+    libraryDependencies set { setOf(kotlinDependency("stdlib"), kotlinDependency("reflect")) }
+    assemblyOutputFile set { wemi.Keys.cacheDirectory.get() / "kotlin-stdlib-assembly.zip" } // TODO(jp): .jar, but now it gets flattened
+}
+
 
 val jitpackBuild by configuration("Used when building for Jitpack") {
     // See jitpack.yml

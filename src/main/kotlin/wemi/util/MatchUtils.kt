@@ -125,7 +125,7 @@ object MatchUtils {
                 resultItems.add(MatchResultItem(i, score))
             }
         }
-        Collections.sort<MatchResultItem>(resultItems)
+        resultItems.sort()
 
         @Suppress("UNCHECKED_CAST")
         val result = java.lang.reflect.Array.newInstance(type, minOf(8, resultItems.size)) as Array<T>

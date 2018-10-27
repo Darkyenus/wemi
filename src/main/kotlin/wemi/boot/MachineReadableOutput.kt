@@ -9,6 +9,7 @@ import java.io.OutputStreamWriter
 import java.io.PrintStream
 import java.nio.file.Paths
 import kotlin.system.exitProcess
+import wemi.boot.Main.*
 
 private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
 

@@ -9,7 +9,7 @@ interface WithDescriptiveString {
      * Return the human readable [String] representation of this object.
      * May contain ANSI colors.
      *
-     * @see wemi.boot.CLI.format
+     * @see format
      */
     fun toDescriptiveAnsiString(): String
 }

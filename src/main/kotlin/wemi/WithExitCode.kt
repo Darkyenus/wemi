@@ -16,7 +16,7 @@ interface WithExitCode {
      * Return the exit code that the Wemi process should end with, if it would depend on this instance.
      *
      * As per convention, 0 exit code is reserved for success and non-zero for failure.
-     * See [wemi.boot.EXIT_CODE_SUCCESS], [wemi.boot.EXIT_CODE_TASK_FAILURE] and other predefined exit codes.
+     * See [wemi.boot.Main.EXIT_CODE_SUCCESS], [wemi.boot.Main.EXIT_CODE_TASK_FAILURE] and other predefined exit codes.
      */
     fun processExitCode(): Int
 }

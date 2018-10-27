@@ -10,8 +10,8 @@ import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.Configurations.publishing
 import wemi.assembly.*
-import wemi.boot.WemiBuildScriptProject
 import wemi.boot.WemiBundledLibrariesExclude
+import wemi.boot.WemiRuntimeClasspath
 import wemi.collections.WMutableList
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
@@ -516,14 +516,13 @@ object KeyDefaults {
             val directory = Keys.runDirectory.get()
             val options = Keys.runOptions.get()
 
-            val externalClasspath = Keys.externalClasspath.get().map { it.classpathEntry }.distinct()
-            val internalClasspath = Keys.internalClasspath.get().map { it.classpathEntry }.distinct()
-            val wemiClasspathEntry = WemiBuildScriptProject.evaluate { Keys.unmanagedDependencies.get().first().classpathEntry }
+            val externalClasspath = Keys.externalClasspath.get().asSequence().map { it.classpathEntry }.distinct().toList()
+            val internalClasspath = Keys.internalClasspath.get().asSequence().map { it.classpathEntry }.distinct().toList()
 
             val classpathEntries = ArrayList<Path>(internalClasspath.size + externalClasspath.size + 1)
             classpathEntries.addAll(internalClasspath)
             classpathEntries.addAll(externalClasspath)
-            classpathEntries.add(wemiClasspathEntry)
+            classpathEntries.addAll(WemiRuntimeClasspath)
 
             val processBuilder = wemi.run.prepareJavaProcess(
                     javaExecutable, directory, classpathEntries,
@@ -1075,10 +1074,10 @@ object KeyDefaults {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
                 for (file in Keys.internalClasspath.get()) {
-                    assemblyOperation.addSource(file, true)
+                    assemblyOperation.addSource(file, true, extractJarEntries = false)
                 }
                 for (file in Keys.externalClasspath.get()) {
-                    assemblyOperation.addSource(file, false)
+                    assemblyOperation.addSource(file, false, extractJarEntries = true)
                 }
 
                 val outputFile = Keys.assemblyOutputFile.get()

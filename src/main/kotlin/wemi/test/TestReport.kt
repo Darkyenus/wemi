@@ -3,6 +3,7 @@ package wemi.test
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.esotericsoftware.jsonbeans.JsonWriter
 import wemi.WithExitCode
+import wemi.boot.Main
 import wemi.util.*
 
 /**
@@ -20,14 +21,14 @@ internal const val TEST_LAUNCHER_OUTPUT_PREFIX = "WEMI-TEST-HARNESS-OUTPUT: "
 class TestReport : LinkedHashMap<TestIdentifier, TestData>(), WithExitCode {
 
     /**
-     * Returns [wemi.boot.EXIT_CODE_SUCCESS] when all tests are either successful or skipped.
-     * [wemi.boot.EXIT_CODE_TASK_FAILURE] otherwise.
+     * Returns [wemi.boot.Main.EXIT_CODE_SUCCESS] when all tests are either successful or skipped.
+     * [wemi.boot.Main.EXIT_CODE_TASK_FAILURE] otherwise.
      */
     override fun processExitCode(): Int {
         if (values.all { it.status == TestStatus.SUCCESSFUL || it.status == TestStatus.SKIPPED }) {
-            return wemi.boot.EXIT_CODE_SUCCESS
+            return Main.EXIT_CODE_SUCCESS
         }
-        return wemi.boot.EXIT_CODE_TASK_FAILURE
+        return Main.EXIT_CODE_TASK_FAILURE
     }
 
     internal class Serializer : JsonSerializer<TestReport> {

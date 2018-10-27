@@ -215,7 +215,7 @@ private class ReportBuildingListener(val filterStackTraces: Boolean) : TestExecu
     private fun TestIdentifier.toWemi(): wemi.test.TestIdentifier {
         return wemi.test.TestIdentifier(
                 uniqueId, parentId.orElse(null), displayName,
-                isTest, isContainer, tags.map { it.name }.toSet(), source.orElse(null)?.toString())
+                isTest, isContainer, tags.asSequence().map { it.name }.toSet(), source.orElse(null)?.toString())
     }
 }
 
