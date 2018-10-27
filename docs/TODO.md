@@ -5,8 +5,6 @@
 
 - Test everything, especially javadoc/dokka/tests/plugins
 
-- Add shutdown hook to reset CLI (that could help with missing cursor)
-
 - Add ability to disable dynamic task showing
 	- Ensure that it honors WEMI_UNICODE
 

@@ -47,6 +47,11 @@ object CLI {
             println()
         }
 
+        terminal.handle(org.jline.terminal.Terminal.Signal.INT) {
+            // This is what is done by default, but through Shutdown.exit, which does not call shutdown hooks
+            System.exit(130)
+        }
+
         terminal
     }
 

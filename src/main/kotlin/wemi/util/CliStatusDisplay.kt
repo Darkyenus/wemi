@@ -24,8 +24,14 @@ internal class CliStatusDisplay(private val terminal: Terminal) : LineReadingOut
             if (field != value) {
                 if (value) {
                     doEnable()
+                    synchronized(Shutdown.enabledStatusDisplays) {
+                        Shutdown.enabledStatusDisplays.add(this)
+                    }
                 } else {
                     doDisable()
+                    synchronized(Shutdown.enabledStatusDisplays) {
+                        Shutdown.enabledStatusDisplays.remove(this)
+                    }
                 }
                 field = value
             }
@@ -228,5 +234,24 @@ internal class CliStatusDisplay(private val terminal: Terminal) : LineReadingOut
             width += w
         }
         return end - (index + 1)
+    }
+
+    private object Shutdown : Thread("ShutdownEnabledCliStatusDisplays") {
+
+        val enabledStatusDisplays = HashSet<CliStatusDisplay>()
+
+        init {
+            Runtime.getRuntime().addShutdownHook(this)
+        }
+
+        override fun run() {
+            // Less efficient kind of enumeration, but prevents any issues
+            // with enabledStatusDisplays changing while disabling them
+            synchronized(enabledStatusDisplays) {
+                while (enabledStatusDisplays.isNotEmpty()) {
+                    enabledStatusDisplays.first().enabled = false
+                }
+            }
+        }
     }
 }
