@@ -20,7 +20,7 @@ import java.util.*
 class DirectorySynchronizedTests {
 
     private val VERBOSE
-        get() = false
+        get() = true
 
     @Test
     fun stressTest() {
@@ -40,8 +40,14 @@ class DirectorySynchronizedTests {
             command.add(DirectorySynchronizedMain::class.java.name)
             command.add(i.toString())
 
-            if(VERBOSE) println("Starting process $i")
-            ProcessBuilder(command).directory(directory.toFile()).start()
+            if(VERBOSE) println("Starting process $i $command")
+            ProcessBuilder(command).directory(directory.toFile())
+                    .redirectInput(ProcessBuilder.Redirect.PIPE)
+                    .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+                    .redirectError(ProcessBuilder.Redirect.INHERIT)
+                    .start().apply {
+                        outputStream.close()
+                    }
         }
 
         if(VERBOSE) println("All processes created")

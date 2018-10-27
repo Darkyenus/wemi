@@ -1,5 +1,22 @@
 # Things to do next
 
+- WEMI IS COMPILED MULTIPLE TIMES!!!
+
+- Fix IntelliJ plugin to handle new bundling
+
+- Make sure that we really don't need ./wemi as .jar and remove that one method
+
+- Test everything, especially javadoc/dokka/tests/plugins
+
+- Add shutdown hook to reset CLI (that could help with missing cursor)
+
+- Add ability to disable dynamic task showing
+	- Ensure that it honors WEMI_UNICODE
+
+- Investigate how to launch directly, not through reflection, so that stack traces are not polluted.
+
+- Dynamic "what test is executing right now?", or maybe even results as they come in
+
 - Streamline local dependency retrieval, no need to keep it all in memory, possibility to compute hashes during download
 
 - When Kotlin multiplatform projects are standardized, consider rewriting compiler facade from maven plugin
