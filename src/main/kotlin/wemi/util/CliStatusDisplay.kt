@@ -24,13 +24,13 @@ internal class CliStatusDisplay(private val terminal: Terminal) : LineReadingOut
             if (field != value) {
                 if (value) {
                     doEnable()
-                    synchronized(Shutdown.enabledStatusDisplays) {
-                        Shutdown.enabledStatusDisplays.add(this)
+                    synchronized(enabledStatusDisplays) {
+                        enabledStatusDisplays.add(this)
                     }
                 } else {
                     doDisable()
-                    synchronized(Shutdown.enabledStatusDisplays) {
-                        Shutdown.enabledStatusDisplays.remove(this)
+                    synchronized(enabledStatusDisplays) {
+                        enabledStatusDisplays.remove(this)
                     }
                 }
                 field = value
@@ -187,22 +187,6 @@ internal class CliStatusDisplay(private val terminal: Terminal) : LineReadingOut
         terminalWriter.flush()
     }
 
-    /** Do the [action] with status [enabled]. */
-    inline fun <T> withStatus(enabled:Boolean, action:()->T):T {
-        val enabledBefore = synchronized(this@CliStatusDisplay) {
-            val enabledBefore = this.enabled
-            this.enabled = enabled
-            enabledBefore
-        }
-        try {
-            return action()
-        } finally {
-            synchronized(this@CliStatusDisplay) {
-                this.enabled = enabledBefore
-            }
-        }
-    }
-
     private fun AttributedCharSequence.lengthForColumnWidth(begin:Int, columnWidth:Int):Int {
         var index = begin
         var width = 0
@@ -236,22 +220,43 @@ internal class CliStatusDisplay(private val terminal: Terminal) : LineReadingOut
         return end - (index + 1)
     }
 
-    private object Shutdown : Thread("ShutdownEnabledCliStatusDisplays") {
+    companion object {
 
-        val enabledStatusDisplays = HashSet<CliStatusDisplay>()
+        /** Do the [action] with status [enabled]. */
+        inline fun <T> CliStatusDisplay?.withStatus(enabled:Boolean, action:()->T):T {
+            if (this == null) {
+                return action()
+            }
 
-        init {
-            Runtime.getRuntime().addShutdownHook(this)
-        }
-
-        override fun run() {
-            // Less efficient kind of enumeration, but prevents any issues
-            // with enabledStatusDisplays changing while disabling them
-            synchronized(enabledStatusDisplays) {
-                while (enabledStatusDisplays.isNotEmpty()) {
-                    enabledStatusDisplays.first().enabled = false
+            val enabledBefore = synchronized(this) {
+                val enabledBefore = this.enabled
+                this.enabled = enabled
+                enabledBefore
+            }
+            try {
+                return action()
+            } finally {
+                synchronized(this) {
+                    this.enabled = enabledBefore
                 }
             }
+        }
+
+
+        private val enabledStatusDisplays = HashSet<CliStatusDisplay>()
+
+        init {
+            Runtime.getRuntime().addShutdownHook(object : Thread("ShutdownEnabledCliStatusDisplays") {
+                override fun run() {
+                    // Less efficient kind of enumeration, but prevents any issues
+                    // with enabledStatusDisplays changing while disabling them
+                    synchronized(enabledStatusDisplays) {
+                        while (enabledStatusDisplays.isNotEmpty()) {
+                            enabledStatusDisplays.first().enabled = false
+                        }
+                    }
+                }
+            })
         }
     }
 }

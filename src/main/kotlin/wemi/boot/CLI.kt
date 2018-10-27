@@ -11,6 +11,7 @@ import org.jline.utils.AttributedStyle
 import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.util.*
+import wemi.util.CliStatusDisplay.Companion.withStatus
 import java.io.IOException
 import java.io.PrintStream
 import java.nio.file.Path
@@ -55,7 +56,12 @@ object CLI {
         terminal
     }
 
-    internal val MessageDisplay: CliStatusDisplay by lazy { CliStatusDisplay(Terminal) }
+    internal val MessageDisplay: CliStatusDisplay? by lazy {
+        if (WemiColorOutputSupported) {
+            // If terminal doesn't support color, it probably doesn't support ANSI codes
+            CliStatusDisplay(Terminal)
+        } else null
+    }
 
     /** Line reader used when awaiting tasks. */
     private val TaskLineReader: LineReaderImpl by lazy {
@@ -226,7 +232,7 @@ object CLI {
         }
 
         private fun update() {
-            MessageDisplay.setMessage(messageBuilder.toAttributedString(), importantPrefix)
+            MessageDisplay?.setMessage(messageBuilder.toAttributedString(), importantPrefix)
         }
 
         override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value) {

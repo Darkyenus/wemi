@@ -5,6 +5,7 @@ import org.jline.reader.UserInterruptException
 import org.slf4j.LoggerFactory
 import wemi.boot.CLI
 import wemi.util.*
+import wemi.util.CliStatusDisplay.Companion.withStatus
 
 private val LOG = LoggerFactory.getLogger("Input")
 
