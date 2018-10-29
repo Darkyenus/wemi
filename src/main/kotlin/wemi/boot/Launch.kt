@@ -85,20 +85,24 @@ internal val WemiBundledLibrariesExclude = DefaultExclusions + listOf(
         //TODO Add Wemi itself here!
 )
 
-/** Entry point for the WEMI build tool */
-internal fun launch(rootFolder:Path, buildFolder:Path, cacheFolder:Path,
-                    cleanBuild:Boolean, interactiveHint:Boolean,
-                    machineReadableOutput:Boolean, allowBrokenBuildScripts :Boolean,
-                    reloadSupported:Boolean,
-                    taskArguments:List<String>, runtimeClasspath:List<Path>) {
-    WemiRootFolder = rootFolder
-    WemiBuildFolder = buildFolder
-    WemiCacheFolder = cacheFolder
-
-    WemiRuntimeClasspath = runtimeClasspath
-    WemiReloadSupported = reloadSupported
-
-    var interactive = interactiveHint
+/** Called reflectively from Main. See there for more info.
+ * Entry point for the WEMI build tool. */
+@PublishedApi // So that it is easily reflectively visible
+@JvmSynthetic // So that people don't see it
+@JvmField // So that it actually is a field
+internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.function.Consumer { rawOptions ->
+    WemiRootFolder = rawOptions[OPTION_PATH_ROOT_FOLDER] as Path
+    WemiBuildFolder = rawOptions[OPTION_PATH_BUILD_FOLDER] as Path
+    WemiCacheFolder = rawOptions[OPTION_PATH_CACHE_FOLDER] as Path
+    val cleanBuild = rawOptions[OPTION_BOOL_CLEAN_BUILD] as Boolean
+    var interactive = rawOptions[OPTION_BOOL_INTERACTIVE] as Boolean
+    val machineReadableOutput = rawOptions[OPTION_BOOL_MACHINE_READABLE] as Boolean
+    val allowBrokenBuildScripts  = rawOptions[OPTION_BOOL_ALLOW_BROKEN_BUILD_SCRIPTS] as Boolean
+    WemiReloadSupported = rawOptions[OPTION_BOOL_RELOAD_SUPPORTED] as Boolean
+    @Suppress("UNCHECKED_CAST")
+    val taskArguments = rawOptions[OPTION_LIST_OF_STRING_TASKS] as List<String>
+    @Suppress("UNCHECKED_CAST")
+    WemiRuntimeClasspath = rawOptions[OPTION_LIST_OF_PATH_RUNTIME_CLASSPATH] as List<Path>
 
     TPLogger.attachUnhandledExceptionLogger()
     JavaLoggingIntegration.enable()

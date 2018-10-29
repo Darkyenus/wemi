@@ -7,9 +7,6 @@ import java.nio.file.Path
 import kotlin.reflect.KProperty0
 import kotlin.reflect.jvm.isAccessible
 
-/** Version of Wemi build system */
-const val WemiVersion = "0.7-SNAPSHOT"
-
 /** Version of Kotlin used for build scripts */
 val WemiKotlinVersion = KotlinCompilerVersion.Version1_2_71
 

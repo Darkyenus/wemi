@@ -581,7 +581,7 @@ object CLI {
             null
         }
         put("help") {
-            println(formatLabel("Wemi $WemiVersion (Kotlin $WemiKotlinVersion)"))
+            println(formatLabel("Wemi ${Main.WEMI_VERSION} (Kotlin $WemiKotlinVersion, Java ${System.getProperty("java.version")} - ${System.getProperty("java.vendor")})"))
             print(formatLabel("Commands: "))
             println(" exit, reload, help, log <level>")
             println(" projects [filter], configurations [filter], keys [filter] - list available")

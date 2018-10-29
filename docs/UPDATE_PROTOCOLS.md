@@ -3,7 +3,7 @@
 # Wemi Version update
 1. Change versions in
 	- [BuildScript](../build/build.kt)
-	- [Wemi](../src/main/kotlin/wemi/Wemi.kt)
+	- [Wemi](../src/main/java/wemi/boot/Main.java)
 	- [IDEA plugin](../ide-plugins/WemiForIntelliJ/resources/META-INF/plugin.xml)
 2. Update changes in
     - [Changelog](../CHANGES.md)

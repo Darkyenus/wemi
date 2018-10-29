@@ -3,8 +3,6 @@ package wemi.boot;
 import com.darkyen.tproll.TPLogger;
 
 import java.io.*;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -15,11 +13,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /** Parse command line options, loads self-packed libraries and start real Main. */
 @SuppressWarnings("WeakerAccess")
 public class Main {
+
+	/** Version of Wemi build system */
+	public static final String WEMI_VERSION = "0.7-SNAPSHOT";
 
 	// Standard exit codes
 	public static final int EXIT_CODE_SUCCESS = 0;
@@ -52,6 +54,19 @@ public class Main {
 	/* ONLY COMPILE TIME CONSTANTS ALLOWED IN THIS FILE!
 	 * (because it will be reloaded and discarded) */
 
+	static final int OPTION_PATH_ROOT_FOLDER = 0;
+	static final int OPTION_PATH_BUILD_FOLDER = 1;
+	static final int OPTION_PATH_CACHE_FOLDER = 2;
+	static final int OPTION_BOOL_CLEAN_BUILD = 3;
+	static final int OPTION_BOOL_INTERACTIVE = 4;
+	static final int OPTION_BOOL_MACHINE_READABLE = 5;
+	static final int OPTION_BOOL_ALLOW_BROKEN_BUILD_SCRIPTS = 6;
+	static final int OPTION_BOOL_RELOAD_SUPPORTED = 7;
+	static final int OPTION_LIST_OF_STRING_TASKS = 8;
+	static final int OPTION_LIST_OF_PATH_RUNTIME_CLASSPATH = 9;
+	static final int OPTIONS_SIZE = 10;
+
+	@SuppressWarnings("unchecked")
 	public static void main(String[] args) throws Throwable {
 		final boolean[] cleanBuild = {false};
 		final boolean[] interactive = {false};
@@ -115,14 +130,14 @@ public class Main {
 						false, null, arg -> machineReadableOutput[0] = true),
 				new Option(Option.NO_SHORT_NAME, "allow-broken-build-scripts", "ignore build scripts which fail to compile and allow to run without them",
 						false, null, arg -> allowBrokenBuildScripts[0] = true),
-				new Option(Option.NO_SHORT_NAME, "reload-supported", "signal that launcher will handle reload requests (exit code $EXIT_CODE_RELOAD), enables 'reload' command",
+				new Option(Option.NO_SHORT_NAME, "reload-supported", "signal that launcher will handle reload requests (exit code "+EXIT_CODE_RELOAD+"), enables 'reload' command",
 						false, null, arg -> reloadSupported[0] = true),
 				new Option('h', "help", "show this help and exit", false, null, arg -> {
 					Option.printWemiHelp(options[0]);
 					System.exit(EXIT_CODE_SUCCESS);
 				}),
 				new Option(Option.NO_SHORT_NAME, "version", "output version information and exit", false, null, arg -> {
-					System.err.println("wemi $WemiVersion (Kotlin $WemiKotlinVersion)");
+					System.err.println("wemi "+WEMI_VERSION);
 					System.err.println("Copyright (C) 2018 Jan Polák");
 					System.err.println("<https://github.com/Darkyenus/WEMI>");
 					System.exit(EXIT_CODE_SUCCESS);
@@ -169,23 +184,38 @@ public class Main {
 			}
 		}
 
-		// Using parent class loader, not system one, because we want everything, including normal wemi classes
-		// to be loaded through this class loader.
-		// Otherwise wemi classes are loaded through default system class loader, which does not know about this one,
-		// and externally loaded libraries never load.
-		final ClassLoader runtimeClassLoader = new URLClassLoader(classpath, classLoader.getParent());
+		final Object[] launchOptions = new Object[OPTIONS_SIZE];
+		launchOptions[OPTION_PATH_ROOT_FOLDER] = rootDirectory[0];
+		launchOptions[OPTION_PATH_BUILD_FOLDER] = buildDirectory;
+		launchOptions[OPTION_PATH_CACHE_FOLDER] = cacheDirectory;
+		launchOptions[OPTION_BOOL_CLEAN_BUILD] = cleanBuild[0];
+		launchOptions[OPTION_BOOL_INTERACTIVE] = interactive[0];
+		launchOptions[OPTION_BOOL_MACHINE_READABLE] = machineReadableOutput[0];
+		launchOptions[OPTION_BOOL_ALLOW_BROKEN_BUILD_SCRIPTS] = allowBrokenBuildScripts[0];
+		launchOptions[OPTION_BOOL_RELOAD_SUPPORTED] = reloadSupported[0];
+		launchOptions[OPTION_LIST_OF_STRING_TASKS] = taskArguments;
+		launchOptions[OPTION_LIST_OF_PATH_RUNTIME_CLASSPATH] = paths;
+
+		final Consumer<Object[]> launch;
 
 		try {
+			// Using parent class loader, not system one, because we want everything, including normal wemi classes
+			// to be loaded through this class loader.
+			// Otherwise wemi classes are loaded through default system class loader, which does not know about this one,
+			// and externally loaded libraries never load.
+			final ClassLoader runtimeClassLoader = new URLClassLoader(classpath, classLoader.getParent());
+
 			final Class<?> mainClass = Class.forName("wemi.boot.LaunchKt", true, runtimeClassLoader);
-			final Method main = mainClass.getDeclaredMethod("launch", Path.class, Path.class, Path.class, Boolean.TYPE, Boolean.TYPE, Boolean.TYPE, Boolean.TYPE, Boolean.TYPE, List.class, List.class);
-			main.invoke(null, rootDirectory[0], buildDirectory, cacheDirectory, cleanBuild[0], interactive[0], machineReadableOutput[0], allowBrokenBuildScripts[0], reloadSupported[0], taskArguments, paths);
-		} catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException e) {
+			// Options are passed through Consumer and not through reflective method call, to ensure that the stacktrace is clean.
+			launch = (Consumer<Object[]>) mainClass.getDeclaredField("launch").get(null);
+		} catch (ClassNotFoundException | IllegalAccessException e) {
 			System.err.println("Failed to launch");
 			e.printStackTrace(System.err);
 			System.exit(1);
-		} catch (InvocationTargetException e) {
-			throw e.getCause();
+			return;
 		}
+
+		launch.accept(launchOptions);
 	}
 
 	private static List<Path> prepareUnpackedClasspath(ClassLoader classLoader, final Path libDirectory) {

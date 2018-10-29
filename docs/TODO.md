@@ -5,11 +5,6 @@
 
 - Test everything, especially javadoc/dokka/tests/plugins
 
-- Add ability to disable dynamic task showing
-	- Ensure that it honors WEMI_UNICODE
-
-- Investigate how to launch directly, not through reflection, so that stack traces are not polluted.
-
 - Fatjars in Java 9+ ?
 	- Put all libraries in separate packages?
 

@@ -31,7 +31,7 @@ typealias ProjectExclusion = wemi.dependency.DependencyExclusion
 typealias Path = java.nio.file.Path
 
 val WemiVersion
-    get() = wemi.WemiVersion
+    get() = wemi.boot.Main.WEMI_VERSION
 
 // Core Functions
 inline fun project(vararg archetypes: Archetype = arrayOf(Archetypes.DefaultArchetype), noinline initializer: Project.() -> Unit) = wemi.project(path("."), archetypes = *archetypes, initializer = initializer)

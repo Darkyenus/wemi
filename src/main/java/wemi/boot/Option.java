@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 /** Lightweight, GNU compatible (to some extent) command line option parsing. */
 final class Option {
 
-	public static final char NO_SHORT_NAME = '\0';
+	static final char NO_SHORT_NAME = '\0';
 
 	/** Short option name, if any */
 	private final char shortName;
@@ -40,7 +40,7 @@ final class Option {
 
 
 	/** Print option help. */
-	public static void printWemiHelp(Option[] options) {
+	static void printWemiHelp(Option[] options) {
 		// https://www.gnu.org/prep/standards/html_node/_002d_002dhelp.html
 		System.err.println("Usage: wemi [OPTION]... [TASK]...");
 		System.err.println("Wemi build system");
@@ -97,7 +97,7 @@ final class Option {
 
 	/** Parse given command line options, handling them as they are encountered.
 	 * @return remaining, non-option arguments or null if arguments are wrong */
-	public static List<String> parseOptions(String[] args, Option[] options) {
+	static List<String> parseOptions(String[] args, Option[] options) {
 		// https://www.gnu.org/software/libc/manual/html_node/Argument-Syntax.html
 		int argsIndex = 0;
 		while (argsIndex < args.length) {

@@ -3,8 +3,8 @@
 package wemi.boot
 
 import org.slf4j.LoggerFactory
-import wemi.WemiVersion
 import java.io.BufferedReader
+import WemiVersion
 
 /**
  * Since Java does not guarantee any persistency in ordering of annotation's fields/methods,
@@ -146,7 +146,7 @@ internal fun parseFileDirectives(source: BufferedReader, directives:Array<Class<
                 } else {
                     val wemiVersionName = ::WemiVersion.name
                     if (value == wemiVersionName) {
-                        WemiVersion
+                        Main.WEMI_VERSION
                     } else {
                         LOG.warn("{}:{} Invalid directive annotation - unrecognized parameter '{}', only strings and '{}' allowed", source, line, value, wemiVersionName)
                         return false

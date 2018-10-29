@@ -10,6 +10,7 @@ import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.Configurations.publishing
 import wemi.assembly.*
+import wemi.boot.Main
 import wemi.boot.WemiBundledLibrariesExclude
 import wemi.boot.WemiRuntimeClasspath
 import wemi.collections.WMutableList
@@ -292,7 +293,7 @@ object KeyDefaults {
             // Compile Java
             if (javaSources.isNotEmpty()) {
                 val compiler = using(compilingJava) { Keys.javaCompiler.get() }
-                val fileManager = compiler.getStandardFileManager(JavaDiagnosticListener, Locale.getDefault(), StandardCharsets.UTF_8)
+                val fileManager = compiler.getStandardFileManager(JavaDiagnosticListener, Locale.getDefault(), StandardCharsets.UTF_8) ?: throw WemiException("No standardFileManager")
                 val writerSb = StringBuilder()
                 val writer = StringBuilderWriter(writerSb)
                 val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
@@ -386,7 +387,7 @@ object KeyDefaults {
             // Compile Java
             if (javaSources.isNotEmpty()) {
                 val compiler = using(compilingJava) { Keys.javaCompiler.get() }
-                val fileManager = compiler.getStandardFileManager(null, Locale.getDefault(), StandardCharsets.UTF_8)
+                val fileManager = compiler.getStandardFileManager(null, Locale.getDefault(), StandardCharsets.UTF_8) ?: throw WemiException("No standardFileManager")
                 val writerSb = StringBuilder()
                 val writer = StringBuilderWriter(writerSb)
                 val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
@@ -650,7 +651,7 @@ object KeyDefaults {
                         .append('|').appendCentered(projectName, nameWidth, ' ')
                         .append('|').appendCentered(projectVersion, versionWidth, ' ').append("|\n")
 
-                md.append("\n*Built by Wemi ").append(WemiVersion).append("*\n")
+                md.append("\n*Built by Wemi ").append(Main.WEMI_VERSION).append("*\n")
                 md.append("*").append(ZonedDateTime.now()).append("*\n")
 
                 assemblyOperation.addSource(

@@ -24,7 +24,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
     if (task.isMachineReadableCommand) {
         when (task.key) {
             "version" -> {
-                machineReadablePrint(out, WemiVersion)
+                machineReadablePrint(out, Main.WEMI_VERSION)
                 return
             }
             "projects" -> {
