@@ -18,15 +18,11 @@ import wemi.util.name
 import wemi.util.pathExtension
 import wemi.util.pathWithoutExtension
 
-/**
- * All default configurations
- */
+/** All default configurations */
 object Configurations {
 
     //region Stage configurations
-    /**
-     * @see Keys.compile
-     */
+    /** @see Keys.compile */
     val compiling by configuration("Configuration used when compiling") {
         Keys.sourceFiles set KeyDefaults.SourceFiles
 
@@ -42,14 +38,10 @@ object Configurations {
         }
     }
 
-    /**
-     * @see Keys.run
-     */
+    /** @see Keys.run */
     val running by configuration("Configuration used when running, sources are resources") {}
 
-    /**
-     * @see Keys.test
-     */
+    /** @see Keys.test */
     val testing by configuration("Used when testing") {
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
@@ -58,9 +50,7 @@ object Configurations {
         Keys.libraryDependencies add { Dependency(JUnitPlatformLauncher) }
     }
 
-    /**
-     * @see Keys.assembly
-     */
+    /** @see Keys.assembly */
     val assembling by configuration("Configuration used when assembling Jar with dependencies") {}
     //endregion
 
@@ -100,14 +90,10 @@ object Configurations {
     //endregion
 
     //region Archiving
-    /**
-     * Used by [Keys.archive]
-     */
+    /** Used by [Keys.archive] */
     val archiving by configuration("Used when archiving") {}
 
-    /**
-     * Use this configuration to obtain sources archived in [Keys.archive].
-     */
+    /** Use this configuration to obtain sources archived in [Keys.archive]. */
     val archivingSources by configuration("Used when archiving sources") {
         Keys.archiveOutputFile modify { original ->
             val originalName = original.name
@@ -118,9 +104,7 @@ object Configurations {
         Keys.archive set KeyDefaults.ArchiveSources
     }
 
-    /**
-     * Use this configuration to obtain documentation archived in [Keys.archive].
-     */
+    /** Use this configuration to obtain documentation archived in [Keys.archive]. */
     val archivingDocs by configuration("Used when archiving documentation") {
         Keys.archiveOutputFile modify { original ->
             val originalName = original.name
@@ -154,7 +138,7 @@ object Configurations {
      * Most features will rely on caches to do internet dependent things,
      * so if you don't have caches built, some operations may fail.
      *
-     * Note: as this disables some features, do not use it for official releases.
+     * Note: as this disables some important features, do not use it for production releases.
      */
     val offline by configuration("Disables features that are not available when offline") {
         // Disable non-local repositories
