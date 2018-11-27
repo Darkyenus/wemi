@@ -6,7 +6,6 @@ import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.JarMergeStrategyChooser
 import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiCacheFolder
-import wemi.boot.WemiRunningInInteractiveMode
 import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
 import wemi.dependency.LocalM2Repository
@@ -40,8 +39,6 @@ object Archetypes {
      * Implements basic key implementations that don't usually change.
      */
     val Base by archetype {
-        Keys.input set Static(InputBase(WemiRunningInInteractiveMode))
-
         Keys.buildDirectory set Static(WemiBuildFolder)
         Keys.cacheDirectory set Static(WemiCacheFolder)
 

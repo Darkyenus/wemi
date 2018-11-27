@@ -43,7 +43,7 @@ class Key<Value> internal constructor(
         /**
          * Input keys that are used by this key.
          * Used only for documentation and CLI purposes (autocomplete).
-         * @see [Input]
+         * @see read
          */
         internal val inputKeys: Array<Pair<InputKey, InputKeyDescription>>,
         /**
@@ -266,7 +266,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
             }
 
             currentlyEvaluatingNestLevel++
-            return EvalScope(scope, NO_CONFIGURATIONS, ArrayList())
+            return EvalScope(scope, NO_CONFIGURATIONS, ArrayList(), NO_INPUT)
         }
 
         @PublishedApi

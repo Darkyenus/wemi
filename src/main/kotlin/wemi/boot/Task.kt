@@ -30,9 +30,9 @@ class Task(
         val key: String,
         /**
          * Input pairs to use, represents key-value relationship.
-         * When first String (key) is null, represents a free input argument.
+         * When first String (key) is empty, represents a free input argument.
          */
-        val input: List<Pair<String?, String>>,
+        val input: Array<Pair<String, String>>,
         /**
          * Internal flags.
          *  @see FLAG_MACHINE_READABLE_COMMAND
@@ -55,7 +55,7 @@ class Task(
      * Returns first [input] that has given [name] or is free if [orFree].
      */
     fun firstInput(name:String, orFree:Boolean):String? {
-        return input.find { (it.first == null && orFree) || it.first == name }?.second
+        return input.find { (it.first.isEmpty() && orFree) || it.first == name }?.second
     }
 
     /**
@@ -63,7 +63,7 @@ class Task(
      */
     fun inputs(name:String):List<String> {
         return input.mapNotNull { (n, i) ->
-            if (n == null || n == name) {
+            if (n.isEmpty() || n == name) {
                 i
             } else null
         }
@@ -103,27 +103,7 @@ class Task(
 
         return try {
             val result = project.evaluate(configurations) {
-                // Attach input, if any
-                val evalScopeWithInput:EvalScope = if (this@Task.input.isEmpty()) {
-                    this
-                } else {
-                    val freeInput = ArrayList<String>()
-                    val boundInput = HashMap<String, String>()
-
-                    for ((k, v) in this@Task.input) {
-                        if (k == null) {
-                            freeInput.add(v)
-                        } else {
-                            boundInput[k] = v
-                        }
-                    }
-
-                    withMixedInput(freeInput.toTypedArray(), boundInput) { this }
-                }
-
-                evalScopeWithInput.apply {
-                    key.get()
-                }
+                key.get(*this@Task.input)
             }
 
             TaskEvaluationResult(key, result, TaskEvaluationStatus.Success)
@@ -154,7 +134,7 @@ class Task(
 
         for ((k, v) in input) {
             sb.append(' ')
-            if (k != null) {
+            if (k.isNotEmpty()) {
                 sb.append(k).append(INPUT_SEPARATOR)
             }
             sb.append(v)
@@ -172,7 +152,7 @@ class Task(
         if (project != other.project) return false
         if (configurations != other.configurations) return false
         if (key != other.key) return false
-        if (input != other.input) return false
+        if (!input.contentEquals(other.input)) return false
 
         return true
     }

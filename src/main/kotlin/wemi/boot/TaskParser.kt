@@ -495,7 +495,7 @@ object TaskParser : Parser {
 
             consumeWhitespaceParts()
 
-            val input = ArrayList<Pair<String?, String>>()
+            val input = ArrayList<Pair<String, String>>()
 
             while (hasNextPart()) {
                 if (matchSeparator(TASK_SEPARATOR)) {
@@ -510,10 +510,10 @@ object TaskParser : Parser {
 
                 assert(inputKeyOrNull != null || value != null)
 
-                input.add(inputKeyOrNull to (value ?: ""))
+                input.add((inputKeyOrNull ?: "") to (value ?: ""))
             }
 
-            return Task(project, configurations, key, input, flags)
+            return Task(project, configurations, key, input.toTypedArray(), flags)
         }
 
         private fun parseTasks(machineReadable: Boolean = false): List<Task> {

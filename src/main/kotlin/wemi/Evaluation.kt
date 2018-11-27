@@ -16,19 +16,26 @@ internal class Binding<T>(val key:Key<T>, val value:BoundKeyValue<T>, val modifi
     internal val dependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>()
 
     internal var lastEvaluated:Int = -1
+    /* Evaluating key repeatedly with different input will trash the cache.
+    It is not expected to happen, so we do not optimize for it.
+    (Besides, changing values of any other dependency key will do the same) */
+    internal var lastEvaluatedWithInput:Array<out Pair<String, String>> = NO_INPUT
     internal var lastEvaluatedTo:T? = null
 
-    internal fun isFresh():Boolean {
+    internal fun isFresh(forInput:Array<out Pair<String, String>>):Boolean {
         if (lastEvaluated == -1) {
             return false
         }
         if (lastEvaluated == globalTickTime) {
             return true
         }
+        if (!lastEvaluatedWithInput.contentEquals(forInput)) {
+            return false
+        }
         if (value is Expirable && value.isExpired() || modifiers.any { it is Expirable && it.isExpired() }) {
             return false
         }
-        return dependsOn.all { it.second.isFresh() }
+        return dependsOn.all { it.second.isFresh(it.second.lastEvaluatedWithInput) }
     }
 
     override fun equals(other: Any?): Boolean {
@@ -68,7 +75,11 @@ internal interface Expirable {
 class EvalScope @PublishedApi internal constructor(
         @PublishedApi internal val scope:Scope,
         @PublishedApi internal val configurationPrefix:Array<Configuration>,
-        @PublishedApi internal val usedBindings: ArrayList<Pair<Array<Configuration>, Binding<*>>>) : Closeable {
+        @PublishedApi internal val usedBindings: ArrayList<Pair<Array<Configuration>, Binding<*>>>,
+        @PublishedApi internal val input:Array<out Pair<String, String>>) : Closeable {
+
+    /** Used by the input subsystem. See Input.kt. */
+    internal var nextFreeInput = 0
 
     private var closed = false
 
@@ -93,7 +104,7 @@ class EvalScope @PublishedApi internal constructor(
         for (configuration in configurations) {
             scope = scope.scopeFor(configuration)
         }
-        return EvalScope(scope, configurationPrefix + configurations, usedBindings).use { it.action() }
+        return EvalScope(scope, configurationPrefix + configurations, usedBindings, input).use { it.action() }
     }
 
     /** Run the [action] in a scope, which is created by layering [configurations] over this [Scope]. */
@@ -104,17 +115,17 @@ class EvalScope @PublishedApi internal constructor(
         for (configuration in configurations) {
             scope = scope.scopeFor(configuration)
         }
-        return EvalScope(scope, configurationPrefix + configurations, usedBindings).use { it.action() }
+        return EvalScope(scope, configurationPrefix + configurations, usedBindings, input).use { it.action() }
     }
 
     /** Run the [action] in a scope, which is created by layering [configuration] over this [Scope]. */
     @Suppress("unused")
     inline fun <Result> EvalScope.using(configuration: Configuration, action: EvalScope.() -> Result): Result {
         ensureNotClosed()
-        return EvalScope(scope.scopeFor(configuration), configurationPrefix + configuration, usedBindings).use { it.action() }
+        return EvalScope(scope.scopeFor(configuration), configurationPrefix + configuration, usedBindings, input).use { it.action() }
     }
 
-    private fun <Value : Output, Output> getKeyValue(key: Key<Value>, otherwise: Output, useOtherwise: Boolean): Output {
+    private fun <Value : Output, Output> getKeyValue(key: Key<Value>, otherwise: Output, useOtherwise: Boolean, input:Array<out Pair<String, String>>): Output {
         ensureNotClosed()
         val listener = activeKeyEvaluationListener
         listener?.keyEvaluationStarted(this.scope, key)
@@ -134,13 +145,13 @@ class EvalScope @PublishedApi internal constructor(
                     throw WemiException.KeyNotAssignedException(key, this@EvalScope.scope)
                 }
 
-        val result:Value = if (binding.isFresh()) {
+        val result:Value = if (binding.isFresh(input)) {
             @Suppress("UNCHECKED_CAST")
             binding.lastEvaluatedTo as Value
         } else {
             val newDependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>()
             val result:Value =
-            EvalScope(scope, NO_CONFIGURATIONS, newDependsOn).use { evalScope ->
+            EvalScope(scope, NO_CONFIGURATIONS, newDependsOn, input).use { evalScope ->
                 var result = try {
                     binding.value(evalScope)
                 } catch (t: Throwable) {
@@ -168,6 +179,7 @@ class EvalScope @PublishedApi internal constructor(
             }
 
             binding.lastEvaluated = globalTickTime
+            binding.lastEvaluatedWithInput = input
             binding.lastEvaluatedTo = result
 
             binding.dependsOn.clear()
@@ -186,19 +198,24 @@ class EvalScope @PublishedApi internal constructor(
      * Throws exception if no value set. */
     fun <Value> Key<Value>.get(): Value {
         @Suppress("UNCHECKED_CAST")
-        return getKeyValue(this, null, false) as Value
+        return getKeyValue(this, null, false, NO_INPUT) as Value
+    }
+
+    /** Same as [get], but with ability to specify [input] of the task. */
+    fun <Value> Key<Value>.get(vararg input:Pair<String, String>): Value {
+        @Suppress("UNCHECKED_CAST")
+        return getKeyValue(this, null, false, input) as Value
     }
 
     /** Return the value bound to this wemi.key in this scope.
      * Returns [unset] if no value set. */
     fun <Value : Else, Else> Key<Value>.getOrElse(unset: Else): Else {
-        return getKeyValue(this, unset, true)
+        return getKeyValue(this, unset, true, NO_INPUT)
     }
 
-    /** Return the value bound to this wemi.key in this scope.
-     * Returns `null` if no value set. */
-    fun <Value> Key<Value>.getOrNull(): Value? {
-        return getKeyValue(this, null, true)
+    /** Same as [getOrElse], but with ability to specify [input]. See [get]. */
+    fun <Value : Else, Else> Key<Value>.getOrElse(unset: Else, vararg input:Pair<String, String>): Else {
+        return getKeyValue(this, unset, true, input)
     }
 }
 

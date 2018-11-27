@@ -314,7 +314,7 @@ internal class SimpleHistory(private val path: Path?) : History {
             return if (inputKey == null) {
                 "input"
             } else {
-                "input.$inputKey"
+                "input.${inputKey.toLowerCase()}"
             }
         }
 

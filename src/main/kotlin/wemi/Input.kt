@@ -4,112 +4,101 @@ import org.jline.reader.EndOfFileException
 import org.jline.reader.UserInterruptException
 import org.slf4j.LoggerFactory
 import wemi.boot.CLI
+import wemi.boot.WemiRunningInInteractiveMode
 import wemi.util.*
 import wemi.util.CliStatusDisplay.Companion.withStatus
 
 private val LOG = LoggerFactory.getLogger("Input")
 
+internal val NO_INPUT = emptyArray<Pair<String,String>>()
+
 /**
- * Base for input. Does not store any prepared values, but reads from the user, if interactive.
- * If not interactive, simply fails.
+ * Convenience method, calls [read] with [StringValidator].
  */
-internal class InputBase(private val interactive: Boolean) : Input() {
-
-    override fun <Value> getPrepared(key: String, validator: Validator<Value>): Value? = null
-
-    override fun <Value> read(key: String, description: String, validator: Validator<Value>): Value? {
-        if (!interactive) {
-            return null
-        }
-        try {
-            while (true) {
-                val line = CLI.InputLineReader.run {
-                    val previousHistory = history
-                    try {
-                        history = SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key))
-                        CLI.MessageDisplay.withStatus(false) {
-                            readLine("${format(description, format = Format.Bold)} (${format(key, Color.White)}): ")
-                        }
-                    } finally {
-                        history = previousHistory
-                    }
-                }
-                val value = validator(line)
-                value.use({
-                    return it
-                }, {
-                    print(format("Invalid input: ", format = Format.Bold))
-                    println(format(it, foreground = Color.Red))
-                })
-            }
-        } catch (e: UserInterruptException) {
-            return null
-        } catch (e: EndOfFileException) {
-            return null
-        }
-    }
-
-}
+fun EvalScope.read(key: String, description: String): String? = read(key, description, StringValidator)
 
 /**
- * Holds input values, for the [InputExtensionBinding]. Also holds which free input values were already consumed.
+ * Read a [Value] from the input.
+ * The value is first searched for using the [key] from explicit input pairs.
+ * Then, free input strings (without explicit [key]s) are considered. Both are considered from top
+ * (added last) to bottom, and only if they are accepted by the [validator].
+ * As a last resort, user is asked, if in interactive mode. Otherwise, the query fails.
  *
- * @param freeInput array of input strings that can be used when no input pairs fit
- * @param inputPairs map of input strings to use preferably, key corresponds to the key parameter of [Input.read]
+ * @param key simple, non-user-readable key (case insensitive, converted to lowercase)
+ * @param description displayed to the user, if asked interactively
+ * @param validator to use for validation and conversion of found string
+ * @return found value or null if validator fails on all possible values
  */
-private class InputExtension(val freeInput: Array<out String>?, val inputPairs: Map<String, String>?) {
-    /**
-     * Next free input to consume. If [freeInput] is null or [nextFreeInput] >= [freeInput].size,
-     * there is no more free input.
-     */
-    var nextFreeInput = 0
-}
+fun <Value> EvalScope.read(key: String, description: String, validator: Validator<Value>): Value? {
+    val input = this.input
 
-/**
- * Binds mutable [InputExtension] into the [Input] stack.
- */
-private class InputExtensionBinding(val previous: Input, val extension: InputExtension) : Input() {
-
-    override fun <Value> getPrepared(key: String, validator: Validator<Value>): Value? {
-        if (extension.inputPairs != null) {
-            val preparedValue = extension.inputPairs[key]
-
-            if (preparedValue != null) {
-                validator(preparedValue).use<Unit>({
-                    SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key)).add(preparedValue)
-                    return it
-                }, {
-                    LOG.info("Can't use '{}' for input key '{}': {}", preparedValue, key, it)
-                })
-            }
+    // Search in prepared by key
+    for ((preparedKey, preparedValue) in input) {
+        if (!preparedKey.equals(key, ignoreCase = true)) {
+            continue
         }
-        return previous.getPrepared(key, validator)
+
+        validator(preparedValue).use<Unit>({
+            SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key)).add(preparedValue)
+            return it
+        }, {
+            LOG.info("Can't use '{}' for input key '{}': {}", preparedValue, key, it)
+        })
     }
 
-    override fun <Value> read(key: String, description: String, validator: Validator<Value>): Value? {
-        val prepared = getPrepared(key, validator)
-        if (prepared != null) {
-            return prepared
-        }
+    // Search in prepared for free
+    // Move nextFreeInput to a valid index of free input
+    while (nextFreeInput < input.size && input[nextFreeInput].first.isNotEmpty()) {
+        nextFreeInput++
+    }
+    // Try to use it
+    if (nextFreeInput < input.size) {
+        val freeInput = input[nextFreeInput].second
+        validator(freeInput).use({
+            // We will use this free input
+            SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key)).add(freeInput)
+            SimpleHistory.getHistory(SimpleHistory.inputHistoryName(null)).add(freeInput)
+            nextFreeInput++
+            return it
+        }, {
+            LOG.info("Can't use free '{}' for input key '{}': {}", freeInput, key, it)
+        })
+    }
 
-        extension.apply {
-            if (freeInput != null) {
-                if (nextFreeInput < freeInput.size) {
-                    val freeInput = freeInput[nextFreeInput]
-                    validator(freeInput).success {
-                        // We will use this free input
-                        SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key)).add(freeInput)
-                        SimpleHistory.getHistory(SimpleHistory.inputHistoryName(null)).add(freeInput)
-                        nextFreeInput++
-                        return it
+    // Still no hit, read interactively
+    if (!WemiRunningInInteractiveMode) {
+        LOG.info("Not asking for {} - '{}', not interactive", key, description)
+        return null
+    }
+
+    try {
+        while (true) {
+            val line = CLI.InputLineReader.run {
+                val previousHistory = history
+                try {
+                    history = SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key))
+                    CLI.MessageDisplay.withStatus(false) {
+                        readLine("${format(description, format = Format.Bold)} (${format(key, Color.White)}): ")
                     }
+                } finally {
+                    history = previousHistory
                 }
             }
+            val value = validator(line)
+            value.use({
+                return it
+            }, {
+                print(format("Invalid input: ", format = Format.Bold))
+                println(format(it, foreground = Color.Red))
+            })
         }
-
-        return previous.read(key, description, validator)
+    } catch (e: UserInterruptException) {
+        return null
+    } catch (e: EndOfFileException) {
+        return null
     }
 }
+
 
 /**
  * A function that validates given string input and converts it to the desirable type.
@@ -174,87 +163,3 @@ val ClassNameValidator: Validator<String> = validator@ {
 
     Failable.success(className)
 }
-
-/**
- * Input provider. Retrieved values may come from the user interactively, be entered as part of the key string,
- * or be specified programmatically, see [withInput].
- */
-abstract class Input {
-    /**
-     * Get the key value from the stack if it has been specified explicitly and fits the validator.
-     * Items on the top of the stack are considered before those on the bottom.
-     */
-    internal abstract fun <Value> getPrepared(key: String, validator: Validator<Value>): Value?
-
-    /**
-     * Convenience method, calls [read] with [StringValidator].
-     */
-    fun read(key: String, description: String): String? = read(key, description, StringValidator)
-
-    /**
-     * Read a [Value] from the input.
-     * The value is first searched for using the [key] from explicit input pairs.
-     * Then, free input strings (without explicit [key]s) are considered. Both are considered from top
-     * (added last) to bottom, and only if they are accepted by the [validator].
-     * As a last resort, user is asked, if in interactive mode. Otherwise, the query fails.
-     *
-     * @param key simple, preferably lowercase non-user-readable key.
-     * @param description displayed to the user, if asked interactively
-     * @param validator to use for validation and conversion of found string
-     * @return found value or null if validator fails on all possible values
-     */
-    abstract fun <Value> read(key: String, description: String, validator: Validator<Value>): Value?
-}
-
-/**
- * Add given inputs pairs to the scope through an anonymous configuration and run the [action] with that
- * configuration in [Scope] stack.
- * @see [EvalScope.using]
- */
-fun <Result> EvalScope.withInput(vararg inputPairs: Pair<String, String>, action: EvalScope.() -> Result): Result {
-    val inputExtension = InputExtension(null, inputPairs.toMap())
-    return using(anonInitializer = {
-        Keys.input.modify { old ->
-            InputExtensionBinding(old, inputExtension)
-        }
-    }, action = action)
-}
-
-/**
- * Add given free inputs to the scope through an anonymous configuration and run the [action] with that
- * configuration in [Scope] stack.
- *
- * Note that free inputs added last (through [withInput]) are considered first.
- * Inputs on n-th position in the [freeInput] array will be considered only after those on (n-1)-th position were used.
- *
- * @see [EvalScope.using]
- */
-fun <Result> EvalScope.withInput(vararg freeInput: String, action: EvalScope.() -> Result): Result {
-    val inputExtension = InputExtension(freeInput, null)
-    return using(anonInitializer = {
-        Keys.input.modify { old ->
-            InputExtensionBinding(old, inputExtension)
-        }
-    }, action = action)
-}
-
-/**
- * Add given inputs pairs to the scope through an anonymous configuration and run the [action] with that
- * configuration in [Scope] stack.
- *
- * This can specify free and non-free inputs at the same time.
- * Input pairs with null keys are treated as free input.
- *
- * @see [EvalScope.using]
- * @see [withInput]
- */
-fun <Result> EvalScope.withMixedInput(freeInput: Array<out String>, boundInput: Map<String, String>, action: EvalScope.() -> Result): Result {
-    val inputExtension = InputExtension(freeInput, boundInput)
-    return using(anonInitializer = {
-        Keys.input.modify { old ->
-            InputExtensionBinding(old, inputExtension)
-        }
-    }, action = action)
-}
-
-

@@ -497,7 +497,7 @@ object KeyDefaults {
 
     val RunMain: BoundKeyValue<Int> = {
         using(Configurations.running) {
-            val mainClass = Keys.input.get().read("main", "Main class to start", ClassNameValidator)
+            val mainClass = read("main", "Main class to start", ClassNameValidator)
                     ?: throw WemiException("Main class not specified", showStacktrace = false)
             doRun(mainClass)
         }
@@ -618,7 +618,7 @@ object KeyDefaults {
 
                 |Group        | Name | Version |
                 |:-----------:|:----:|:-------:|
-                |com.whatever | Haha | 1.3     |
+                |com.whatever | Pear | 1.3     |
 
                 *Built by Wemi 1.2*
                 *Current date*
