@@ -23,10 +23,10 @@ val AllConfigurations: Map<String, Configuration>
     get() = BuildScriptData.AllConfigurations
 
 /** Standard function type that is bound as value to the key in [BindingHolder] */
-typealias BoundKeyValue<Value> = Scope.() -> Value
+typealias BoundKeyValue<Value> = EvalScope.() -> Value
 
 /** Value modifier that can be additionally bound to a key in [BindingHolder] */
-typealias BoundKeyValueModifier<Value> = Scope.(Value) -> Value
+typealias BoundKeyValueModifier<Value> = EvalScope.(Value) -> Value
 
 /**
  * Create a new [Project].
@@ -199,6 +199,9 @@ fun repository(name: String, url: String, checksum: Repository.M2.Checksum = Rep
  * - `stdlib-jdk8` standard library extension for Java 8 JVM
  * - And more, see http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.jetbrains.kotlin%22
  */
-fun Scope.kotlinDependency(name: String): Dependency {
+fun EvalScope.kotlinDependency(name: String): Dependency {
     return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-$name", Keys.kotlinVersion.get().string, MavenCentral))
 }
+
+@DslMarker
+annotation class WemiDsl

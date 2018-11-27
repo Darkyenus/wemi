@@ -1,8 +1,8 @@
 package wemi.publish
 
 import wemi.Configurations
+import wemi.EvalScope
 import wemi.Keys
-import wemi.Scope
 import wemi.dependency.Classifier
 import wemi.dependency.Repository
 import java.nio.file.Path
@@ -28,7 +28,7 @@ typealias ArtifactEntry = Pair<Path, Classifier?>
  * @param includeDocumentation true to package documentation and add it to resulting artifacts under [Repository.M2.JavadocClassifier].
  * Documentation artifact is obtained through [Configurations.archivingDocs].
  */
-fun Scope.artifacts(classifier:Classifier?, includeSources:Boolean = true, includeDocumentation:Boolean = true):List<ArtifactEntry> {
+fun EvalScope.artifacts(classifier:Classifier?, includeSources:Boolean = true, includeDocumentation:Boolean = true):List<ArtifactEntry> {
     val result = ArrayList<ArtifactEntry>(3)
 
     val artifact = Keys.archive.get()

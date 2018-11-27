@@ -1,7 +1,7 @@
 package wemi.test
 
 import org.slf4j.LoggerFactory
-import wemi.Scope
+import wemi.EvalScope
 import wemi.boot.CLI
 import wemi.dependency.Dependency
 import wemi.dependency.DependencyId
@@ -40,7 +40,7 @@ const val JUnitEngineVersion = "5.0.2"
  * @see [JUnitEngineVersion] for used version (based on Wemi version)
  */
 @Suppress("unused")//Scope.
-val Scope.JUnitAPI: Dependency
+val EvalScope.JUnitAPI: Dependency
     get() = Dependency(DependencyId("org.junit.jupiter", "junit-jupiter-api", JUnitEngineVersion, MavenCentral))
 
 /**
@@ -51,7 +51,7 @@ val Scope.JUnitAPI: Dependency
  * @see [JUnitEngineVersion] for used version (based on Wemi version)
  */
 @Suppress("unused")//Scope.
-val Scope.JUnitEngine: Dependency
+val EvalScope.JUnitEngine: Dependency
     get() = Dependency(DependencyId("org.junit.jupiter", "junit-jupiter-engine", JUnitEngineVersion, MavenCentral))
 
 /**
@@ -60,7 +60,7 @@ val Scope.JUnitEngine: Dependency
  * To use JUnit 4 tests, add this as a testing dependency, together with JUnit 4.
  */
 @Suppress("unused")//Scope. and not auto-imported
-val Scope.JUnit4Engine: Dependency
+val EvalScope.JUnit4Engine: Dependency
     get() = Dependency(DependencyId("org.junit.vintage", "junit-vintage-engine", "4.12.2", MavenCentral))
 
 /**

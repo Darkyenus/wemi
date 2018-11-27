@@ -39,8 +39,6 @@ object Keys {
     val buildDirectory by key<Path>("Directory with Wemi build scripts, directories with logs, cache, etc.")
     val cacheDirectory by key<Path>("Directory in which Wemi stores cache and processed data")
 
-    val input by key<Input>("Provides access to user input, that can be programmatically pre-set")
-
     val sourceRoots by key<Set<Path>>("Directories which are source roots for the project (example: '/src/main/java')", defaultValue = emptySet())
     val sourceExtensions by key<Set<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)", defaultValue = emptySet())
     /**

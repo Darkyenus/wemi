@@ -23,6 +23,7 @@ typealias Archetype = wemi.Archetype
 typealias Configuration = wemi.Configuration
 typealias Project = wemi.Project
 typealias Scope = wemi.Scope
+typealias EvalScope = wemi.EvalScope
 typealias Repository = wemi.dependency.Repository
 typealias ProjectId = wemi.dependency.DependencyId
 typealias ProjectDependency = wemi.dependency.Dependency
@@ -50,10 +51,10 @@ inline fun dependency(groupNameVersion: String, vararg attributes: Pair<Dependen
 inline fun repository(name: String, url: String, checksum: Repository.M2.Checksum = Repository.M2.Checksum.SHA1) = wemi.repository(name, url, checksum)
 
 // Helper functions
-inline fun Scope.kotlinDependency(name: String) = _kotlinDependency(name)
-inline val Scope.JUnitAPI
+inline fun EvalScope.kotlinDependency(name: String) = _kotlinDependency(name)
+inline val EvalScope.JUnitAPI
     inline get() = _JUnitAPI
-val Scope.JUnitEngine
+val EvalScope.JUnitEngine
     inline get() = _JUnitEngine
 inline fun dependency(project:Project, aggregate:Boolean, vararg configurations:Configuration) = _dependency(project, aggregate, *configurations)
 
@@ -112,9 +113,6 @@ val projectRoot
     inline get() = wemi.Keys.projectRoot
 val buildDirectory
     inline get() = wemi.Keys.buildDirectory
-
-val input
-    inline get() = wemi.Keys.input
 
 val sourceRoots
     inline get() = wemi.Keys.sourceRoots

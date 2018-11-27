@@ -209,9 +209,9 @@ abstract class Input {
 /**
  * Add given inputs pairs to the scope through an anonymous configuration and run the [action] with that
  * configuration in [Scope] stack.
- * @see [Scope.using]
+ * @see [EvalScope.using]
  */
-fun <Result> Scope.withInput(vararg inputPairs: Pair<String, String>, action: Scope.() -> Result): Result {
+fun <Result> EvalScope.withInput(vararg inputPairs: Pair<String, String>, action: EvalScope.() -> Result): Result {
     val inputExtension = InputExtension(null, inputPairs.toMap())
     return using(anonInitializer = {
         Keys.input.modify { old ->
@@ -227,9 +227,9 @@ fun <Result> Scope.withInput(vararg inputPairs: Pair<String, String>, action: Sc
  * Note that free inputs added last (through [withInput]) are considered first.
  * Inputs on n-th position in the [freeInput] array will be considered only after those on (n-1)-th position were used.
  *
- * @see [Scope.using]
+ * @see [EvalScope.using]
  */
-fun <Result> Scope.withInput(vararg freeInput: String, action: Scope.() -> Result): Result {
+fun <Result> EvalScope.withInput(vararg freeInput: String, action: EvalScope.() -> Result): Result {
     val inputExtension = InputExtension(freeInput, null)
     return using(anonInitializer = {
         Keys.input.modify { old ->
@@ -245,10 +245,10 @@ fun <Result> Scope.withInput(vararg freeInput: String, action: Scope.() -> Resul
  * This can specify free and non-free inputs at the same time.
  * Input pairs with null keys are treated as free input.
  *
- * @see [Scope.using]
+ * @see [EvalScope.using]
  * @see [withInput]
  */
-fun <Result> Scope.withMixedInput(freeInput: Array<out String>, boundInput: Map<String, String>, action: Scope.() -> Result): Result {
+fun <Result> EvalScope.withMixedInput(freeInput: Array<out String>, boundInput: Map<String, String>, action: EvalScope.() -> Result): Result {
     val inputExtension = InputExtension(freeInput, boundInput)
     return using(anonInitializer = {
         Keys.input.modify { old ->

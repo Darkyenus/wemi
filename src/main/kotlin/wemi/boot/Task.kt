@@ -104,7 +104,7 @@ class Task(
         return try {
             val result = project.evaluate(configurations) {
                 // Attach input, if any
-                if (this@Task.input.isEmpty()) {
+                val evalScopeWithInput:EvalScope = if (this@Task.input.isEmpty()) {
                     this
                 } else {
                     val freeInput = ArrayList<String>()
@@ -119,7 +119,9 @@ class Task(
                     }
 
                     withMixedInput(freeInput.toTypedArray(), boundInput) { this }
-                }.run {
+                }
+
+                evalScopeWithInput.apply {
                     key.get()
                 }
             }

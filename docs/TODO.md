@@ -3,14 +3,14 @@
 - WEMI IS COMPILED MULTIPLE TIMES!!! cache compile!
 	- Warnings in EnclaveCL
 
+- clean should be a command!
+
 - Test everything, especially javadoc/dokka/tests/plugins
 
 - Fatjars in Java 9+ ?
 	- Put all libraries in separate packages?
 
 - Automated tests
-
-- Ensure that test classpath is not polluted by double classes
 
 - Dynamic "what test is executing right now?", or maybe even results as they come in
 

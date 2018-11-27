@@ -120,21 +120,19 @@ object KeyDefaults {
     }
 
 
-    val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<DependencyId, ResolvedDependency>>> = Cached {
-        val repositories = use { Keys.repositoryChain.get() }
-        val libraryDependencies = use { Keys.libraryDependencies.get() }
-        val libraryDependencyProjectMapper = use { Keys.libraryDependencyProjectMapper.get() }
+    val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<DependencyId, ResolvedDependency>>> =  {
+        val repositories = Keys.repositoryChain.get()
+        val libraryDependencies = Keys.libraryDependencies.get()
+        val libraryDependencyProjectMapper = Keys.libraryDependencyProjectMapper.get()
 
-        produce {
-            val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
-            val complete = DependencyResolver.resolve(resolved, libraryDependencies, repositories, libraryDependencyProjectMapper)
-            Partial(resolved, complete)
-        }
+        val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
+        val complete = DependencyResolver.resolve(resolved, libraryDependencies, repositories, libraryDependencyProjectMapper)
+        Partial(resolved, complete)
     }
 
     private val ResolveProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
-    fun Scope.inProjectDependencies(aggregate:Boolean?, operation:Scope.(dep:ProjectDependency)->Unit) {
-        ResolveProjectDependencies_CircularDependencyProtection.block(this, failure = {
+    fun EvalScope.inProjectDependencies(aggregate:Boolean?, operation:EvalScope.(dep:ProjectDependency)->Unit) {
+        ResolveProjectDependencies_CircularDependencyProtection.block(this.scope, failure = {
             //TODO Show cycle
             throw WemiException("Cyclic dependencies in projectDependencies are not allowed", showStacktrace = false)
         }, action = {
@@ -218,7 +216,7 @@ object KeyDefaults {
 
     fun outputClassesDirectory(tag: String): BoundKeyValue<Path> = {
         // Using scopeProject() instead of Keys.projectName, because it has to be unique
-        Keys.cacheDirectory.get() / "$tag-${scopeProject().name.toSafeFileName('_')}"
+        Keys.cacheDirectory.get() / "$tag-${scope.scopeProject().name.toSafeFileName('_')}"
     }
 
     private val CompileLOG = LoggerFactory.getLogger("Compile")
@@ -465,42 +463,43 @@ object KeyDefaults {
         options
     }
 
+    /** Implements the launch of JVM for [Run] and [RunMain]. */
+    private fun EvalScope.doRun(mainClass:String):Int {
+        val javaExecutable = Keys.javaExecutable.get()
+        val classpathEntries = LinkedHashSet<Path>()
+        for (locatedFile in Keys.externalClasspath.get()) {
+            classpathEntries.add(locatedFile.classpathEntry)
+        }
+        for (locatedFile in Keys.internalClasspath.get()) {
+            classpathEntries.add(locatedFile.classpathEntry)
+        }
+        val directory = Keys.runDirectory.get()
+        val options = Keys.runOptions.get()
+        val arguments = Keys.runArguments.get()
+
+        val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, classpathEntries,
+                mainClass, options, arguments)
+
+        // Separate process output from Wemi output
+        println()
+        val process = processBuilder.start()
+        val result = process.waitFor()
+        println()
+
+        return result
+    }
+
     val Run: BoundKeyValue<Int> = {
         using(Configurations.running) {
-            val javaExecutable = Keys.javaExecutable.get()
-            val classpathEntries = LinkedHashSet<Path>()
-            for (locatedFile in Keys.externalClasspath.get()) {
-                classpathEntries.add(locatedFile.classpathEntry)
-            }
-            for (locatedFile in Keys.internalClasspath.get()) {
-                classpathEntries.add(locatedFile.classpathEntry)
-            }
-            val directory = Keys.runDirectory.get()
-            val mainClass = Keys.mainClass.get()
-            val options = Keys.runOptions.get()
-            val arguments = Keys.runArguments.get()
-
-            val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, classpathEntries,
-                    mainClass, options, arguments)
-
-            // Separate process output from Wemi output
-            println()
-            val process = processBuilder.start()
-            val result = process.waitFor()
-            println()
-
-            result
+            doRun(Keys.mainClass.get())
         }
     }
 
     val RunMain: BoundKeyValue<Int> = {
-        val mainClass = Keys.input.get().read("main", "Main class to start", ClassNameValidator)
-                ?: throw WemiException("Main class not specified", showStacktrace = false)
-
-        using({
-            Keys.mainClass set Static(mainClass)
-        }) {
-            Keys.run.get()
+        using(Configurations.running) {
+            val mainClass = Keys.input.get().read("main", "Main class to start", ClassNameValidator)
+                    ?: throw WemiException("Main class not specified", showStacktrace = false)
+            doRun(mainClass)
         }
     }
 
@@ -822,7 +821,8 @@ object KeyDefaults {
 
     private val DokkaFatJar = listOf(Dependency(DependencyId("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", JCenter), WemiBundledLibrariesExclude))
 
-    val ArchiveDokkaInterface: BoundKeyValue<DokkaInterface> = CachedBy(Keys.javaHome) { javaHome ->
+    val ArchiveDokkaInterface: BoundKeyValue<DokkaInterface> = {
+        val javaHome = Keys.javaHome.get()
         val artifacts = DependencyResolver.resolveArtifacts(DokkaFatJar, emptyList())?.toMutableList()
                 ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 

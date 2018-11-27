@@ -5,14 +5,12 @@ package wemi
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import wemi.collections.ArrayMap
 import wemi.collections.WMutableList
 import wemi.collections.toMutable
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
 import wemi.util.*
 import java.io.File
-import java.lang.ref.SoftReference
 import java.nio.file.Path
 import java.util.*
 
@@ -101,6 +99,7 @@ class Key<Value> internal constructor(
  * @param parent of the [Configuration]
  * @see BindingHolder for info about how the values are bound
  */
+@WemiDsl
 class Configuration internal constructor(val name: String,
                                          val description: String,
                                          val parent: Configuration?)
@@ -126,25 +125,6 @@ class Configuration internal constructor(val name: String,
 }
 
 /**
- * A special version of [Configuration] that is anonymous and can be created at runtime, any time.
- * Unlike full configuration, does not have name, description, nor parent.
- *
- * @param fromScope for debug only
- * @see [Scope.using] about creation of these
- */
-class AnonymousConfiguration @PublishedApi internal constructor(private val fromScope:Scope) : BindingHolder() {
-    /**
-     * @return <anonymous>
-     */
-    override fun toDescriptiveAnsiString(): String =
-            StringBuilder().format(Color.White).append(fromScope)
-                    .append(".using(").format(format = Format.Bold)
-                    .append("<anonymous>:").format(Color.White).append(')').format().toString()
-
-    override fun toString(): String = "$fromScope.using(<anonymous>:)"
-}
-
-/**
  * Holds information about configuration extensions made by [BindingHolder.extend].
  * Values bound to this take precedence over the values [extending],
  * like values in [Configuration] take precedence over those in [Configuration.parent].
@@ -152,6 +132,7 @@ class AnonymousConfiguration @PublishedApi internal constructor(private val from
  * @param extending which configuration is being extended by this extension
  * @param from which this extension has been created, mostly for debugging
  */
+@WemiDsl
 class ConfigurationExtension internal constructor(
         @Suppress("MemberVisibilityCanBePrivate")
         val extending: Configuration,
@@ -174,6 +155,7 @@ class ConfigurationExtension internal constructor(
  * @param projectRoot at which this [Project] is located at in the filesystem
  * @see BindingHolder for info about how the values are bound
  */
+@WemiDsl
 class Project internal constructor(val name: String, internal val projectRoot: Path?, archetypes:Array<out Archetype>)
     : BindingHolder(), WithDescriptiveString, JsonWritable {
 
@@ -225,7 +207,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
      * @param configurations that should be applied to this [Project]'s [Scope] before [action] is run in it.
      *          It is equivalent to calling [Scope.using] directly in the [action], but more convenient.
      */
-    inline fun <Result> evaluate(vararg configurations:Configuration, action:Scope.()->Result):Result {
+    inline fun <Result> evaluate(vararg configurations:Configuration, action:EvalScope.()->Result):Result {
         try {
             return startEvaluate(this, configurations, null).run(action)
         } finally {
@@ -233,7 +215,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         }
     }
 
-    inline fun <Result> evaluate(configurations:List<Configuration>, action:Scope.()->Result):Result {
+    inline fun <Result> evaluate(configurations:List<Configuration>, action:EvalScope.()->Result):Result {
         try {
             return startEvaluate(this, null, configurations).run(action)
         } finally {
@@ -260,7 +242,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         @PublishedApi
         internal fun startEvaluate(project:Project,
                                    configurationsArray: Array<out Configuration>?,
-                                   configurationsList:List<Configuration>?):Scope {
+                                   configurationsList:List<Configuration>?):EvalScope {
             // Ensure that this thread is the only thread that can be evaluating
             synchronized(this@Companion) {
                 val currentThread = Thread.currentThread()
@@ -284,7 +266,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
             }
 
             currentlyEvaluatingNestLevel++
-            return scope
+            return EvalScope(scope, NO_CONFIGURATIONS, ArrayList())
         }
 
         @PublishedApi
@@ -297,6 +279,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
                     assert(currentlyEvaluatingThread == Thread.currentThread())
                     currentlyEvaluatingThread = null
                 }
+                globalTickTime++
             }
         }
     }
@@ -310,6 +293,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
  * @param name used mostly for debugging
  * @see Archetypes for more info about this concept
  */
+@WemiDsl
 class Archetype internal constructor(val name: String, val parent:Archetype?) : BindingHolder() {
 
     override fun toDescriptiveAnsiString(): String {
@@ -347,7 +331,11 @@ class Scope internal constructor(
         val scopeBindingHolders: List<BindingHolder>,
         val scopeParent: Scope?) {
 
-    private val configurationScopeCache: MutableMap<Configuration, Scope> = java.util.HashMap()
+    private val configurationScopeCache: MutableMap<Configuration, Scope> = HashMap()
+
+    /** When key is evaluated, it needs a [Binding].
+     * This cache contains only already at-least once evaluated bindings. */
+    internal val keyBindingCache:MutableMap<Key<*>, Binding<*>> = HashMap()
 
     private inline fun traverseHoldersBack(action: (BindingHolder) -> Unit) {
         var scope = this
@@ -403,157 +391,91 @@ class Scope internal constructor(
         }
     }
 
-    @PublishedApi
-    internal fun scopeFor(anonymousConfiguration: AnonymousConfiguration): Scope {
-        // Cannot be extended
-        anonymousConfiguration.locked = true // Here because of visibility rules
-        return Scope("<anonymous>", listOf(anonymousConfiguration), this)
-    }
+    private fun <T> createElementaryKeyBinding(key:Key<T>):Binding<T>? {
+        val boundValue: BoundKeyValue<T>
+        val allModifiersReverse = ArrayList<BoundKeyValueModifier<T>>()
 
-    /**
-     * Run the [action] in a scope, which is created by layering [configurations] over this [Scope].
-     */
-    @Suppress("unused")
-    inline fun <Result> Scope.using(vararg configurations: Configuration, action: Scope.() -> Result): Result {
-        var scope = this
-        for (configuration in configurations) {
-            scope = scope.scopeFor(configuration)
-        }
-        return scope.action()
-    }
+        var scope: Scope = this
 
-    /**
-     * Run the [action] in a scope, which is created by layering [configurations] over this [Scope].
-     */
-    @Suppress("unused")
-    inline fun <Result> Scope.using(configurations: Collection<Configuration>, action: Scope.() -> Result): Result {
-        var scope = this
-        for (configuration in configurations) {
-            scope = scope.scopeFor(configuration)
-        }
-        return scope.action()
-    }
-
-    /**
-     * Run the [action] in a scope, which is created by layering [configuration] over this [Scope].
-     */
-    @Suppress("unused")
-    inline fun <Result> Scope.using(configuration: Configuration, action: Scope.() -> Result): Result {
-        return scopeFor(configuration).action()
-    }
-
-    /**
-     * Run the [action] in a scope, which is created by layering new anonymous configuration,
-     * created by the [anonInitializer], over this [Scope].
-     *
-     * @param anonInitializer initializer of the anonymous scope. Works exactly like standard [Configuration] initializer
-     */
-    @Suppress("unused")
-    inline fun <Result> Scope.using(anonInitializer: AnonymousConfiguration.() -> Unit,
-                                    action: Scope.() -> Result): Result {
-        val anonConfig = AnonymousConfiguration(this)
-        anonConfig.anonInitializer()
-        // Locking is deferred to scopeFor because of visibility rules for inlined functions
-        return scopeFor(anonConfig).action()
-    }
-
-    private fun <Value : Output, Output> getKeyValue(key: Key<Value>, otherwise: Output, useOtherwise: Boolean): Output {
-        val listener = activeKeyEvaluationListener
-
-        listener?.keyEvaluationStarted(this, key)
-
-        // Evaluate
-        var foundValue: Value? = key.defaultValue
-        var foundValueValid = key.hasDefaultValue
-        var holderOfFoundValue:BindingHolder? = null
-        val allModifiersReverse: ArrayList<BoundKeyValueModifier<Value>> = ArrayList()
-
-        var scope: Scope? = this
-
-        searchForValue@ while (scope != null) {
+        searchForBoundValue@while (true) {
             // Retrieve the holder
             @Suppress("UNCHECKED_CAST")
             for (holder in scope.scopeBindingHolders) {
-                val holderModifiers = holder.modifierBindings[key] as ArrayList<BoundKeyValueModifier<Value>>?
+                val holderModifiers = holder.modifierBindings[key] as ArrayList<BoundKeyValueModifier<T>>?
                 if (holderModifiers != null && holderModifiers.isNotEmpty()) {
-                    listener?.keyEvaluationHasModifiers(scope, holder, holderModifiers.size)
-
                     allModifiersReverse.addAllReversed(holderModifiers)
                 }
 
-                val boundValue = holder.binding[key] as BoundKeyValue<Value>?
-                if (boundValue != null) {
-                    // Unpack the value
-                    try {
-                        foundValue = boundValue()
-                    } catch (t:Throwable) {
-                        try {
-                            listener?.keyEvaluationFailedByError(t, true)
-                        } catch (suppressed:Throwable) {
-                            t.addSuppressed(suppressed)
-                        }
-                        throw t
-                    }
-
-                    foundValueValid = true
-                    holderOfFoundValue = holder
-                    break@searchForValue
+                val boundValueCandidate = holder.binding[key] as BoundKeyValue<T>?
+                if (boundValueCandidate != null) {
+                    boundValue = boundValueCandidate
+                    break@searchForBoundValue
                 }
             }
 
-            scope = scope.scopeParent
+            scope = scope.scopeParent ?: return null
         }
 
-        if (foundValueValid) {
+        val modifiers:Array<BoundKeyValueModifier<T>> =
+                if (allModifiersReverse.size == 0) {
+                    @Suppress("UNCHECKED_CAST")
+                    NO_BINDING_MODIFIERS as Array<BoundKeyValueModifier<T>>
+                } else Array(allModifiersReverse.size) {
+                    allModifiersReverse[allModifiersReverse.size - it - 1]
+                }
+        return Binding(key, boundValue, modifiers)
+    }
+
+    private fun <T> isKeyBindingUsableInThisScope(binding:Binding<T>) : Boolean {
+        return binding.dependsOn.all { (prefixConfigurations, usedBinding) ->
+            val scope = prefixConfigurations.fold(this@Scope) { s, c -> s.scopeFor(c) }
+            usedBinding == scope.getKeyBinding(usedBinding.key)
+        }
+    }
+
+    private fun <T> searchForCompatibleBinding(inScope:Scope, ignoreChild:Scope?, key:Key<T>, thisScopeMintBinding:Binding<T>):Binding<T>? {
+        // Search directly this scope
+        if (inScope != ignoreChild) {
             @Suppress("UNCHECKED_CAST")
-            var result = foundValue as Value
-
-            // Apply modifiers
-            try {
-                for (i in allModifiersReverse.indices.reversed()) {
-                    result = allModifiersReverse[i].invoke(this, result)
+            val existingBinding = inScope.keyBindingCache[key] as Binding<T>?
+            if (existingBinding != null) {
+                if (existingBinding == thisScopeMintBinding && isKeyBindingUsableInThisScope(existingBinding)) {
+                    // Success
+                    return existingBinding
+                } else {
+                    // If this has incompatible bindings, further search is unlikely to uncover anything better
+                    return null
                 }
-            } catch (t:Throwable) {
-                try {
-                    listener?.keyEvaluationFailedByError(t, false)
-                } catch (suppressed:Throwable) {
-                    t.addSuppressed(suppressed)
-                }
-                throw t
             }
-
-            // Done
-            listener?.keyEvaluationSucceeded(key, scope, holderOfFoundValue, result)
-
-            return result
         }
 
-        if (useOtherwise) {
-            listener?.keyEvaluationFailedByNoBinding(true, otherwise)
-            return otherwise
-        } else {
-            listener?.keyEvaluationFailedByNoBinding(false, null)
-            throw WemiException.KeyNotAssignedException(key, this@Scope)
+        // Search in children scopes
+        for ((_, childScope) in inScope.configurationScopeCache) {
+            if (childScope === ignoreChild) {
+                continue
+            }
+            val result = searchForCompatibleBinding(childScope, null, key, thisScopeMintBinding)
+            if (result != null) {
+                return result
+            }
         }
+
+        // Search in parent scope
+        val parent = inScope.scopeParent ?: return null
+        return searchForCompatibleBinding(parent, inScope, key, thisScopeMintBinding)
     }
 
-    /** Return the value bound to this wemi.key in this scope.
-     * Throws exception if no value set. */
-    fun <Value> Key<Value>.get(): Value {
-        @Suppress("UNCHECKED_CAST")
-        return getKeyValue(this, null, false) as Value
-    }
+    internal fun <T> getKeyBinding(key:Key<T>):Binding<T>? {
+        // Put into the cache after successful evaluation
+        keyBindingCache[key]?.let {
+            @Suppress("UNCHECKED_CAST")
+            return it as Binding<T>
+        }
 
-    /** Return the value bound to this wemi.key in this scope.
-     * Returns [unset] if no value set. */
-    fun <Value : Else, Else> Key<Value>.getOrElse(unset: Else): Else {
-        return getKeyValue(this, unset, true)
-    }
+        val newKeyBinding = createElementaryKeyBinding(key) ?: return null
 
-    /** Return the value bound to this wemi.key in this scope.
-     * Returns `null` if no value set. */
-    fun <Value> Key<Value>.getOrNull(): Value? {
-        return getKeyValue(this, null, true)
+        // Check if any neighbor has any useful binding
+        return searchForCompatibleBinding(this, this, key, newKeyBinding) ?: newKeyBinding
     }
 
     /**
@@ -580,17 +502,8 @@ class Scope internal constructor(
      * @return amount of values forgotten
      */
     internal fun cleanCache(): Int {
-        var sum = configurationScopeCache.values.sumBy { it.cleanCache() }
-
-        for (holder in scopeBindingHolders) {
-            for (value in holder.binding.values) {
-                if (value is CachedBoundValue) {
-                    value.cleanCache()
-                    sum++
-                }
-            }
-        }
-
+        val sum = keyBindingCache.size + configurationScopeCache.values.sumBy { it.cleanCache() }
+        keyBindingCache.clear()
         return sum
     }
 
@@ -875,7 +788,7 @@ sealed class BindingHolder : WithDescriptiveString {
     /**
      * Bind this key to values that itself holds, under given configurations.
      */
-    internal infix fun <Value> Key<Set<Value>>.setToUnionOfSelfIn(configurations: Scope.()->Iterable<Configuration>) {
+    internal infix fun <Value> Key<Set<Value>>.setToUnionOfSelfIn(configurations: EvalScope.()->Iterable<Configuration>) {
         this set {
             val configurationsIt = configurations().iterator()
             if (!configurationsIt.hasNext()) {
@@ -895,7 +808,7 @@ sealed class BindingHolder : WithDescriptiveString {
     /**
      * Bind this key to values that itself holds, under given configurations.
      */
-    internal infix fun <Value> Key<List<Value>>.setToConcatenationOfSelfIn(configurations: Scope.()->Iterable<Configuration>) {
+    internal infix fun <Value> Key<List<Value>>.setToConcatenationOfSelfIn(configurations: EvalScope.()->Iterable<Configuration>) {
         this set {
             val configurationsIt = configurations().iterator()
             if (!configurationsIt.hasNext()) {
@@ -918,141 +831,6 @@ sealed class BindingHolder : WithDescriptiveString {
     abstract override fun toDescriptiveAnsiString(): String
 }
 
-/** @see useKeyEvaluationListener */
-@Volatile
-private var activeKeyEvaluationListener:WemiKeyEvaluationListener? = null
-
-/** Execute [action] with [listener] set to listen to any key evaluations that are done during this time. */
-fun <Result>useKeyEvaluationListener(listener: WemiKeyEvaluationListener, action:()->Result):Result {
-    val oldListener = activeKeyEvaluationListener
-    val usedListener =
-            if (oldListener == null) listener else WemiKeyEvaluationListenerSplitter(oldListener, listener)
-    try {
-        activeKeyEvaluationListener = usedListener
-        return action()
-    } finally {
-        assert(activeKeyEvaluationListener === usedListener) { "Someone has applied different listener during action()!" }
-        activeKeyEvaluationListener = oldListener
-    }
-}
-
-/**
- * Called with details about key evaluation.
- * Useful for closer inspection of key evaluation.
- *
- * Keys are evaluated in a tree, the currently evaluated key is on a stack.
- * @see keyEvaluationStarted for more information
- */
-interface WemiKeyEvaluationListener {
-    /**
-     * Evaluation of a key has started.
-     *
-     * This will be always ended with [keyEvaluationFailedByNoBinding], [keyEvaluationFailedByError] or
-     * with [keyEvaluationSucceeded] call. Between those, [keyEvaluationHasModifiers] can be called
-     * and more [keyEvaluationStarted]-[keyEvaluationSucceeded]/Failed pairs can be nested, even recursively.
-     *
-     * This captures the calling stack of key evaluation.
-     *
-     * @param fromScope in which scope is the binding being searched from
-     * @param key that is being evaluated
-     */
-    fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {}
-
-    /**
-     * Called when evaluation of key on top of the key evaluation stack will use some modifiers, if it succeeds.
-     *
-     * @param modifierFromScope in which scope the modifier has been found
-     * @param modifierFromHolder in which holder inside the [modifierFromScope] the modifier has been found
-     * @param amount of modifiers added from this scope-holder
-     */
-    fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder:BindingHolder, amount:Int) {}
-
-    /**
-     * Called when evaluation of key on top of the key evaluation stack used some special feature,
-     * such as retrieval from cache.
-     *
-     * @param feature short uncapitalized human readable description of the feature, for example "from cache"
-     * @see FEATURE_READ_FROM_CACHE
-     * @see FEATURE_WRITTEN_TO_CACHE
-     */
-    fun keyEvaluationFeature(feature:String) {}
-
-    /**
-     * Evaluation of key on top of key evaluation stack has been successful.
-     *
-     * @param key that just finished executing, same as the one from [keyEvaluationStarted]
-     * @param bindingFoundInScope scope in which the binding of this key has been found, null if default value
-     * @param bindingFoundInHolder holder in [bindingFoundInScope] in which the key binding has been found, null if default value
-     * @param result that has been used, may be null if caller considers null valid
-     */
-    fun <Value>keyEvaluationSucceeded(key: Key<Value>,
-                                      bindingFoundInScope: Scope?,
-                                      bindingFoundInHolder: BindingHolder?,
-                                      result: Value) {}
-
-    /**
-     * Evaluation of key on top of key evaluation stack has failed, because the key has no binding, nor default value.
-     *
-     * @param withAlternative user supplied alternative will be used if true (passed in [alternativeResult]),
-     *                          [wemi.WemiException.KeyNotAssignedException] will be thrown if false
-     */
-    fun keyEvaluationFailedByNoBinding(withAlternative:Boolean, alternativeResult:Any?) {}
-
-    /**
-     * Evaluation of key or one of the modifiers has thrown an exception.
-     * This means that the key evaluation has failed and the exception will be thrown.
-     *
-     * This is not invoked when the exception is [wemi.WemiException.KeyNotAssignedException] thrown by the key
-     * evaluation system itself. [keyEvaluationFailedByNoBinding] will be called for that.
-     *
-     * @param exception that was thrown
-     * @param fromKey if true, the evaluation of key threw the exception, if false it was one of the modifiers
-     */
-    fun keyEvaluationFailedByError(exception:Throwable, fromKey:Boolean) {}
-
-    companion object {
-        /** [keyEvaluationFeature] to signify that this value has been read from cache */
-        const val FEATURE_READ_FROM_CACHE = "from cache"
-        /** [keyEvaluationFeature] to signify that this value has not been found in cache, but was stored there for later use */
-        const val FEATURE_WRITTEN_TO_CACHE = "to cache"
-    }
-}
-
-private class WemiKeyEvaluationListenerSplitter(
-        private val first:WemiKeyEvaluationListener,
-        private val second:WemiKeyEvaluationListener) : WemiKeyEvaluationListener {
-
-    override fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {
-        first.keyEvaluationStarted(fromScope, key)
-        second.keyEvaluationStarted(fromScope, key)
-    }
-
-    override fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder: BindingHolder, amount: Int) {
-        first.keyEvaluationHasModifiers(modifierFromScope, modifierFromHolder, amount)
-        second.keyEvaluationHasModifiers(modifierFromScope, modifierFromHolder, amount)
-    }
-
-    override fun keyEvaluationFeature(feature: String) {
-        first.keyEvaluationFeature(feature)
-        second.keyEvaluationFeature(feature)
-    }
-
-    override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value) {
-        first.keyEvaluationSucceeded(key, bindingFoundInScope, bindingFoundInHolder, result)
-        second.keyEvaluationSucceeded(key, bindingFoundInScope, bindingFoundInHolder, result)
-    }
-
-    override fun keyEvaluationFailedByNoBinding(withAlternative: Boolean, alternativeResult: Any?) {
-        first.keyEvaluationFailedByNoBinding(withAlternative, alternativeResult)
-        second.keyEvaluationFailedByNoBinding(withAlternative, alternativeResult)
-    }
-
-    override fun keyEvaluationFailedByError(exception: Throwable, fromKey: Boolean) {
-        first.keyEvaluationFailedByError(exception, fromKey)
-        second.keyEvaluationFailedByError(exception, fromKey)
-    }
-}
-
 /**
  * Special [BoundKeyValue] for values that should be evaluated only once per whole binding,
  * regardless of Scope. Use only for values with no dependencies on any modifiable input.
@@ -1064,8 +842,8 @@ private class WemiKeyEvaluationListenerSplitter(
  *
  * @see LazyStatic for values that are in this nature, but their computation is not trivial
  */
-class Static<Value>(private val value:Value) : (Scope) -> Value {
-    override fun invoke(ignored: Scope): Value {
+class Static<Value>(private val value:Value) : (EvalScope) -> Value {
+    override fun invoke(ignored: EvalScope): Value {
         activeKeyEvaluationListener?.keyEvaluationFeature("static")
         return value
     }
@@ -1080,11 +858,11 @@ class Static<Value>(private val value:Value) : (Scope) -> Value {
  * heavyResource set LazyStatic { createHeavyResource() }
  * ```
  */
-class LazyStatic<Value>(generator:()->Value) : (Scope) -> Value {
+class LazyStatic<Value>(generator:()->Value) : (EvalScope) -> Value {
     private var generator:(()->Value)? = generator
     private var cachedValue:Value? = null
 
-    override fun invoke(scope: Scope): Value {
+    override fun invoke(scope: EvalScope): Value {
         val generator = this.generator
         val value:Value
         @Suppress("UNCHECKED_CAST")
@@ -1101,215 +879,29 @@ class LazyStatic<Value>(generator:()->Value) : (Scope) -> Value {
     }
 }
 
-/** Bound values that cache their content should implement this interface to let `clean` command clean it. */
-interface CachedBoundValue {
-    fun cleanCache()
-}
 
-/** Specialization of [Cached] for single value input, with values cached per input.
- * Do not use when many different temporary inputs are expected, as it may cause a memory leak.
- *
- * Example:
- * ```kotlin
- * kotlinCompiler set CachedBy(kotlinVersion) { version -> createKotlinCompilerForVersion(version) }
- * ```
- */
-class CachedBy<Value, By>(private val byKey:Key<By>, private val valueProducer:(By)->Value) : (Scope) -> Value, CachedBoundValue {
+/** Object representing a snapshot of Path, based on time of last modification.  */
+@Deprecated("Investigate a new home for this class")
+class PathCacheEntry private constructor(val path:Path, val lastModified:Long) {
+    constructor (path:Path) : this(path, path.lastModified.toMillis())
+    constructor (file:File) : this(file.toPath(), file.lastModified())
+    constructor (located:LocatedPath) : this(located.file)
 
-    private val cache = ArrayMap<By, Value>()
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
 
-    override fun invoke(scope: Scope): Value {
-        val byValue = scope.run {
-            byKey.get()
-        }
+        other as PathCacheEntry
 
-        var createdNew = false
-        val result = cache.getOrPut(byValue) {
-            createdNew = true
-            valueProducer(byValue)
-        }
+        if (path != other.path) return false
+        if (lastModified != other.lastModified) return false
 
-        if (!createdNew) {
-            activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE)
-        } else {
-            activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_WRITTEN_TO_CACHE)
-        }
+        return true
+    }
 
+    override fun hashCode(): Int {
+        var result = path.hashCode()
+        result = 31 * result + lastModified.hashCode()
         return result
     }
-
-    override fun cleanCache() {
-        cache.clear()
-    }
-}
-
-/** BoundValue that is cached based on used inputs.
- *
- * Inputs + result is stored per scope. When [Cached] is queried for a value, all stored inputs from all scopes
- * are checked for a match. If one is found, that value is returned. Otherwise a new value is generated
- * and stored for later use.
- *
- * [valueProducer] is not called with [Scope], so it is not possible to directly [Scope.get].
- * This is intentional, as the retrieval should happen inside [CachedEvaluation.use], so that [Cached] may capture its inputs.
- *
- * Then, when result is to be produced, it should be done so through [CachedEvaluation.produce].
- *
- * Example:
- * ```kotlin
- * expensiveOperation set Cached {
- *      // Code here always happens
- *      val someFiles = use { inputFiles.get() }
- *      val option = use { expensiveOperationOptions.get() }
- *
- *      produce {
- *          // Code here happens only when inputs retrieved through `use` before were not seen yet
- *          performExpensiveOperation(someFiles, option)
- *      }
- * }
- * ```
- */
-class Cached<Value>(private val valueProducer:CachedEvaluation<Value>.()->Value) : (Scope) -> Value, CachedBoundValue {
-
-    internal val cacheByScope = HashMap<Scope, SoftReference<CacheEntry<*>>>()
-
-    override fun invoke(scope: Scope): Value {
-        return valueProducer.invoke(CachedEvaluation(scope, cacheByScope))
-    }
-
-    override fun cleanCache() {
-        cacheByScope.clear()
-    }
-
-    @CacheDsl
-    class CachedEvaluation<Value> internal constructor(
-            @PublishedApi internal val scope:Scope,
-            private val cacheByScope:MutableMap<Scope, SoftReference<CacheEntry<*>>>) {
-
-        private val cacheEntry = CacheEntry<Value>()
-
-        /** Obtain value bound to key in [obtain] and return it.
-         * Same value is also wrapped with [wrapValueForCache] and remembered through [inputValueUsed].
-         * @see useAs */
-        inline fun <Value> use(obtain:Scope.() -> Value):Value {
-            return useAs(obtain, ::wrapValueForCache)
-        }
-
-        /** Obtain value bound to key in [obtain] and return it.
-         * Same value is also wrapped with [wrap] and remembered through [inputValueUsed].
-         * The wrapping is done to add additional comparison logic to used types.
-         * @see use
-         * @see wrapValueForCache for wrapping rationale */
-        inline fun <Value> useAs(obtain:Scope.() -> Value, wrap:(Value) -> Any?):Value {
-            val value = scope.run(obtain)
-            inputValueUsed(wrap(value))
-            return value
-        }
-
-        /** Wrap the value to be more useful when comparing old inputs to new inputs.
-         *
-         * Current implementation only wraps instances of [Path], [File] and [LocatedPath] (and their [List]s and [Set]s)
-         * into [PathCacheEntry], so that when file changes, equal [Path] instances won't equal anymore. */
-        fun wrapValueForCache(value:Any?):Any? {
-            return when (value) {
-                is Path ->
-                    PathCacheEntry(value)
-                is File ->
-                    PathCacheEntry(value)
-                is LocatedPath ->
-                    PathCacheEntry(value)
-                is List<*> ->
-                    value.map(::wrapValueForCache)
-                is Set<*> ->
-                    value.mapTo(HashSet(), ::wrapValueForCache)
-                else ->
-                    value
-            }
-        }
-
-        /** Manually put input value to cache key list.
-         * Used internally by [use] methods, but may be also used when the inputs do not come from the key system.
-         * (Though something like `val envInput = use { readInputFile() }`) would be also valid. */
-        fun inputValueUsed(value:Any?) {
-            cacheEntry.add(value)
-        }
-
-        /** Returns cached value that corresponds to given inputs, or [EvaluatingCached] if no such cached value found. */
-        @PublishedApi
-        internal fun getCachedResult():Any? {
-            for (valueReference in cacheByScope.values) {
-                val value = valueReference.get() ?: continue
-                if (value == cacheEntry) {
-                    activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE)
-                    cacheByScope[scope] = valueReference
-                    return value.cachedValue
-                }
-            }
-            return EvaluatingCached
-        }
-
-        /** After [cacheResult] returned [EvaluatingCached] and new value was evaluated */
-        @PublishedApi
-        internal fun cacheResult(newResultToCache:Value) {
-            cacheEntry.cachedValue = newResultToCache
-            cacheByScope[scope] = SoftReference<CacheEntry<*>>(cacheEntry)
-            activeKeyEvaluationListener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_WRITTEN_TO_CACHE)
-        }
-
-        /** Return what [producer] returns, unless it was already evaluated for these inputs,
-         * in which case return that previous result and don't evaluate anything. */
-        inline fun produce(producer:EvaluatingCached.()->Value):Value {
-            val cachedResult = getCachedResult()
-            if (cachedResult !== EvaluatingCached) {
-                @Suppress("UNCHECKED_CAST")
-                return cachedResult as Value
-            }
-
-            val newResult = producer.invoke(EvaluatingCached)
-            cacheResult(newResult)
-            return newResult
-        }
-    }
-
-    internal class CacheEntry<Value> : ArrayList<Any?>() {
-        var cachedValue:Value? = null
-    }
-
-    /** Object representing a snapshot of Path, based on time of last modification.  */
-    class PathCacheEntry private constructor(val path:Path, val lastModified:Long) {
-        constructor (path:Path) : this(path, path.lastModified.toMillis())
-        constructor (file:File) : this(file.toPath(), file.lastModified())
-        constructor (located:LocatedPath) : this(located.file)
-
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-
-            other as PathCacheEntry
-
-            if (path != other.path) return false
-            if (lastModified != other.lastModified) return false
-
-            return true
-        }
-
-        override fun hashCode(): Int {
-            var result = path.hashCode()
-            result = 31 * result + lastModified.hashCode()
-            return result
-        }
-    }
-
-    /** Used to prevent accidentally accessing wrong scopes when evaluating cached keys.
-     * @see EvaluatingCached */
-    @Retention(AnnotationRetention.SOURCE)
-    @Target(AnnotationTarget.CLASS, AnnotationTarget.TYPE)
-    @DslMarker
-    private annotation class CacheDsl
-
-    /**
-     * Special receiver used in [CachedEvaluation.produce] to disallow accessing [CachedEvaluation.use] methods.
-     */
-    /* Also used as an unique value returned by [CachedEvaluation.getCachedResult] to signify that cache is empty. */
-    @CacheDsl
-    object EvaluatingCached
 }

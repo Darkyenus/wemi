@@ -25,7 +25,7 @@ open class WemiException : RuntimeException {
      * Special version of the [WemiException], thrown when the [key] that is being evaluated is not set in [scope]
      * it is being evaluated in.
      *
-     * @see Scope.get can throw this
+     * @see EvalScope.get can throw this
      */
     class KeyNotAssignedException(val key: Key<*>, val scope: Scope) : WemiException("'${key.name}' not assigned in $scope", showStacktrace = false)
 
