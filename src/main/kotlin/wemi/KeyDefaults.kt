@@ -193,30 +193,10 @@ object KeyDefaults {
         classpath
     }
 
-    val Clean: BoundKeyValue<Int> = {
-        val folders = arrayOf(
-                Keys.outputClassesDirectory.get(),
-                Keys.outputSourcesDirectory.get(),
-                Keys.outputHeadersDirectory.get()
-        )
-        var clearedCount = 0
-        for (folder in folders) {
-            if (folder.exists()) {
-                folder.deleteRecursively()
-                clearedCount += 1
-            }
-        }
-
-        for ((_, project) in AllProjects) {
-            clearedCount += project.projectScope.cleanCache()
-        }
-
-        clearedCount
-    }
-
     fun outputClassesDirectory(tag: String): BoundKeyValue<Path> = {
         // Using scopeProject() instead of Keys.projectName, because it has to be unique
-        Keys.cacheDirectory.get() / "$tag-${scope.scopeProject().name.toSafeFileName('_')}"
+        // Prefix - signifies that it should be deleted on clean command
+        Keys.cacheDirectory.get() / "-$tag-${scope.scopeProject().name.toSafeFileName('_')}"
     }
 
     private val CompileLOG = LoggerFactory.getLogger("Compile")

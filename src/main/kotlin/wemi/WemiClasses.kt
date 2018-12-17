@@ -433,9 +433,9 @@ class Scope internal constructor(
         }
     }
 
-    private fun <T> searchForCompatibleBinding(inScope:Scope, ignoreChild:Scope?, key:Key<T>, thisScopeMintBinding:Binding<T>):Binding<T>? {
+    private fun <T> searchForCompatibleBinding(inScope:Scope, ignore:Scope?, key:Key<T>, thisScopeMintBinding:Binding<T>):Binding<T>? {
         // Search directly this scope
-        if (inScope != ignoreChild) {
+        if (inScope !== ignore) {
             @Suppress("UNCHECKED_CAST")
             val existingBinding = inScope.keyBindingCache[key] as Binding<T>?
             if (existingBinding != null) {
@@ -451,10 +451,10 @@ class Scope internal constructor(
 
         // Search in children scopes
         for ((_, childScope) in inScope.configurationScopeCache) {
-            if (childScope === ignoreChild) {
+            if (childScope === ignore) {
                 continue
             }
-            val result = searchForCompatibleBinding(childScope, null, key, thisScopeMintBinding)
+            val result = searchForCompatibleBinding(childScope, inScope, key, thisScopeMintBinding)
             if (result != null) {
                 return result
             }
@@ -462,6 +462,9 @@ class Scope internal constructor(
 
         // Search in parent scope
         val parent = inScope.scopeParent ?: return null
+        if (parent === ignore) {
+            return null
+        }
         return searchForCompatibleBinding(parent, inScope, key, thisScopeMintBinding)
     }
 

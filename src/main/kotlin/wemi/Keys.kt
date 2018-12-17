@@ -69,8 +69,6 @@ object Keys {
     val externalClasspath by key<List<LocatedPath>>("Classpath, externally obtained elements from external sources, i.e. library dependencies, external classpath of all project dependencies and internal classpath of non-aggregate dependencies", defaultValue = emptyList())
     val internalClasspath by key<List<LocatedPath>>("Classpath, internally created elements, i.e. compiled sources and resources, including those of aggregate project dependencies", defaultValue = emptyList())
 
-    val clean by key<Int>("Clean compile directories and internal cache, returns approximate amount of items cleaned")
-
     val javaHome by key<Path>("Java home to use for compilation/running etc.")
     val javaExecutable by key<Path>("Java executable, used for running the project")
     val kotlinVersion by key<KotlinCompilerVersion>("Kotlin version used for compilation and standard libraries", WemiKotlinVersion)

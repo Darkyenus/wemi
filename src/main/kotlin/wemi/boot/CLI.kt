@@ -14,6 +14,7 @@ import wemi.util.*
 import wemi.util.CliStatusDisplay.Companion.withStatus
 import java.io.IOException
 import java.io.PrintStream
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 
@@ -402,7 +403,7 @@ object CLI {
 
         put("inspect") { task ->
             for ((type, name) in task.input) {
-                if (type == "project" || (type == null && name.endsWith("/"))) {
+                if (type == "project" || (type.isEmpty() && name.endsWith("/"))) {
                     val projectName = name.removeSuffix("/")
                     val project = AllProjects.findCaseInsensitive(projectName)
                     if (project == null) {
@@ -414,7 +415,7 @@ object CLI {
                     println(formatValue(project.name))
                     print(formatLabel("  At: "))
                     println(formatValue(project.projectRoot?.toString() ?: "<no root>"))
-                } else if (type == "configuration" || (type == null && name.endsWith(":"))) {
+                } else if (type == "configuration" || (type.isEmpty() && name.endsWith(":"))) {
                     val configurationName = name.removeSuffix(":")
                     val configuration = AllConfigurations.findCaseInsensitive(configurationName)
                     if (configuration == null) {
@@ -429,7 +430,7 @@ object CLI {
                         print(formatLabel("  Parent: "))
                         println(formatValue(configuration.parent.name))
                     }
-                } else if (type == "key" || (type == null && name.isNotEmpty() && name.last().isJavaIdentifierPart())) {
+                } else if (type == "key" || (type.isEmpty() && name.isNotEmpty() && name.last().isJavaIdentifierPart())) {
                     val key = AllKeys.findCaseInsensitive(name)
                     if (key == null) {
                         println(format("No key named '$name' found", Color.White))
@@ -560,6 +561,27 @@ object CLI {
             result
         }
 
+        put("clean") {
+            // Deletes all files that start with - or . in build/cache
+            if (WemiCacheFolder.isDirectory()) {
+                for (cacheEntry in Files.list(WemiCacheFolder)) {
+                    val name = cacheEntry.name
+                    if (name.startsWith('-') || name.startsWith('.')) {
+                        // Delete it
+                        LOG.debug("Deleting {}", cacheEntry)
+                        cacheEntry.deleteRecursively()
+                    }
+                }
+            }
+
+            for ((_, project) in AllProjects) {
+                val cleared = project.projectScope.cleanCache()
+                LOG.debug("Cleared {} items from {}", cleared, project)
+            }
+
+            null
+        }
+
         put("log") { task ->
             val level = task.firstInput("level", true)
             if (level == null) {
@@ -588,6 +610,7 @@ object CLI {
             println(" project <project> - change current project")
             println(" trace <task> - run given task and show a hierarchy of used keys")
             println(" inspect <project/, configuration:, key> - show known info about subject")
+            println(" clean - clean compile directories and internal cache")
             print(formatLabel("Keys: "))
             println("Configurations and projects hold values/behavior of keys. That can be mundane data like version of\n" +
                     "the project in 'projectVersion' key or complex operation, like compiling and running in 'run' key.\n" +

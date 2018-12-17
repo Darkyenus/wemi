@@ -50,8 +50,6 @@ object Archetypes {
         Keys.internalClasspath set KeyDefaults.InternalClasspath
         Keys.externalClasspath set KeyDefaults.ExternalClasspath
 
-        Keys.clean set KeyDefaults.Clean
-
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources")
         Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers")
