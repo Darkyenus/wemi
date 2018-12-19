@@ -1,9 +1,15 @@
 # Things to do next
 
+- Autocomplete does not have commands? (or not clean)
+
+- Fix todos in Evaluation (making trace work again)
+
+- Use Expirable where appropriate
+
+- Remove short in searchForCompatibleBinding, making the caching more efficient, maybe probably.
+
 - WEMI IS COMPILED MULTIPLE TIMES!!! cache compile!
 	- Warnings in EnclaveCL
-
-- clean should be a command!
 
 - Test everything, especially javadoc/dokka/tests/plugins
 

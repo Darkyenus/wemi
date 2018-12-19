@@ -11,7 +11,8 @@ internal var globalTickTime = 0
 internal val NO_BINDING_MODIFIERS = emptyArray<BoundKeyValueModifier<*>>()
 internal val NO_CONFIGURATIONS = emptyArray<Configuration>()
 
-internal class Binding<T>(val key:Key<T>, val value:BoundKeyValue<T>, val modifiers:Array<BoundKeyValueModifier<T>>) {
+/** @param value may be null when default key value is used. */
+internal class Binding<T>(val key:Key<T>, val value:BoundKeyValue<T>?, val modifiers:Array<BoundKeyValueModifier<T>>) {
 
     internal val dependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>()
 
@@ -51,7 +52,7 @@ internal class Binding<T>(val key:Key<T>, val value:BoundKeyValue<T>, val modifi
     }
 
     override fun hashCode(): Int {
-        var result = value.hashCode()
+        var result = value?.hashCode() ?: 0
         result = 31 * result + modifiers.contentHashCode()
         return result
     }
@@ -132,12 +133,7 @@ class EvalScope @PublishedApi internal constructor(
 
         val binding = scope.getKeyBinding(key)
                 ?: // Use default binding
-                if (key.hasDefaultValue) {
-                    @Suppress("UNCHECKED_CAST")
-                    val result = key.defaultValue as Value
-                    listener?.keyEvaluationSucceeded(key, null, null, result)
-                    return result
-                } else if (useOtherwise) {
+                if (useOtherwise) {
                     listener?.keyEvaluationFailedByNoBinding(true, otherwise)
                     return otherwise
                 } else {
@@ -152,8 +148,12 @@ class EvalScope @PublishedApi internal constructor(
             val newDependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>()
             val result:Value =
             EvalScope(scope, NO_CONFIGURATIONS, newDependsOn, input).use { evalScope ->
-                var result = try {
-                    binding.value(evalScope)
+                val boundValue = binding.value
+                var result = if (boundValue == null) {
+                    @Suppress("UNCHECKED_CAST")
+                    binding.key.defaultValue as Value
+                } else try {
+                    boundValue(evalScope)
                 } catch (t: Throwable) {
                     try {
                         listener?.keyEvaluationFailedByError(t, true)

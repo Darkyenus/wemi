@@ -144,7 +144,7 @@ object KeyDefaults {
                 }
 
                 // Enter a different scope
-                projectDependency.project.evaluate(*projectDependency.configurations) {
+                projectDependency.project.evaluate(Arrays.asList(*projectDependency.configurations)) {
                     operation(projectDependency)
                 }
             }

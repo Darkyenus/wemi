@@ -59,10 +59,6 @@ object Archetypes {
 
         Keys.archiveOutputFile set { Keys.buildDirectory.get() / "${Keys.projectName.get()}-${Keys.projectVersion.get()}.zip" }
         Keys.archive set KeyDefaults.Archive
-
-        extend(Configurations.publishing) {
-            Keys.archive set KeyDefaults.ArchivePublishing
-        }
     }
 
     /**

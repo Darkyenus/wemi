@@ -207,19 +207,12 @@ class Project internal constructor(val name: String, internal val projectRoot: P
      * @param configurations that should be applied to this [Project]'s [Scope] before [action] is run in it.
      *          It is equivalent to calling [Scope.using] directly in the [action], but more convenient.
      */
-    inline fun <Result> evaluate(vararg configurations:Configuration, action:EvalScope.()->Result):Result {
-        try {
-            return startEvaluate(this, configurations, null).run(action)
-        } finally {
-            endEvaluate()
-        }
-    }
-
     inline fun <Result> evaluate(configurations:List<Configuration>, action:EvalScope.()->Result):Result {
         try {
-            return startEvaluate(this, null, configurations).run(action)
+            evaluateLock()
+            return createEvalScope(this, configurations).run(action)
         } finally {
-            endEvaluate()
+            evaluateUnlock()
         }
     }
 
@@ -230,19 +223,25 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         private var currentlyEvaluatingNestLevel = 0
 
         /**
-         * Prepare to evaluate some keys.
-         * Must be closed with [endEvaluate].
-         *
-         * Exactly one of [configurationsArray] and [configurationsList] must be non-null.
+         * Create base scope in which to start evaluation.
          *
          * @param project that is the base of the scope
          * @return scope that should be used to evaluate the action
          * @see evaluate
          */
         @PublishedApi
-        internal fun startEvaluate(project:Project,
-                                   configurationsArray: Array<out Configuration>?,
-                                   configurationsList:List<Configuration>?):EvalScope {
+        internal fun createEvalScope(project:Project, configurationsArray: List<Configuration>):EvalScope {
+            // Prepare scope to use
+            var scope = project.projectScope
+            for (config in configurationsArray) {
+                scope = scope.scopeFor(config)
+            }
+
+            return EvalScope(scope, NO_CONFIGURATIONS, ArrayList(), NO_INPUT)
+        }
+
+        @PublishedApi
+        internal fun evaluateLock() {
             // Ensure that this thread is the only thread that can be evaluating
             synchronized(this@Companion) {
                 val currentThread = Thread.currentThread()
@@ -252,25 +251,11 @@ class Project internal constructor(val name: String, internal val projectRoot: P
                     throw IllegalStateException("Can't evaluate from $currentThread, already evaluating from $currentlyEvaluatingThread")
                 }
             }
-
-            // Prepare scope to use
-            var scope = project.projectScope
-            if (configurationsArray != null) {
-                for (config in configurationsArray) {
-                    scope = scope.scopeFor(config)
-                }
-            } else {
-                for (config in configurationsList!!) {
-                    scope = scope.scopeFor(config)
-                }
-            }
-
             currentlyEvaluatingNestLevel++
-            return EvalScope(scope, NO_CONFIGURATIONS, ArrayList(), NO_INPUT)
         }
 
         @PublishedApi
-        internal fun endEvaluate() {
+        internal fun evaluateUnlock() {
             currentlyEvaluatingNestLevel--
             assert(currentlyEvaluatingNestLevel >= 0)
             if (currentlyEvaluatingNestLevel == 0) {
@@ -392,7 +377,7 @@ class Scope internal constructor(
     }
 
     private fun <T> createElementaryKeyBinding(key:Key<T>):Binding<T>? {
-        val boundValue: BoundKeyValue<T>
+        val boundValue: BoundKeyValue<T>?
         val allModifiersReverse = ArrayList<BoundKeyValueModifier<T>>()
 
         var scope: Scope = this
@@ -413,7 +398,12 @@ class Scope internal constructor(
                 }
             }
 
-            scope = scope.scopeParent ?: return null
+            scope = scope.scopeParent ?: if (key.hasDefaultValue) {
+                boundValue = null
+                break@searchForBoundValue
+            } else {
+                return null
+            }
         }
 
         val modifiers:Array<BoundKeyValueModifier<T>> =
@@ -434,6 +424,9 @@ class Scope internal constructor(
     }
 
     private fun <T> searchForCompatibleBinding(inScope:Scope, ignore:Scope?, key:Key<T>, thisScopeMintBinding:Binding<T>):Binding<T>? {
+        if (true) // TODO(jp): Disable this short after testing
+            return null
+
         // Search directly this scope
         if (inScope !== ignore) {
             @Suppress("UNCHECKED_CAST")

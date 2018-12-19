@@ -78,7 +78,7 @@ class Task(
      */
     fun evaluateKey(defaultProject:Project?): TaskEvaluationResult {
         var project: Project? = defaultProject
-        val configurations = mutableListOf<Configuration>()
+        val configurations = ArrayList<Configuration>()
 
         // Parse Project
         if (this.project != null) {

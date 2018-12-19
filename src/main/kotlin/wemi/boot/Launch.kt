@@ -141,23 +141,23 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
             ConsoleLogFunction(null, null)
     ))
 
-    var buildScriptProject = prepareBuildScriptProject(allowBrokenBuildScripts, interactive && !machineReadableOutput, cleanBuild)
+    val buildScriptInfo = prepareBuildScriptInfo(allowBrokenBuildScripts, interactive && !machineReadableOutput, cleanBuild)
 
-    if (buildScriptProject == null) {
+    if (buildScriptInfo == null) {
         if (!allowBrokenBuildScripts) {
             // Failure to prepare build script (already logged)
             exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
         }
 
-        buildScriptProject = createProjectFromBuildScriptInfo(null)
         LOG.debug("Blank build file loaded")
     }
+    val buildScriptProject = createProjectFromBuildScriptInfo(buildScriptInfo)
 
     // Load build script configuration
     WemiBuildScriptProject = buildScriptProject
     BuildScriptData.AllProjects[buildScriptProject.name] = buildScriptProject
 
-    val errors = buildScriptProject.evaluate { Keys.run.get() }
+    val errors = buildScriptInfo?.let { loadBuildScript(it) } ?: 0
     if (errors > 0 && !allowBrokenBuildScripts) {
         exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
     }
@@ -253,8 +253,8 @@ private fun TaskParser.PartitionedLine.machineReadableCheckErrors() {
     }
 }
 
-private fun prepareBuildScriptProject(allowBrokenBuildScripts:Boolean, askUser:Boolean, cleanBuild:Boolean):Project? {
-    var preparedProject:Project? = null
+private fun prepareBuildScriptInfo(allowBrokenBuildScripts:Boolean, askUser:Boolean, cleanBuild:Boolean):BuildScriptInfo? {
+    var finalBuildScriptInfo:BuildScriptInfo? = null
 
     do {
         var keepTrying = false
@@ -273,7 +273,7 @@ private fun prepareBuildScriptProject(allowBrokenBuildScripts:Boolean, askUser:B
             }
         }
 
-        preparedProject = directorySynchronized(WemiBuildFolder, {
+        finalBuildScriptInfo = directorySynchronized(WemiBuildFolder, {
             LOG.info("Waiting for lock on {}", WemiBuildFolder)
         }) {
             val buildScriptInfo = getBuildScript(WemiCacheFolder, buildScriptSources, cleanBuild)
@@ -290,11 +290,9 @@ private fun prepareBuildScriptProject(allowBrokenBuildScripts:Boolean, askUser:B
             } else {
                 LOG.debug("Obtained build script info {}", buildScriptInfo)
 
-                val project = createProjectFromBuildScriptInfo(buildScriptInfo)
-
                 try {
-                    project.evaluate { Keys.compile.get() }
-                    project
+                    compileBuildScript(buildScriptInfo)
+                    buildScriptInfo
                 } catch (ce: WemiException) {
                     val message = ce.message
                     if (ce.showStacktrace || message == null || message.isBlank()) {
@@ -318,7 +316,7 @@ private fun prepareBuildScriptProject(allowBrokenBuildScripts:Boolean, askUser:B
         }
     } while (keepTrying)
 
-    return preparedProject
+    return finalBuildScriptInfo
 }
 
 private fun buildScriptsBadAskIfReload(problem:String):Boolean {

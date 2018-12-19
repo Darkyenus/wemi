@@ -118,7 +118,9 @@ object Configurations {
     //endregion
 
     //region Publishing
-    val publishing by configuration("Used when publishing archived outputs") {}
+    val publishing by configuration("Used when publishing archived outputs") {
+        Keys.archive set KeyDefaults.ArchivePublishing
+    }
     //endregion
 
     //region IDE configurations

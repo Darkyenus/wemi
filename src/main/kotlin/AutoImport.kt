@@ -148,9 +148,6 @@ val externalClasspath
 val internalClasspath
     inline get() = wemi.Keys.internalClasspath
 
-val clean
-    inline get() = wemi.Keys.clean
-
 val javaHome
     inline get() = wemi.Keys.javaHome
 val javaExecutable

@@ -119,7 +119,15 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
 
         for (classpathEntry in buildScriptInfo.unmanagedDependencies) {
             if (!classpathEntry.exists()) {
-                recompileReason = "Corrupted build-script info: classpath entries missing"
+                recompileReason = "Corrupted build-script info: unmanaged classpath entries missing"
+                LOG.debug("Rebuilding build scripts: Classpath cache corrupted ({} does not exist)", classpathEntry)
+                return@recompile true
+            }
+        }
+
+        for (classpathEntry in buildScriptInfo.managedDependencies) {
+            if (!classpathEntry.exists()) {
+                recompileReason = "Corrupted build-script info: managed classpath entries missing"
                 LOG.debug("Rebuilding build scripts: Classpath cache corrupted ({} does not exist)", classpathEntry)
                 return@recompile true
             }
@@ -133,7 +141,10 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
     if (recompile) {
         LOG.info("Compiling build script: {}", recompileReason)
         resultJar.deleteRecursively()
-        buildScriptInfo.resolve()
+        if (!buildScriptInfo.resolve()) {
+            // Dependency resolution failed
+            return null
+        }
 
         try {
             Files.newBufferedWriter(buildScriptInfoFile, Charsets.UTF_8).use {
@@ -150,9 +161,10 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
 }
 
 internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?): Project {
-    return Project(WemiBuildScriptProjectName, WemiBuildFolder, arrayOf(BuildScript)).apply {
+    return Project(WemiBuildScriptProjectName, WemiBuildFolder, emptyArray()).apply {
         Keys.projectName set Static(WemiBuildScriptProjectName)
         Keys.projectRoot set Static(WemiBuildFolder)
+        Keys.compilerOptions set Static (BuildScriptInfo.compilerOptions)
 
         if (buildScriptInfo != null) {
             Keys.repositories set Static(buildScriptInfo.repositories)
@@ -165,26 +177,17 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
                 dependencies
             }
             Keys.sourceFiles set Static(buildScriptInfo.sources)
-
-            Keys.compile set {
-                val resultJar = buildScriptInfo.scriptJar
-                if (!buildScriptInfo.recompilationNeeded) {
-                    return@set resultJar
+            Keys.externalClasspath set LazyStatic {
+                val result = ArrayList<LocatedPath>(buildScriptInfo.unmanagedDependencies.size + buildScriptInfo.managedDependencies.size)
+                for (dependency in buildScriptInfo.unmanagedDependencies) {
+                    result.add(LocatedPath(dependency))
                 }
-
-                val sources = Keys.sourceFiles.get()
-                val externalClasspath = Keys.externalClasspath.get()
-                LOG.debug("Compiling sources: {} classpath: {} resultJar: {}", sources, externalClasspath, resultJar)
-
-                val status = WemiKotlinVersion.compilerInstance().compileJVM(sources, externalClasspath.map { it.classpathEntry }, resultJar, null, Keys.compilerOptions.get(), LoggerFactory.getLogger("BuildScriptCompilation"), null)
-                if (status != KotlinCompiler.CompileExitStatus.OK) {
-                    LOG.warn("Compilation failed for {}: {}", sources, status)
-                    throw WemiException.CompilationException("Build script failed to compile: $status")
+                for (dependency in buildScriptInfo.managedDependencies) {
+                    result.add(LocatedPath(dependency))
                 }
-
-                buildScriptInfo.recompilationNeeded = false
-                return@set resultJar
+                result
             }
+            Keys.internalClasspath set Static(listOf(LocatedPath(buildScriptInfo.scriptJar)))
         } else {
             Keys.internalClasspath set Static(emptyList())
             Keys.run set Static(0)
@@ -213,6 +216,7 @@ class BuildScriptInfo internal constructor(
     private val _dependencies = HashSet<Dependency>()
     // WemiLauncherFile is the first entry of this list
     private val _unmanagedDependencies = ArrayList<Path>()
+    private val _managedDependencies = ArrayList<Path>()
 
     val repositories:Set<Repository>
         get() = _repositories
@@ -220,6 +224,9 @@ class BuildScriptInfo internal constructor(
         get() = _dependencies
     val unmanagedDependencies:List<Path>
         get() = _unmanagedDependencies
+    /** Resolved [dependencies] retrieved from [repositories]. */
+    val managedDependencies:List<Path>
+        get() = _managedDependencies
 
     var recompilationNeeded:Boolean = true
 
@@ -261,10 +268,13 @@ class BuildScriptInfo internal constructor(
         }
     }
 
+    /** Resolve dependencies declared in source files.
+     * This can take a long time, as it may download dependencies from the web. */
     internal fun resolve():Boolean {
         _repositories.clear()
         _dependencies.clear()
         _unmanagedDependencies.clear()
+        _managedDependencies.clear()
 
         _unmanagedDependencies.addAll(runtimeClasspath)
         _repositories.addAll(DefaultRepositories)
@@ -284,6 +294,16 @@ class BuildScriptInfo internal constructor(
             }
         }
 
+        val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
+        if (!DependencyResolver.resolve(resolved, dependencies, createRepositoryChain(repositories))) {
+            // Dependencies failed to resolve
+            // TODO Is this logged properly & nicely?
+            return false
+        }
+        for ((_, r) in resolved) {
+            _managedDependencies.add(r.artifact ?: continue)
+        }
+
         return true
     }
 
@@ -292,6 +312,7 @@ class BuildScriptInfo internal constructor(
             fieldCollection("repositories", _repositories)
             fieldCollection("dependencies", _dependencies)
             fieldCollection("unmanagedDependencies", _unmanagedDependencies)
+            fieldCollection("managedDependencies", _managedDependencies)
         }
     }
 
@@ -299,65 +320,85 @@ class BuildScriptInfo internal constructor(
         value.fieldToCollection("repositories", _repositories)
         value.fieldToCollection("dependencies", _dependencies)
         value.fieldToCollection("unmanagedDependencies", _unmanagedDependencies)
+        value.fieldToCollection("managedDependencies", _managedDependencies)
     }
 
     override fun toString(): String {
         return "BuildScriptInfo(scriptJar=$scriptJar, sources=$sources, _repositories=$_repositories, _dependencies=$_dependencies, _unmanagedDependencies=$_unmanagedDependencies)"
     }
-}
 
-/**
- * Special archetype only for build-script meta-project.
- */
-internal val BuildScript by archetype(Archetypes::Base) {
-
-    Keys.compilerOptions set Static (
-        CompilerFlags().also {
+    companion object {
+        val compilerOptions = CompilerFlags().also {
             it[KotlinCompilerFlags.moduleName] = WemiBuildScriptProjectName
             it[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
         }
-    )
+    }
+}
 
-    Keys.run set {
-        // Load build script configuration
-        val internal = Keys.internalClasspath.get()
-        val external = Keys.externalClasspath.get()
-        val urls = arrayOfNulls<URL>(internal.size + external.size)
-        var i = 0
-        for (path in internal) {
-            urls[i++] = path.classpathEntry.toUri().toURL()
-        }
-        for (path in external) {
-            urls[i++] = path.classpathEntry.toUri().toURL()
-        }
-
-        val buildScriptClassloader = URLClassLoader(urls, Magic.WemiDefaultClassLoader)
-
-        LOG.debug("Loading plugins...")
-        val pluginServiceLoader = ServiceLoader.load(PluginEnvironment::class.java, buildScriptClassloader)
-        for (pluginService in pluginServiceLoader) {
-            LOG.debug("Loading plugin service {}", pluginService)
-
-            pluginService.initialize()
-        }
-
-        LOG.debug("Loading build...")
-        var result = 0
-
-        // Main classes of the build script, that should be initialized to load the build script.
-        val initClasses = Keys.sourceFiles.get().map { Magic.transformFileNameToKotlinClassName(it.file.name.pathWithoutExtension()) }
-
-        for (initClass in initClasses) {
-            try {
-                Class.forName(initClass, true, buildScriptClassloader)
-            } catch (e: Exception) {
-                LOG.warn("Failed to load build file class {} from {}", initClass, urls, e)
-                result++
-            }
-        }
-
-        LOG.debug("Build script loaded")
-        result
+@Throws(WemiException.CompilationException::class)
+internal fun compileBuildScript(buildScriptInfo:BuildScriptInfo) {
+    val resultJar = buildScriptInfo.scriptJar
+    if (!buildScriptInfo.recompilationNeeded) {
+        return
     }
 
+    val sources = buildScriptInfo.sources
+
+    val externalClasspath = buildScriptInfo.unmanagedDependencies + buildScriptInfo.managedDependencies
+    LOG.debug("Compiling sources: {} classpath: {} resultJar: {}", sources, externalClasspath, resultJar)
+
+    val status = WemiKotlinVersion.compilerInstance().compileJVM(sources, externalClasspath, resultJar,
+            null, BuildScriptInfo.compilerOptions, LoggerFactory.getLogger("BuildScriptCompilation"), null)
+    if (status != KotlinCompiler.CompileExitStatus.OK) {
+        LOG.warn("Compilation failed for {}: {}", sources, status)
+        throw WemiException.CompilationException("Build script failed to compile: $status")
+    }
+
+    buildScriptInfo.recompilationNeeded = false
+    return
+}
+
+/** Load the classes of the compiled [buildScriptInfo].
+ * @return amount of classes which failed to load (= 0 means all successful) */
+internal fun loadBuildScript(buildScriptInfo:BuildScriptInfo):Int {
+    // Load build script configuration
+    val internal = buildScriptInfo.unmanagedDependencies
+    val external = buildScriptInfo.managedDependencies
+    val urls = arrayOfNulls<URL>(1 + internal.size + external.size)
+    var i = 0
+    urls[i++] = buildScriptInfo.scriptJar.toUri().toURL()
+    for (path in internal) {
+        urls[i++] = path.toUri().toURL()
+    }
+    for (path in external) {
+        urls[i++] = path.toUri().toURL()
+    }
+
+    val buildScriptClassloader = URLClassLoader(urls, Magic.WemiDefaultClassLoader)
+
+    LOG.debug("Loading plugins...")
+    val pluginServiceLoader = ServiceLoader.load(PluginEnvironment::class.java, buildScriptClassloader)
+    for (pluginService in pluginServiceLoader) {
+        LOG.debug("Loading plugin service {}", pluginService)
+
+        pluginService.initialize()
+    }
+
+    LOG.debug("Loading build...")
+    var errors = 0
+
+    // Main classes of the build script, that should be initialized to load the build script.
+    val initClasses = buildScriptInfo.sources.map { Magic.transformFileNameToKotlinClassName(it.file.name.pathWithoutExtension()) }
+
+    for (initClass in initClasses) {
+        try {
+            Class.forName(initClass, true, buildScriptClassloader)
+        } catch (e: Exception) {
+            LOG.warn("Failed to load build file class {} from {}", initClass, urls, e)
+            errors++
+        }
+    }
+
+    LOG.debug("Build script loaded")
+    return errors
 }
