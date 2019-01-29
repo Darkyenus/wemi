@@ -563,6 +563,7 @@ object CLI {
 
         put("clean") {
             // Deletes all files that start with - or . in build/cache
+            var folders = 0
             if (WemiCacheFolder.isDirectory()) {
                 for (cacheEntry in Files.list(WemiCacheFolder)) {
                     val name = cacheEntry.name
@@ -570,13 +571,26 @@ object CLI {
                         // Delete it
                         LOG.debug("Deleting {}", cacheEntry)
                         cacheEntry.deleteRecursively()
+                        folders++
                     }
                 }
             }
 
+            var bindings = 0
             for ((_, project) in AllProjects) {
                 val cleared = project.projectScope.cleanCache()
                 LOG.debug("Cleared {} items from {}", cleared, project)
+                bindings += cleared
+            }
+
+            if (folders == 0 && bindings == 0) {
+                println(formatLabel("Already clean"))
+            } else {
+                print(formatLabel("Cleaned "))
+                print(formatValue(folders.toString()))
+                print(formatLabel(" file cache entries and "))
+                print(formatValue(bindings.toString()))
+                println(formatLabel(" bindings"))
             }
 
             null
