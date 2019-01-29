@@ -236,7 +236,7 @@ object CLI {
             MessageDisplay?.setMessage(messageBuilder.toAttributedString(), importantPrefix)
         }
 
-        override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value) {
+        override fun <V> keyEvaluationSucceeded(key: Key<V>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: V) {
             pop()
         }
 

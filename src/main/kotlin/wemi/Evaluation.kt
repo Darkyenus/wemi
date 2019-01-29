@@ -2,17 +2,16 @@ package wemi
 
 import java.io.Closeable
 
-/**
- *
- */
-
+/** Each external key invocation will increase this value (=tick).
+ * Bindings are evaluated only once per tick, regardless of their expiry. */
 internal var globalTickTime = 0
 
-internal val NO_BINDING_MODIFIERS = emptyArray<BoundKeyValueModifier<*>>()
+internal val NO_BINDING_MODIFIERS = emptyArray<ValueModifier<*>>()
 internal val NO_CONFIGURATIONS = emptyArray<Configuration>()
+private val ALWAYS_EXPIRED:() -> Boolean = { true }
 
 /** @param value may be null when default key value is used. */
-internal class Binding<T>(val key:Key<T>, val value:BoundKeyValue<T>?, val modifiers:Array<BoundKeyValueModifier<T>>) {
+internal class Binding<T>(val key:Key<T>, val value:Value<T>?, val modifiers:Array<ValueModifier<T>>) {
 
     internal val dependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>()
 
@@ -22,18 +21,20 @@ internal class Binding<T>(val key:Key<T>, val value:BoundKeyValue<T>?, val modif
     (Besides, changing values of any other dependency key will do the same) */
     internal var lastEvaluatedWithInput:Array<out Pair<String, String>> = NO_INPUT
     internal var lastEvaluatedTo:T? = null
+    internal var lastEvaluationExpirationTriggers = ArrayList<() -> Boolean>()
 
     internal fun isFresh(forInput:Array<out Pair<String, String>>):Boolean {
         if (lastEvaluated == -1) {
             return false
         }
-        if (lastEvaluated == globalTickTime) {
-            return true
-        }
         if (!lastEvaluatedWithInput.contentEquals(forInput)) {
             return false
         }
-        if (value is Expirable && value.isExpired() || modifiers.any { it is Expirable && it.isExpired() }) {
+        if (lastEvaluated == globalTickTime) {
+            return true
+        }
+        @Suppress("UNCHECKED_CAST")
+        if (lastEvaluationExpirationTriggers.any { it() }) {
             return false
         }
         return dependsOn.all { it.second.isFresh(it.second.lastEvaluatedWithInput) }
@@ -58,18 +59,11 @@ internal class Binding<T>(val key:Key<T>, val value:BoundKeyValue<T>?, val modif
     }
 }
 
-/** Use this on [BoundKeyValue] or [BoundKeyValueModifier] to specify that this value can expire. */
-internal interface Expirable {
-    // TODO(jp): This will probably need some extra info here
-    /** Called before the already computed value is reused, to check if it can be, or if it has to be recomputed. */
-    fun isExpired():Boolean
-}
-
 /**
  * Evaluating of [Key]s is possible only inside [EvalScope].
  *
  * Internally, this tracks which [Key]s were used during the evaluation.
- * This information is then used to properly invalidate caches when any of the used keys expire through [Expirable].
+ * This information is then used to properly invalidate caches when any of the used keys expire through [expiresWhen].
  * If none of the used keys expires, the cache is valid forever.
  */
 @WemiDsl
@@ -77,6 +71,7 @@ class EvalScope @PublishedApi internal constructor(
         @PublishedApi internal val scope:Scope,
         @PublishedApi internal val configurationPrefix:Array<Configuration>,
         @PublishedApi internal val usedBindings: ArrayList<Pair<Array<Configuration>, Binding<*>>>,
+        @PublishedApi internal val expirationTriggers: ArrayList<() -> Boolean>,
         @PublishedApi internal val input:Array<out Pair<String, String>>) : Closeable {
 
     /** Used by the input subsystem. See Input.kt. */
@@ -98,35 +93,32 @@ class EvalScope @PublishedApi internal constructor(
     }
 
     /** Run the [action] in a scope, which is created by layering [configurations] over this [Scope]. */
-    @Suppress("unused")
-    inline fun <Result> EvalScope.using(vararg configurations: Configuration, action: EvalScope.() -> Result): Result {
+    inline fun <Result> using(vararg configurations: Configuration, action: EvalScope.() -> Result): Result {
         ensureNotClosed()
         var scope = scope
         for (configuration in configurations) {
             scope = scope.scopeFor(configuration)
         }
-        return EvalScope(scope, configurationPrefix + configurations, usedBindings, input).use { it.action() }
+        return EvalScope(scope, configurationPrefix + configurations, usedBindings, expirationTriggers, input).use { it.action() }
     }
 
     /** Run the [action] in a scope, which is created by layering [configurations] over this [Scope]. */
-    @Suppress("unused")
-    inline fun <Result> EvalScope.using(configurations: Collection<Configuration>, action: EvalScope.() -> Result): Result {
+    inline fun <Result> using(configurations: Collection<Configuration>, action: EvalScope.() -> Result): Result {
         ensureNotClosed()
         var scope = scope
         for (configuration in configurations) {
             scope = scope.scopeFor(configuration)
         }
-        return EvalScope(scope, configurationPrefix + configurations, usedBindings, input).use { it.action() }
+        return EvalScope(scope, configurationPrefix + configurations, usedBindings, expirationTriggers, input).use { it.action() }
     }
 
     /** Run the [action] in a scope, which is created by layering [configuration] over this [Scope]. */
-    @Suppress("unused")
-    inline fun <Result> EvalScope.using(configuration: Configuration, action: EvalScope.() -> Result): Result {
+    inline fun <Result> using(configuration: Configuration, action: EvalScope.() -> Result): Result {
         ensureNotClosed()
-        return EvalScope(scope.scopeFor(configuration), configurationPrefix + configuration, usedBindings, input).use { it.action() }
+        return EvalScope(scope.scopeFor(configuration), configurationPrefix + configuration, usedBindings, expirationTriggers, input).use { it.action() }
     }
 
-    private fun <Value : Output, Output> getKeyValue(key: Key<Value>, otherwise: Output, useOtherwise: Boolean, input:Array<out Pair<String, String>>): Output {
+    private fun <V : Output, Output> getKeyValue(key: Key<V>, otherwise: Output, useOtherwise: Boolean, input:Array<out Pair<String, String>>): Output {
         ensureNotClosed()
         val listener = activeKeyEvaluationListener
         listener?.keyEvaluationStarted(this.scope, key)
@@ -141,17 +133,21 @@ class EvalScope @PublishedApi internal constructor(
                     throw WemiException.KeyNotAssignedException(key, this@EvalScope.scope)
                 }
 
-        val result:Value = if (binding.isFresh(input)) {
+        val result:V = if (binding.isFresh(input)) {
             @Suppress("UNCHECKED_CAST")
-            binding.lastEvaluatedTo as Value
+            binding.lastEvaluatedTo as V
         } else {
             val newDependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>()
-            val result:Value =
-            EvalScope(scope, NO_CONFIGURATIONS, newDependsOn, input).use { evalScope ->
+            // Following evaluation may add new expiration triggers, so clean the old ones
+            binding.lastEvaluationExpirationTriggers.clear()
+
+            val result:V =
+            EvalScope(scope, NO_CONFIGURATIONS, newDependsOn, binding.lastEvaluationExpirationTriggers, input).use { evalScope ->
                 val boundValue = binding.value
-                var result = if (boundValue == null) {
+                var result =
+                if (boundValue == null) {
                     @Suppress("UNCHECKED_CAST")
-                    binding.key.defaultValue as Value
+                    binding.key.defaultValue as V
                 } else try {
                     boundValue(evalScope)
                 } catch (t: Throwable) {
@@ -196,26 +192,39 @@ class EvalScope @PublishedApi internal constructor(
 
     /** Return the value bound to this wemi.key in this scope.
      * Throws exception if no value set. */
-    fun <Value> Key<Value>.get(): Value {
+    fun <V> Key<V>.get(): V {
         @Suppress("UNCHECKED_CAST")
-        return getKeyValue(this, null, false, NO_INPUT) as Value
+        return getKeyValue(this, null, false, NO_INPUT) as V
     }
 
     /** Same as [get], but with ability to specify [input] of the task. */
-    fun <Value> Key<Value>.get(vararg input:Pair<String, String>): Value {
+    fun <V> Key<V>.get(vararg input:Pair<String, String>): V {
         @Suppress("UNCHECKED_CAST")
-        return getKeyValue(this, null, false, input) as Value
+        return getKeyValue(this, null, false, input) as V
     }
 
     /** Return the value bound to this wemi.key in this scope.
      * Returns [unset] if no value set. */
-    fun <Value : Else, Else> Key<Value>.getOrElse(unset: Else): Else {
+    fun <V : Else, Else> Key<V>.getOrElse(unset: Else): Else {
         return getKeyValue(this, unset, true, NO_INPUT)
     }
 
     /** Same as [getOrElse], but with ability to specify [input]. See [get]. */
-    fun <Value : Else, Else> Key<Value>.getOrElse(unset: Else, vararg input:Pair<String, String>): Else {
+    fun <V : Else, Else> Key<V>.getOrElse(unset: Else, vararg input:Pair<String, String>): Else {
         return getKeyValue(this, unset, true, input)
+    }
+
+    /** Value that will be eventually returned as a result of this evaluation will additionally expire when [isExpired]
+     * returns `true`. */
+    fun expiresWhen(isExpired:() -> Boolean) {
+        expirationTriggers.add(isExpired)
+    }
+
+    /** Returned value will be considered expired immediately and will not be cached
+     * (except for the duration of this top-level evaluation).
+     * Equivalent to [expiresWhen]`{ true }`. */
+    fun expiresNow() {
+        expirationTriggers.add(ALWAYS_EXPIRED)
     }
 }
 
@@ -287,10 +296,10 @@ interface WemiKeyEvaluationListener {
      * @param bindingFoundInHolder holder in [bindingFoundInScope] in which the key binding has been found, null if default value
      * @param result that has been used, may be null if caller considers null valid
      */
-    fun <Value>keyEvaluationSucceeded(key: Key<Value>,
+    fun <V>keyEvaluationSucceeded(key: Key<V>,
                                       bindingFoundInScope: Scope?,
                                       bindingFoundInHolder: BindingHolder?,
-                                      result: Value) {}
+                                      result: V) {}
 
     /**
      * Evaluation of key on top of key evaluation stack has failed, because the key has no binding, nor default value.
@@ -339,7 +348,7 @@ private class WemiKeyEvaluationListenerSplitter(
         second.keyEvaluationFeature(feature)
     }
 
-    override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value) {
+    override fun <V> keyEvaluationSucceeded(key: Key<V>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: V) {
         first.keyEvaluationSucceeded(key, bindingFoundInScope, bindingFoundInHolder, result)
         second.keyEvaluationSucceeded(key, bindingFoundInScope, bindingFoundInHolder, result)
     }

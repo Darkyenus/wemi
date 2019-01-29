@@ -191,7 +191,7 @@ private val APPEND_KEY_RESULT_LOG = LoggerFactory.getLogger("AppendKeyResult")
 /**
  * Append the [value] formatted like the result of the [key] and newline.
  */
-fun <Value> StringBuilder.appendKeyResultLn(key: Key<Value>, value:Value) {
+fun <V> StringBuilder.appendKeyResultLn(key: Key<V>, value:V) {
     val prettyPrinter = key.prettyPrinter
 
     if (prettyPrinter != null) {

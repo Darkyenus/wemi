@@ -78,7 +78,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         return node
     }
 
-    override fun <Value> keyEvaluationSucceeded(key: Key<Value>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: Value) {
+    override fun <V> keyEvaluationSucceeded(key: Key<V>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: V) {
         val node = popAndIndent()
         val keyData = node.value
         val h = keyData.heading

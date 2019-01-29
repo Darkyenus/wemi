@@ -23,10 +23,10 @@ val AllConfigurations: Map<String, Configuration>
     get() = BuildScriptData.AllConfigurations
 
 /** Standard function type that is bound as value to the key in [BindingHolder] */
-typealias BoundKeyValue<Value> = EvalScope.() -> Value
+typealias Value<V> = EvalScope.() -> V
 
 /** Value modifier that can be additionally bound to a key in [BindingHolder] */
-typealias BoundKeyValueModifier<Value> = EvalScope.(Value) -> Value
+typealias ValueModifier<V> = EvalScope.(original:V) -> V
 
 /**
  * Create a new [Project].
@@ -66,7 +66,7 @@ private val NO_INPUT_KEYS = emptyArray<Pair<InputKey, InputKeyDescription>>()
  *          Recommended to be used only for keys of [Collection]s with empty immutable default.
  * @param inputKeys
  */
-fun <Value> key(description: String, defaultValue: Value, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+fun <V> key(description: String, defaultValue: V, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: ((V) -> CharSequence)? = null): KeyDelegate<V> {
     return KeyDelegate(description, true, defaultValue, inputKeys, prettyPrinter)
 }
 
@@ -75,7 +75,7 @@ fun <Value> key(description: String, defaultValue: Value, inputKeys: Array<Pair<
  *
  * @see [key] with default value for exact documentation
  */
-fun <Value> key(description: String, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: ((Value) -> CharSequence)? = null): KeyDelegate<Value> {
+fun <V> key(description: String, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: ((V) -> CharSequence)? = null): KeyDelegate<V> {
     return KeyDelegate(description, false, null, inputKeys, prettyPrinter)
 }
 

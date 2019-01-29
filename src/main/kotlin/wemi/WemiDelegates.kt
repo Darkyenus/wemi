@@ -153,16 +153,16 @@ fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRoo
  *
  * Mostly boilerplate, but takes care of creating and registering the [Key].
  */
-class KeyDelegate<Value> internal constructor(
+class KeyDelegate<V> internal constructor(
         private val description: String,
         private val hasDefaultValue: Boolean,
-        private val defaultValue: Value?,
+        private val defaultValue: V?,
         private val inputKeys: Array<Pair<InputKey, InputKeyDescription>>,
-        private val prettyPrinter: ((Value) -> CharSequence)?) : ReadOnlyProperty<Any?, Key<Value>> {
+        private val prettyPrinter: ((V) -> CharSequence)?) : ReadOnlyProperty<Any?, Key<V>> {
 
-    private lateinit var key: Key<Value>
+    private lateinit var key: Key<V>
 
-    operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): KeyDelegate<Value> {
+    operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): KeyDelegate<V> {
         this.key = Key(property.name, description, hasDefaultValue, defaultValue, inputKeys, prettyPrinter)
         @Suppress("UNCHECKED_CAST")
         synchronized(BuildScriptData.AllKeys) {
@@ -175,7 +175,7 @@ class KeyDelegate<Value> internal constructor(
         return this
     }
 
-    override fun getValue(thisRef: Any?, property: KProperty<*>): Key<Value> = key
+    override fun getValue(thisRef: Any?, property: KProperty<*>): Key<V> = key
 }
 
 /**

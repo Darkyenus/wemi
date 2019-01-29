@@ -51,7 +51,7 @@ import kotlin.collections.LinkedHashSet
  */
 object KeyDefaults {
 
-    val SourceFiles: BoundKeyValue<List<LocatedPath>> = {
+    val SourceFiles: Value<List<LocatedPath>> = {
         val roots = Keys.sourceRoots.get()
         val extensions = Keys.sourceExtensions.get()
         val result = WMutableList<LocatedPath>()
@@ -63,7 +63,7 @@ object KeyDefaults {
         result
     }
 
-    val ResourceFiles: BoundKeyValue<List<LocatedPath>> = {
+    val ResourceFiles: Value<List<LocatedPath>> = {
         val roots = Keys.resourceRoots.get()
         val result = WMutableList<LocatedPath>()
 
@@ -85,7 +85,7 @@ object KeyDefaults {
     /** Create BoundKeyValueModifier which takes a list of classpath entries (.jars or folders),
      * appends given classifier to each one and filters out only files that exist.
      * For example, `library.jar` could be translated to `library-sources.jar` with `"sources"` classifier. */
-    fun classifierAppendingClasspathModifier(appendClassifier:String):BoundKeyValueModifier<List<LocatedPath>> = { originalList ->
+    fun classifierAppendingClasspathModifier(appendClassifier:String):ValueModifier<List<LocatedPath>> = { originalList ->
         originalList.mapNotNull { originalLocatedPath ->
             val originalPath = originalLocatedPath.classpathEntry
 
@@ -120,7 +120,7 @@ object KeyDefaults {
     }
 
 
-    val ResolvedLibraryDependencies: BoundKeyValue<Partial<Map<DependencyId, ResolvedDependency>>> =  {
+    val ResolvedLibraryDependencies: Value<Partial<Map<DependencyId, ResolvedDependency>>> =  {
         val repositories = Keys.repositoryChain.get()
         val libraryDependencies = Keys.libraryDependencies.get()
         val libraryDependencyProjectMapper = Keys.libraryDependencyProjectMapper.get()
@@ -152,7 +152,7 @@ object KeyDefaults {
     }
 
     private val ClasspathResolution_LOG = LoggerFactory.getLogger("ClasspathResolution")
-    val ExternalClasspath: BoundKeyValue<List<LocatedPath>> = {
+    val ExternalClasspath: Value<List<LocatedPath>> = {
         val result = WMutableList<LocatedPath>()
 
         val resolved = Keys.resolvedLibraryDependencies.get()
@@ -177,7 +177,7 @@ object KeyDefaults {
         result
     }
 
-    val InternalClasspath: BoundKeyValue<List<LocatedPath>> = {
+    val InternalClasspath: Value<List<LocatedPath>> = {
         val compiled = Keys.compile.get()
         val resources = Keys.resourceFiles.get()
 
@@ -193,7 +193,7 @@ object KeyDefaults {
         classpath
     }
 
-    fun outputClassesDirectory(tag: String): BoundKeyValue<Path> = {
+    fun outputClassesDirectory(tag: String): Value<Path> = {
         // Using scopeProject() instead of Keys.projectName, because it has to be unique
         // Prefix - signifies that it should be deleted on clean command
         Keys.cacheDirectory.get() / "-$tag-${scope.scopeProject().name.toSafeFileName('_')}"
@@ -259,7 +259,7 @@ object KeyDefaults {
         CompileLOG.render(null, diagnostic.kind.name, message, location)
     }
 
-    val CompileJava: BoundKeyValue<Path> = {
+    val CompileJava: Value<Path> = {
         using(Configurations.compiling) {
             val output = Keys.outputClassesDirectory.get()
             output.ensureEmptyDirectory()
@@ -335,7 +335,7 @@ object KeyDefaults {
         }
     }
 
-    val CompileJavaKotlin: BoundKeyValue<Path> = {
+    val CompileJavaKotlin: Value<Path> = {
         using(Configurations.compiling) {
             val output = Keys.outputClassesDirectory.get()
             output.ensureEmptyDirectory()
@@ -433,7 +433,7 @@ object KeyDefaults {
         }
     }
 
-    val RunOptions: BoundKeyValue<List<String>> = {
+    val RunOptions: Value<List<String>> = {
         val options = WMutableList<String>()
         options.add("-ea")
         val debugPort = System.getenv("WEMI_RUN_DEBUG_PORT")?.toIntOrNull()
@@ -469,28 +469,30 @@ object KeyDefaults {
         return result
     }
 
-    val Run: BoundKeyValue<Int> = {
+    val Run: Value<Int> = {
         using(Configurations.running) {
+            expiresNow()
             doRun(Keys.mainClass.get())
         }
     }
 
-    val RunMain: BoundKeyValue<Int> = {
+    val RunMain: Value<Int> = {
         using(Configurations.running) {
             val mainClass = read("main", "Main class to start", ClassNameValidator)
                     ?: throw WemiException("Main class not specified", showStacktrace = false)
+            expiresNow()
             doRun(mainClass)
         }
     }
 
-    val TestParameters: BoundKeyValue<TestParameters> = {
+    val TestParameters: Value<TestParameters> = {
         val testParameters = wemi.test.TestParameters()
         testParameters.filter.classNamePatterns.include("^.*Tests?$")
         testParameters.select.classpathRoots.add(Keys.outputClassesDirectory.get().absolutePath)
         testParameters
     }
 
-    val Test: BoundKeyValue<TestReport> = {
+    val Test: Value<TestReport> = {
         using(Configurations.testing) {
             val javaExecutable = Keys.javaExecutable.get()
             val directory = Keys.runDirectory.get()
@@ -517,7 +519,7 @@ object KeyDefaults {
         }
     }
 
-    val Archive: BoundKeyValue<Path> = {
+    val Archive: Value<Path> = {
         using(archiving) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
@@ -542,7 +544,7 @@ object KeyDefaults {
     /**
      * Special version of [Archive] that includes classpath contributions from [Keys.projectDependencies].
      */
-    val ArchivePublishing: BoundKeyValue<Path> = {
+    val ArchivePublishing: Value<Path> = {
         using(archiving) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
@@ -564,7 +566,7 @@ object KeyDefaults {
         }
     }
 
-    val ArchiveSources: BoundKeyValue<Path> = {
+    val ArchiveSources: Value<Path> = {
         using(archiving) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
@@ -589,7 +591,7 @@ object KeyDefaults {
     /**
      * Binding for [Keys.archive] to use when archiving documentation and no documentation is available.
      */
-    val ArchiveDummyDocumentation: BoundKeyValue<Path> = {
+    val ArchiveDummyDocumentation: Value<Path> = {
         using(Configurations.archiving) {
             AssemblyOperation().use { assemblyOperation ->
 
@@ -675,7 +677,7 @@ object KeyDefaults {
         }
     }
 
-    val ArchiveJavadocOptions: BoundKeyValue<List<String>> = {
+    val ArchiveJavadocOptions: Value<List<String>> = {
         using(archiving) {
             val options = WMutableList<String>()
 
@@ -705,7 +707,7 @@ object KeyDefaults {
     }
 
     private val ARCHIVE_JAVADOC_LOG = LoggerFactory.getLogger("ArchiveJavadoc")
-    val ArchiveJavadoc: BoundKeyValue<Path> = {
+    val ArchiveJavadoc: Value<Path> = {
         using(archiving) {
             val sourceFiles = using(compilingJava){ Keys.sourceFiles.get() }
 
@@ -772,7 +774,7 @@ object KeyDefaults {
         }
     }
 
-    val ArchiveDokkaOptions: BoundKeyValue<DokkaOptions> = {
+    val ArchiveDokkaOptions: Value<DokkaOptions> = {
         val kotlinOptions = using(compilingKotlin) { Keys.compilerOptions.get() }
         val javaOptions = using(compilingJava) { Keys.compilerOptions.get() }
 
@@ -801,7 +803,7 @@ object KeyDefaults {
 
     private val DokkaFatJar = listOf(Dependency(DependencyId("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", JCenter), WemiBundledLibrariesExclude))
 
-    val ArchiveDokkaInterface: BoundKeyValue<DokkaInterface> = {
+    val ArchiveDokkaInterface: Value<DokkaInterface> = {
         val javaHome = Keys.javaHome.get()
         val artifacts = DependencyResolver.resolveArtifacts(DokkaFatJar, emptyList())?.toMutableList()
                 ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
@@ -824,7 +826,7 @@ object KeyDefaults {
     }
 
     private val ARCHIVE_DOKKA_LOG = LoggerFactory.getLogger("ArchiveDokka")
-    val ArchiveDokka: BoundKeyValue<Path> = {
+    val ArchiveDokka: Value<Path> = {
         using(archiving) {
             val options = Keys.archiveDokkaOptions.get()
 
@@ -875,7 +877,7 @@ object KeyDefaults {
      * 
      * [Configurations.publishing] scope is applied at [Keys.publish], so this does not handle it.
      */
-    val PublishModelM2: BoundKeyValue<InfoNode> = {
+    val PublishModelM2: Value<InfoNode> = {
         /*
         Commented out code is intended as example when customizing own publishMetadata pom.xml.
         
@@ -1040,7 +1042,7 @@ object KeyDefaults {
         }
     }
 
-    val PublishM2: BoundKeyValue<URI> = {
+    val PublishM2: Value<URI> = {
         using(publishing) {
             val repository = Keys.publishRepository.get()
             val metadata = Keys.publishMetadata.get()
@@ -1050,7 +1052,7 @@ object KeyDefaults {
         }
     }
 
-    val Assembly: BoundKeyValue<Path> = {
+    val Assembly: Value<Path> = {
         using(assembling) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data

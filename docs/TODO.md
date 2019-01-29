@@ -11,6 +11,10 @@
 - WEMI IS COMPILED MULTIPLE TIMES!!! cache compile!
 	- Warnings in EnclaveCL
 
+- IntelliJ seems to have trouble turning programs off:
+	ServerSocket accept, while (true) ktere cte crap ze streamu; terminal + control+c to vypne, intelliJ + end task zastavi wemi (v UI to vypada ze to je vypnuty) ale ve skutecnosti je stale otevrenej socket/server socket a musis to killnout z terminalu pres pid
+    Zadny non-daemon vlakna, nic takovyho. Mel sem jen jedno vlakno v kodu (single ss accept, all blocking operations) a pro jistotu sem si na ruznych mistech vypsal z jakych vlaken co bezi a vzdy vse bylo z main
+
 - Test everything, especially javadoc/dokka/tests/plugins
 
 - Fatjars in Java 9+ ?

@@ -18,9 +18,9 @@ typealias InputKey = String
 typealias InputKeyDescription = String
 
 /** 
- * Key which can have value of type [Value] assigned, through [Project] or [Configuration].
+ * Key which can have value of type [V] assigned, through [Project] or [Configuration].
  */
-class Key<Value> internal constructor(
+class Key<V> internal constructor(
         /**
          * Name of the key. Specified by the variable name this key was declared at.
          * Uniquely describes the key.
@@ -33,13 +33,13 @@ class Key<Value> internal constructor(
          */
         val description: String,
         /** True if defaultValue is set, false if not.
-         * Needed, because we don't know whether or not is [Value] nullable
+         * Needed, because we don't know whether or not is [V] nullable
          * or not, so we need to know if we should return null or not. */
         internal val hasDefaultValue: Boolean,
         /**
          * Default value used for this key, when no other value is bound.
          */
-        internal val defaultValue: Value?,
+        internal val defaultValue: V?,
         /**
          * Input keys that are used by this key.
          * Used only for documentation and CLI purposes (autocomplete).
@@ -52,7 +52,7 @@ class Key<Value> internal constructor(
          *
          * Called when the key is evaluated in CLI top level.
          */
-        internal val prettyPrinter: ((Value) -> CharSequence)?) : WithDescriptiveString, JsonWritable, Comparable<Key<*>> {
+        internal val prettyPrinter: ((V) -> CharSequence)?) : WithDescriptiveString, JsonWritable, Comparable<Key<*>> {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -237,7 +237,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
                 scope = scope.scopeFor(config)
             }
 
-            return EvalScope(scope, NO_CONFIGURATIONS, ArrayList(), NO_INPUT)
+            return EvalScope(scope, NO_CONFIGURATIONS, ArrayList(), ArrayList(), NO_INPUT)
         }
 
         @PublishedApi
@@ -377,8 +377,8 @@ class Scope internal constructor(
     }
 
     private fun <T> createElementaryKeyBinding(key:Key<T>):Binding<T>? {
-        val boundValue: BoundKeyValue<T>?
-        val allModifiersReverse = ArrayList<BoundKeyValueModifier<T>>()
+        val boundValue: Value<T>?
+        val allModifiersReverse = ArrayList<ValueModifier<T>>()
 
         var scope: Scope = this
 
@@ -386,12 +386,12 @@ class Scope internal constructor(
             // Retrieve the holder
             @Suppress("UNCHECKED_CAST")
             for (holder in scope.scopeBindingHolders) {
-                val holderModifiers = holder.modifierBindings[key] as ArrayList<BoundKeyValueModifier<T>>?
+                val holderModifiers = holder.modifierBindings[key] as ArrayList<ValueModifier<T>>?
                 if (holderModifiers != null && holderModifiers.isNotEmpty()) {
                     allModifiersReverse.addAllReversed(holderModifiers)
                 }
 
-                val boundValueCandidate = holder.binding[key] as BoundKeyValue<T>?
+                val boundValueCandidate = holder.binding[key] as Value<T>?
                 if (boundValueCandidate != null) {
                     boundValue = boundValueCandidate
                     break@searchForBoundValue
@@ -406,10 +406,10 @@ class Scope internal constructor(
             }
         }
 
-        val modifiers:Array<BoundKeyValueModifier<T>> =
+        val modifiers:Array<ValueModifier<T>> =
                 if (allModifiersReverse.size == 0) {
                     @Suppress("UNCHECKED_CAST")
-                    NO_BINDING_MODIFIERS as Array<BoundKeyValueModifier<T>>
+                    NO_BINDING_MODIFIERS as Array<ValueModifier<T>>
                 } else Array(allModifiersReverse.size) {
                     allModifiersReverse[allModifiersReverse.size - it - 1]
                 }
@@ -546,8 +546,8 @@ class Scope internal constructor(
 private val LOG: Logger = LoggerFactory.getLogger("BindingHolder")
 
 /**
- * Holds [Key] value bindings (through [BoundKeyValue]),
- * key modifiers (through [BoundKeyValueModifier]),
+ * Holds [Key] value bindings (through [Value]),
+ * key modifiers (through [ValueModifier]),
  * and [ConfigurationExtension] extensions (through [ConfigurationExtension]).
  *
  * Also provides ways to set them during the object's initialization.
@@ -557,8 +557,8 @@ private val LOG: Logger = LoggerFactory.getLogger("BindingHolder")
  */
 sealed class BindingHolder : WithDescriptiveString {
 
-    internal val binding = HashMap<Key<*>, BoundKeyValue<Any?>>()
-    internal val modifierBindings = HashMap<Key<*>, ArrayList<BoundKeyValueModifier<Any?>>>()
+    internal val binding = HashMap<Key<*>, Value<Any?>>()
+    internal val modifierBindings = HashMap<Key<*>, ArrayList<ValueModifier<Any?>>>()
     internal val configurationExtensions = HashMap<Configuration, ConfigurationExtension>()
     internal var locked = false
 
@@ -571,14 +571,14 @@ sealed class BindingHolder : WithDescriptiveString {
      * [value] will be evaluated every time someone queries receiver key and this [BindingHolder] is
      * the topmost in the query [Scope] with the key bound.
      *
-     * If the key already has [BoundKeyValue] bound in this scope, it will be replaced.
+     * If the key already has [Value] bound in this scope, it will be replaced.
      *
      * @see modify
      */
-    infix fun <Value> Key<Value>.set(value: BoundKeyValue<Value>) {
+    infix fun <V> Key<V>.set(value: Value<V>) {
         ensureUnlocked()
         @Suppress("UNCHECKED_CAST")
-        val old = binding.put(this as Key<Any>, value as BoundKeyValue<Any?>)
+        val old = binding.put(this as Key<Any>, value as Value<Any?>)
         if (old != null) {
             LOG.debug("Overriding previous value bound to {} in {}", this, this@BindingHolder)
         }
@@ -591,16 +591,16 @@ sealed class BindingHolder : WithDescriptiveString {
      * [valueModifier] are all evaluated on the obtained value, from those in least significant [BindingHolder]s
      * first, those added earlier first, up to the last-added, most-significant modifier in [Scope].
      *
-     * First modifier will receive as an argument result of the [BoundKeyValue], second the result of first, and so on.
+     * First modifier will receive as an argument result of the [Value], second the result of first, and so on.
      * Result of last modifier will be then used as a definitive result of the key query.
      *
      * @param valueModifier to be added
      * @see set
      */
-    infix fun <Value> Key<Value>.modify(valueModifier: BoundKeyValueModifier<Value>) {
+    infix fun <V> Key<V>.modify(valueModifier: ValueModifier<V>) {
         ensureUnlocked()
         @Suppress("UNCHECKED_CAST")
-        val modifiers = modifierBindings.getOrPut(this as Key<Any>) { ArrayList() } as ArrayList<BoundKeyValueModifier<*>>
+        val modifiers = modifierBindings.getOrPut(this as Key<Any>) { ArrayList() } as ArrayList<ValueModifier<*>>
         modifiers.add(valueModifier)
     }
 
@@ -645,7 +645,7 @@ sealed class BindingHolder : WithDescriptiveString {
      *
      * @see modify
      */
-    inline infix fun <Value, Coll : Collection<Value>> Key<Coll>.add(crossinline additionalValue: BoundKeyValue<Value>) {
+    inline infix fun <V, Coll : Collection<V>> Key<Coll>.add(crossinline additionalValue: Value<V>) {
         this.modify { collection ->
             val mutable = collection.toMutable()
             mutable.add(additionalValue())
@@ -659,7 +659,7 @@ sealed class BindingHolder : WithDescriptiveString {
      *
      * @see modify
      */
-    inline infix fun <Value, Coll : Collection<Value>> Key<Coll>.addAll(crossinline additionalValues: BoundKeyValue<Iterable<Value>>) {
+    inline infix fun <V, Coll : Collection<V>> Key<Coll>.addAll(crossinline additionalValues: Value<Iterable<V>>) {
         this.modify { collection ->
             val mutable = collection.toMutable()
             mutable.addAll(additionalValues())
@@ -676,7 +676,7 @@ sealed class BindingHolder : WithDescriptiveString {
      *
      * @see modify
      */
-    inline infix fun <Value, Coll : Set<Value>> Key<Coll>.remove(crossinline valueToRemove: BoundKeyValue<Value>) {
+    inline infix fun <V, Coll : Set<V>> Key<Coll>.remove(crossinline valueToRemove: Value<V>) {
         this.modify { collection ->
             val mutable = collection.toMutable()
             mutable.remove(valueToRemove())
@@ -690,7 +690,7 @@ sealed class BindingHolder : WithDescriptiveString {
      *
      * @see modify
      */
-    inline infix fun <Value, Coll : Collection<Value>> Key<Coll>.removeAll(crossinline valuesToRemove: BoundKeyValue<Iterable<Value>>) {
+    inline infix fun <V, Coll : Collection<V>> Key<Coll>.removeAll(crossinline valuesToRemove: Value<Iterable<V>>) {
         this.modify { collection ->
             val mutable = collection.toMutable()
             mutable.removeAll(valuesToRemove())
@@ -727,7 +727,7 @@ sealed class BindingHolder : WithDescriptiveString {
      *
      * @see modify
      */
-    operator fun <Type> Key<CompilerFlags>.set(flag: CompilerFlag<Type>, value: BoundKeyValue<Type>) {
+    operator fun <Type> Key<CompilerFlags>.set(flag: CompilerFlag<Type>, value: Value<Type>) {
         this.modify { flags: CompilerFlags ->
             flags[flag] = value()
             flags
@@ -784,7 +784,7 @@ sealed class BindingHolder : WithDescriptiveString {
     /**
      * Bind this key to values that itself holds, under given configurations.
      */
-    internal infix fun <Value> Key<Set<Value>>.setToUnionOfSelfIn(configurations: EvalScope.()->Iterable<Configuration>) {
+    internal infix fun <V> Key<Set<V>>.setToUnionOfSelfIn(configurations: EvalScope.()->Iterable<Configuration>) {
         this set {
             val configurationsIt = configurations().iterator()
             if (!configurationsIt.hasNext()) {
@@ -804,7 +804,7 @@ sealed class BindingHolder : WithDescriptiveString {
     /**
      * Bind this key to values that itself holds, under given configurations.
      */
-    internal infix fun <Value> Key<List<Value>>.setToConcatenationOfSelfIn(configurations: EvalScope.()->Iterable<Configuration>) {
+    internal infix fun <V> Key<List<V>>.setToConcatenationOfSelfIn(configurations: EvalScope.()->Iterable<Configuration>) {
         this set {
             val configurationsIt = configurations().iterator()
             if (!configurationsIt.hasNext()) {
@@ -828,7 +828,7 @@ sealed class BindingHolder : WithDescriptiveString {
 }
 
 /**
- * Special [BoundKeyValue] for values that should be evaluated only once per whole binding,
+ * Special [Value] for values that should be evaluated only once per whole binding,
  * regardless of Scope. Use only for values with no dependencies on any modifiable input.
  *
  * Example:
@@ -838,15 +838,15 @@ sealed class BindingHolder : WithDescriptiveString {
  *
  * @see LazyStatic for values that are in this nature, but their computation is not trivial
  */
-class Static<Value>(private val value:Value) : (EvalScope) -> Value {
-    override fun invoke(ignored: EvalScope): Value {
+class Static<V>(private val value:V) : (EvalScope) -> V {
+    override fun invoke(ignored: EvalScope): V {
         activeKeyEvaluationListener?.keyEvaluationFeature("static")
         return value
     }
 }
 
 /**
- * Special [BoundKeyValue] for values that should be evaluated only once, but lazily.
+ * Special [Value] for values that should be evaluated only once, but lazily.
  * Similar to [Static] in nature of supported values.
  *
  * Example:
@@ -854,13 +854,13 @@ class Static<Value>(private val value:Value) : (EvalScope) -> Value {
  * heavyResource set LazyStatic { createHeavyResource() }
  * ```
  */
-class LazyStatic<Value>(generator:()->Value) : (EvalScope) -> Value {
-    private var generator:(()->Value)? = generator
-    private var cachedValue:Value? = null
+class LazyStatic<V>(generator:()->V) : (EvalScope) -> V {
+    private var generator:(()->V)? = generator
+    private var cachedValue:V? = null
 
-    override fun invoke(scope: EvalScope): Value {
+    override fun invoke(scope: EvalScope): V {
         val generator = this.generator
-        val value:Value
+        val value:V
         @Suppress("UNCHECKED_CAST")
         if (generator != null) {
             value = generator.invoke()
@@ -869,7 +869,7 @@ class LazyStatic<Value>(generator:()->Value) : (EvalScope) -> Value {
             activeKeyEvaluationListener?.keyEvaluationFeature("first lazy static")
         } else {
             activeKeyEvaluationListener?.keyEvaluationFeature("lazy static")
-            value = this.cachedValue as Value
+            value = this.cachedValue as V
         }
         return value
     }

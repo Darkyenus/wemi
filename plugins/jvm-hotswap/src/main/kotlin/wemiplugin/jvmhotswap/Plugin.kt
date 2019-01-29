@@ -2,7 +2,6 @@ package wemiplugin.jvmhotswap
 
 import org.slf4j.LoggerFactory
 import wemi.*
-import wemi.KeyDefaults.inProjectDependencies
 import wemi.collections.toMutable
 import wemi.util.*
 import java.io.DataOutputStream
@@ -41,7 +40,7 @@ object JvmHotswap {
         Strings are sent through Java's DataOutputStream.
          */
 
-        val RunHotswap:BoundKeyValue<Int> = {
+        val RunHotswap:Value<Int> = {
             using(Configurations.running, hotswapping) {
                 val javaExecutable = Keys.javaExecutable.get()
                 val classpathEntries = LinkedHashSet<Path>()

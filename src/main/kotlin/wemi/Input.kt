@@ -18,7 +18,7 @@ internal val NO_INPUT = emptyArray<Pair<String,String>>()
 fun EvalScope.read(key: String, description: String): String? = read(key, description, StringValidator)
 
 /**
- * Read a [Value] from the input.
+ * Read a [V] from the input.
  * The value is first searched for using the [key] from explicit input pairs.
  * Then, free input strings (without explicit [key]s) are considered. Both are considered from top
  * (added last) to bottom, and only if they are accepted by the [validator].
@@ -29,7 +29,7 @@ fun EvalScope.read(key: String, description: String): String? = read(key, descri
  * @param validator to use for validation and conversion of found string
  * @return found value or null if validator fails on all possible values
  */
-fun <Value> EvalScope.read(key: String, description: String, validator: Validator<Value>): Value? {
+fun <V> EvalScope.read(key: String, description: String, validator: Validator<V>): V? {
     val input = this.input
 
     // Search in prepared by key
@@ -105,7 +105,7 @@ fun <Value> EvalScope.read(key: String, description: String, validator: Validato
  * Should be pure. Returns [Failable], with the validated/converted value or with an error string,
  * that will be printed for the user verbatim.
  */
-typealias Validator<Value> = (String) -> Failable<Value, String>
+typealias Validator<V> = (String) -> Failable<V, String>
 
 /**
  * Default validator, always succeeds and returns the entered string, no matter what it is.
