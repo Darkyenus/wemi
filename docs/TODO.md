@@ -4,7 +4,7 @@
 
 - Fix todos in Evaluation (making trace work again)
 
-- Use Expirable where appropriate
+- Better API for file sets, make them invalidate correctly
 
 - Remove short in searchForCompatibleBinding, making the caching more efficient, maybe probably.
 

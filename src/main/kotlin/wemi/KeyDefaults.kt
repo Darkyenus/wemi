@@ -34,10 +34,7 @@ import java.io.BufferedReader
 import java.net.URI
 import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.LinkOption
-import java.nio.file.Path
-import java.nio.file.Paths
+import java.nio.file.*
 import java.time.ZonedDateTime
 import java.util.*
 import javax.tools.*
@@ -515,6 +512,7 @@ object KeyDefaults {
             val report = handleProcessForTesting(processBuilder, testParameters)
                     ?: throw WemiException("Test execution failed, see logs for more information", showStacktrace = false)
 
+            expiresNow()
             report
         }
     }
@@ -536,6 +534,7 @@ object KeyDefaults {
                         NoPrependData,
                         compress = true)
 
+                expiresWith(outputFile)
                 outputFile
             }
         }
@@ -561,6 +560,7 @@ object KeyDefaults {
                         NoPrependData,
                         compress = true)
 
+                expiresWith(outputFile)
                 outputFile
             }
         }
@@ -583,6 +583,7 @@ object KeyDefaults {
                         NoPrependData,
                         compress = true)
 
+                expiresWith(outputFile)
                 outputFile
             }
         }
@@ -649,6 +650,7 @@ object KeyDefaults {
                         NoPrependData,
                         compress = true)
 
+                expiresWith(outputFile)
                 outputFile
             }
         }
@@ -769,6 +771,7 @@ object KeyDefaults {
                         NoPrependData,
                         compress = true)
 
+                expiresWith(outputFile)
                 outputFile
             }
         }
@@ -865,6 +868,7 @@ object KeyDefaults {
                         NoPrependData,
                         compress = true)
 
+                expiresWith(outputFile)
                 outputFile
             }
 
@@ -1048,7 +1052,17 @@ object KeyDefaults {
             val metadata = Keys.publishMetadata.get()
             val artifacts = Keys.publishArtifacts.get()
 
-            repository.publish(metadata, artifacts)
+            val result = repository.publish(metadata, artifacts)
+
+            try {
+                expiresWith(Paths.get(result))
+            } catch (e:IllegalArgumentException) {
+                expiresNow()
+            } catch (e: FileSystemNotFoundException) {
+                expiresNow()
+            }
+
+            result
         }
     }
 
@@ -1070,6 +1084,8 @@ object KeyDefaults {
                         outputFile,
                         Keys.assemblyPrependData.get(),
                         compress = true)
+
+                expiresWith(outputFile)
 
                 outputFile
             }

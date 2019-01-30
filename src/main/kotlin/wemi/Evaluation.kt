@@ -1,6 +1,8 @@
 package wemi
 
+import wemi.util.lastModifiedMillis
 import java.io.Closeable
+import java.nio.file.Path
 
 /** Each external key invocation will increase this value (=tick).
  * Bindings are evaluated only once per tick, regardless of their expiry. */
@@ -226,6 +228,14 @@ class EvalScope @PublishedApi internal constructor(
     fun expiresNow() {
         expirationTriggers.add(ALWAYS_EXPIRED)
     }
+}
+
+/** When the file changes (detected by presence and date modified, not recursive), the result of this evaluation will expire.
+ * @see EvalScope.expiresWhen for more details about expiration */
+fun EvalScope.expiresWith(file: Path) {
+    val time = file.lastModifiedMillis()
+
+    expiresWhen { file.lastModifiedMillis() != time }
 }
 
 

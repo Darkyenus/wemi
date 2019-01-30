@@ -10,7 +10,6 @@ import wemi.collections.toMutable
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
 import wemi.util.*
-import java.io.File
 import java.nio.file.Path
 import java.util.*
 
@@ -872,32 +871,5 @@ class LazyStatic<V>(generator:()->V) : (EvalScope) -> V {
             value = this.cachedValue as V
         }
         return value
-    }
-}
-
-
-/** Object representing a snapshot of Path, based on time of last modification.  */
-@Deprecated("Investigate a new home for this class")
-class PathCacheEntry private constructor(val path:Path, val lastModified:Long) {
-    constructor (path:Path) : this(path, path.lastModified.toMillis())
-    constructor (file:File) : this(file.toPath(), file.lastModified())
-    constructor (located:LocatedPath) : this(located.file)
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as PathCacheEntry
-
-        if (path != other.path) return false
-        if (lastModified != other.lastModified) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = path.hashCode()
-        result = 31 * result + lastModified.hashCode()
-        return result
     }
 }
