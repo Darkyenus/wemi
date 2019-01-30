@@ -85,6 +85,11 @@ internal val WemiBundledLibrariesExclude = DefaultExclusions + listOf(
         //TODO Add Wemi itself here!
 )
 
+/** Build scripts can place arbitrary tasks to be completed here.
+ * Tasks will be evaluated directly after build script is loaded and before pre-specified or interactive tasks.
+ * After that, it is not allowed to add new tasks. */
+internal var autoRunTasks:ArrayList<Task>? = ArrayList()
+
 /** Called reflectively from Main. See there for more info.
  * Entry point for the WEMI build tool. */
 @PublishedApi // So that it is easily reflectively visible
@@ -95,7 +100,7 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
     WemiBuildFolder = rawOptions[OPTION_PATH_BUILD_FOLDER] as Path
     WemiCacheFolder = rawOptions[OPTION_PATH_CACHE_FOLDER] as Path
     val cleanBuild = rawOptions[OPTION_BOOL_CLEAN_BUILD] as Boolean
-    var interactive = rawOptions[OPTION_BOOL_INTERACTIVE] as Boolean
+    var interactive = rawOptions[OPTION_BOOL_INTERACTIVE] as Boolean?
     val machineReadableOutput = rawOptions[OPTION_BOOL_MACHINE_READABLE] as Boolean
     val allowBrokenBuildScripts  = rawOptions[OPTION_BOOL_ALLOW_BROKEN_BUILD_SCRIPTS] as Boolean
     WemiReloadSupported = rawOptions[OPTION_BOOL_RELOAD_SUPPORTED] as Boolean
@@ -116,10 +121,12 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
     } else {
         machineOutput = null
 
-        if (taskArguments.isEmpty()) {
+        if (interactive == null && taskArguments.isEmpty()) {
             interactive = true
         }
     }
+
+    interactive = interactive ?: false
 
     WemiRunningInInteractiveMode = interactive
     LOG.trace("Starting Wemi from root: {}", WemiRootFolder)
@@ -168,6 +175,37 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
     // - Ensure Configurations are loaded -
     Configurations
     // ------------------------------------
+
+    // Auto-run
+    for (task in autoRunTasks!!) {
+        LOG.info("Auto-run: {}", task)
+        val result = task.evaluateKey(null)
+        when (result.status) {
+            TaskEvaluationStatus.Success -> {
+                LOG.info("Success")
+            }
+            TaskEvaluationStatus.NoProject -> {
+                LOG.warn("Failure: invalid or missing project")
+            }
+            TaskEvaluationStatus.NoConfiguration -> {
+                LOG.warn("Failure: invalid configuration")
+            }
+            TaskEvaluationStatus.NoKey -> {
+                LOG.warn("Failure: invalid key")
+            }
+            TaskEvaluationStatus.NotAssigned -> {
+                LOG.warn("Failure: key has no bound value")
+            }
+            TaskEvaluationStatus.Exception -> {
+                LOG.warn("Failure: failed with exception", result.data)
+            }
+            TaskEvaluationStatus.Command -> {
+                LOG.info("Success (command)")
+            }
+        }
+    }
+    autoRunTasks = null
+
 
     var exitCode = EXIT_CODE_SUCCESS
     val parsedArgs = TaskParser.PartitionedLine(taskArguments, false, machineReadableOutput)

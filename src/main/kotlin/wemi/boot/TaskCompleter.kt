@@ -116,7 +116,7 @@ internal object TaskCompleter : Completer {
         Candidate(name,
                 name,
                 null,
-                null,
+                "[command]",
                 null,
                 null,
                 true

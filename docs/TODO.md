@@ -1,7 +1,9 @@
 # Things to do next
 
+## For next release
 - Better API for file sets, make them invalidate correctly
 
+## For later
 - Remove short in searchForCompatibleBinding, making the caching more efficient, maybe probably.
 
 - WEMI IS COMPILED MULTIPLE TIMES!!! cache compile!
@@ -19,11 +21,6 @@
 - Automated tests
 
 - Dynamic "what test is executing right now?", or maybe even results as they come in
-
-- Ensure that javac does not get unnecessary output directories, like headers
-
-- FIX CLEAN TASK, move all compile folders to extra folder and let clean delete it whole, or maybe even some sort of
-	"folders to not delete on clean" system, this would be nice. Some sort of -- prefix to not delete?
 
 - Explain why dokka is in its own project: because I suspect that it bundles its own kotlin stdlib and I don't want that to pollute everything (oh and make sure that that cursed fatjar never gets added to IDE dependencies!!!)
 

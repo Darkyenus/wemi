@@ -2,7 +2,9 @@
 
 import wemi.Archetypes
 import wemi.Configurations
+import wemi.boot.Task
 import wemi.boot.WemiRootFolder
+import wemi.boot.autoRunTasks
 import wemi.dependency.DependencyAttribute
 import wemi.dependency.Repository
 import java.net.URL
@@ -78,6 +80,16 @@ fun path(path:String):Path {
 inline operator fun URL.div(path: CharSequence): URL = this._div(path)
 inline operator fun Path.div(path: CharSequence): Path = this._div(path)
 inline operator fun CharSequence.div(path: CharSequence): StringBuilder = this._div(path)
+
+// Miscellaneous
+fun autoRun(task: Task) {
+    val tasks = autoRunTasks ?: throw IllegalStateException("Too late to register Task auto-run")
+    tasks.add(task)
+}
+
+fun Project.autoRun(key:Key<*>, vararg configurations:Configuration) {
+    autoRun(Task(this.name, configurations.map { it.name }, key.name, emptyArray()))
+}
 
 // Configurations
 val compiling

@@ -98,9 +98,7 @@ object Keys {
 
     val publishMetadata by key<InfoNode>("Meta information that should be published together with archives by 'publish'")
     val publishRepository by key<Repository>("Repository to which the archives are published")
-    /**
-     * @see wemi.publish.artifacts preferred method for adding to this list.
-     */
+    /** @see wemi.publish.artifacts preferred method for adding to this list. */
     val publishArtifacts by key<List<ArtifactEntry>>("Artifacts that should get published", defaultValue = emptyList())
     val publish by key<URI>("Publish archives to 'publishRepository' and return the URI to where it was published")
 

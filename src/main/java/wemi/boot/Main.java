@@ -69,7 +69,7 @@ public class Main {
 	@SuppressWarnings("unchecked")
 	public static void main(String[] args) throws Throwable {
 		final boolean[] cleanBuild = {false};
-		final boolean[] interactive = {false};
+		final Boolean[] interactive = {null};
 		final boolean[] machineReadableOutput = {false};
 		final boolean[] allowBrokenBuildScripts = {false};
 		final boolean[] reloadSupported = {false};
@@ -108,8 +108,10 @@ public class Main {
 							System.exit(EXIT_CODE_ARGUMENT_ERROR);
 					}
 				}),
-				new Option('i', "interactive", "enable interactive mode even in presence of flags",
+				new Option('i', "interactive", "enable interactive mode even in presence of tasks",
 						false, null, arg -> interactive[0] = true),
+				new Option(Option.NO_SHORT_NAME, "non-interactive", "disable interactive mode even when no tasks are present",
+						false, null, arg -> interactive[0] = false),
 				new Option('v', "verbose", "verbose mode, same as --log=debug",
 						false, null, arg -> TPLogger.DEBUG()),
 				new Option(Option.NO_SHORT_NAME, "root", "set the root directory of the built project",

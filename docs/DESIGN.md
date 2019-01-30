@@ -53,41 +53,79 @@ At the core of WEMI are four intertwined concepts.
 *configurations* and allows to query values bound to *keys*.
 
 ### Keys
-Key is represented by an instance of `Key<Value>`. Each key type has a different
-name, type (generic `Value`) and is represented by a single instance.
+Key is represented by an instance of `Key<V>`. Each key type has a different
+name, type (generic `V`) and is represented by a single instance.
 The key also holds its human readable description.
 
-Key itself does not hold any bound value, though it may have a default value,
-which is immutable and identical for the whole and each build, and is always considered
-last during any *value resolution*.
+Keys themselves typically don't hold any values, but are used in `BindingHolder`s, which can be though of as a
+maps, with `Key<V>`s for keys and `() -> V` functions for values. These functions are then invoked only when needed.
 
-Values bound to keys are not evaluated when bound, but each time when requested.
-In a way, keys are not assigned object of type `Value`, but of type `() -> Value`.
-This allows to use keys for both preferences/settings and for operations/tasks.
+Examples of `BindingHolder`s are `Project`s and `Configuration`s. When they are defined, it is possible to bind values
+in them to arbitrary keys through following syntax:
+```kotlin
+someKey set { println("evaluating some key"); "some value: " + 1 }
+```
+Curly braces are Kotlin's syntax for a lambda - the function which is then stored
+in the `BindingHolder` and evaluated when needed.
 
-For example, `projectName` is a key of type `String` that holds the project's name
-(used for example when publishing). `clean` is a key of type `Int`, which, when retrieved,
-will clear the build files and key cache.
+There are two major consequences of this design:
+- Both static settings and dynamic tasks have the same syntax. For example, there is a `compile` key, which, when evaluated,
+compiles the project, or `projectName`, which returns the project's name (used for example when publishing to Maven repository)
+- Keys may refer to many different values, depending on the context in which it is queried.
+For example `sourceFiles` may return different set of files, depending on whether tests are being compiled or not.
+This is controlled through *configurations*.
 
-Key may be marked as cached during declaration (not by default). Scopes hold
-resolved values of these keys for future invocations. Only keys that never change
-value for the build script run/compilation AND are costly to compute should be cached.
-Example of cached key is `externalClasspath`, which may have to download dependencies
-from the internet and thus may be a slow operation.
+Key object itself may also hold a default value, which is used when no other `BindingHolder` in the context (*scope*),
+has any value bound to the key. This, however, is always an immutable object set during the declaration of the key.
+For example, keys which are of some `Collection` type often have an empty collection as a default value.
 
 Key definition looks like this:
 ```kotlin
-val compile by key<File>("Compile sources and return the result")
+val compile by key<Path>("Compile sources and return the result")
 ```
-Here variable `compile` is of type `Key<File>` and holds a reference to the created key.
-`compile` is also the name of the key and would be used to invoke this key from the user interface.
-As seen, key's description is also specified during declaration and so can be the default value,
-custom output printer and whether or not should the result of the key be cached.
+Here variable `compile` is of type `Key<Path>` and holds a reference to the created key.
+`compile` is also used as the name of the key and would be used to invoke this key from the user interface.
+Key's description is also specified during declaration and so can be the default value,
+custom output printer and other miscellaneous options.
 
 *Key declaration leverages Kotlin's delegate system (through `KeyDelegate<Value>` object) which the reason for the
 `by` syntax and a mechanism through which Wemi can assign the variable name to the key, for its invocation from outside.*
 
-Standard keys are defined in `wemi.Keys` object.
+Wemi provided keys are defined in `wemi.Keys` object. When defining custom keys in your build script,
+do so at the top level, as they must all be known after the build script is loaded
+ (i.e. not in `Project` specification, not in functions, etc.).
+
+Key evaluation can be triggered either from the outside (as a command line parameter or through command line interface),
+or as a part of evaluation of the keys value:
+```kotlin
+compile set {
+	val sources = sourceFiles.get() // `sourceFiles` and `javaCompiler` are keys
+	val compiler = javaCompiler.get()
+	
+	compiler.compile(sources)
+}
+```
+`Key.get()` evaluates the key in the same context (*scope*) in which the current value is being evaluated, and
+**it is available only when declaring a value for some key** (i.e. not from arbitrary functions).
+Evaluation triggered from the outside are referred to as **top-level evaluations**.
+
+Bound values (i.e. functions) are evaluated only when needed and when it can be assumed, that their output has changed.
+The values returned by a key invocation are cached (at most for the duration of *wemi* instance lifetime).
+The logic behind the caching is: When a key, which has already been evaluated in the same context (*scope*) is evaluated:
+1. If the last evaluation happened during this top-level evaluation, it is always kept
+2. If any key which was used during the last evaluation has changed, it is re-evaluated
+3. If any user-specified trigger reports that it should be, it is re-evaluated
+
+Example of user-specified triggers:
+```kotlin
+notCachedKey set {
+	val path:Path = doSomeOperationWhichShouldNotBeCached()
+
+	expiresNow() // Never cached
+	expiresWhen { someCondition() } // Cache is invalidated when someCondition() is true
+	expiresWith(path) // Cache is invalidated when path file is modified from the current state 
+}
+```
 
 ### Projects & Configurations
 Build script will typically define one or more projects and may define any number of configurations, if needed.
@@ -134,7 +172,7 @@ As you can see, it is very similar to the project definition, and the similarity
 The main difference to notice is that configuration has a description, like keys.
 
 It is a soft convention to name configurations with the description of the activity in which the configuration will be used,
-with the verb in *present participle*, that is, ending with *-ing*. If the configuration is not used for an activity,
+with the verb in *present participle* (ending with *-ing*). If the configuration is not used for an activity,
 any descriptive name is fine.
 
 Standard configurations are defined in `wemi.Configurations` object.
@@ -148,8 +186,7 @@ Default archetype declares support for Java and Kotlin languages.
 Standard archetypes are defined in `wemi.Archetypes` object.
 
 ### Scopes
-Scopes are the heart of the *value querying* mechanism. They are not declared, but created at runtime, on demand.
-Scopes also manage the key caching system, but that is not their primary role.
+Scopes are the heart of the *key evaluation* mechanism. They are not declared, but created at runtime, on demand.
 They are **composed** out of one *project* and zero or more *configurations* in some order.
 
 This reflects in the key invocation syntax, which is used in the user interface to query/invoke key values.
@@ -181,7 +218,7 @@ evaluating `myProject/foo:compile` will then evaluate, in order tasks `myProject
 `myProject/foo:compileOptions`. `using` clauses can be freely nested.
 
 Note that you can push only a configuration on the stack, it is not possible to change the project with it.
-To see how to evaluate the key in an arbitrary configuration, you can check [how it is implemented in CLI](src/main/kotlin/wemi/boot/CLI.kt).
+To see how to evaluate the key in an arbitrary configuration, you can check [how it is implemented in CLI](../src/main/kotlin/wemi/boot/CLI.kt).
 
 ### Configuration extensions
 While the scope system outlined above is powerful, some things are still not possible to do easily in it.
@@ -284,22 +321,33 @@ the work of plugins in other build systems, but there is nothing special about t
 Java/Kotlin/JVM libraries.
 
 ### Build script directives
-Directives start with `///` which **must** be at the start of the line, anywhere in the file. Space after `///` is optional.
+Build script can start with a number of directives, in a form of file annotations.
+Note that since they are not parsed by the Kotlin compiler, be conservative in their syntax (keep them on single line).
 
 #### Repository directive
 ```kotlin
-/// m2-repository <repo-name> at <url>
+@file:BuildDependencyRepository("<repo-name>", "<url>")
 ```
-Given maven2 repository will be used when searching for libraries using the *library directive*.
+Given maven2 repository will be used when searching for libraries using the *library dependency directive*.
 This is not the same as repositories of the compiled project, see `repositories` key for that.
 
-#### Library directive
+#### Library dependency directive
 ```kotlin
-/// build-library <group>:<name>:<version>
+@file:BuildDependency("<group>:<name>:<version>")
+or
+@file:BuildDependency("<group>", "<name>", "<version>")
 ```
 Add library as a dependency for this build script. The library is directly available in the whole build script.
 Library is searched for in the repositories specified by *repository directive*.
 This is not the same as library dependencies of the compiled project, see `libraryDependencies` key for that.
+
+#### Classpath dependency directive
+```kotlin
+@file:BuildClasspathDependency("<jar path>")
+```
+Add specified jar as a dependency for this build script. Unmanaged version of *library dependency directive*.
+The path may be absolute, or relative to the project's root directory.
+This is not the same as unmanaged dependencies of the compiled project, see `unmanagedDependencies` key for that.
 
 ## Input system
 A small but important part of the Wemi's functionality is its input system. Most keys take their inputs by evaluating
@@ -307,8 +355,8 @@ other keys, but sometimes it is more beneficial to ask the user. For example the
 to execute arbitrary main class from the project's classpath, interactively, without having to change the `mainClass`
 key.
 
-The input is provided through the object held in the `input` key. It can be asked to provide arbitrary, textual or other,
-value for given input query. Input query consists of three parts:
+Input system can be queried through the [`read`](../src/main/kotlin/wemi/Input.kt) method.
+It can be asked to provide arbitrary type of value for given input query. Input query consists of three parts:
 1. *Input key* - is any simple string, which specifies what is the query about.
     For example `main` when asking about main class. The string should be a valid Java identifier.
 2. *Prompt* - arbitrary human readable string that will be shown to the user when asked to provide the input text.
@@ -317,27 +365,23 @@ value for given input query. Input query consists of three parts:
     and returns either arbitrary object to be used as the user's response, or an error message to be shown to
     the user.
 
-Sometimes, it is more beneficial to supply the answer to a prompt even before the question is asked.
-The *input key* is used to specify what question is being answered in advance.
-For example, to start the project's `foo.bar.Main` class from the shell, use `$ ./wemi runMain main=foo.bar.Main`.
+This will typically ask the user interactively, but sometimes, it is more beneficial to supply the answer to a prompt
+even before the question is asked. The *input key* is used to specify what question is being answered in advance.
+For example, to start the project's `foo.bar.Main` class from the shell, use `$ ./wemi "runMain main=foo.bar.Main"`.
 (More on this syntax in the section **Query language**.)
 
 However, often it is known beforehand that the key will ask only a single question. For example, the default
 implementation of `runMain` key will only ever ask about `main` input key. So it is possible to omit the `main=`
-part of the query and use simply `runMain foo.bar.Main`.
+part of the query and use simply `"runMain foo.bar.Main"`.
 
-To specify the inputs from code, wrap your key invocation in `withInput(){}` call. For example:
+To specify the inputs from code, supply them as a parameters to `get()`. For example:
 ```kotlin
 {
     // With free input
-    withInput("foo.bar.Main") {
-        runMain.get()
-    }
+    runMain.get("" to "foo.bar.Main")
     
     // With named input
-    withInput("main" to "foo.bar.Main") {
-        runMain.get()
-    }
+    runMain.get("main" to "foo.bar.Main")
 }
 ```
 
@@ -345,43 +389,6 @@ When there is multiple stored inputs, first the named ones are tried, then the f
 If named input does not satisfy the validator, it is skipped and the user is notified.
 Free inputs added together are considered only after the one before them is consumed.
 Consumed *free* inputs are never considered again. However it is not advised to use more than one free input.
-
-For example:
-```kotlin
-
-withInput("main" to "foo.Main1") {
-    withInput("foo.Main2") {
-        // Both runMain queries won't ask for input and will always execute the class foo.Main1,
-        // because named input is used before the free "foo.Main2"
-        runMain.get()
-        runMain.get()
-    }
-}
-
-// Query: myRun foo.MainQ
-myRun set {
-    withInput("foo.Main2") {
-        withInput("foo.Main1") {
-            runMain.get() // Will execute foo.Main1
-            runMain.get() // Will execute foo.Main2
-            runMain.get() // Will execute foo.MainQ from the query
-        }
-    }
-}
-
-// Query: myRun foo.MainQ
-myRun set {
-    withInput("foo.Main2", "foo.Main3") {
-        withInput("foo.Main1") {
-            runMain.get() // Will execute foo.Main1
-            runMain.get() // Will execute foo.Main2
-            runMain.get() // Will execute foo.Main3
-            runMain.get() // Will execute foo.MainQ from the query
-        }
-    }
-}
-
-```
 
 ## Command line user interface
 WEMI features a simple interactive user interface in a form of Read-Evaluate-Print-Loop, which is launched by default.
@@ -409,7 +416,7 @@ can be seen throughout this document. A single query fits on a line, with follow
 <project>, <configuration>, <task>, <input-key> := Valid Java identifier
 <input-text> := Arbitrary text
 ```
-(See [TaskParser](src/main/kotlin/wemi/boot/TaskParser.kt) for more information about the grammar.)
+(See [TaskParser](../src/main/kotlin/wemi/boot/TaskParser.kt) for more information about the grammar.)
 
 Project, configuration and task items were explained in the section `Scope`.
 Named input and free input items allow to specify input text to use when the evaluated keys require input.
