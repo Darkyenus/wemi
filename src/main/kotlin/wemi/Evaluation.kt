@@ -12,8 +12,15 @@ internal val NO_BINDING_MODIFIERS = emptyArray<ValueModifier<*>>()
 internal val NO_CONFIGURATIONS = emptyArray<Configuration>()
 private val ALWAYS_EXPIRED:() -> Boolean = { true }
 
-/** @param value may be null when default key value is used. */
-internal class Binding<T>(val key:Key<T>, val value:Value<T>?, val modifiers:Array<ValueModifier<T>>) {
+/** Characterizes found binding of [value] and its [modifiers] for some [key]. */
+class Binding<T>(val key:Key<T>,
+                 /** May be null when default key value is used. */
+                 val value:Value<T>?,
+                 val modifiers:Array<ValueModifier<T>>,
+                 /** Scope in which [value] was found. Same nullability as [value]. */
+                 val valueOriginScope:Scope?,
+                 /** BindingHolder in which [value] was found. Same nullability as [value]. */
+                 val valueOriginHolder:BindingHolder?) {
 
     internal val dependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>()
 
@@ -125,7 +132,7 @@ class EvalScope @PublishedApi internal constructor(
         val listener = activeKeyEvaluationListener
         listener?.keyEvaluationStarted(this.scope, key)
 
-        val binding = scope.getKeyBinding(key)
+        val binding = scope.getKeyBinding(key, listener)
                 ?: // Use default binding
                 if (useOtherwise) {
                     listener?.keyEvaluationFailedByNoBinding(true, otherwise)
@@ -136,6 +143,7 @@ class EvalScope @PublishedApi internal constructor(
                 }
 
         val result:V = if (binding.isFresh(input)) {
+            listener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE)
             @Suppress("UNCHECKED_CAST")
             binding.lastEvaluatedTo as V
         } else {
@@ -176,6 +184,10 @@ class EvalScope @PublishedApi internal constructor(
                 result
             }
 
+            if (binding.lastEvaluationExpirationTriggers.isNotEmpty()) {
+                listener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_EXPIRATION_TRIGGERS)
+            }
+
             binding.lastEvaluated = globalTickTime
             binding.lastEvaluatedWithInput = input
             binding.lastEvaluatedTo = result
@@ -188,7 +200,7 @@ class EvalScope @PublishedApi internal constructor(
         }
 
         // Done
-        listener?.keyEvaluationSucceeded(key, scope, /*holderOfFoundValue*/null, result)// TODO(jp): /**/
+        listener?.keyEvaluationSucceeded(binding, result)
         return result
     }
 
@@ -294,22 +306,17 @@ interface WemiKeyEvaluationListener {
      *
      * @param feature short uncapitalized human readable description of the feature, for example "from cache"
      * @see FEATURE_READ_FROM_CACHE
-     * @see FEATURE_WRITTEN_TO_CACHE
+     * @see FEATURE_EXPIRATION_TRIGGERS
      */
     fun keyEvaluationFeature(feature:String) {}
 
     /**
      * Evaluation of key on top of key evaluation stack has been successful.
      *
-     * @param key that just finished executing, same as the one from [keyEvaluationStarted]
-     * @param bindingFoundInScope scope in which the binding of this key has been found, null if default value
-     * @param bindingFoundInHolder holder in [bindingFoundInScope] in which the key binding has been found, null if default value
+     * @param binding that was used to fulfill the key evaluation
      * @param result that has been used, may be null if caller considers null valid
      */
-    fun <V>keyEvaluationSucceeded(key: Key<V>,
-                                      bindingFoundInScope: Scope?,
-                                      bindingFoundInHolder: BindingHolder?,
-                                      result: V) {}
+    fun <V>keyEvaluationSucceeded(binding: Binding<V>, result: V) {}
 
     /**
      * Evaluation of key on top of key evaluation stack has failed, because the key has no binding, nor default value.
@@ -334,8 +341,8 @@ interface WemiKeyEvaluationListener {
     companion object {
         /** [keyEvaluationFeature] to signify that this value has been read from cache */
         const val FEATURE_READ_FROM_CACHE = "from cache"
-        /** [keyEvaluationFeature] to signify that this value has not been found in cache, but was stored there for later use */
-        const val FEATURE_WRITTEN_TO_CACHE = "to cache"
+        /** [keyEvaluationFeature] to signify that when this value has been cached, it specified explicit expiration triggers */
+        const val FEATURE_EXPIRATION_TRIGGERS = "has expiration triggers"
     }
 }
 
@@ -358,9 +365,9 @@ private class WemiKeyEvaluationListenerSplitter(
         second.keyEvaluationFeature(feature)
     }
 
-    override fun <V> keyEvaluationSucceeded(key: Key<V>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: V) {
-        first.keyEvaluationSucceeded(key, bindingFoundInScope, bindingFoundInHolder, result)
-        second.keyEvaluationSucceeded(key, bindingFoundInScope, bindingFoundInHolder, result)
+    override fun <V> keyEvaluationSucceeded(binding: Binding<V>, result: V) {
+        first.keyEvaluationSucceeded(binding, result)
+        second.keyEvaluationSucceeded(binding, result)
     }
 
     override fun keyEvaluationFailedByNoBinding(withAlternative: Boolean, alternativeResult: Any?) {

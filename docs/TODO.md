@@ -1,7 +1,5 @@
 # Things to do next
 
-- Fix todos in Evaluation (making trace work again)
-
 - Better API for file sets, make them invalidate correctly
 
 - Remove short in searchForCompatibleBinding, making the caching more efficient, maybe probably.

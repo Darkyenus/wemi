@@ -10,6 +10,7 @@ import org.jline.utils.AttributedStringBuilder
 import org.jline.utils.AttributedStyle
 import org.slf4j.LoggerFactory
 import wemi.*
+import wemi.Binding
 import wemi.util.*
 import wemi.util.CliStatusDisplay.Companion.withStatus
 import java.io.IOException
@@ -236,7 +237,7 @@ object CLI {
             MessageDisplay?.setMessage(messageBuilder.toAttributedString(), importantPrefix)
         }
 
-        override fun <V> keyEvaluationSucceeded(key: Key<V>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: V) {
+        override fun <V> keyEvaluationSucceeded(binding: Binding<V>, result: V) {
             pop()
         }
 
@@ -340,9 +341,7 @@ object CLI {
         return keyEvaluationResult
     }
 
-    /**
-     * Known CLI commands.
-     */
+    /** Known CLI commands. */
     internal val commands: Map<String, (Task) -> TaskEvaluationResult?> = HashMap<String, (Task) -> TaskEvaluationResult?>().apply {
         put("exit") {
             throw ExitWemi(false)
@@ -644,7 +643,7 @@ object CLI {
             return null
         }
 
-        val parsed = TaskParser.PartitionedLine(listOf(command), true, false)
+        val parsed = TaskParser.PartitionedLine(listOf(command), allowQuotes = true, machineReadable = false)
         val tasks = parsed.tasks
 
         val errors = parsed.formattedErrors(true)

@@ -375,8 +375,10 @@ class Scope internal constructor(
         }
     }
 
-    private fun <T> createElementaryKeyBinding(key:Key<T>):Binding<T>? {
+    private fun <T> createElementaryKeyBinding(key:Key<T>, listener:WemiKeyEvaluationListener?):Binding<T>? {
         val boundValue: Value<T>?
+        val boundValueOriginScope: Scope?
+        val boundValueOriginHolder: BindingHolder?
         val allModifiersReverse = ArrayList<ValueModifier<T>>()
 
         var scope: Scope = this
@@ -387,18 +389,23 @@ class Scope internal constructor(
             for (holder in scope.scopeBindingHolders) {
                 val holderModifiers = holder.modifierBindings[key] as ArrayList<ValueModifier<T>>?
                 if (holderModifiers != null && holderModifiers.isNotEmpty()) {
+                    listener?.keyEvaluationHasModifiers(scope, holder, holderModifiers.size)
                     allModifiersReverse.addAllReversed(holderModifiers)
                 }
 
                 val boundValueCandidate = holder.binding[key] as Value<T>?
                 if (boundValueCandidate != null) {
                     boundValue = boundValueCandidate
+                    boundValueOriginHolder = holder
+                    boundValueOriginScope = scope
                     break@searchForBoundValue
                 }
             }
 
             scope = scope.scopeParent ?: if (key.hasDefaultValue) {
                 boundValue = null
+                boundValueOriginHolder = null
+                boundValueOriginScope = null
                 break@searchForBoundValue
             } else {
                 return null
@@ -412,13 +419,13 @@ class Scope internal constructor(
                 } else Array(allModifiersReverse.size) {
                     allModifiersReverse[allModifiersReverse.size - it - 1]
                 }
-        return Binding(key, boundValue, modifiers)
+        return Binding(key, boundValue, modifiers, boundValueOriginScope, boundValueOriginHolder)
     }
 
     private fun <T> isKeyBindingUsableInThisScope(binding:Binding<T>) : Boolean {
         return binding.dependsOn.all { (prefixConfigurations, usedBinding) ->
             val scope = prefixConfigurations.fold(this@Scope) { s, c -> s.scopeFor(c) }
-            usedBinding == scope.getKeyBinding(usedBinding.key)
+            usedBinding == scope.getKeyBinding(usedBinding.key, null)
         }
     }
 
@@ -460,14 +467,14 @@ class Scope internal constructor(
         return searchForCompatibleBinding(parent, inScope, key, thisScopeMintBinding)
     }
 
-    internal fun <T> getKeyBinding(key:Key<T>):Binding<T>? {
+    internal fun <T> getKeyBinding(key:Key<T>, listener:WemiKeyEvaluationListener?):Binding<T>? {
         // Put into the cache after successful evaluation
         keyBindingCache[key]?.let {
             @Suppress("UNCHECKED_CAST")
             return it as Binding<T>
         }
 
-        val newKeyBinding = createElementaryKeyBinding(key) ?: return null
+        val newKeyBinding = createElementaryKeyBinding(key, listener) ?: return null
 
         // Check if any neighbor has any useful binding
         return searchForCompatibleBinding(this, this, key, newKeyBinding) ?: newKeyBinding

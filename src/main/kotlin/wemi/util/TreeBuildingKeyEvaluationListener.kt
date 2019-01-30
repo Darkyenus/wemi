@@ -1,9 +1,6 @@
 package wemi.util
 
-import wemi.BindingHolder
-import wemi.Key
-import wemi.Scope
-import wemi.WemiKeyEvaluationListener
+import wemi.*
 import wemi.boot.CLI
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -44,7 +41,6 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         stack.peekLast().value.features().add(feature)
         when (feature) {
             WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE -> cacheReads++
-            WemiKeyEvaluationListener.FEATURE_WRITTEN_TO_CACHE -> cacheWrites++
         }
     }
 
@@ -78,25 +74,25 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         return node
     }
 
-    override fun <V> keyEvaluationSucceeded(key: Key<V>, bindingFoundInScope: Scope?, bindingFoundInHolder: BindingHolder?, result: V) {
+    override fun <V> keyEvaluationSucceeded(binding: Binding<V>, result: V) {
         val node = popAndIndent()
         val keyData = node.value
         val h = keyData.heading
         h.append(CLI.ICON_SUCCESS).format(Color.White).append(" from ")
         when {
-            bindingFoundInScope == null && bindingFoundInHolder == null ->
+            binding.valueOriginScope == null && binding.valueOriginHolder == null ->
                 h.format(foreground = Color.Magenta).append("default value").format()
-            bindingFoundInScope != null && bindingFoundInHolder != null -> {
-                h.format().append(bindingFoundInScope)
-                if (bindingFoundInScope.scopeBindingHolders.last() !== bindingFoundInHolder) {
+            binding.valueOriginScope != null && binding.valueOriginHolder != null -> {
+                h.format().append(binding.valueOriginScope)
+                if (binding.valueOriginScope.scopeBindingHolders.last() !== binding.valueOriginHolder) {
                     // Specify which holder only if it isn't nominal
-                    h.format(Color.White).append(" in ").format(format = Format.Underline).append(bindingFoundInHolder).format()
+                    h.format(Color.White).append(" in ").format(format = Format.Underline).append(binding.valueOriginHolder).format()
                 }
                 evaluations++
             }
             else -> {
                 // This is unexpected...
-                h.format().append(bindingFoundInScope).append(" - ").append(bindingFoundInHolder)
+                h.format().append(binding.valueOriginScope).append(" - ").append(binding.valueOriginHolder)
             }
         }
 
@@ -122,7 +118,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
             val body = keyData.body()
             val originalLength = body.length
             body.append('\n') // Body convention
-            body.appendKeyResultLn(key, result)
+            body.appendKeyResultLn(binding.key, result)
             body.setLength(body.length - 1) // Strip newline appended by previous statement
 
             if (body.length == originalLength + 1) {
