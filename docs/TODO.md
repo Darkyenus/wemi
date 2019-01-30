@@ -1,7 +1,5 @@
 # Things to do next
 
-- Autocomplete does not have commands? (or not clean)
-
 - Fix todos in Evaluation (making trace work again)
 
 - Better API for file sets, make them invalidate correctly

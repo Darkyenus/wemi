@@ -112,6 +112,17 @@ internal object TaskCompleter : Completer {
             true
     )
 
+    private val commandCandidates: List<Candidate> = CLI.commands.keys.map { name ->
+        Candidate(name,
+                name,
+                null,
+                null,
+                null,
+                null,
+                true
+                )
+    }
+
     private fun TaskParser.ParsedTaskLine.retrieveInputKeyForInput(inputIndex:Int):String? {
         val separator = words.getOrNull(inputIndex - 1)
         val inputKey = words.getOrNull(inputIndex - 2)
@@ -222,6 +233,7 @@ internal object TaskCompleter : Completer {
                         candidates.addAll(projectCandidates)
                         candidates.addAll(configurationCandidates)
                         candidates.addAll(keyCandidates)
+                        candidates.addAll(commandCandidates)
                     } //else we don't know
                 }
                 Project,
@@ -250,6 +262,7 @@ internal object TaskCompleter : Completer {
                             candidates.addAll(projectCandidates)
                             candidates.addAll(configurationCandidates)
                             candidates.addAll(keyCandidates)
+                            candidates.addAll(commandCandidates)
                         }
                         TaskParser.CONFIGURATION_SEPARATOR -> {
                             // Configuration has been entered, time for new one, or perhaps a key?
@@ -298,6 +311,7 @@ internal object TaskCompleter : Completer {
                     }
                     if (!hasProject) {
                         candidates.addAll(projectCandidates)
+                        candidates.addAll(commandCandidates)
                     }
                     candidates.addAll(configurationCandidates)
                     candidates.addAll(keyCandidates)

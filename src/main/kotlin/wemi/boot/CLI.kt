@@ -343,7 +343,7 @@ object CLI {
     /**
      * Known CLI commands.
      */
-    private val commands: Map<String, (Task) -> TaskEvaluationResult?> = HashMap<String, (Task) -> TaskEvaluationResult?>().apply {
+    internal val commands: Map<String, (Task) -> TaskEvaluationResult?> = HashMap<String, (Task) -> TaskEvaluationResult?>().apply {
         put("exit") {
             throw ExitWemi(false)
         }
