@@ -180,7 +180,7 @@ inline var Path.lastModified: FileTime
         Files.setLastModifiedTime(this, value)
     }
 
-private val NO_LINK_OPTIONS = emptyArray<LinkOption>()
+internal val NO_LINK_OPTIONS = emptyArray<LinkOption>()
 private val NO_FOLLOW_LINKS_OPTIONS = arrayOf(LinkOption.NOFOLLOW_LINKS)
 
 /** Return last modified time of receiver file or -1 if it doesn't exist. Follows links. */

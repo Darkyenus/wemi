@@ -3,6 +3,12 @@
 ## For next release
 - Better API for file sets, make them invalidate correctly
 
+- Input parameter for "test", which will run only specified test
+
+- Filter out org.junit.jupiter.api.AssertionUtils.fail-like stack traces in tests
+
+- Rewrite directorySynchronized based on exclusive file creation and timestamp
+
 ## For later
 - Remove short in searchForCompatibleBinding, making the caching more efficient, maybe probably.
 

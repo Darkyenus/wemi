@@ -33,23 +33,23 @@ class TaskParserTests {
 
     @Test
     fun testTaskParsing() {
-        assertEqualsMulti("key", Task(null, emptyList(),"key", emptyList()))
-        assertEqualsMulti("project/key", Task("project", emptyList(),"key", emptyList()))
-        assertEqualsMulti("conf:key", Task(null, listOf("conf"),"key", emptyList()))
-        assertEqualsMulti("conf1:conf2:key", Task(null, listOf("conf1", "conf2"),"key", emptyList()))
-        assertEqualsMulti("project/conf1:conf2:key", Task("project", listOf("conf1", "conf2"),"key", emptyList()))
-        assertEqualsMulti("project /  conf1 :   conf2:key  ", Task("project", listOf("conf1", "conf2"),"key", emptyList()))
-        assertEqualsMulti("project/conf1:conf2:key", Task("project", listOf("conf1", "conf2"),"key", emptyList()))
-        assertEqualsMulti("key free", Task(null, emptyList(),"key", listOf(null to "free")))
-        assertEqualsMulti("key free free", Task(null, emptyList(),"key", listOf(null to "free", null to "free")))
-        assertEqualsMulti("key free1 free2", Task(null, emptyList(),"key", listOf(null to "free1", null to "free2")))
-        assertEqualsMulti("key k=f", Task(null, emptyList(),"key", listOf("k" to "f")))
-        assertEqualsMulti("key k  =  f   ", Task(null, emptyList(),"key", listOf("k" to "f")))
-        assertEqualsMulti("key k=f k=f", Task(null, emptyList(),"key", listOf("k" to "f", "k" to "f")))
-        assertEqualsMulti("key free k=f", Task(null, emptyList(),"key", listOf(null to "free", "k" to "f")))
-        assertEqualsMulti("key k=f free", Task(null, emptyList(),"key", listOf("k" to "f", null to "free")))
+        assertEqualsMulti("key", Task(null, emptyList(),"key", emptyArray()))
+        assertEqualsMulti("project/key", Task("project", emptyList(),"key", emptyArray()))
+        assertEqualsMulti("conf:key", Task(null, listOf("conf"),"key", emptyArray()))
+        assertEqualsMulti("conf1:conf2:key", Task(null, listOf("conf1", "conf2"),"key", emptyArray()))
+        assertEqualsMulti("project/conf1:conf2:key", Task("project", listOf("conf1", "conf2"),"key", emptyArray()))
+        assertEqualsMulti("project /  conf1 :   conf2:key  ", Task("project", listOf("conf1", "conf2"),"key", emptyArray()))
+        assertEqualsMulti("project/conf1:conf2:key", Task("project", listOf("conf1", "conf2"),"key", emptyArray()))
+        assertEqualsMulti("key free", Task(null, emptyList(),"key", arrayOf("" to "free")))
+        assertEqualsMulti("key free free", Task(null, emptyList(),"key", arrayOf("" to "free", "" to "free")))
+        assertEqualsMulti("key free1 free2", Task(null, emptyList(),"key", arrayOf("" to "free1", "" to "free2")))
+        assertEqualsMulti("key k=f", Task(null, emptyList(),"key", arrayOf("k" to "f")))
+        assertEqualsMulti("key k  =  f   ", Task(null, emptyList(),"key", arrayOf("k" to "f")))
+        assertEqualsMulti("key k=f k=f", Task(null, emptyList(),"key", arrayOf("k" to "f", "k" to "f")))
+        assertEqualsMulti("key free k=f", Task(null, emptyList(),"key", arrayOf("" to "free", "k" to "f")))
+        assertEqualsMulti("key k=f free", Task(null, emptyList(),"key", arrayOf("k" to "f", "" to "free")))
         assertEqualsMulti("project /  conf1 :   conf2:key   k=f free free2 kk=ff",
-                Task("project", listOf("conf1", "conf2"),"key", listOf("k" to "f", null to "free", null to "free2", "kk" to "ff")))
+                Task("project", listOf("conf1", "conf2"),"key", arrayOf("k" to "f", "" to "free", "" to "free2", "kk" to "ff")))
     }
 
 }
