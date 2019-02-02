@@ -14,7 +14,6 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
 
     private val roots = ArrayList<TreeNode<KeyData>>()
     private val stack = ArrayDeque<TreeNode<KeyData>>()
-    private var cacheWrites = 0
     private var cacheReads = 0
     private var evaluations = 0
 
@@ -179,7 +178,6 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         }
         sb.format(Color.White)
                 .append("(cache reads: ").append(cacheReads)
-                .append(", cache writes: ").append(cacheWrites)
                 .append(", key evaluations: ").append(evaluations).append(')')
                 .format()
     }
@@ -187,7 +185,6 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
     fun reset() {
         roots.clear()
         stack.clear()
-        cacheWrites = 0
         cacheReads = 0
         evaluations = 0
     }

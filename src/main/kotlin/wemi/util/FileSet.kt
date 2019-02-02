@@ -1,6 +1,7 @@
 package wemi.util
 
 import org.slf4j.LoggerFactory
+import wemi.boot.WemiRootFolder
 import java.io.IOException
 import java.lang.IllegalStateException
 import java.nio.file.*
@@ -43,6 +44,32 @@ class FileSet internal constructor(
         val caseSensitive:Boolean = true,
         val next: FileSet?) {
 
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.append('[')
+
+        var set = this
+        while (true) {
+            sb.append(root)
+            for (pattern in patterns) {
+                sb.append(' ').append(pattern)
+            }
+
+            if (!defaultExcludes) {
+                sb.append(" (without default excludes)")
+            }
+            if (!caseSensitive) {
+                sb.append(" (case insensitive)")
+            }
+
+            set = set.next ?: break
+            sb.append(", ")
+        }
+
+        sb.append(']')
+        return sb.toString()
+    }
+
     /**
      * [pattern] syntax closely follows [ant pattern syntax](https://ant.apache.org/manual/dirtasks.html#patterns)
      * which is in turn based on shell glob syntax.
@@ -68,7 +95,67 @@ class FileSet internal constructor(
     class Pattern internal constructor(val include:Boolean, pattern:String) {
         /** Sanitized pattern string */
         val pattern:SanitizedPattern = sanitizePattern(pattern)
+
+        override fun toString(): String {
+            if (include) {
+                return "include($pattern)"
+            } else {
+                return "exclude($pattern)"
+            }
+        }
     }
+}
+
+val FILE_SET_PRETTY_PRINTER : (FileSet?) -> CharSequence = printer@{
+    var set = it ?: return@printer format("empty file set", Color.White)
+    val sb = StringBuilder()
+    var i = 1
+    while (true) {
+        val lineStart = sb.length
+        sb.format(Color.Black, format = Format.Bold)
+        if (set.root.startsWith(WemiRootFolder)) {
+            sb.append(WemiRootFolder.relativize(set.root))
+        } else {
+            sb.append(set.root)
+        }
+        sb.format()
+        if (!set.caseSensitive) {
+            sb.append(Color.White).append(" (case insensitive)").format()
+        }
+        val splitter = sb.length
+        sb.append('\n') // This might get removed later to make the line more compact
+
+        if (set.patterns.isNotEmpty() || !set.defaultExcludes) {
+            sb.format(Color.White).append(' ')
+
+            for (pattern in set.patterns) {
+                if (pattern.include) {
+                    sb.append(" include(")
+                } else {
+                    sb.append(" exclude(")
+                }
+                sb.format().append(pattern.pattern).format(Color.White).append(")")
+            }
+            if (!set.defaultExcludes) {
+                sb.append(" (without default excludes)")
+            }
+            sb.format()
+        }
+        sb.append('\n')
+
+        if (sb.length - lineStart <= 120) {
+            // Remove line separator between root and patterns
+            sb.setCharAt(splitter, ' ')
+        }
+
+        ownMatchingFiles(set) { path ->
+            sb.format(Color.White).append(i++).append(": ").format().appendPrettyValue(path).append('\n')
+        }
+
+        set = set.next ?: break
+    }
+
+    sb
 }
 
 /** Strip problematic sequences which are NO-OPs, but matcher could choke on them. */

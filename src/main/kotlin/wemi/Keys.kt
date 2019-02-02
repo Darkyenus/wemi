@@ -15,6 +15,7 @@ import wemi.publish.InfoNode
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.prettyPrint
+import wemi.util.FILE_SET_PRETTY_PRINTER
 import wemi.util.FileSet
 import wemi.util.LocatedPath
 import wemi.util.Partial
@@ -45,8 +46,8 @@ object Keys {
      * use language configuration, for example [wemi.Configurations.compilingJava].
      * Under [wemi.Configurations.testing] contains test sources as well (in addition to normal sources).
      */
-    val sources by key<FileSet?>("Source files of the project (compiled, part of internal classpath)", defaultValue = null)
-    val resources by key<FileSet?>("Resource files of the project (not compiled, part of internal classpath)", defaultValue = null)
+    val sources by key<FileSet?>("Source files of the project (compiled, part of internal classpath)", defaultValue = null, prettyPrinter = FILE_SET_PRETTY_PRINTER)
+    val resources by key<FileSet?>("Resource files of the project (not compiled, part of internal classpath)", defaultValue = null, prettyPrinter = FILE_SET_PRETTY_PRINTER)
     @Deprecated("Use sources instead")
     val sourceRoots by key<Set<Path>>("Directories which are source roots for the project (example: '/src/main/java')", defaultValue = emptySet())
     @Deprecated("Use sources instead")

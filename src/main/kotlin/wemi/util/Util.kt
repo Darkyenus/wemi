@@ -157,7 +157,7 @@ fun StringBuilder.appendPadded(number:Int, width:Int, padding:Char):StringBuilde
 //endregion
 
 //region Pretty printing
-private fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
+internal fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
     if (value is WithDescriptiveString) {
         val valueText = value.toDescriptiveAnsiString()
         if (valueText.contains(ANSI_ESCAPE)) {
@@ -454,14 +454,14 @@ fun StringBuilder.format(foreground: Color? = null, background: Color? = null, f
  * Color for ANSI formatting
  */
 enum class Color(internal val offset: Int) {
-    Black(0),
+    Black(0), // Significant
     Red(1), // Error
     Green(2), // Label
     Yellow(3), // Suggestion
     Blue(4), // Value
     Magenta(5), // (Cache)
     Cyan(6), // Time
-    White(7)
+    White(7) // Not significant
 }
 
 /**
