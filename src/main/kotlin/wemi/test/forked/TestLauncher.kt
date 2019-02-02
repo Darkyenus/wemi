@@ -152,8 +152,8 @@ private class ReportBuildingListener(val filterStackTraces: Boolean) : TestExecu
             var filtered = originalStackTrace.dropLastWhile {
                 it.className != className
             }
-            // Filter Assumptions extras (it throws from deep inside and it is not relevant)
-            filtered = filtered.dropWhile { it.className == "org.junit.jupiter.api.Assumptions" }
+            // Filter Assertions/Assumptions extras (it throws from deep inside and it is not relevant)
+            filtered = filtered.dropWhile { it.className.startsWith("org.junit.jupiter.api.Ass") }
 
 
             if (filtered.isEmpty()) {
