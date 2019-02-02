@@ -72,7 +72,7 @@ internal class KotlinCompilerImpl1_2_71 : KotlinCompiler {
         }
     }
 
-    override fun compileJVM(sources: Collection<LocatedPath>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
+    override fun compileJVM(sources: Collection<Path>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
         val messageCollector = createLoggingMessageCollector(logger, loggerMarker)
         val args = K2JVMCompilerArguments()
 
@@ -192,7 +192,7 @@ internal class KotlinCompilerImpl1_2_71 : KotlinCompiler {
                         buildHistoryFile = buildHistoryFile,
                         modulesApiHistory = EmptyModulesApiHistory
                 )
-                compiler.compile(sources.map { it.file.toFile() }, args, messageCollector, providedChangedFiles = null)
+                compiler.compile(sources.map { it.toFile() }, args, messageCollector, providedChangedFiles = null)
             }
 
             if (exitCode == ExitCode.OK) {
@@ -201,7 +201,7 @@ internal class KotlinCompilerImpl1_2_71 : KotlinCompiler {
             }
         } else {
             args.destination = destination.absolutePath
-            args.freeArgs = sources.map { it.file.absolutePath }
+            args.freeArgs = sources.map { it.absolutePath }
             exitCode = K2JVMCompiler().exec(messageCollector, Services.EMPTY, args)
         }
 

@@ -12,7 +12,10 @@ import wemi.dependency.LocalM2Repository
 import wemi.dependency.createRepositoryChain
 import wemi.publish.artifacts
 import wemi.run.javaExecutable
+import wemi.util.FileSet
 import wemi.util.div
+import wemi.util.fileSet
+import wemi.util.plus
 import javax.tools.ToolProvider
 
 /**
@@ -42,9 +45,6 @@ object Archetypes {
         Keys.buildDirectory set Static(WemiBuildFolder)
         Keys.cacheDirectory set Static(WemiCacheFolder)
 
-        Keys.resourceFiles set KeyDefaults.ResourceFiles
-        Keys.sourceFiles set KeyDefaults.SourceFiles
-
         Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
         Keys.internalClasspath set KeyDefaults.InternalClasspath
@@ -68,13 +68,18 @@ object Archetypes {
      * Implements basic key implementations for JVM that don't usually change.
      */
     val JVMBase by archetype(::Base) {
-        Keys.resourceRoots set { setOf(Keys.projectRoot.get() / "src/main/resources") }
+        Keys.resources set { (Keys.projectRoot.get() / "src/main/resources").fileSet() }
         extend (Configurations.testing) {
-            Keys.resourceRoots add { Keys.projectRoot.get() / "src/test/resources" }
+            Keys.resources modify { it + (Keys.projectRoot.get() / "src/test/resources").fileSet() }
         }
 
-        Keys.sourceRoots setToUnionOfSelfIn { Keys.compilingConfigurations.get() }
-        Keys.sourceFiles setToConcatenationOfSelfIn { Keys.compilingConfigurations.get() }
+        Keys.sources set {
+            var result: FileSet? = null
+            for (configuration in Keys.compilingConfigurations.get()) {
+                result += using(configuration) { Keys.sources.get() }
+            }
+            result
+        }
 
         Keys.repositories set { DefaultRepositories }
 
@@ -123,8 +128,6 @@ object Archetypes {
      */
     val BlankJVMProject by archetype(::JVMBase) {
         Keys.internalClasspath set Static(emptyList())
-
-        Keys.resourceRoots set Static(emptySet())
     }
 
     /**

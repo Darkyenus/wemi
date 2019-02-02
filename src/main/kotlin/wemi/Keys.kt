@@ -15,6 +15,7 @@ import wemi.publish.InfoNode
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.prettyPrint
+import wemi.util.FileSet
 import wemi.util.LocatedPath
 import wemi.util.Partial
 import java.net.URI
@@ -39,21 +40,26 @@ object Keys {
     val buildDirectory by key<Path>("Directory with Wemi build scripts, directories with logs, cache, etc.")
     val cacheDirectory by key<Path>("Directory in which Wemi stores cache and processed data")
 
-    val sourceRoots by key<Set<Path>>("Directories which are source roots for the project (example: '/src/main/java')", defaultValue = emptySet())
-    val sourceExtensions by key<Set<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)", defaultValue = emptySet())
     /**
-     * By default returns all source files. To retrieve only those files that belong to one particular language,
+     * By default contains all source files. To retrieve only those files that belong to one particular language,
      * use language configuration, for example [wemi.Configurations.compilingJava].
      * Under [wemi.Configurations.testing] contains test sources as well (in addition to normal sources).
      */
+    val sources by key<FileSet?>("Source files of the project (compiled, part of internal classpath)", defaultValue = null)
+    val resources by key<FileSet?>("Resource files of the project (not compiled, part of internal classpath)", defaultValue = null)
+    @Deprecated("Use sources instead")
+    val sourceRoots by key<Set<Path>>("Directories which are source roots for the project (example: '/src/main/java')", defaultValue = emptySet())
+    @Deprecated("Use sources instead")
+    val sourceExtensions by key<Set<String>>("Files with these extensions in sourceRoots are considered to be sources (Stored without .)", defaultValue = emptySet())
+    @Deprecated("Use sources instead")
     val sourceFiles by key<List<LocatedPath>>("Files to be compiled. Usually derived from sourceRoots and sourceExtensions. Maps source root -> source files", defaultValue = emptyList())
+    @Deprecated("Use sources instead")
     val resourceRoots by key<Set<Path>>("Directories which are resource roots for the project (example: '/src/main/resources')", defaultValue = emptySet())
+    @Deprecated("Use sources instead")
     val resourceFiles by key<List<LocatedPath>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files", defaultValue = emptyList())
 
-    /**
-     * Used to generalize keys like [sourceFiles] or [sourceExtensions] to union of distinct subsets.
-     * Is typically not used to implement the compilation itself, as it usually needs specialized inter-operation of languages.
-     */
+    /** Used to generalize keys like [sources] to union of distinct subsets.
+     * Is typically not used to implement the compilation itself, as it usually needs specialized inter-operation of languages. */
     val compilingConfigurations by key<Set<Configuration>>("Configurations that are used when compiling the sources, such as `compilingJava`.", defaultValue = emptySet())
 
     val repositories by key<Set<Repository>>("Repositories to be used when resolving dependencies", defaultValue = emptySet())

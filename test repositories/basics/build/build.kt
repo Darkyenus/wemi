@@ -70,12 +70,14 @@ val basics by project {
             options.outputFormat = wemi.documentation.DokkaOptions.FORMAT_HTML
 
             val root = projectRoot.get()
-            for (sourceRoot in sourceRoots.get()) {
+            var sourceRootFileSet = sources.get()
+            while (sourceRootFileSet != null) {
                 options.sourceLinks.add(SourceLinkMapItem(
-                        sourceRoot,
-                        "https://github.com/Darkyenus/WEMI/tree/master/test%20repositories/basics/${root.relativize(sourceRoot).toString()}",
+                        sourceRootFileSet!!.root,
+                        "https://github.com/Darkyenus/WEMI/tree/master/test%20repositories/basics/${root.relativize(sourceRootFileSet!!.root).toString()}",
                         "#L"
                 ))
+                sourceRootFileSet = sourceRootFileSet?.next
             }
 
             options
@@ -92,9 +94,6 @@ val basics by project {
     foxColor set { "Red" }
 
     queryingExample set {
-        val testingSourceRoots = using (testing) { sourceRoots.get() }
-        val normalSourceRoots = sourceRoots.get()
-
         StringBuilder()
     } // Fresh string builder at the root
 }

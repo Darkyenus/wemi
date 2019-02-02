@@ -1,7 +1,11 @@
 # Things to do next
 
 ## For next release
-- Better API for file sets, make them invalidate correctly
+- Fix Hotswap plugin, it will fail now that compilation is cached
+
+- Pretty-printing for FileSet
+
+- IntelliJ plugin may still use old sourceFile things
 
 - Input parameter for "test", which will run only specified test
 

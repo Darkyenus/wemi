@@ -22,7 +22,7 @@ interface KotlinCompiler {
      * @param classpath for user class files
      * @param flags custom arguments, parsed by kotlin compiler
      */
-    fun compileJVM(sources: Collection<LocatedPath>,
+    fun compileJVM(sources: Collection<Path>,
                    classpath: Collection<Path>,
                    destination: Path,
                    cacheFolder: Path?,
@@ -117,10 +117,10 @@ enum class KotlinCompilerVersion (
     override fun toString(): String = string
 }
 
-/**
- * Valid Kotlin source file extensions.
- */
+/** Valid Kotlin source file extensions */
 val KotlinSourceFileExtensions = setOf("kt", "kts")
+/** Includes needed to match Kotlin files */
+val KotlinSourceFileIncludes = arrayOf(include("**.kt"), include("**.kts"))
 
 /**
  * General Kotlin compiler flags.

@@ -31,6 +31,7 @@ import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
 import wemi.util.*
 import java.io.BufferedReader
+import java.io.File
 import java.net.URI
 import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
@@ -47,29 +48,6 @@ import kotlin.collections.LinkedHashSet
  * This includes implementations of most tasks.
  */
 object KeyDefaults {
-
-    val SourceFiles: Value<List<LocatedPath>> = {
-        val roots = Keys.sourceRoots.get()
-        val extensions = Keys.sourceExtensions.get()
-        val result = WMutableList<LocatedPath>()
-
-        for (root in roots) {
-            constructLocatedFiles(root, result) { it.name.pathHasExtension(extensions) }
-        }
-
-        result
-    }
-
-    val ResourceFiles: Value<List<LocatedPath>> = {
-        val roots = Keys.resourceRoots.get()
-        val result = WMutableList<LocatedPath>()
-
-        for (root in roots) {
-            constructLocatedFiles(root, result)
-        }
-
-        result
-    }
 
     /** Create value for [Keys.libraryDependencyProjectMapper] that appends given classifier to sources. */
     fun classifierAppendingLibraryDependencyProjectMapper(appendClassifier:String):(Dependency) -> Dependency = {
@@ -176,7 +154,7 @@ object KeyDefaults {
 
     val InternalClasspath: Value<List<LocatedPath>> = {
         val compiled = Keys.compile.get()
-        val resources = Keys.resourceFiles.get()
+        val resources = Keys.resources.getLocatedPaths()
 
         val classpath = WMutableList<LocatedPath>(resources.size + 128)
         constructLocatedFiles(compiled, classpath)
@@ -261,7 +239,7 @@ object KeyDefaults {
             val output = Keys.outputClassesDirectory.get()
             output.ensureEmptyDirectory()
 
-            val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
+            val javaSources = using(compilingJava) { Keys.sources.getPaths() }
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
 
@@ -301,7 +279,7 @@ object KeyDefaults {
                 compilerOptions.add("-h")
                 compilerOptions.add(headersOut.absolutePath)
 
-                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.file.toFile() })
+                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.toFile() })
 
                 val success = compiler.getTask(
                         writer,
@@ -337,8 +315,8 @@ object KeyDefaults {
             val output = Keys.outputClassesDirectory.get()
             output.ensureEmptyDirectory()
 
-            val javaSources = using(compilingJava) { Keys.sourceFiles.get() }
-            val kotlinSources = using(compilingKotlin) { Keys.sourceFiles.get() }
+            val javaSources = using(compilingJava) { Keys.sources.getPaths() }
+            val kotlinSources = using(compilingKotlin) { Keys.sources.getPaths() }
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
 
@@ -399,7 +377,7 @@ object KeyDefaults {
                 compilerOptions.add("-h")
                 compilerOptions.add(headersOut.absolutePath)
 
-                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.file.toFile() })
+                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.toFile() })
 
                 val success = compiler.getTask(
                         writer,
@@ -570,7 +548,7 @@ object KeyDefaults {
         using(archiving) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
-                for (file in Keys.sourceFiles.get()) {
+                for (file in Keys.sources.getLocatedPaths()) {
                     assemblyOperation.addSource(file, true)
                 }
 
@@ -711,7 +689,7 @@ object KeyDefaults {
     private val ARCHIVE_JAVADOC_LOG = LoggerFactory.getLogger("ArchiveJavadoc")
     val ArchiveJavadoc: Value<Path> = {
         using(archiving) {
-            val sourceFiles = using(compilingJava){ Keys.sourceFiles.get() }
+            val sourceFiles = using(compilingJava){ Keys.sources.getLocatedPaths() }
 
             if (sourceFiles.isEmpty()) {
                 ARCHIVE_JAVADOC_LOG.info("No source files for Javadoc, creating dummy documentation instead")
@@ -724,7 +702,9 @@ object KeyDefaults {
 
             val documentationTool = ToolProvider.getSystemDocumentationTool()!!
             val fileManager = documentationTool.getStandardFileManager(diagnosticListener, Locale.ROOT, Charsets.UTF_8)
-            fileManager.setLocation(StandardLocation.SOURCE_PATH, using(Configurations.compilingJava) { Keys.sourceRoots.get() }.map { it.toFile() })
+            val sourceRoots = HashSet<File>()
+            sourceFiles.mapNotNullTo(sourceRoots) { it.root?.toFile() }
+            fileManager.setLocation(StandardLocation.SOURCE_PATH, sourceRoots)
             val javadocOutput = Keys.cacheDirectory.get() / "javadoc-${Keys.projectName.get().toSafeFileName('_')}"
             javadocOutput.ensureEmptyDirectory()
             fileManager.setLocation(DocumentationTool.Location.DOCUMENTATION_OUTPUT, listOf(javadocOutput.toFile()))
@@ -783,10 +763,8 @@ object KeyDefaults {
 
         val options = DokkaOptions()
 
-        for (sourceRoot in Keys.sourceRoots.get()) {
-            if (sourceRoot.exists()) {
-                options.sourceRoots.add(DokkaOptions.SourceRoot(sourceRoot))
-            }
+        for (sourceRoot in Keys.sources.getLocatedPaths()) {
+            options.sourceRoots.add(DokkaOptions.SourceRoot(sourceRoot.root ?: continue))
         }
 
         options.moduleName = kotlinOptions[KotlinCompilerFlags.moduleName] ?: Keys.projectName.get()

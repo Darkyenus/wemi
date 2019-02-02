@@ -67,7 +67,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
 
     val resultJar = cacheFolder / "build.jar"
     val buildScriptInfoFile = cacheFolder / "build-info.json"
-    val buildScriptInfo = BuildScriptInfo(resultJar, buildScriptSources.map { LocatedPath(it) }, WemiRuntimeClasspath)
+    val buildScriptInfo = BuildScriptInfo(resultJar, buildScriptSources, WemiRuntimeClasspath)
 
     var recompileReason = ""
 
@@ -176,7 +176,7 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
                 }
                 dependencies
             }
-            Keys.sourceFiles set Static(buildScriptInfo.sources)
+            Keys.sources set Static(buildScriptInfo.sources.fold<Path, FileSet?>(null) { set, source -> set + source.fileSet() })
             Keys.externalClasspath set LazyStatic {
                 val result = ArrayList<LocatedPath>(buildScriptInfo.unmanagedDependencies.size + buildScriptInfo.managedDependencies.size)
                 for (dependency in buildScriptInfo.unmanagedDependencies) {
@@ -208,7 +208,7 @@ class BuildScriptInfo internal constructor(
         /** jar to which the build script has been compiled */
         val scriptJar: Path,
         /** source files, from which the build script is compiled */
-        val sources: List<LocatedPath>,
+        val sources: List<Path>,
         /** Jars with wemi, kotlin runtime, etc. */
         private val runtimeClasspath: List<Path>) : JsonReadable, JsonWritable {
 
@@ -281,7 +281,7 @@ class BuildScriptInfo internal constructor(
 
         for (sourceFile in sources) {
             val success = try {
-                Files.newBufferedReader(sourceFile.file, Charsets.UTF_8).use {
+                Files.newBufferedReader(sourceFile, Charsets.UTF_8).use {
                     parseFileDirectives(it, SupportedDirectives, ::consumeDirective)
                 }
             } catch (e:Exception) {
@@ -388,7 +388,7 @@ internal fun loadBuildScript(buildScriptInfo:BuildScriptInfo):Int {
     var errors = 0
 
     // Main classes of the build script, that should be initialized to load the build script.
-    val initClasses = buildScriptInfo.sources.map { Magic.transformFileNameToKotlinClassName(it.file.name.pathWithoutExtension()) }
+    val initClasses = buildScriptInfo.sources.map { Magic.transformFileNameToKotlinClassName(it.name.pathWithoutExtension()) }
 
     for (initClass in initClasses) {
         try {

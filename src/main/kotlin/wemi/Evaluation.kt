@@ -1,6 +1,6 @@
 package wemi
 
-import wemi.util.lastModifiedMillis
+import wemi.util.*
 import java.io.Closeable
 import java.nio.file.Path
 
@@ -239,6 +239,55 @@ class EvalScope @PublishedApi internal constructor(
      * Equivalent to [expiresWhen]`{ true }`. */
     fun expiresNow() {
         expirationTriggers.add(ALWAYS_EXPIRED)
+    }
+
+    private inline fun <T> ArrayList<T>.longHashCode(hashCode:(T)->Long):Long {
+        var result = 1L
+        for (i in indices) {
+            val path = this[i]
+            result = result * 31 + hashCode(path)
+        }
+        return result
+    }
+
+    /** Obtain the contents of the [FileSet] and expire the result if it changes.
+     * @see get for value retrieval
+     * @see expiresWhen for expiration mechanism
+     * @see FileSet.matchingFiles for path list retrieval */
+    fun Key<FileSet?>.getPaths():List<Path> {
+        val fileSet = this.get() ?: return emptyList()
+        val result = ArrayList<Path>(128)
+        fileSet.matchingFiles(result)
+        result.sortWith(PATH_COMPARATOR_WITH_TOTAL_ORDERING)
+        val originalHash = result.longHashCode(Path::lastModifiedMillis)
+        expiresWhen {
+            val newPaths = ArrayList<Path>(result.size + 32)
+            fileSet.matchingFiles(newPaths)
+            newPaths.sortWith(PATH_COMPARATOR_WITH_TOTAL_ORDERING)
+            val newHash = newPaths.longHashCode(Path::lastModifiedMillis)
+            originalHash != newHash
+        }
+        return result
+    }
+
+    /** Obtain the contents of the [FileSet] and expire the result if it changes.
+     * @see get for value retrieval
+     * @see expiresWhen for expiration mechanism
+     * @see FileSet.matchingFiles for path list retrieval */
+    fun Key<FileSet?>.getLocatedPaths():List<LocatedPath> {
+        val fileSet = this.get() ?: return emptyList()
+        val result = ArrayList<LocatedPath>(128)
+        fileSet.matchingLocatedFiles(result)
+        result.sortWith(LOCATED_PATH_COMPARATOR_WITH_TOTAL_ORDERING)
+        val originalHash = result.longHashCode { it.file.lastModifiedMillis() }
+        expiresWhen {
+            val newPaths = ArrayList<LocatedPath>(result.size + 32)
+            fileSet.matchingLocatedFiles(newPaths)
+            newPaths.sortWith(LOCATED_PATH_COMPARATOR_WITH_TOTAL_ORDERING)
+            val newHash = newPaths.longHashCode { it.file.lastModifiedMillis() }
+            originalHash != newHash
+        }
+        return result
     }
 }
 

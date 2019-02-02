@@ -13,10 +13,7 @@ import wemi.dependency.Dependency
 import wemi.dependency.Repository.M2.Companion.JavadocClassifier
 import wemi.dependency.Repository.M2.Companion.SourcesClassifier
 import wemi.test.JUnitPlatformLauncher
-import wemi.util.div
-import wemi.util.name
-import wemi.util.pathExtension
-import wemi.util.pathWithoutExtension
+import wemi.util.*
 
 /** All default configurations */
 object Configurations {
@@ -24,8 +21,6 @@ object Configurations {
     //region Stage configurations
     /** @see Keys.compile */
     val compiling by configuration("Configuration used when compiling") {
-        Keys.sourceFiles set KeyDefaults.SourceFiles
-
         Keys.externalClasspath modify { classpath ->
             // Internal classpath of aggregate projects is not included in standard external classpath.
             // But it is needed for the compilation, so we add it explicitly.
@@ -56,12 +51,10 @@ object Configurations {
 
     //region Compiling
     val compilingJava by configuration("Configuration layer used when compiling Java sources", compiling) {
-        Keys.sourceRoots set { setOf(Keys.projectRoot.get() / "src/main/java") }
+        Keys.sources set { (Keys.projectRoot.get() / "src/main/java").fileSet(*JavaSourceFileIncludes) }
         extend (Configurations.testing) {
-            Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/java" }
+            Keys.sources modify { it + (Keys.projectRoot.get() / "src/test/java").fileSet(*JavaSourceFileIncludes) }
         }
-
-        Keys.sourceExtensions set Static(JavaSourceFileExtensions)
 
         Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
         Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
@@ -69,15 +62,17 @@ object Configurations {
     }
 
     val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
-        Keys.sourceRoots set {
+        Keys.sources set {
             val root = Keys.projectRoot.get()
-            setOf(root / "src/main/java", root / "src/main/kotlin")
+            (root / "src/main/java").fileSet(*KotlinSourceFileIncludes) +
+                    (root / "src/main/kotlin").fileSet(*KotlinSourceFileIncludes)
         }
         extend (Configurations.testing) {
-            Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/java" }
-            Keys.sourceRoots add { Keys.projectRoot.get() / "src/test/kotlin" }
+            Keys.sources modify {
+                it + (Keys.projectRoot.get() / "src/test/java").fileSet(*KotlinSourceFileIncludes) +
+                        (Keys.projectRoot.get() / "src/test/kotlin").fileSet(*KotlinSourceFileIncludes)
+            }
         }
-        Keys.sourceExtensions set Static(KotlinSourceFileExtensions)
 
         Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance() }
         Keys.compilerOptions modify {

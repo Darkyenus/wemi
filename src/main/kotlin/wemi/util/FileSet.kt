@@ -115,7 +115,7 @@ operator fun FileSet?.plus(fileSet:FileSet?):FileSet? {
     while (true) {
         me = FileSet(other.root, *other.patterns,
                 defaultExcludes = other.defaultExcludes, caseSensitive = other.caseSensitive, next = me)
-        other = fileSet.next ?: break
+        other = other.next ?: break
     }
     return me
 }
@@ -126,6 +126,41 @@ fun FileSet?.matchingFiles():List<Path> {
     val result = ArrayList<Path>()
     set.matchingFiles(result)
     return result
+}
+
+/** Find all files which are matched by the receiver. */
+fun FileSet?.matchingLocatedFiles():List<LocatedPath> {
+    val set = this ?: return emptyList()
+    val result = ArrayList<LocatedPath>()
+    set.matchingLocatedFiles(result)
+    return result
+}
+
+/** Find all files which are matched by the receiver and place them into the [into] collection. */
+fun FileSet.matchingFiles(into:MutableCollection<Path>) {
+    var fileSet = this
+    while (true) {
+        ownMatchingFiles(fileSet) {
+            into.add(it)
+        }
+        fileSet = fileSet.next ?: break
+    }
+}
+
+/** Find all files which are matched by the receiver and place them into the [into] collection.
+ * [LocatedPath.root] is set to corresponding [FileSet.root] (unless single file is matched). */
+fun FileSet.matchingLocatedFiles(into:MutableCollection<LocatedPath>) {
+    var fileSet = this
+    while (true) {
+        ownMatchingFiles(fileSet) {
+            if (fileSet.root === it) {
+                into.add(LocatedPath(it))
+            } else {
+                into.add(LocatedPath(fileSet.root, it))
+            }
+        }
+        fileSet = fileSet.next ?: break
+    }
 }
 
 /** Does the matching itself. */
@@ -328,7 +363,7 @@ internal fun matches(patterns: Array<out FileSet.Pattern>, defaultExcludes:Boole
 }
 
 /** Like [matchingFiles], but ignoring [FileSet.next]. */
-private fun ownMatchingFiles(fileSet:FileSet, into:MutableCollection<Path>) {
+private inline fun ownMatchingFiles(fileSet:FileSet, crossinline collect:(Path) -> Unit) {
     val rootAttributes = try {
         Files.readAttributes<BasicFileAttributes>(fileSet.root, BasicFileAttributes::class.java, *NO_LINK_OPTIONS)
     } catch (e: IOException) {
@@ -338,7 +373,7 @@ private fun ownMatchingFiles(fileSet:FileSet, into:MutableCollection<Path>) {
     if (!rootAttributes.isDirectory) {
         // Special logic for non-directories
         if (matches(fileSet.patterns, false, fileSet.caseSensitive, fileSet.root.name)) {
-            into.add(fileSet.root)
+            collect(fileSet.root)
         }
         return
     }
@@ -377,7 +412,7 @@ private fun ownMatchingFiles(fileSet:FileSet, into:MutableCollection<Path>) {
             val originalLength = pathBuilder.length
             pathBuilder.append(file.name)
             if (matches(fileSet.patterns, fileSet.defaultExcludes, fileSet.caseSensitive, pathBuilder)) {
-                into.add(file)
+                collect(file)
             }
             pathBuilder.setLength(originalLength)
             return FileVisitResult.CONTINUE
@@ -388,13 +423,4 @@ private fun ownMatchingFiles(fileSet:FileSet, into:MutableCollection<Path>) {
             return FileVisitResult.CONTINUE
         }
     })
-}
-
-/** Find all files which are matched by the receiver and place them into the [into] collection. */
-fun FileSet.matchingFiles(into:MutableCollection<Path>) {
-    var fileSet = this
-    while (true) {
-        ownMatchingFiles(fileSet, into)
-        fileSet = fileSet.next ?: break
-    }
 }

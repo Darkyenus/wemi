@@ -422,6 +422,26 @@ fun Path.ensureEmptyDirectory() {
     }
 }
 
+/** [Path]s are comparable, but only if they belong to the same provider.
+ * This comparator declares total ordering, even for different providers.
+ * This ordering is not stable between program runs. */
+val PATH_COMPARATOR_WITH_TOTAL_ORDERING = object : Comparator<Path> {
+    override fun compare(o1: Path, o2: Path): Int {
+        try {
+            return o1.compareTo(o2)
+        } catch (e:ClassCastException) {
+            return System.identityHashCode(o1.fileSystem).compareTo(System.identityHashCode(o2.fileSystem))
+        }
+    }
+}
+
+/** Like [PATH_COMPARATOR_WITH_TOTAL_ORDERING], but for [LocatedPath] */
+val LOCATED_PATH_COMPARATOR_WITH_TOTAL_ORDERING = object : Comparator<LocatedPath> {
+    override fun compare(o1: LocatedPath, o2: LocatedPath): Int {
+        return PATH_COMPARATOR_WITH_TOTAL_ORDERING.compare(o1.file, o2.file)
+    }
+}
+
 private val FILE_SYNCHRONIZED_OPEN_OPTIONS = setOf<OpenOption>(
         StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
 private val LOCKED_PATHS = WeakHashMap<Path, Semaphore>()

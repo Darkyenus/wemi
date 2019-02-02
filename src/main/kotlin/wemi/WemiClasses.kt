@@ -788,46 +788,6 @@ sealed class BindingHolder : WithDescriptiveString {
     //endregion
 
     /**
-     * Bind this key to values that itself holds, under given configurations.
-     */
-    internal infix fun <V> Key<Set<V>>.setToUnionOfSelfIn(configurations: EvalScope.()->Iterable<Configuration>) {
-        this set {
-            val configurationsIt = configurations().iterator()
-            if (!configurationsIt.hasNext()) {
-                emptySet()
-            } else {
-                var result = using(configurationsIt.next()) { this@setToUnionOfSelfIn.get() }
-                while (configurationsIt.hasNext()) {
-                    val mutableResult = result.toMutable()
-                    mutableResult.addAll(using(configurationsIt.next()) { this@setToUnionOfSelfIn.get() })
-                    result = mutableResult
-                }
-                result
-            }
-        }
-    }
-
-    /**
-     * Bind this key to values that itself holds, under given configurations.
-     */
-    internal infix fun <V> Key<List<V>>.setToConcatenationOfSelfIn(configurations: EvalScope.()->Iterable<Configuration>) {
-        this set {
-            val configurationsIt = configurations().iterator()
-            if (!configurationsIt.hasNext()) {
-                emptyList()
-            } else {
-                var result = using(configurationsIt.next()) { this@setToConcatenationOfSelfIn.get() }
-                while (configurationsIt.hasNext()) {
-                    val mutableResult = result.toMutable()
-                    mutableResult.addAll(using(configurationsIt.next()) { this@setToConcatenationOfSelfIn.get() })
-                    result = mutableResult
-                }
-                result
-            }
-        }
-    }
-
-    /**
      * One line string, using only White foreground for non-important stuff and Bold for important stuff.
      */
     abstract override fun toDescriptiveAnsiString(): String

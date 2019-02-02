@@ -32,7 +32,7 @@ internal class KotlinCompilerImpl1_1_61 : KotlinCompiler {
         }
     }
 
-    override fun compileJVM(sources: Collection<LocatedPath>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
+    override fun compileJVM(sources: Collection<Path>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
         val messageCollector = createLoggingMessageCollector(logger, loggerMarker)
         val compiler = K2JVMCompiler()
         val args = compiler.createArguments()
@@ -78,12 +78,11 @@ internal class KotlinCompilerImpl1_1_61 : KotlinCompiler {
         // Setup args
         val sourceSet = HashSet<String>()
         for (source in sources) {
-            val file = source.file
             when {
-                file.isDirectory() || file.name.pathHasExtension(KotlinSourceFileExtensions) -> {
-                    sourceSet.add(file.absolutePath)
+                source.isDirectory() || source.name.pathHasExtension(KotlinSourceFileExtensions) -> {
+                    sourceSet.add(source.absolutePath)
                 }
-                file.name.pathHasExtension(JavaSourceFileExtensions) -> {
+                source.name.pathHasExtension(JavaSourceFileExtensions) -> {
                     val root = source.root
                     if (root != null) {
                         sourceSet.add(root.absolutePath)// Add folder
@@ -92,7 +91,7 @@ internal class KotlinCompilerImpl1_1_61 : KotlinCompiler {
                     }
                 }
                 else -> {
-                    LOG.warn("Unrecognized source file, ignoring: {}", file)
+                    LOG.warn("Unrecognized source file, ignoring: {}", source)
                 }
             }
         }

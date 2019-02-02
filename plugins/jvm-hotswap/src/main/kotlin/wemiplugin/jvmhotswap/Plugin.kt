@@ -2,6 +2,7 @@ package wemiplugin.jvmhotswap
 
 import org.slf4j.LoggerFactory
 import wemi.*
+import wemi.KeyDefaults.inProjectDependencies
 import wemi.collections.toMutable
 import wemi.util.*
 import java.io.DataOutputStream
@@ -43,6 +44,14 @@ object JvmHotswap {
         val RunHotswap:Value<Int> = {
             using(Configurations.running, hotswapping) {
                 val javaExecutable = Keys.javaExecutable.get()
+                val sources = Keys.sources.get().let {
+                    var result = it
+                    inProjectDependencies(null) {
+                        result += Keys.sources.get()
+                    }
+                    result
+                }
+
                 val classpathEntries = LinkedHashSet<Path>()
                 for (locatedFile in Keys.externalClasspath.get()) {
                     classpathEntries.add(locatedFile.classpathEntry)
@@ -71,7 +80,7 @@ object JvmHotswap {
                 }.use { server ->
                     // Create initial snapshot of sources
                     val sourceIncluded: (LocatedPath) -> Boolean = { !it.file.isHidden() }
-                    var sourceSnapshot = snapshotFiles(hotswapSources(), sourceIncluded)
+                    var sourceSnapshot = snapshotFiles(sources.matchingLocatedFiles(), sourceIncluded)
                     // Create initial snapshot of internal classpath
                     val classpathIncluded: (LocatedPath) -> Boolean = { it.file.name.pathHasExtension("class") }
                     var classpathSnapshot = snapshotFiles(initialInternalClasspath, classpathIncluded)
@@ -90,7 +99,7 @@ object JvmHotswap {
 
                     while (!process.waitFor(2, TimeUnit.SECONDS)) {
                         // Process is still running, check filesystem for changes
-                        val newSourceSnapshot = snapshotFiles(hotswapSources(), sourceIncluded)
+                        val newSourceSnapshot = snapshotFiles(sources.matchingLocatedFiles(), sourceIncluded)
                         if (snapshotsAreEqual(newSourceSnapshot, sourceSnapshot)) {
                             // No changes
                             continue
@@ -138,16 +147,5 @@ object JvmHotswap {
                 }
             }
         }
-
-        private fun Scope.hotswapSources():List<LocatedPath> {
-            val files = Keys.sourceFiles.get().toMutable()
-
-            inProjectDependencies(null) {
-                files.addAll(Keys.sourceFiles.get())
-            }
-
-            return files
-        }
-
     }
 }

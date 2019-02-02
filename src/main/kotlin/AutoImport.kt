@@ -126,16 +126,10 @@ val projectRoot
 val buildDirectory
     inline get() = wemi.Keys.buildDirectory
 
-val sourceRoots
-    inline get() = wemi.Keys.sourceRoots
-val sourceExtensions
-    inline get() = wemi.Keys.sourceExtensions
-val sourceFiles
-    inline get() = wemi.Keys.sourceFiles
-val resourceRoots
-    inline get() = wemi.Keys.resourceRoots
-val resourceFiles
-    inline get() = wemi.Keys.resourceFiles
+val sources
+    inline get() = wemi.Keys.sources
+val resources
+    inline get() = wemi.Keys.resources
 
 val compilingConfigurations
     inline get() = wemi.Keys.compilingConfigurations
