@@ -23,31 +23,6 @@ import java.util.*
 private val LOG = LoggerFactory.getLogger("BuildScript")
 
 /**
- * Build file is a file with `.kt` extension, in [buildFolder].
- */
-internal fun findBuildScriptSources(buildFolder: Path): List<Path> {
-    var result: ArrayList<Path>? = null
-
-    if (buildFolder.isDirectory()) {
-        Files.newDirectoryStream(buildFolder).use { stream ->
-            for (path in stream) {
-                if (!path.isDirectory() && !path.isHidden() && !path.name.startsWith('.')
-                        && path.name.pathHasExtension("kt")) {
-                    var r = result
-                    if (r == null) {
-                        r = ArrayList()
-                        result = r
-                    }
-                    r.add(path)
-                }
-            }
-        }
-    }
-
-    return result ?: emptyList()
-}
-
-/**
  * Retrieve the compiled build script.
  *
  * Tries to use existing files before compiling.
