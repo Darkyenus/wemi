@@ -95,7 +95,7 @@ class EvalScope @PublishedApi internal constructor(
         @PublishedApi internal val configurationPrefix:Array<Configuration>,
         @PublishedApi internal val usedBindings: ArrayList<Pair<Array<Configuration>, Binding<*>>>,
         @PublishedApi internal val expirationTriggers: ArrayList<() -> Boolean>,
-        @PublishedApi internal val input:Array<out Pair<String, String>>) : Closeable {
+        val input:Array<out Pair<String, String>>) : Closeable {
 
     /** Used by the input subsystem. See Input.kt. */
     internal var nextFreeInput = 0

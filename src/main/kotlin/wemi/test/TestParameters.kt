@@ -10,9 +10,7 @@ import wemi.util.*
 @Json(TestParameters.Serializer::class)
 class TestParameters {
 
-    /**
-     * The configuration parameters to be used.
-     */
+    /** The configuration parameters to be used. */
     val configuration: MutableMap<String, String> = HashMap()
 
     /**
@@ -28,59 +26,33 @@ class TestParameters {
 
     val filter = Filters()
 
+    override fun toString(): String {
+        return "TestParameters(configuration=$configuration, select=$select, filter=$filter)"
+    }
+
     class Selectors internal constructor() {
-        /**
-         * A list of URIs that are to be used for test discovery.
-         */
-        val uris = mutableListOf<String>()
+        /** A list of fully classified packages that are to be used for test discovery */
+        val packages:MutableList<String> = ArrayList()
+        /** A list of fully classified classes that are to be used for test discovery */
+        val classes:MutableList<String> = ArrayList()
+        /** A list of fully classified method names that are to be used for test discovery */
+        val methods:MutableList<String> = ArrayList()
+        /** A list of classpath resources that are to be used for test discovery */
+        val resources:MutableList<String> = ArrayList()
 
-        /**
-         * A list of files that are to be used for test discovery.
-         */
-        val files = mutableListOf<String>()
-
-        /**
-         * A list of directories that are to be used for test discovery.
-         */
-        val directories = mutableListOf<String>()
-
-        /**
-         * A list of packages that are to be used for test discovery.
-         */
-        val packages = mutableListOf<String>()
-
-        /**
-         * A list of classes that are to be used for test discovery.
-         */
-        val classes = mutableListOf<String>()
-
-        /**
-         * A list of methods that are to be used for test discovery.
-         */
-        val methods = mutableListOf<String>()
-
-        /**
-         * A list of classpath resources that are to be used for test discovery.
-         */
-        val resources = mutableListOf<String>()
-
-        /**
-         * A list of classpath roots that are to be used for test discovery.
-         */
-        val classpathRoots = mutableListOf<String>()
+        /** A list of classpath roots that are to be used for test discovery.
+         * Managed by Wemi. */
+        internal val classpathRoots:MutableList<String> = ArrayList()
 
         fun isEmpty(): Boolean {
-            return uris.isEmpty()
-                    && files.isEmpty()
-                    && directories.isEmpty()
-                    && packages.isEmpty()
+            return packages.isEmpty()
                     && classes.isEmpty()
                     && methods.isEmpty()
                     && resources.isEmpty()
         }
 
         override fun toString(): String {
-            return "(uris=$uris, files=$files, directories=$directories, packages=$packages, classes=$classes, methods=$methods, resources=$resources, classpathRoots=$classpathRoots)"
+            return "(packages=$packages, classes=$classes, methods=$methods, resources=$resources, classpathRoots=$classpathRoots)"
         }
     }
 
@@ -91,33 +63,18 @@ class TestParameters {
      * the matched item will be included/excluded from the test plan.
      */
     class Filters internal constructor() {
-        /**
-         * Engine IDs to be included/excluded when building the test plan.
-         */
-        val engines = IncludeExcludeList()
 
-        /**
-         * List of regular expression patterns to be matched against fully classified class names,
-         * to determine which classes should be included/excluded in the test plan.
-         *
-         * When [IncludeExcludeList.included] is empty,
-         * [org.junit.platform.engine.discovery.ClassNameFilter.STANDARD_INCLUDE_PATTERN] is used as default.
-         */
-        val classNamePatterns = IncludeExcludeList()
-
-        /**
-         * A list of packages to be included/excluded when building the test plan.
-         * Applies to sub-packages as well.
-         */
-        val packages = IncludeExcludeList()
-
-        /**
-         * A list of tags to be included/excluded when building the test plan.
-         */
-        val tags = IncludeExcludeList()
+        /** A list of regular expressions to be matched against fully classified class names,
+         * to determine which classes should be included/excluded in the test plan. */
+        val classNamePatterns:IncludeExcludeList = IncludeExcludeList()
+        /** A list of fully qualified packages to be included/excluded when building the test plan.
+         * Applies to sub-packages as well. */
+        val packages:IncludeExcludeList = IncludeExcludeList()
+        /** A list of tags to be included/excluded when building the test plan. */
+        val tags:IncludeExcludeList = IncludeExcludeList()
 
         override fun toString(): String {
-            return "(engines=$engines, classNamePatterns=$classNamePatterns, packages=$packages, tags=$tags)"
+            return "(classNamePatterns=$classNamePatterns, packages=$packages, tags=$tags)"
         }
     }
 
@@ -131,9 +88,6 @@ class TestParameters {
 
                 // Selector
                 name("selector").writeObject {
-                    fieldCollection("uris", value.select.uris)
-                    fieldCollection("files", value.select.files)
-                    fieldCollection("directories", value.select.directories)
                     fieldCollection("packages", value.select.packages)
                     fieldCollection("classes", value.select.classes)
                     fieldCollection("methods", value.select.methods)
@@ -143,7 +97,6 @@ class TestParameters {
 
                 // Filter
                 name("filter").writeObject {
-                    field("engines", value.filter.engines)
                     field("classNamePatterns", value.filter.classNamePatterns)
                     field("packages", value.filter.packages)
                     field("tags", value.filter.tags)
@@ -161,9 +114,6 @@ class TestParameters {
 
             // Selector
             value.get("selector")?.let { selectorValue ->
-                selectorValue.fieldToCollection("uris", result.select.uris)
-                selectorValue.fieldToCollection("files", result.select.files)
-                selectorValue.fieldToCollection("directories", result.select.directories)
                 selectorValue.fieldToCollection("packages", result.select.packages)
                 selectorValue.fieldToCollection("classes", result.select.classes)
                 selectorValue.fieldToCollection("methods", result.select.methods)
@@ -173,7 +123,6 @@ class TestParameters {
 
             // Filter
             value.get("filter")?.let { filterValue ->
-                filterValue.fieldTo("engines", result.filter.engines)
                 filterValue.fieldTo("classNamePatterns", result.filter.classNamePatterns)
                 filterValue.fieldTo("packages", result.filter.packages)
                 filterValue.fieldTo("tags", result.filter.tags)
@@ -183,55 +132,41 @@ class TestParameters {
         }
     }
 
-    override fun toString(): String {
-        return "TestParameters(configuration=$configuration, select=$select, filter=$filter)"
-    }
-
-    @Suppress("unused")
     /**
      * Mutable collection coupling included and excluded names/patterns.
      */
+    @Suppress("unused")
     class IncludeExcludeList : JsonReadable, JsonWritable {
         /**
-         * Names/patterns that are included.
+         * Names/patterns that are included. OR semantics.
          */
         val included: MutableList<String> = ArrayList()
         /**
-         * Names/patterns that are excluded.
+         * Names/patterns that are excluded. OR semantics.
          */
         val excluded: MutableList<String> = ArrayList()
 
-        /**
-         * Add [item] to included items.
-         */
+        /** Add [item] to included items */
         fun include(item: String) {
             included.add(item)
         }
 
-        /**
-         * Add [items] to included items.
-         */
+        /** Add [items] to included items */
         fun include(vararg items: String) {
             included.addAll(items)
         }
 
-        /**
-         * Add [item] to excluded items.
-         */
+        /** Add [item] to excluded items */
         fun exclude(item: String) {
             excluded.add(item)
         }
 
-        /**
-         * Add [items] to excluded items.
-         */
+        /** Add [items] to excluded items */
         fun exclude(vararg items: String) {
             excluded.addAll(items)
         }
 
-        /**
-         * @return true if both [included] and [excluded] are empty
-         */
+        /** @return true if both [included] and [excluded] are empty */
         fun isEmpty(): Boolean = included.isEmpty() && excluded.isEmpty()
 
         override fun toString(): String {

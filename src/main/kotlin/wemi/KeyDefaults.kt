@@ -462,8 +462,12 @@ object KeyDefaults {
 
     val TestParameters: Value<TestParameters> = {
         val testParameters = wemi.test.TestParameters()
-        testParameters.filter.classNamePatterns.include("^.*Tests?$")
         testParameters.select.classpathRoots.add(Keys.outputClassesDirectory.get().absolutePath)
+
+        read("class", "Include classes, whose fully classified name match this regex", StringValidator, true)?.let {  classPattern ->
+            testParameters.filter.classNamePatterns.include(classPattern)
+        }
+
         testParameters
     }
 
@@ -485,7 +489,7 @@ object KeyDefaults {
                     javaExecutable, directory, classpathEntries,
                     TEST_LAUNCHER_MAIN_CLASS, options, emptyList())
 
-            val testParameters = Keys.testParameters.get()
+            val testParameters = Keys.testParameters.get(*input) // Input passthrough
 
             val report = handleProcessForTesting(processBuilder, testParameters)
                     ?: throw WemiException("Test execution failed, see logs for more information", showStacktrace = false)

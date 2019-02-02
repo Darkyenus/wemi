@@ -5,11 +5,9 @@
 
 - IntelliJ plugin may still use old sourceFile things
 
-- Input parameter for "test", which will run only specified test
-
+## For later
 - Rewrite directorySynchronized based on exclusive file creation and timestamp
 
-## For later
 - Remove short in searchForCompatibleBinding, making the caching more efficient, maybe probably.
 
 - WEMI IS COMPILED MULTIPLE TIMES!!! cache compile!

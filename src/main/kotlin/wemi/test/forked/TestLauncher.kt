@@ -1,11 +1,8 @@
 package wemi.test.forked
 
 import com.darkyen.tproll.util.StringBuilderWriter
-import org.junit.platform.engine.DiscoverySelector
-import org.junit.platform.engine.Filter
-import org.junit.platform.engine.TestExecutionResult
+import org.junit.platform.engine.*
 import org.junit.platform.engine.TestExecutionResult.Status.*
-import org.junit.platform.engine.TestSource
 import org.junit.platform.engine.discovery.ClassNameFilter.excludeClassNamePatterns
 import org.junit.platform.engine.discovery.ClassNameFilter.includeClassNamePatterns
 import org.junit.platform.engine.discovery.DiscoverySelectors.*
@@ -14,13 +11,10 @@ import org.junit.platform.engine.discovery.PackageNameFilter.includePackageNames
 import org.junit.platform.engine.reporting.ReportEntry
 import org.junit.platform.engine.support.descriptor.ClassSource
 import org.junit.platform.engine.support.descriptor.MethodSource
-import org.junit.platform.launcher.EngineFilter.excludeEngines
-import org.junit.platform.launcher.EngineFilter.includeEngines
+import org.junit.platform.launcher.*
 import org.junit.platform.launcher.TagFilter.excludeTags
 import org.junit.platform.launcher.TagFilter.includeTags
-import org.junit.platform.launcher.TestExecutionListener
 import org.junit.platform.launcher.TestIdentifier
-import org.junit.platform.launcher.TestPlan
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder
 import org.junit.platform.launcher.core.LauncherFactory
 import wemi.test.*
@@ -32,6 +26,7 @@ import java.io.OutputStreamWriter
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.ZoneId
+import java.util.*
 
 /**
  * Launched by test task in a forked process.
@@ -58,9 +53,6 @@ fun main(args: Array<String>) {
 
         val discoveryRequest = LauncherDiscoveryRequestBuilder().apply {
             val selectors = mutableListOf<DiscoverySelector>()
-            selectors.addMapped(testParameters.select.uris, ::selectUri)
-            selectors.addMapped(testParameters.select.files, ::selectFile)
-            selectors.addMapped(testParameters.select.directories, ::selectDirectory)
             selectors.addMapped(testParameters.select.packages, ::selectPackage)
             selectors.addMapped(testParameters.select.classes, ::selectClass)
             selectors.addMapped(testParameters.select.methods, ::selectMethod)
@@ -73,8 +65,6 @@ fun main(args: Array<String>) {
             selectors(selectors)
 
             val filters = mutableListOf<Filter<*>>()
-            testParameters.filter.engines.included.ifNotEmpty { filters.add(includeEngines(it)) }
-            testParameters.filter.engines.excluded.ifNotEmpty { filters.add(excludeEngines(it)) }
             testParameters.filter.classNamePatterns.included.ifNotEmpty { filters.add(includeClassNamePatterns(*it.toTypedArray())) }
             testParameters.filter.classNamePatterns.excluded.ifNotEmpty { filters.add(excludeClassNamePatterns(*it.toTypedArray())) }
             testParameters.filter.packages.included.ifNotEmpty { filters.add(includePackageNames(it)) }

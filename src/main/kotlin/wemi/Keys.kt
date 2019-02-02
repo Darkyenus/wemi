@@ -94,7 +94,7 @@ object Keys {
     val run by key<Int>("Compile and run the project, return exit code")
     val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code", inputKeys = arrayOf("main" to "Main class to run"))
 
-    val testParameters by key<TestParameters>("Parameters for the test key. By default discovers all tests in the test sources.")
+    val testParameters by key<TestParameters>("Parameters for the test key. By default discovers all tests in the test sources.", inputKeys = arrayOf("class" to "Include classes, whose fully classified name match this regex"))
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it.prettyPrint() })
 
     val archiveOutputFile by key<Path>("File to which archive should be saved to")

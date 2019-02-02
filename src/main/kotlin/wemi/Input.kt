@@ -27,9 +27,10 @@ fun EvalScope.read(key: String, description: String): String? = read(key, descri
  * @param key simple, non-user-readable key (case insensitive, converted to lowercase)
  * @param description displayed to the user, if asked interactively
  * @param validator to use for validation and conversion of found string
+ * @param doNotAsk if value is not already specified, do not ask the user and return null
  * @return found value or null if validator fails on all possible values
  */
-fun <V> EvalScope.read(key: String, description: String, validator: Validator<V>): V? {
+fun <V> EvalScope.read(key: String, description: String, validator: Validator<V>, doNotAsk:Boolean = false): V? {
     val input = this.input
 
     // Search in prepared by key
@@ -63,6 +64,10 @@ fun <V> EvalScope.read(key: String, description: String, validator: Validator<V>
         }, {
             LOG.info("Can't use free '{}' for input key '{}': {}", freeInput, key, it)
         })
+    }
+
+    if (doNotAsk) {
+        return null
     }
 
     // Still no hit, read interactively
