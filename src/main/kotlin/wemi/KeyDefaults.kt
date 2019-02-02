@@ -315,8 +315,8 @@ object KeyDefaults {
             val output = Keys.outputClassesDirectory.get()
             output.ensureEmptyDirectory()
 
-            val javaSources = using(compilingJava) { Keys.sources.getPaths() }
-            val kotlinSources = using(compilingKotlin) { Keys.sources.getPaths() }
+            val javaSources = using(compilingJava) { Keys.sources.getLocatedPaths() }
+            val kotlinSources = using(compilingKotlin) { Keys.sources.getLocatedPaths() }
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
 
@@ -377,7 +377,7 @@ object KeyDefaults {
                 compilerOptions.add("-h")
                 compilerOptions.add(headersOut.absolutePath)
 
-                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.toFile() })
+                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.file.toFile() })
 
                 val success = compiler.getTask(
                         writer,

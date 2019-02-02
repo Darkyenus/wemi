@@ -18,6 +18,7 @@ import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.internal.MessageLocation
 import wemi.compile.internal.render
+import wemi.util.LocatedPath
 import wemi.util.absolutePath
 import wemi.util.copyRecursively
 import java.io.File
@@ -69,7 +70,7 @@ internal class KotlinCompilerImpl1_2_41 : KotlinCompiler {
         }
     }
 
-    override fun compileJVM(sources: Collection<Path>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
+    override fun compileJVM(sources: Collection<LocatedPath>, classpath: Collection<Path>, destination: Path, cacheFolder: Path?, flags: CompilerFlags, logger: Logger, loggerMarker: Marker?): KotlinCompiler.CompileExitStatus {
         val messageCollector = createLoggingMessageCollector(logger, loggerMarker)
         val compiler = K2JVMCompiler()
         val args = compiler.createArguments()
@@ -181,7 +182,7 @@ internal class KotlinCompilerImpl1_2_41 : KotlinCompiler {
                         // https://github.com/JetBrains/kotlin/commit/30d0cc3a34fdfc15debcd5c9eb4b009d7c1df624
                         localStateDirs = emptyList()
                 )
-                compilerRunner.compile(sources.map { it.toFile() }, args, messageCollector, providedChangedFiles = null)
+                compilerRunner.compile(sources.map { it.file.toFile() }, args, messageCollector, providedChangedFiles = null)
             }
 
             if (exitCode == ExitCode.OK) {
@@ -190,7 +191,7 @@ internal class KotlinCompilerImpl1_2_41 : KotlinCompiler {
             }
         } else {
             args.destination = destination.absolutePath
-            args.freeArgs = sources.map { it.absolutePath }
+            args.freeArgs = sources.map { it.file.absolutePath }
             exitCode = compiler.exec(messageCollector, Services.EMPTY, args)
         }
 

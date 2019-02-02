@@ -22,7 +22,7 @@ interface KotlinCompiler {
      * @param classpath for user class files
      * @param flags custom arguments, parsed by kotlin compiler
      */
-    fun compileJVM(sources: Collection<Path>,
+    fun compileJVM(sources: Collection<LocatedPath>,
                    classpath: Collection<Path>,
                    destination: Path,
                    cacheFolder: Path?,

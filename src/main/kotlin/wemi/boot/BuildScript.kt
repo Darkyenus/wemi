@@ -52,7 +52,7 @@ internal fun findBuildScriptSources(buildFolder: Path): List<Path> {
  *
  * Tries to use existing files before compiling.
  */
-internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScriptInfo? {
+internal fun getBuildScript(cacheFolder: Path, buildScriptSourceSet:FileSet, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScriptInfo? {
     if (cacheFolder.exists() && !cacheFolder.isDirectory()) {
         LOG.error("Build directory {} exists and is not a directory", cacheFolder)
         return null
@@ -67,7 +67,7 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSources: List<Path>, f
 
     val resultJar = cacheFolder / "build.jar"
     val buildScriptInfoFile = cacheFolder / "build-info.json"
-    val buildScriptInfo = BuildScriptInfo(resultJar, buildScriptSources, WemiRuntimeClasspath)
+    val buildScriptInfo = BuildScriptInfo(resultJar, buildScriptSourceSet, buildScriptSources, WemiRuntimeClasspath)
 
     var recompileReason = ""
 
@@ -176,7 +176,7 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
                 }
                 dependencies
             }
-            Keys.sources set Static(buildScriptInfo.sources.fold<Path, FileSet?>(null) { set, source -> set + source.fileSet() })
+            Keys.sources set Static(buildScriptInfo.sourceSet)
             Keys.externalClasspath set LazyStatic {
                 val result = ArrayList<LocatedPath>(buildScriptInfo.unmanagedDependencies.size + buildScriptInfo.managedDependencies.size)
                 for (dependency in buildScriptInfo.unmanagedDependencies) {
@@ -207,6 +207,8 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
 class BuildScriptInfo internal constructor(
         /** jar to which the build script has been compiled */
         val scriptJar: Path,
+        /** Source set from which [sources] were generated */
+        val sourceSet:FileSet,
         /** source files, from which the build script is compiled */
         val sources: List<Path>,
         /** Jars with wemi, kotlin runtime, etc. */
@@ -347,7 +349,7 @@ internal fun compileBuildScript(buildScriptInfo:BuildScriptInfo) {
     val externalClasspath = buildScriptInfo.unmanagedDependencies + buildScriptInfo.managedDependencies
     LOG.debug("Compiling sources: {} classpath: {} resultJar: {}", sources, externalClasspath, resultJar)
 
-    val status = WemiKotlinVersion.compilerInstance().compileJVM(sources, externalClasspath, resultJar,
+    val status = WemiKotlinVersion.compilerInstance().compileJVM(sources.map { LocatedPath(it) }, externalClasspath, resultJar,
             null, BuildScriptInfo.compilerOptions, LoggerFactory.getLogger("BuildScriptCompilation"), null)
     if (status != KotlinCompiler.CompileExitStatus.OK) {
         LOG.warn("Compilation failed for {}: {}", sources, status)

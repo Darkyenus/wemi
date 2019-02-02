@@ -1,8 +1,6 @@
 # Things to do next
 
 ## For next release
-- basics/ outright doesn't work, something with java sources, probably
-
 - Fix Hotswap plugin, it will fail now that compilation is cached
 
 - IntelliJ plugin may still use old sourceFile things

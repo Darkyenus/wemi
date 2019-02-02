@@ -27,4 +27,9 @@ class GreeterTests {
     fun stupidTest() {
         assertEquals(true, true)
     }
+
+    @Test
+    fun failingTest() {
+        assertEquals("cat", "dog")
+    }
 }

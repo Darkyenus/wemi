@@ -13,10 +13,7 @@ import wemi.*
 import wemi.boot.Main.*
 import wemi.dependency.DefaultExclusions
 import wemi.dependency.DependencyExclusion
-import wemi.util.Color
-import wemi.util.directorySynchronized
-import wemi.util.div
-import wemi.util.format
+import wemi.util.*
 import java.io.*
 import java.nio.file.Path
 import java.time.Duration
@@ -294,10 +291,12 @@ private fun TaskParser.PartitionedLine.machineReadableCheckErrors() {
 private fun prepareBuildScriptInfo(allowBrokenBuildScripts:Boolean, askUser:Boolean, cleanBuild:Boolean):BuildScriptInfo? {
     var finalBuildScriptInfo:BuildScriptInfo? = null
 
+    val buildScriptSourceSet = WemiBuildFolder.fileSet(include("*.kt"))
+
     do {
         var keepTrying = false
 
-        val buildScriptSources = findBuildScriptSources(WemiBuildFolder)
+        val buildScriptSources = buildScriptSourceSet.matchingFiles()
         if (buildScriptSources.isEmpty()) {
             if (allowBrokenBuildScripts) {
                 LOG.warn("No build script sources found in {}", WemiBuildFolder)
@@ -314,7 +313,7 @@ private fun prepareBuildScriptInfo(allowBrokenBuildScripts:Boolean, askUser:Bool
         finalBuildScriptInfo = directorySynchronized(WemiBuildFolder, {
             LOG.info("Waiting for lock on {}", WemiBuildFolder)
         }) {
-            val buildScriptInfo = getBuildScript(WemiCacheFolder, buildScriptSources, cleanBuild)
+            val buildScriptInfo = getBuildScript(WemiCacheFolder, buildScriptSourceSet, buildScriptSources, cleanBuild)
 
             if (buildScriptInfo == null) {
                 if (allowBrokenBuildScripts) {
