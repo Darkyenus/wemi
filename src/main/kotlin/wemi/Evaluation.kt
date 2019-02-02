@@ -32,21 +32,35 @@ class Binding<T>(val key:Key<T>,
     internal var lastEvaluatedTo:T? = null
     internal var lastEvaluationExpirationTriggers = ArrayList<() -> Boolean>()
 
-    internal fun isFresh(forInput:Array<out Pair<String, String>>):Boolean {
+    internal enum class Freshness(val fresh:Boolean, val listenerMessage:String) {
+        Fresh(true, "from cache"),
+        FreshThisTick(true, "from cache (already evaluated)"),
+        DifferentInput(false, "re-evaluated (different input)"),
+        FirstEvaluation(false, "first evaluation"),
+        ExplicitlyExpired(false, "re-evaluated (explicit expiry)"),
+        ChildNotFresh(false, "re-evaluated (child expired)")
+    }
+
+    internal fun isFresh(forInput:Array<out Pair<String, String>>):Freshness {
         if (lastEvaluated == -1) {
-            return false
+            return Freshness.FirstEvaluation
         }
         if (!lastEvaluatedWithInput.contentEquals(forInput)) {
-            return false
+            return Freshness.DifferentInput
         }
         if (lastEvaluated == globalTickTime) {
-            return true
+            return Freshness.FreshThisTick
         }
         @Suppress("UNCHECKED_CAST")
         if (lastEvaluationExpirationTriggers.any { it() }) {
-            return false
+            return Freshness.ExplicitlyExpired
         }
-        return dependsOn.all { it.second.isFresh(it.second.lastEvaluatedWithInput) }
+        for ((_, binding) in dependsOn) {
+            if (!binding.isFresh(binding.lastEvaluatedWithInput).fresh) {
+                return Freshness.ChildNotFresh
+            }
+        }
+        return Freshness.Fresh
     }
 
     override fun equals(other: Any?): Boolean {
@@ -141,9 +155,12 @@ class EvalScope @PublishedApi internal constructor(
                     listener?.keyEvaluationFailedByNoBinding(false, null)
                     throw WemiException.KeyNotAssignedException(key, this@EvalScope.scope)
                 }
+        // Record that we used this key to fill current binding information
+        usedBindings.add(configurationPrefix to binding)
 
-        val result:V = if (binding.isFresh(input)) {
-            listener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE)
+        val bindingFresh = binding.isFresh(input)
+        listener?.keyEvaluationFeature(bindingFresh.listenerMessage)
+        val result:V = if (bindingFresh.fresh) {
             @Suppress("UNCHECKED_CAST")
             binding.lastEvaluatedTo as V
         } else {
@@ -354,7 +371,6 @@ interface WemiKeyEvaluationListener {
      * such as retrieval from cache.
      *
      * @param feature short uncapitalized human readable description of the feature, for example "from cache"
-     * @see FEATURE_READ_FROM_CACHE
      * @see FEATURE_EXPIRATION_TRIGGERS
      */
     fun keyEvaluationFeature(feature:String) {}
@@ -388,8 +404,6 @@ interface WemiKeyEvaluationListener {
     fun keyEvaluationFailedByError(exception:Throwable, fromKey:Boolean) {}
 
     companion object {
-        /** [keyEvaluationFeature] to signify that this value has been read from cache */
-        const val FEATURE_READ_FROM_CACHE = "from cache"
         /** [keyEvaluationFeature] to signify that when this value has been cached, it specified explicit expiration triggers */
         const val FEATURE_EXPIRATION_TRIGGERS = "has expiration triggers"
     }

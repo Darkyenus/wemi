@@ -14,7 +14,6 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
 
     private val roots = ArrayList<TreeNode<KeyData>>()
     private val stack = ArrayDeque<TreeNode<KeyData>>()
-    private var cacheReads = 0
     private var evaluations = 0
 
     override fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {
@@ -38,9 +37,6 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
 
     override fun keyEvaluationFeature(feature: String) {
         stack.peekLast().value.features().add(feature)
-        when (feature) {
-            WemiKeyEvaluationListener.FEATURE_READ_FROM_CACHE -> cacheReads++
-        }
     }
 
     override fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder: BindingHolder, amount: Int) {
@@ -77,12 +73,12 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
         val node = popAndIndent()
         val keyData = node.value
         val h = keyData.heading
-        h.append(CLI.ICON_SUCCESS).format(Color.White).append(" from ")
+        h.append(CLI.ICON_SUCCESS).format(Color.White).append(" from ").format()
         when {
             binding.valueOriginScope == null && binding.valueOriginHolder == null ->
-                h.format(foreground = Color.Magenta).append("default value").format()
+                h.append("default value")
             binding.valueOriginScope != null && binding.valueOriginHolder != null -> {
-                h.format().append(binding.valueOriginScope)
+                h.append(binding.valueOriginScope)
                 if (binding.valueOriginScope.scopeBindingHolders.last() !== binding.valueOriginHolder) {
                     // Specify which holder only if it isn't nominal
                     h.format(Color.White).append(" in ").format(format = Format.Underline).append(binding.valueOriginHolder).format()
@@ -91,7 +87,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
             }
             else -> {
                 // This is unexpected...
-                h.format().append(binding.valueOriginScope).append(" - ").append(binding.valueOriginHolder)
+                h.append(binding.valueOriginScope).append(" - ").append(binding.valueOriginHolder)
             }
         }
 
@@ -177,15 +173,13 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
             }
         }
         sb.format(Color.White)
-                .append("(cache reads: ").append(cacheReads)
-                .append(", key evaluations: ").append(evaluations).append(')')
+                .append("(key evaluations: ").append(evaluations).append(')')
                 .format()
     }
 
     fun reset() {
         roots.clear()
         stack.clear()
-        cacheReads = 0
         evaluations = 0
     }
 
