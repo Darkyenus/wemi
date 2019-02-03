@@ -1,8 +1,6 @@
 # Things to do next
 
 ## For next release
-- dependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>() -> store only binding, rest is useless
-
 - IntelliJ plugin may still use old sourceFile things
 
 ## For later

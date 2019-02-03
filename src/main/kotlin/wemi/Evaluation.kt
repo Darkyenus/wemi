@@ -27,7 +27,7 @@ class Binding<T>(val key:Key<T>,
                  /** BindingHolder in which [value] was found. Same nullability as [value]. */
                  val valueOriginHolder:BindingHolder?) {
 
-    internal val dependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>()
+    internal val dependsOn = ArrayList<Binding<*>>()
 
     internal var lastEvaluated:Int = LAST_EVALUATED_NEVER
     /* Evaluating key repeatedly with different input will trash the cache.
@@ -64,7 +64,7 @@ class Binding<T>(val key:Key<T>,
         if (lastEvaluationExpirationTriggers.any { it() }) {
             return Freshness.ExplicitlyExpired
         }
-        for ((_, binding) in dependsOn) {
+        for (binding in dependsOn) {
             if (!binding.isFresh(binding.lastEvaluatedWithInput).fresh) {
                 return Freshness.ChildNotFresh
             }
@@ -102,7 +102,7 @@ class Binding<T>(val key:Key<T>,
 class EvalScope @PublishedApi internal constructor(
         @PublishedApi internal val scope:Scope,
         @PublishedApi internal val configurationPrefix:Array<Configuration>,
-        @PublishedApi internal val usedBindings: ArrayList<Pair<Array<Configuration>, Binding<*>>>,
+        @PublishedApi internal val usedBindings: ArrayList<Binding<*>>,
         @PublishedApi internal val expirationTriggers: ArrayList<() -> Boolean>,
         val input:Array<out Pair<String, String>>) : Closeable {
 
@@ -171,7 +171,7 @@ class EvalScope @PublishedApi internal constructor(
                     throw WemiException.KeyNotAssignedException(key, this@EvalScope.scope)
                 }
         // Record that we used this key to fill current binding information
-        usedBindings.add(configurationPrefix to binding)
+        usedBindings.add(binding)
 
         val bindingFresh = binding.isFresh(input)
         listener?.keyEvaluationFeature(bindingFresh.listenerMessage)
@@ -179,7 +179,7 @@ class EvalScope @PublishedApi internal constructor(
             @Suppress("UNCHECKED_CAST")
             binding.lastEvaluatedTo as V
         } else {
-            val newDependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>()
+            val newDependsOn = ArrayList<Binding<*>>()
             // Following evaluation may add new expiration triggers, so clean the old ones
             binding.lastEvaluationExpirationTriggers.clear()
 
@@ -338,7 +338,7 @@ class EvalScope @PublishedApi internal constructor(
                 return true
             }
             var result = false
-            for ((_, nextBinding) in binding.dependsOn) {
+            for (nextBinding in binding.dependsOn) {
                 if (isOnPathUpTo(nextBinding)) {
                     binding.lastEvaluated = LAST_EVALUATED_FORCE_EXPIRED
                     result = true
