@@ -42,6 +42,7 @@ object JvmHotswap {
          */
 
         val RunHotswap:Value<Int> = {
+            expiresNow()
             using(Configurations.running, hotswapping) {
                 val javaExecutable = Keys.javaExecutable.get()
                 val sources = Keys.sources.get().let {
@@ -65,6 +66,7 @@ object JvmHotswap {
                 val options = Keys.runOptions.get().toMutable()
                 val port = hotswapAgentPort.get()
                 val agentJar = Magic.classpathFileOf(JvmHotswap.javaClass)!!
+                LOG.debug("Agent jar: {}", agentJar)
                 options.add("-javaagent:${agentJar.absolutePath}=$port")
 
                 val arguments = Keys.runArguments.get()
@@ -108,6 +110,7 @@ object JvmHotswap {
 
                         // Recompile
                         val newClasspathSnapshot = try {
+                            Keys.internalClasspath.forceExpireNow(Keys.compile)
                             snapshotFiles(Keys.internalClasspath.get(), classpathIncluded)
                         } catch (e: WemiException.CompilationException) {
                             LOG.info("Can't swap: {}", e.message)

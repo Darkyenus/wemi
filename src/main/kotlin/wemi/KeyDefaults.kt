@@ -118,8 +118,8 @@ object KeyDefaults {
                     continue
                 }
 
-                // Enter a different scope
-                projectDependency.project.evaluate(Arrays.asList(*projectDependency.configurations)) {
+                // Enter a different scope and perform the operation
+                using(projectDependency.project, *projectDependency.configurations) {
                     operation(projectDependency)
                 }
             }
@@ -743,7 +743,7 @@ object KeyDefaults {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
                 for (file in locatedFiles) {
-                    assemblyOperation.addSource(file, true, false)
+                    assemblyOperation.addSource(file, own = true, extractJarEntries = false)
                 }
 
                 val outputFile = Keys.archiveOutputFile.get()
@@ -838,7 +838,7 @@ object KeyDefaults {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
                 for (file in locatedFiles) {
-                    assemblyOperation.addSource(file, true, false)
+                    assemblyOperation.addSource(file, own = true, extractJarEntries = false)
                 }
 
                 val outputFile = Keys.archiveOutputFile.get()

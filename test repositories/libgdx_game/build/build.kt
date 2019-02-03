@@ -1,6 +1,6 @@
 
 // Testing only
-@file:BuildClasspathDependency("../../build/wemi-plugin-jvm-hotswap-0.5-SNAPSHOT.jar")
+@file:BuildClasspathDependency("../../build/wemi-plugin-jvm-hotswap-0.7-SNAPSHOT.jar")
 
 import wemi.Keys.runOptions
 import wemi.dependency.Repository

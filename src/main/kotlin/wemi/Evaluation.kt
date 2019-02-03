@@ -3,14 +3,19 @@ package wemi
 import wemi.util.*
 import java.io.Closeable
 import java.nio.file.Path
+import java.util.*
 
 /** Each external key invocation will increase this value (=tick).
  * Bindings are evaluated only once per tick, regardless of their expiry. */
 internal var globalTickTime = 0
 
 internal val NO_BINDING_MODIFIERS = emptyArray<ValueModifier<*>>()
+@PublishedApi
 internal val NO_CONFIGURATIONS = emptyArray<Configuration>()
 private val ALWAYS_EXPIRED:() -> Boolean = { true }
+
+internal const val LAST_EVALUATED_NEVER = -1
+internal const val LAST_EVALUATED_FORCE_EXPIRED = -2
 
 /** Characterizes found binding of [value] and its [modifiers] for some [key]. */
 class Binding<T>(val key:Key<T>,
@@ -24,7 +29,7 @@ class Binding<T>(val key:Key<T>,
 
     internal val dependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>()
 
-    internal var lastEvaluated:Int = -1
+    internal var lastEvaluated:Int = LAST_EVALUATED_NEVER
     /* Evaluating key repeatedly with different input will trash the cache.
     It is not expected to happen, so we do not optimize for it.
     (Besides, changing values of any other dependency key will do the same) */
@@ -38,12 +43,16 @@ class Binding<T>(val key:Key<T>,
         DifferentInput(false, "re-evaluated (different input)"),
         FirstEvaluation(false, "first evaluation"),
         ExplicitlyExpired(false, "re-evaluated (explicit expiry)"),
+        ExplicitlyForcedToExpire(false, "re-evaluated (same-tick forced expiry)"),
         ChildNotFresh(false, "re-evaluated (child expired)")
     }
 
     internal fun isFresh(forInput:Array<out Pair<String, String>>):Freshness {
-        if (lastEvaluated == -1) {
+        if (lastEvaluated == LAST_EVALUATED_NEVER) {
             return Freshness.FirstEvaluation
+        }
+        if (lastEvaluated == LAST_EVALUATED_FORCE_EXPIRED) {
+            return Freshness.ExplicitlyForcedToExpire
         }
         if (!lastEvaluatedWithInput.contentEquals(forInput)) {
             return Freshness.DifferentInput
@@ -139,6 +148,12 @@ class EvalScope @PublishedApi internal constructor(
     inline fun <Result> using(configuration: Configuration, action: EvalScope.() -> Result): Result {
         ensureNotClosed()
         return EvalScope(scope.scopeFor(configuration), configurationPrefix + configuration, usedBindings, expirationTriggers, input).use { it.action() }
+    }
+
+    inline fun <Result> using(project:Project, vararg configurations:Configuration, action: EvalScope.() -> Result): Result {
+        ensureNotClosed()
+        val scope = project.scopeFor(*configurations)
+        return EvalScope(scope, NO_CONFIGURATIONS, usedBindings, expirationTriggers, input).use { it.action() }
     }
 
     private fun <V : Output, Output> getKeyValue(key: Key<V>, otherwise: Output, useOtherwise: Boolean, input:Array<out Pair<String, String>>): Output {
@@ -305,6 +320,37 @@ class EvalScope @PublishedApi internal constructor(
             originalHash != newHash
         }
         return result
+    }
+
+    /** Force the binding of this key in this scope (if any exists) to expire, this same tick.
+     * This can be used to evaluate the same key twice in the same tick.
+     * NOTE: DO NOT USE, UNLESS YOU KNOW WHAT ARE YOU DOING
+     * (It probably won't break, but there are most likely more adequate tools for the job)
+     * @param upTo along with this key, also force expire every key which leads up to the invocation of this one */
+    fun Key<*>.forceExpireNow(upTo:Key<*>?) {
+        val binding = scope.keyBindingCache[this] ?: return
+        binding.lastEvaluated = LAST_EVALUATED_FORCE_EXPIRED
+        upTo ?: return
+
+        fun isOnPathUpTo(binding:Binding<*>):Boolean {
+            if (binding.key == upTo) {
+                binding.lastEvaluated = LAST_EVALUATED_FORCE_EXPIRED
+                return true
+            }
+            var result = false
+            for ((_, nextBinding) in binding.dependsOn) {
+                if (isOnPathUpTo(nextBinding)) {
+                    binding.lastEvaluated = LAST_EVALUATED_FORCE_EXPIRED
+                    result = true
+                }
+            }
+            return result
+        }
+        isOnPathUpTo(binding)
+    }
+
+    override fun toString(): String {
+        return "EvalScope($scope/${Arrays.toString(configurationPrefix)}, input=${Arrays.toString(input)})"
     }
 }
 

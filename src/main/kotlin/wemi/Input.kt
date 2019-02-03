@@ -10,6 +10,7 @@ import wemi.util.CliStatusDisplay.Companion.withStatus
 
 private val LOG = LoggerFactory.getLogger("Input")
 
+@PublishedApi
 internal val NO_INPUT = emptyArray<Pair<String,String>>()
 
 /**

@@ -81,11 +81,11 @@ object Archetypes {
             result
         }
 
-        Keys.repositories set { DefaultRepositories }
+        Keys.repositories set Static(DefaultRepositories)
 
         Keys.javaHome set Static(wemi.run.JavaHome)
         Keys.javaExecutable set { javaExecutable(Keys.javaHome.get()) }
-        Keys.javaCompiler set {
+        Keys.javaCompiler set LazyStatic {
             ToolProvider.getSystemJavaCompiler()
                 ?: throw WemiException("Could not find Java Compiler in the classpath, ensure that you are running Wemi from JDK-bundled JRE. " +
                         "Default java.home property is set to \"${System.getProperty("java.home")}\".")

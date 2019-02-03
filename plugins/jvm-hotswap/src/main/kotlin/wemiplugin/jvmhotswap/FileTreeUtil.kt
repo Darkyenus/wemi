@@ -50,7 +50,7 @@ private fun snapshotFile(digest:MessageDigest, result:HashMap<LocatedPath, ByteA
         Files.list(file).forEachOrdered {
             snapshotFile(digest, result, isIncluded, LocatedPath(path.root, it))
         }
-    } else if (file.isRegularFile()) {
+    } else {
         result[path] = (digest.digest(file) ?: return /* Ignore weird files */)
     }// else dunno, we don't care
 }

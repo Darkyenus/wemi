@@ -197,6 +197,16 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         Scope(name, holders, null)
     }
 
+    /** Create base [Scope] in which evaluation tree for this [Project] can start. */
+    @PublishedApi
+    internal fun scopeFor(vararg configurations:Configuration):Scope {
+        var scope = projectScope
+        for (config in configurations) {
+            scope = scope.scopeFor(config)
+        }
+        return scope
+    }
+
     /**
      * Evaluate the [action] in the scope of this [Project].
      * This is the entry-point to the key-evaluation mechanism.
@@ -206,10 +216,10 @@ class Project internal constructor(val name: String, internal val projectRoot: P
      * @param configurations that should be applied to this [Project]'s [Scope] before [action] is run in it.
      *          It is equivalent to calling [Scope.using] directly in the [action], but more convenient.
      */
-    inline fun <Result> evaluate(configurations:List<Configuration>, action:EvalScope.()->Result):Result {
+    inline fun <Result> evaluate(vararg configurations:Configuration, action:EvalScope.()->Result):Result {
         try {
             evaluateLock()
-            return createEvalScope(this, configurations).run(action)
+            return EvalScope(this.scopeFor(*configurations), NO_CONFIGURATIONS, ArrayList(), ArrayList(), NO_INPUT).run(action)
         } finally {
             evaluateUnlock()
         }
@@ -220,24 +230,6 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         @Volatile
         private var currentlyEvaluatingThread:Thread? = null
         private var currentlyEvaluatingNestLevel = 0
-
-        /**
-         * Create base scope in which to start evaluation.
-         *
-         * @param project that is the base of the scope
-         * @return scope that should be used to evaluate the action
-         * @see evaluate
-         */
-        @PublishedApi
-        internal fun createEvalScope(project:Project, configurationsArray: List<Configuration>):EvalScope {
-            // Prepare scope to use
-            var scope = project.projectScope
-            for (config in configurationsArray) {
-                scope = scope.scopeFor(config)
-            }
-
-            return EvalScope(scope, NO_CONFIGURATIONS, ArrayList(), ArrayList(), NO_INPUT)
-        }
 
         @PublishedApi
         internal fun evaluateLock() {
@@ -422,51 +414,6 @@ class Scope internal constructor(
         return Binding(key, boundValue, modifiers, boundValueOriginScope, boundValueOriginHolder)
     }
 
-    private fun <T> isKeyBindingUsableInThisScope(binding:Binding<T>) : Boolean {
-        return binding.dependsOn.all { (prefixConfigurations, usedBinding) ->
-            val scope = prefixConfigurations.fold(this@Scope) { s, c -> s.scopeFor(c) }
-            usedBinding == scope.getKeyBinding(usedBinding.key, null)
-        }
-    }
-
-    private fun <T> searchForCompatibleBinding(inScope:Scope, ignore:Scope?, key:Key<T>, thisScopeMintBinding:Binding<T>):Binding<T>? {
-        if (true) // TODO(jp): Disable this short after testing
-            return null
-
-        // Search directly this scope
-        if (inScope !== ignore) {
-            @Suppress("UNCHECKED_CAST")
-            val existingBinding = inScope.keyBindingCache[key] as Binding<T>?
-            if (existingBinding != null) {
-                if (existingBinding == thisScopeMintBinding && isKeyBindingUsableInThisScope(existingBinding)) {
-                    // Success
-                    return existingBinding
-                } else {
-                    // If this has incompatible bindings, further search is unlikely to uncover anything better
-                    return null
-                }
-            }
-        }
-
-        // Search in children scopes
-        for ((_, childScope) in inScope.configurationScopeCache) {
-            if (childScope === ignore) {
-                continue
-            }
-            val result = searchForCompatibleBinding(childScope, inScope, key, thisScopeMintBinding)
-            if (result != null) {
-                return result
-            }
-        }
-
-        // Search in parent scope
-        val parent = inScope.scopeParent ?: return null
-        if (parent === ignore) {
-            return null
-        }
-        return searchForCompatibleBinding(parent, inScope, key, thisScopeMintBinding)
-    }
-
     internal fun <T> getKeyBinding(key:Key<T>, listener:WemiKeyEvaluationListener?):Binding<T>? {
         // Put into the cache after successful evaluation
         keyBindingCache[key]?.let {
@@ -474,10 +421,7 @@ class Scope internal constructor(
             return it as Binding<T>
         }
 
-        val newKeyBinding = createElementaryKeyBinding(key, listener) ?: return null
-
-        // Check if any neighbor has any useful binding
-        return searchForCompatibleBinding(this, this, key, newKeyBinding) ?: newKeyBinding
+        return createElementaryKeyBinding(key, listener)
     }
 
     /**

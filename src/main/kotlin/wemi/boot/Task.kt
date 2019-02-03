@@ -78,7 +78,6 @@ class Task(
      */
     fun evaluateKey(defaultProject:Project?): TaskEvaluationResult {
         var project: Project? = defaultProject
-        val configurations = ArrayList<Configuration>()
 
         // Parse Project
         if (this.project != null) {
@@ -91,10 +90,10 @@ class Task(
         }
 
         // Parse Configurations
-        for (configString in this.configurations) {
-            val config = AllConfigurations.findCaseInsensitive(configString)
+        val configurations = Array(this.configurations.size) { i ->
+            val configString = this.configurations[i]
+            AllConfigurations.findCaseInsensitive(configString)
                     ?: return TaskEvaluationResult(null, configString, TaskEvaluationStatus.NoConfiguration)
-            configurations.add(config)
         }
 
         // Parse Key
@@ -102,7 +101,7 @@ class Task(
                 ?: return TaskEvaluationResult(null, this.key, TaskEvaluationStatus.NoKey)
 
         return try {
-            val result = project.evaluate(configurations) {
+            val result = project.evaluate(*configurations) {
                 key.get(*this@Task.input)
             }
 

@@ -1,14 +1,12 @@
 # Things to do next
 
 ## For next release
-- Fix Hotswap plugin, it will fail now that compilation is cached
+- dependsOn = ArrayList<Pair<Array<Configuration>, Binding<*>>>() -> store only binding, rest is useless
 
 - IntelliJ plugin may still use old sourceFile things
 
 ## For later
 - Rewrite directorySynchronized based on exclusive file creation and timestamp
-
-- Remove short in searchForCompatibleBinding, making the caching more efficient, maybe probably.
 
 - WEMI IS COMPILED MULTIPLE TIMES!!! cache compile!
 	- Warnings in EnclaveCL
