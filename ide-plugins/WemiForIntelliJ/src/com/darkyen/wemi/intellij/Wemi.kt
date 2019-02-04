@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij
 
+import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.readFully
 import com.darkyen.wemi.intellij.util.toPath
 import com.esotericsoftware.jsonbeans.JsonReader
@@ -11,9 +12,11 @@ import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationEvent
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import java.io.*
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 // Must be a subset of Kotlin file extensions
@@ -30,7 +33,17 @@ const val WemiBuildDirectoryName = "build"
 /** Finds project's Wemi launcher, if present.
  * Should be fairly cheap. */
 fun findWemiLauncher(project:Project):WemiLauncher? {
-    val wemiJar = project.baseDir?.toPath()?.resolve(WemiLauncherFileName)?.toAbsolutePath() ?: return null
+    if (project.isDefault)
+        return null
+    val wemiJar = project.guessProjectDir().toPath()?.resolve(WemiLauncherFileName)?.toAbsolutePath() ?: return null
+
+    if (!Files.isRegularFile(wemiJar)) return null
+
+    return WemiLauncher(wemiJar)
+}
+
+fun findWemiLauncher(projectDir:String):WemiLauncher? {
+    val wemiJar = Paths.get(projectDir).resolve(WemiLauncherFileName)?.toAbsolutePath() ?: return null
 
     if (!Files.isRegularFile(wemiJar)) return null
 
@@ -116,6 +129,7 @@ class WemiLauncherSession(
         private val prefixConfigurations: Array<String> = emptyArray(),
         val tracker: ExternalStatusTracker?) {
 
+    var wemiVersion: Version = Version.NONE
     private var process = SessionProcess(commandLine)
 
     fun task(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):Result {

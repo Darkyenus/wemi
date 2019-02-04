@@ -9,7 +9,7 @@ import java.nio.file.Paths
 /**
  * Settings to be used when invoking the wemi(.jar) file for information retrieval or other requests.
  */
-class WemiExecutionSettings(val wemiLauncher: String,
+class WemiExecutionSettings(val wemiLauncher: String?,
                             val javaVmExecutable:String,
                             val downloadDocs:Boolean,
                             val downloadSources:Boolean,
@@ -17,14 +17,14 @@ class WemiExecutionSettings(val wemiLauncher: String,
                             val projectName:String?,
                             val allowBrokenBuildScripts:Boolean) : ExternalSystemExecutionSettings() {
 
-    constructor(wemiLauncher: WemiLauncher,
+    constructor(wemiLauncher: WemiLauncher?,
                 javaVmExecutable: String,
                 downloadDocs: Boolean,
                 downloadSources: Boolean,
                 prefixConfigurations: String,
                 projectName: String?,
                 allowBrokenBuildScripts:Boolean):this(
-            wemiLauncher.file.toString(),
+            wemiLauncher?.file?.toString(),
             javaVmExecutable,
             downloadDocs,
             downloadSources,
@@ -32,8 +32,10 @@ class WemiExecutionSettings(val wemiLauncher: String,
             projectName,
             allowBrokenBuildScripts)
 
-    val launcher:WemiLauncher
-        get() = WemiLauncher(Paths.get(wemiLauncher))
+    val launcher:WemiLauncher?
+        get() {
+            return WemiLauncher(Paths.get(wemiLauncher?: return null))
+        }
 
     var deferDebugToWemi:Boolean? = null
 

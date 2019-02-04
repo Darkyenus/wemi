@@ -30,7 +30,6 @@ import com.intellij.util.PathUtil
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.containers.ContainerUtilRt
 import icons.WemiIcons
-import java.io.File
 import java.net.URL
 import java.nio.file.Paths
 
@@ -90,7 +89,7 @@ class WemiManager : ExternalSystemUiAware,
 
 
             WemiExecutionSettings(
-                    findWemiLauncher(project) ?: throw RuntimeException("Project $project does not have a Wemi launcher!"),
+                    findWemiLauncher(pair.second) ?: throw RuntimeException("Project $project does not have a Wemi launcher!"),
                     javaVmExecutablePath,
                     projectSettings?.downloadDocs ?: true,
                     projectSettings?.downloadSources ?: true,
@@ -123,13 +122,8 @@ class WemiManager : ExternalSystemUiAware,
 
     //endregion
 
-    /**
-     * Called when:
-     */
-    override fun enhanceLocalProcessing(urls: MutableList<URL>) {
-        urls.add(File(PathUtil.getJarPathForClass(Unit::class.java)).toURI().toURL())
-        urls.add(File(PathUtil.getJarPathForClass(JsonReader::class.java)).toURI().toURL())
-    }
+    @Deprecated("Only for backwards compatibility with IntelliJ < 2018.3 (abstract back then)")
+    fun enhanceLocalProcessing(urls: MutableList<URL>) {}
 
     /**
      * Called when:

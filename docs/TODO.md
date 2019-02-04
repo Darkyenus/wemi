@@ -1,7 +1,6 @@
 # Things to do next
 
 ## For next release
-- IntelliJ plugin may still use old sourceFile things
 
 ## For later
 - Rewrite directorySynchronized based on exclusive file creation and timestamp

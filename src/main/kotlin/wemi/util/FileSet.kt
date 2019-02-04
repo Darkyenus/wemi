@@ -1,9 +1,10 @@
 package wemi.util
 
+import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
 import wemi.boot.WemiRootFolder
+import wemi.util.FileSet.Pattern
 import java.io.IOException
-import java.lang.IllegalStateException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.*
@@ -42,7 +43,26 @@ class FileSet internal constructor(
         vararg val patterns:Pattern,
         val defaultExcludes:Boolean = true,
         val caseSensitive:Boolean = true,
-        val next: FileSet?) {
+        val next: FileSet?) : JsonWritable {
+
+    override fun JsonWriter.write() {
+        writeArray {
+            var fileSet = this@FileSet
+            while (true) {
+                writeObject {
+                    field("root", fileSet.root)
+                    name("patterns").writeArray {
+                        for (pattern in fileSet.patterns) {
+                            pattern.run { write() }
+                        }
+                    }
+                    field("defaultExcludes", defaultExcludes)
+                    field("caseSensitive", caseSensitive)
+                }
+                fileSet = fileSet.next ?: break
+            }
+        }
+    }
 
     override fun toString(): String {
         val sb = StringBuilder()
@@ -92,7 +112,8 @@ class FileSet internal constructor(
      *
      * @param include true = this pattern includes, false = this pattern excludes
      */
-    class Pattern internal constructor(val include:Boolean, pattern:String) {
+    class Pattern internal constructor(val include:Boolean, pattern:String) : JsonWritable {
+
         /** Sanitized pattern string */
         val pattern:SanitizedPattern = sanitizePattern(pattern)
 
@@ -101,6 +122,13 @@ class FileSet internal constructor(
                 return "include($pattern)"
             } else {
                 return "exclude($pattern)"
+            }
+        }
+
+        override fun JsonWriter.write() {
+            writeObject {
+                name(if (include) "include" else "exclude")
+                value(pattern)
             }
         }
     }

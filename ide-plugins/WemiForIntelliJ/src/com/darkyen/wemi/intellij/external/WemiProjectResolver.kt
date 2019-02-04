@@ -7,6 +7,7 @@ import com.darkyen.wemi.intellij.importing.WEMI_MODULE_DATA_KEY
 import com.darkyen.wemi.intellij.importing.WemiModuleComponentData
 import com.darkyen.wemi.intellij.module.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
+import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.deleteRecursively
 import com.darkyen.wemi.intellij.util.digestToHexString
 import com.darkyen.wemi.intellij.util.update
@@ -70,6 +71,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
             tracker.stage = "Creating session"
             val launcher = (settings ?: return null).launcher
+                    ?: throw IllegalStateException("Wemi launcher is missing")
 
             var prefixConfigurations = settings.prefixConfigurationsArray()
             if (isPreviewMode) {
@@ -85,6 +87,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             tracker.stage = "Loading build scripts"
             val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
             LOG.info("Wemi version is $wemiVersion")
+            session.wemiVersion = Version(wemiVersion)
 
             @Suppress("UnnecessaryVariable") // Creates place for breakpoint
             val resolvedProject = resolveProjectInfo(session, projectPath, settings, tracker)
@@ -304,23 +307,25 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 }
             }
             // Wemi Sources (included in the jar)
-            try {
-                val wemiLauncherFile = File(settings.wemiLauncher)
-                ZipFile(wemiLauncherFile).use { file ->
-                    val sourceEntry = file.getEntry("source.zip")
-                    if (sourceEntry != null) {
-                        val sourcesPath = libFolderPath.resolve("wemi-source.jar")
+            if (settings.wemiLauncher != null) {
+                try {
+                    val wemiLauncherFile = File(settings.wemiLauncher)
+                    ZipFile(wemiLauncherFile).use { file ->
+                        val sourceEntry = file.getEntry("source.zip")
+                        if (sourceEntry != null) {
+                            val sourcesPath = libFolderPath.resolve("wemi-source.jar")
 
-                        // Extract sources
-                        file.getInputStream(sourceEntry).use { ins ->
-                            Files.copy(ins, sourcesPath)
+                            // Extract sources
+                            file.getInputStream(sourceEntry).use { ins ->
+                                Files.copy(ins, sourcesPath)
+                            }
+
+                            libraryData.addPath(LibraryPathType.SOURCE, sourcesPath.toAbsolutePath().toString())
                         }
-
-                        libraryData.addPath(LibraryPathType.SOURCE, sourcesPath.toAbsolutePath().toString())
                     }
+                } catch (e: Exception) {
+                    LOG.warn("Failed to retrieve Wemi sources", e)
                 }
-            } catch (e:Exception) {
-                LOG.warn("Failed to retrieve Wemi sources", e)
             }
 
 
@@ -342,6 +347,23 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
     private fun createWemiProjectData(session: WemiLauncherSession, projectName:String):WemiProjectData {
         val javacOptions = session.jsonArray(projectName, task = "compilerOptions", configurations = *arrayOf("compilingJava"))
+        val sourceRoots: Array<String>
+        val resourceRoots: Array<String>
+        val sourceRootsTesting: Array<String>
+        val resourceRootsTesting: Array<String>
+
+        if (session.wemiVersion < Version.WEMI_0_7) {
+            sourceRoots = session.stringArray(projectName, task = "sourceRoots")
+            resourceRoots = session.stringArray(projectName, task = "resourceRoots")
+            sourceRootsTesting = session.stringArray(projectName, "testing", task = "sourceRoots")
+            resourceRootsTesting = session.stringArray(projectName, "testing", task = "resourceRoots")
+        } else {
+            sourceRoots = session.jsonArray(projectName, task = "sources").fileSetRoots()
+            resourceRoots = session.jsonArray(projectName, task = "resources").fileSetRoots()
+            sourceRootsTesting = session.jsonArray(projectName, "testing", task = "sources").fileSetRoots()
+            resourceRootsTesting = session.jsonArray(projectName, "testing", task = "resources").fileSetRoots()
+        }
+
         return WemiProjectData(
                 projectName,
                 session.stringOrNull(projectName, task = "projectName?") ?: projectName,
@@ -356,10 +378,10 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 },
                 session.string(projectName, task = "outputClassesDirectory"),
                 session.stringOrNull(projectName, configurations = *arrayOf("testing"), task = "outputClassesDirectory?"),
-                session.stringArray(projectName, task = "sourceRoots"),
-                session.stringArray(projectName, task = "resourceRoots"),
-                session.stringArray(projectName, "testing", task = "sourceRoots"),
-                session.stringArray(projectName, "testing", task = "resourceRoots")
+                sourceRoots,
+                resourceRoots,
+                sourceRootsTesting,
+                resourceRootsTesting
                 )
     }
 
@@ -618,6 +640,16 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             } else {
                 File(get("root")?.asString() ?: getString("file")!!)
             }.absoluteFile
+        }
+
+        fun JsonValue.fileSetRoots():Array<String> {
+            var child = this.child
+
+            return Array(size) {
+                val root = child.getString("root")
+                child = child.next
+                root
+            }
         }
 
         fun JsonValue.mapGet(key:String):JsonValue? {

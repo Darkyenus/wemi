@@ -139,6 +139,7 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
     return Project(WemiBuildScriptProjectName, WemiBuildFolder, emptyArray()).apply {
         Keys.projectName set Static(WemiBuildScriptProjectName)
         Keys.projectRoot set Static(WemiBuildFolder)
+        Keys.cacheDirectory set Static (WemiCacheFolder)
         Keys.compilerOptions set Static (BuildScriptInfo.compilerOptions)
 
         if (buildScriptInfo != null) {

@@ -47,7 +47,8 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                 taskThreadBinding.put(id, Thread.currentThread())
             }
 
-            val launcher = settings!!.launcher
+            val launcher = settings?.launcher
+                    ?: throw IllegalStateException("Wemi launcher is missing")
 
             val env = settings.env.toMutableMap()
 
