@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import icons.WemiIcons
 import java.nio.file.Files
 import java.nio.file.Path
@@ -21,8 +22,9 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
+        if (project.isDefault) return
         reinstallWemiLauncher(project, "Could not (re)install Wemi launcher")
-        project.baseDir?.refresh(true, false)
+        project.guessProjectDir()?.refresh(true, false)
     }
 
     override fun update(e: AnActionEvent) {
@@ -57,7 +59,7 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
                 return null
             }
 
-            val projectBaseDir = project.baseDir
+            val projectBaseDir = project.guessProjectDir()
             val projectBasePath = projectBaseDir?.toPath()
             val wemiLauncherPath = projectBasePath?.resolve(WemiLauncherFileName)?.toAbsolutePath() ?: run {
                 LOG.error("Project $project does not have baseDir convertible to Path")

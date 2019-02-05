@@ -17,7 +17,11 @@ import java.io.File
  * Used when importing (unlinked?) project.
  */
 class ImportFromWemiControlBuilder
-    : AbstractExternalProjectImportBuilder<ImportFromWemiControl>(ProjectDataManager.getInstance(), ImportFromWemiControl(), WemiProjectSystemId) {
+    : AbstractExternalProjectImportBuilder<ImportFromWemiControl>(
+        ProjectDataManager.getInstance(),
+        // TODO(jp): Make this lazy when it breaks (caused by https://github.com/JetBrains/intellij-community/commit/3da632b6acc01747284014cdcd26e2421daac7a6 which is too recent as of time of writing)
+        ImportFromWemiControl(),
+        WemiProjectSystemId) {
 
     override fun getIcon() = WemiIcons.ACTION
 

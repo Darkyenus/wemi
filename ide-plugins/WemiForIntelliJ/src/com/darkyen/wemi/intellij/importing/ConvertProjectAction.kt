@@ -12,6 +12,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.roots.*
 import com.intellij.openapi.roots.impl.libraries.LibraryEx
 import icons.WemiIcons
@@ -68,7 +69,7 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
             }
         }
 
-        project.baseDir?.refresh(true, true)
+        project.guessProjectDir()?.refresh(true, true)
         importUnlinkedProject(project, wemiLauncher)
     }
 

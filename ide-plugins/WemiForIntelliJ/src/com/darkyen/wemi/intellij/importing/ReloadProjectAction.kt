@@ -10,6 +10,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.externalSystem.service.execution.ProgressExecutionMode
 import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import icons.WemiIcons
 import org.jetbrains.kotlin.idea.refactoring.psiElement
 
@@ -54,7 +55,7 @@ class ReloadProjectAction : AnAction("Reload Wemi Project",
             if (project.isDefault) {
                 return false
             }
-            if (!WemiSystemSettings.getInstance(project).linkedProjectsSettings.isEmpty() && project.baseDir != null) {
+            if (!WemiSystemSettings.getInstance(project).linkedProjectsSettings.isEmpty() && project.guessProjectDir() != null) {
                 return true
             }
             return false

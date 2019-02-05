@@ -8,6 +8,7 @@ import com.intellij.ide.util.newProjectWizard.AddModuleWizard
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import icons.WemiIcons
 
 /**
@@ -48,7 +49,7 @@ class ImportProjectAction : AnAction("Import Wemi Project",
             if (project.isDefault) {
                 return false
             }
-            if (!WemiSystemSettings.getInstance(project).linkedProjectsSettings.isEmpty() || project.baseDir == null) {
+            if (!WemiSystemSettings.getInstance(project).linkedProjectsSettings.isEmpty() || project.guessProjectDir() == null) {
                 return false
             }
             return true

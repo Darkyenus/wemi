@@ -358,10 +358,10 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             sourceRootsTesting = session.stringArray(projectName, "testing", task = "sourceRoots")
             resourceRootsTesting = session.stringArray(projectName, "testing", task = "resourceRoots")
         } else {
-            sourceRoots = session.jsonArray(projectName, task = "sources").fileSetRoots()
-            resourceRoots = session.jsonArray(projectName, task = "resources").fileSetRoots()
-            sourceRootsTesting = session.jsonArray(projectName, "testing", task = "sources").fileSetRoots()
-            resourceRootsTesting = session.jsonArray(projectName, "testing", task = "resources").fileSetRoots()
+            sourceRoots = session.jsonArray(projectName, task = "sources", orNull = true).fileSetRoots()
+            resourceRoots = session.jsonArray(projectName, task = "resources", orNull = true).fileSetRoots()
+            sourceRootsTesting = session.jsonArray(projectName, "testing", task = "sources", orNull = true).fileSetRoots()
+            resourceRootsTesting = session.jsonArray(projectName, "testing", task = "resources", orNull = true).fileSetRoots()
         }
 
         return WemiProjectData(
@@ -393,7 +393,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
 
         try {
-            session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies").get("value").forEach { resolvedValue ->
+            session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies?", orNull = true).get("value")?.forEach { resolvedValue ->
                 val projectId = resolvedValue.get("key")
                 val artifact = resolvedValue.get("value")?.get("data")?.find { it.getString("name") == "artifactFile" }?.get("value")?.asString() ?: return@forEach
 
@@ -408,7 +408,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                                 File(artifact).absoluteFile))
             }
 
-            session.jsonArray(projectName, *config, task = "unmanagedDependencies").forEach {
+            session.jsonArray(projectName, *config, task = "unmanagedDependencies?", orNull = true).forEach {
                 val file = it.locatedFileOrPathClasspathEntry()
 
                 add(file.absolutePath, WemiLibraryDependency(file.name, file))
@@ -499,7 +499,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 project.createChild(ProjectKeys.LIBRARY, libraryData)
 
                 for ((projectName, dependencyScope) in projects) {
-                    val projectModule = modules[projectName]!!
+                    val projectModule = modules.getValue(projectName)
                     val libraryDependencyData = LibraryDependencyData(projectModule.data, libraryData, LibraryLevel.PROJECT)
                     libraryDependencyData.scope = dependencyScope
                     libraryDependencyData.isExported = dependencyScope.exported
@@ -606,9 +606,9 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
         private val LOG = Logger.getInstance(WemiProjectResolver::class.java)
 
-        fun WemiLauncherSession.stringArray(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):Array<String> {
+        fun WemiLauncherSession.stringArray(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true, orNull:Boolean = false):Array<String> {
             return task(project = project, configurations = *configurations, task = task, includeUserConfigurations = includeUserConfigurations)
-                    .data(JsonValue.ValueType.array)
+                    .data(JsonValue.ValueType.array, orNull)
                     .asStringArray()
         }
 
@@ -624,14 +624,14 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                     .asString()
         }
 
-        fun WemiLauncherSession.jsonObject(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):JsonValue {
+        fun WemiLauncherSession.jsonObject(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true, orNull:Boolean = false):JsonValue {
             return task(project = project, configurations = *configurations, task = task, includeUserConfigurations = includeUserConfigurations)
-                    .data(JsonValue.ValueType.`object`)
+                    .data(JsonValue.ValueType.`object`, orNull)
         }
 
-        fun WemiLauncherSession.jsonArray(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):JsonValue {
+        fun WemiLauncherSession.jsonArray(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true, orNull:Boolean = false):JsonValue {
             return task(project = project, configurations = *configurations, task = task, includeUserConfigurations = includeUserConfigurations)
-                    .data(JsonValue.ValueType.array)
+                    .data(JsonValue.ValueType.array, orNull)
         }
 
         fun JsonValue.locatedFileOrPathClasspathEntry():File {
@@ -643,8 +643,11 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
 
         fun JsonValue.fileSetRoots():Array<String> {
-            var child = this.child
+            if (this.isNull) {
+                return emptyArray() // limitation of JsonWritable, empty FileSet is just null
+            }
 
+            var child = this.child
             return Array(size) {
                 val root = child.getString("root")
                 child = child.next

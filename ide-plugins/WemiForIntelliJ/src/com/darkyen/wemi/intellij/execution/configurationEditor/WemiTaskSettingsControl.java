@@ -112,7 +112,11 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 
 		myVmOptionsLabel = new JBLabel(ExternalSystemBundle.message("run.configuration.settings.label.vmoptions"));
 		myVmOptionsEditor = new RawCommandLineEditor();
-		myVmOptionsEditor.setDialogCaption(ExternalSystemBundle.message("run.configuration.settings.label.vmoptions"));
+		try {
+			//noinspection deprecation
+			myVmOptionsEditor.setDialogCaption(ExternalSystemBundle.message("run.configuration.settings.label.vmoptions"));
+		} catch (Throwable ignored) {}// Above call is deprecated, this will throw something when it is removed
+
 		canvas.add(myVmOptionsLabel, ExternalSystemUiUtil.getLabelConstraints(0));
 		canvas.add(myVmOptionsEditor, ExternalSystemUiUtil.getFillLineConstraints(0));
 
