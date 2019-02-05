@@ -135,7 +135,7 @@ class FileSet internal constructor(
 }
 
 val FILE_SET_PRETTY_PRINTER : (FileSet?) -> CharSequence = printer@{
-    var set = it ?: return@printer format("empty file set", Color.White)
+    var set = it ?: return@printer format("empty file set\n", Color.White)
     val sb = StringBuilder()
     var i = 1
     while (true) {
