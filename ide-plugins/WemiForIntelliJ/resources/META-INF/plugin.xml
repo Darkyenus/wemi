@@ -150,6 +150,9 @@
         <!-- File -->
         <fileIconProvider id="wemi-script-file" order="first" implementation="com.darkyen.wemi.intellij.file.ScriptIconProvider"/>
         <iconProvider id="wemi-script-file" order="first" implementation="com.darkyen.wemi.intellij.file.ScriptIconProvider"/>
+
+        <!-- Terminal highlighting -->
+        <consoleFilterProvider implementation="com.darkyen.wemi.intellij.util.WemiTerminalFilterProvider"/>
     </extensions>
 
 </idea-plugin>

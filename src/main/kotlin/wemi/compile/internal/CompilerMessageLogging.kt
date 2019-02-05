@@ -56,18 +56,18 @@ fun Logger.render(marker: Marker?,
 
     if (location != null) {
         val locationPath = Paths.get(location.path).toAbsolutePath()
-        result.format(Color.White)
+        result.format(Color.Black)
         if (locationPath.startsWith(WemiRootFolder)) {
             val relative = WemiRootFolder.relativize(locationPath)
             result.append(relative.toString())
         } else {
             result.append(locationPath.toString())
         }
-        result.format().append(':')
+        result.append(':')
         if (location.line > 0) {
-            result.append(location.line).append(':')
+            result.append(location.line)
             if (location.column > 0) {
-                result.format(Color.White).append(location.column).format().append(':')
+                result.format(Color.White).append(':').append(location.column).format()
             }
         }
         result.append(' ')
@@ -118,10 +118,10 @@ fun Logger.render(marker: Marker?,
         "EXCEPTION", "ERROR" -> {
             error(marker, "{}", result)
         }
-        "STRONG_WARNING", "WARNING" -> {
+        "STRONG_WARNING", "WARNING", "MANDATORY_WARNING" -> {
             warn(marker, "{}", result)
         }
-        "INFO" -> {
+        "INFO", "NOTE" -> {
             info(marker, "{}", result)
         }
         "LOGGING", "OUTPUT" -> {

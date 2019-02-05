@@ -2,6 +2,7 @@
 
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.*
+import wemi.util.*
 
 
 val someKey by key<String>("")
@@ -55,4 +56,15 @@ val evaluationTest by project {
         assertThat(using(subtracting, multiplying){ numberKey.get() }, equalTo(-6))
     }
     
+}
+
+val compileErrors by project(path("errors")) {
+    extend(compilingJava) {
+        sources set { (projectRoot.get() / "src").fileSet(include("**.java")) }
+        compilerOptions[wemi.compile.JavaCompilerFlags.customFlags] += "-Xlint:all"
+    }
+
+    extend(compilingKotlin) {
+        sources set { (projectRoot.get() / "src").fileSet(include("**.kt")) }
+    }
 }
