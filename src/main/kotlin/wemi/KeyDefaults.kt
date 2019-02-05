@@ -10,6 +10,7 @@ import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.Configurations.publishing
 import wemi.assembly.*
+import wemi.boot.CLI
 import wemi.boot.Main
 import wemi.boot.WemiBundledLibrariesExclude
 import wemi.boot.WemiRuntimeClasspath
@@ -29,6 +30,7 @@ import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
+import wemi.util.CliStatusDisplay.Companion.withStatus
 import wemi.util.*
 import java.io.BufferedReader
 import java.io.File
@@ -436,12 +438,13 @@ object KeyDefaults {
                 mainClass, options, arguments)
 
         // Separate process output from Wemi output
-        println()
-        val process = processBuilder.start()
-        val result = process.waitFor()
-        println()
-
-        return result
+        return CLI.MessageDisplay.withStatus(false) {
+            println()
+            val process = processBuilder.start()
+            val result = process.waitFor()
+            println()
+            result
+        }
     }
 
     val Run: Value<Int> = {

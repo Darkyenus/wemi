@@ -1,6 +1,7 @@
 # Things to do next
 
 ## For next release
+- Support for Ctrl-C terminating only process currently `run`ning
 
 ## For later
 - Rewrite directorySynchronized based on exclusive file creation and timestamp

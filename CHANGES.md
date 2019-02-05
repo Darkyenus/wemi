@@ -1,4 +1,13 @@
-# 0.7
+# 0.7 2019-02-05
+- Replaced `(re)sourceRoots`, `sourceExtensions` and `(re)sourceFiles` with single `(re)sources` key, powered by `FileSet` class (inspired by Ant's `<fileSet>`)
+- Add new key value caching system (see `EvalScope`)
+- Remove anonymous configurations
+- When evaluating keys, current evaluation stack is displayed in the CLI
+- Input system rewritten
+- It is now possible to specify pattern to filter which test should run in `test`
+- Change how Wemi is bundled and launched internally, which should improve IDE behavior
+- Many bug fixes and robustness improvements
+- IDE: File paths are now clickable
 
 # 0.6 2018-10-21
 - Fix kotlin 1.2.71 incremental compilation

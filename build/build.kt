@@ -7,14 +7,12 @@ import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.MergeStrategy
 import wemi.boot.WemiCacheFolder
-import wemi.collections.WMutableList
+import wemi.collections.toMutable
 import wemi.compile.KotlinCompilerFlags
 import wemi.createProject
 import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
 import wemi.publish.InfoNode
-import wemi.util.LocatedPath
-import wemi.util.executable
 import wemi.util.*
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -23,11 +21,12 @@ val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.61"),
         createKotlinCompilerProject("1.2.21"),
         createKotlinCompilerProject("1.2.41"),
-        createKotlinCompilerProject("1.2.71")
+        createKotlinCompilerProject("1.2.71"),
+        createKotlinCompilerProject("1.3.20")
 )
 
 const val WemiGroup = "com.darkyen.wemi"
-const val WemiVersion = "0.7-SNAPSHOT"
+const val ThisWemiVersion = "0.7" // as opposed to the generic WemiVersion, which is the version with which we build
 
 /**
  * Wemi Build System core
@@ -35,7 +34,7 @@ const val WemiVersion = "0.7-SNAPSHOT"
 val core:Project by project {
     projectGroup set { WemiGroup }
     projectName set { "wemi-core" }
-    projectVersion set { WemiVersion }
+    projectVersion set { ThisWemiVersion }
 
     mainClass set { "wemi.boot.PreMain" }
 
@@ -74,7 +73,7 @@ val core:Project by project {
     extend(assembling) {
         // Add all compiler frontends to the internal classpath
         internalClasspath modify { cp ->
-            val cpWithCompilers = WMutableList(cp) // TODO(jp): cp.toMutable()
+            val cpWithCompilers = cp.toMutable()
 
             for (p in CompilerProjects) {
                 p.evaluate {
@@ -88,46 +87,39 @@ val core:Project by project {
         }
 
         // Add .jar with sources to resource files
-        resourceFiles add {
+        resources modify { oldResources ->
+            val sourcePath = WemiCacheFolder / "source.zip"
             AssemblyOperation().use { asOp ->
-                val sourcePath = WemiCacheFolder / "source.zip"
-
-                for (file in using(compilingJava) { Keys.sourceFiles.get() }) {
-                    asOp.addSource(file, true, false)
-                }
-                for (file in using(compilingKotlin) { Keys.sourceFiles.get() }) {
-                    asOp.addSource(file, true, false)
+                for (file in Keys.sources.getLocatedPaths()) {
+                    asOp.addSource(file, true, extractJarEntries = false)
                 }
 
                 asOp.assembly({ MergeStrategy.Deduplicate }, DefaultRenameFunction, DefaultAssemblyMapFilter, sourcePath, byteArrayOf(), false)
-
-                LocatedPath(sourcePath)
             }
+
+            oldResources + sourcePath.fileSet()
         }
 
         // Add kotlin stdlib as a bundled jar
-        resourceFiles modify { oldResourceFiles ->
-            val newResourceFiles = WMutableList(oldResourceFiles)
+        resources modify { oldResources ->
+            var resources = oldResources
 
             val libraryList = StringBuilder()
-
-            val links = Files.createTempDirectory("wemi-links") // TODO Not needed in next version because internal resources wont get flattened
             for (stdlibJar in kotlinStdlib.evaluate{ externalClasspath.get() }) {
                 val jarEntry = stdlibJar.classpathEntry
-                val zipEntry = links / "${jarEntry.name.pathWithoutExtension()}.zip"
-                Files.createSymbolicLink(zipEntry, jarEntry)
-                newResourceFiles.add(LocatedPath(zipEntry))
-
-                libraryList.append(zipEntry.name).append('\n')
+                resources += jarEntry.fileSet()
+                libraryList.append(jarEntry.name).append('\n')
             }
 
-            val librariesPath = links / "libraries"
+            val assemblyFolder = WemiCacheFolder / "-assembly-libraries"
+            Files.createDirectories(assemblyFolder)
+            val librariesPath = assemblyFolder / "libraries"
             Files.newBufferedWriter(librariesPath, StandardCharsets.UTF_8).use {
                 it.append(libraryList)
             }
-            newResourceFiles.add(LocatedPath(librariesPath))
+            resources += librariesPath.fileSet()
 
-            newResourceFiles
+            resources
         }
     }
 
@@ -192,11 +184,12 @@ fun createKotlinCompilerProject(version:String):Project {
 
     return createProject(projectName.toString(), path("src/main-kotlinc/$version"), Archetypes.JavaKotlinProject) {
 
-        extendMultiple(compilingJava, compilingKotlin) {
-            sourceRoots set { setOf(projectRoot.get() / "src") }
+        extend(compilingJava) {
+            sources set { null }
         }
 
         extend(compilingKotlin) {
+            sources set { (projectRoot.get() / "src").fileSet(include("**.kt")) }
             compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
         }
 
@@ -213,11 +206,12 @@ fun createKotlinCompilerProject(version:String):Project {
 }
 
 val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
-    extendMultiple(compilingJava, compilingKotlin) {
-        sourceRoots set { setOf(projectRoot.get() / "src") }
+    extend(compilingJava) {
+        sources set { null }
     }
 
     extend(compilingKotlin) {
+        sources set { (projectRoot.get() / "src").fileSet(include("**.kt")) }
         compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
     }
 
