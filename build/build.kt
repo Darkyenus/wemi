@@ -26,7 +26,7 @@ val CompilerProjects = listOf(
 )
 
 const val WemiGroup = "com.darkyen.wemi"
-const val ThisWemiVersion = "0.7" // as opposed to the generic WemiVersion, which is the version with which we build
+const val ThisWemiVersion = "0.8-SNAPSHOT" // as opposed to the generic WemiVersion, which is the version with which we build
 
 /**
  * Wemi Build System core

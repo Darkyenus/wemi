@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.darkyen.wemi.intellij</id>
     <name>WEMI</name>
-    <version>0.7</version>
+    <version>0.8-SNAPSHOT</version>
     <vendor email="darkyenus@gmail.com" url="http://darkyenus.github.io">Jan Polák</vendor>
 
     <description><![CDATA[
@@ -16,6 +16,10 @@
     ]]></description>
 
     <change-notes><![CDATA[
+      0.8
+      <ul>
+        <li>Compatibility with Wemi 0.8</li>
+      </ul>
       0.7
       <ul>
         <li>Compatibility with Wemi 0.7</li>

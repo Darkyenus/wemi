@@ -1,3 +1,5 @@
+# 0.8
+
 # 0.7 2019-02-05
 - Replaced `(re)sourceRoots`, `sourceExtensions` and `(re)sourceFiles` with single `(re)sources` key, powered by `FileSet` class (inspired by Ant's `<fileSet>`)
 - Add new key value caching system (see `EvalScope`)

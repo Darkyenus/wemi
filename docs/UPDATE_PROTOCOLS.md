@@ -23,6 +23,6 @@
 This propagates to `kotlinVersion` key, used to compile user projects.
 
 # New Java Version
-- Check [BytecodeUtil](../plugins/jvm-hotswap/src/main/kotlin/wemiplugin/jvmhotswap/agent/BytecodeUtil.java)
+- Check [BytecodeUtil](../plugins/jvm-hotswap/src/main/java/wemiplugin/jvmhotswap/agent/BytecodeUtil.java)
 	and update `.class` parsing logic.
 - Update `javadocUrl` in [KeyDefaults](../src/main/kotlin/wemi/KeyDefaults.kt)
