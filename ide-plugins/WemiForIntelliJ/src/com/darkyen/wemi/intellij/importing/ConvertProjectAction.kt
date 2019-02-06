@@ -13,6 +13,7 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.project.rootManager
 import com.intellij.openapi.roots.*
 import com.intellij.openapi.roots.impl.libraries.LibraryEx
 import icons.WemiIcons
@@ -30,7 +31,7 @@ import java.nio.file.Path
  * This is usually the first point at which user meets this plugin.
  */
 class ConvertProjectAction : AnAction("Convert to Wemi Project",
-        "Convert project from different or not build system to Wemi", WemiIcons.ACTION) {
+        "Convert project from different or no build system to Wemi", WemiIcons.ACTION) {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project
@@ -112,7 +113,7 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
     }
 
     private fun StringBuilder.appendModuleInfo(projectRoot:Path, module: Module, group:String, name:String, nameIdentifier: CharSequence, version:String) {
-        val moduleRoot = module.moduleFile?.parent?.toPath() ?: projectRoot
+        val moduleRoot = module.rootManager.contentRoots.firstOrNull()?.toPath() ?: projectRoot
 
         append("\n")
         append("val ").append(nameIdentifier).append(" by project")

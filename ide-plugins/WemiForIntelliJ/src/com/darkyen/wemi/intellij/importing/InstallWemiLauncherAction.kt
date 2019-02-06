@@ -11,6 +11,7 @@ import com.intellij.openapi.project.guessProjectDir
 import icons.WemiIcons
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermission
 
 /**
  * Action to convert foreign project to Wemi and import it.
@@ -81,6 +82,18 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
                         "Failed to create \"wemi\" file",
                         NotificationType.ERROR)
                 return null
+            }
+            try {
+                val options = Files.getPosixFilePermissions(wemiLauncherPath).toMutableSet()
+                options.add(PosixFilePermission.OWNER_EXECUTE)
+                options.add(PosixFilePermission.GROUP_EXECUTE)
+                options.add(PosixFilePermission.OTHERS_EXECUTE)
+                Files.setPosixFilePermissions(wemiLauncherPath, options)
+            } catch (e:Exception) {
+                LOG.error("Failed to make Wemi binary ($wemiLauncherPath) executable", e)
+                WemiNotificationGroup.showBalloon(project, failNotificationTitle,
+                        "Failed to make \"wemi\" launcher executable, you may need to make it manually",
+                        NotificationType.WARNING)
             }
 
             return Pair(projectBasePath, WemiLauncher(wemiLauncherPath))
