@@ -291,7 +291,7 @@ private fun TaskParser.PartitionedLine.machineReadableCheckErrors() {
 private fun prepareBuildScriptInfo(allowBrokenBuildScripts:Boolean, askUser:Boolean, cleanBuild:Boolean):BuildScriptInfo? {
     var finalBuildScriptInfo:BuildScriptInfo? = null
 
-    val buildScriptSourceSet = WemiBuildFolder.fileSet(include("*.kt"))
+    val buildScriptSourceSet = FileSet(WemiBuildFolder, include("*.kt"))
 
     do {
         var keepTrying = false

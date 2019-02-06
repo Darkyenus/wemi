@@ -14,7 +14,6 @@ import wemi.publish.artifacts
 import wemi.run.javaExecutable
 import wemi.util.FileSet
 import wemi.util.div
-import wemi.util.fileSet
 import wemi.util.plus
 import javax.tools.ToolProvider
 
@@ -68,9 +67,9 @@ object Archetypes {
      * Implements basic key implementations for JVM that don't usually change.
      */
     val JVMBase by archetype(::Base) {
-        Keys.resources set { (Keys.projectRoot.get() / "src/main/resources").fileSet() }
+        Keys.resources set { FileSet(Keys.projectRoot.get() / "src/main/resources") }
         extend (Configurations.testing) {
-            Keys.resources modify { it + (Keys.projectRoot.get() / "src/test/resources").fileSet() }
+            Keys.resources modify { it + FileSet(Keys.projectRoot.get() / "src/test/resources") }
         }
 
         Keys.sources set {

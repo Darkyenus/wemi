@@ -38,12 +38,12 @@ typealias SanitizedPattern = String
  * @see exclude to create include patterns
  * @see Pattern for detailed description of the used pattern syntax
  */
-class FileSet internal constructor(
+class FileSet(
         val root: Path,
         vararg val patterns:Pattern,
         val defaultExcludes:Boolean = true,
         val caseSensitive:Boolean = true,
-        val next: FileSet?) : JsonWritable {
+        val next: FileSet? = null) : JsonWritable {
 
     override fun JsonWriter.write() {
         writeArray {
@@ -206,6 +206,7 @@ private val DUPLICATE_FILE_SEPARATORS = Regex("(?:/\\.?)+/")
 private val EXTRA_BLOBS = Regex("\\*{3,}")
 
 /** Create a [FileSet] with this path as its [FileSet.root]. */
+@Deprecated("Use FileSet constructor directly", ReplaceWith("FileSet(this, patterns)", "wemi.util.FileSet"))
 fun Path.fileSet(vararg patterns: FileSet.Pattern,
                  defaultExcludes:Boolean = true,
                  caseSensitive:Boolean = true): FileSet {

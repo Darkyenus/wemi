@@ -2,6 +2,10 @@
 
 ## For next release
 - Support for Ctrl-C terminating only process currently `run`ning
+- IDE: Convert to Wemi is still using old (re)sourceFiles keys
+	- It determined that the module's root is in .idea/modules, so perhaps we should rather look at module's content root
+- After copying wemi out (when converting to Wemi, at least), make the file executable
+- nice maven writeup: https://blog.packagecloud.io/eng/2017/03/09/how-does-a-maven-repository-work/
 
 ## For later
 - Rewrite directorySynchronized based on exclusive file creation and timestamp
