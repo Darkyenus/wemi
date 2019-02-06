@@ -441,7 +441,7 @@ object KeyDefaults {
         return CLI.MessageDisplay.withStatus(false) {
             println()
             val process = processBuilder.start()
-            val result = process.waitFor()
+            val result = CLI.forwardSignalsTo(process) { process.waitFor() }
             println()
             result
         }

@@ -58,6 +58,20 @@ object CLI {
         terminal
     }
 
+    /** While [during] is executing inside of this function, forward as much signals as possible to [process].
+     * This is not always possible, so take this only as a hint.
+     * (Currently handles only SIGINT on a best effort basis, where it actually attempts to stop the process) */
+    fun <T>forwardSignalsTo(process:Process, during:()->T):T {
+        val previousInterrupt = Terminal.handle(org.jline.terminal.Terminal.Signal.INT) {
+            process.destroy()
+        }
+        try {
+            return during()
+        } finally {
+            Terminal.handle(org.jline.terminal.Terminal.Signal.INT, previousInterrupt)
+        }
+    }
+
     internal val MessageDisplay: CliStatusDisplay? by lazy {
         if (WemiColorOutputSupported) {
             // If terminal doesn't support color, it probably doesn't support ANSI codes

@@ -1,7 +1,6 @@
 # Things to do next
 
 ## For next release
-- Support for Ctrl-C terminating only process currently `run`ning
 - IDE: Convert to Wemi is still using old (re)sourceFiles keys
 	- It determined that the module's root is in .idea/modules, so perhaps we should rather look at module's content root
 - After copying wemi out (when converting to Wemi, at least), make the file executable
