@@ -72,14 +72,6 @@ object Archetypes {
             Keys.resources modify { it + FileSet(Keys.projectRoot.get() / "src/test/resources") }
         }
 
-        Keys.sources set {
-            var result: FileSet? = null
-            for (configuration in Keys.compilingConfigurations.get()) {
-                result += using(configuration) { Keys.sources.get() }
-            }
-            result
-        }
-
         Keys.repositories set Static(DefaultRepositories)
 
         Keys.javaHome set Static(wemi.run.JavaHome)
@@ -129,10 +121,13 @@ object Archetypes {
         Keys.internalClasspath set Static(emptyList())
     }
 
-    /**
-     * Primary archetype for projects that use pure Java.
-     */
+    /** Primary archetype for projects that use pure Java. */
     val JavaProject by archetype(::JVMBase) {
+        Keys.sources set { FileSet(Keys.projectRoot.get() / "src/main/java") }
+        extend (Configurations.testing) {
+            Keys.sources modify { FileSet(Keys.projectRoot.get() / "src/test/java", next = it) }
+        }
+
         Keys.compilingConfigurations set Static(setOf(Configurations.compilingJava))
 
         Keys.compile set KeyDefaults.CompileJava
@@ -148,6 +143,17 @@ object Archetypes {
      * Primary archetype for projects that use Java and Kotlin.
      */
     val JavaKotlinProject by archetype(::JVMBase) {
+        Keys.sources set {
+            val root = Keys.projectRoot.get()
+            FileSet(root / "src/main/java", next = FileSet(root / "src/main/kotlin"))
+        }
+        extend (Configurations.testing) {
+            Keys.sources modify {
+                val root = Keys.projectRoot.get()
+                FileSet(root / "src/test/java", next = FileSet(root / "src/test/kotlin", next = it))
+            }
+        }
+
         Keys.compilingConfigurations set Static(setOf(Configurations.compilingJava, Configurations.compilingKotlin))
 
         Keys.libraryDependencies add { kotlinDependency("stdlib") }

@@ -2,13 +2,10 @@ package wemi.compile
 
 import com.esotericsoftware.jsonbeans.JsonWriter
 import wemi.util.JsonWritable
-import wemi.util.include
 import wemi.util.writeValue
 
 /** Extensions that a valid Java source file can have */
-val JavaSourceFileExtensions = setOf("java")
-/** Includes needed to match Java files */
-val JavaSourceFileIncludes = arrayOf(include("**.java"))
+val JavaSourceFileExtensions = listOf("java")
 
 /**
  * Flags used by the Java compiler.

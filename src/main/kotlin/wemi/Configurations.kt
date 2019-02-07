@@ -51,9 +51,8 @@ object Configurations {
 
     //region Compiling
     val compilingJava by configuration("Configuration layer used when compiling Java sources", compiling) {
-        Keys.sources set { FileSet(Keys.projectRoot.get() / "src/main/java", *JavaSourceFileIncludes) }
-        extend (Configurations.testing) {
-            Keys.sources modify { it + FileSet(Keys.projectRoot.get() / "src/test/java", *JavaSourceFileIncludes) }
+        Keys.sources modify {
+            it.appendPatterns(filter(*Array(JavaSourceFileExtensions.size) { i -> "**.${JavaSourceFileExtensions[i]}"}))
         }
 
         Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
@@ -62,16 +61,8 @@ object Configurations {
     }
 
     val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
-        Keys.sources set {
-            val root = Keys.projectRoot.get()
-            FileSet(root / "src/main/java", *KotlinSourceFileIncludes) +
-                    FileSet(root / "src/main/kotlin", *KotlinSourceFileIncludes)
-        }
-        extend (Configurations.testing) {
-            Keys.sources modify {
-                it + FileSet(Keys.projectRoot.get() / "src/test/java", *KotlinSourceFileIncludes) +
-                        FileSet(Keys.projectRoot.get() / "src/test/kotlin", *KotlinSourceFileIncludes)
-            }
+        Keys.sources modify {
+            it.appendPatterns(filter(*Array(KotlinSourceFileExtensions.size) { i ->"**.${KotlinSourceFileExtensions[i]}"}))
         }
 
         Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance() }

@@ -18,6 +18,10 @@ typealias SanitizedPattern = String
  * and may optionally form a linked list with other [FileSet]s through [next]. Resulting collection of files is then
  * a simple union of files matched by individual [FileSet]s.
  *
+ * [root] is often used standalone, without regards to [patterns] and other parameters, when external tool only accepts
+ * a directory. For example, compilers may use [root] as a root of the package hierarchy, or IDE plugins may use it as source root.
+ * For this reason, it is advisable to set it only to the path of "natural root" for the given resource.
+ *
  * For simplicity, [FileSet] may also represent a single file, when [root] is not a directory, but a file.
  * This file is then included by default and [defaultExcludes] are ignored. The file may still get excluded and re-included
  * through [patterns], which are matched directly against the file name.
@@ -91,7 +95,7 @@ class FileSet(
     }
 
     /**
-     * [pattern] syntax closely follows [ant pattern syntax](https://ant.apache.org/manual/dirtasks.html#patterns)
+     * [patterns] syntax closely follows [ant pattern syntax](https://ant.apache.org/manual/dirtasks.html#patterns)
      * which is in turn based on shell glob syntax.
      *
      * All symbols match themselves (and possibly their opposite-case counterpart if [FileSet.caseSensitive] is `false`),
@@ -109,27 +113,42 @@ class FileSet(
      * For compatibility with Ant, when pattern ends with `/`, `**` is appended so that it matches all files of the folder.
      * Note that unlike gitignore's syntax, trailing `/` does not force the matched file to be a directory, so
      * `thing/∗∗` will also match a regular file "thing". ([FileSet] does not allow to match directories.)
-     *
-     * @param include true = this pattern includes, false = this pattern excludes
      */
-    class Pattern internal constructor(val include:Boolean, pattern:String) : JsonWritable {
+    class Pattern(val type:Type, patterns:Array<String>) : JsonWritable {
 
-        /** Sanitized pattern string */
-        val pattern:SanitizedPattern = sanitizePattern(pattern)
+        /** Sanitized pattern strings */
+        val patterns:Array<SanitizedPattern> = Array(patterns.size){ i -> sanitizePattern(patterns[i]) }
 
         override fun toString(): String {
-            if (include) {
-                return "include($pattern)"
-            } else {
-                return "exclude($pattern)"
-            }
+            val sb = StringBuilder(32)
+            sb.append(type).append('(')
+            patterns.joinTo(sb, ", ")
+            sb.append(')')
+            return sb.toString()
         }
 
         override fun JsonWriter.write() {
             writeObject {
-                name(if (include) "include" else "exclude")
-                value(pattern)
+                name(type.name)
+                writeArray {
+                    for (pattern in patterns) {
+                        value(pattern)
+                    }
+                }
             }
+        }
+
+        /** [FileSet] initially matches either all files of the directory of its [root], or no files,
+         * if the first [Pattern] is an [Include]. To obtain the matching set of files, [Pattern]s are applied in the
+         * order in which they are specified, to modify the set. Note that only files accessible through the [root]
+         * (without `..`) are considered. */
+        enum class Type {
+            /** When file matches ALL patterns, it is added to the set */
+            Include,
+            /** When file from set matches ALL patterns, it is removed from the set */
+            Exclude,
+            /** When file in set doesn't match ANY pattern, it is removed from the set */
+            Filter
         }
     }
 }
@@ -157,12 +176,9 @@ val FILE_SET_PRETTY_PRINTER : (FileSet?) -> CharSequence = printer@{
             sb.format(Color.White).append(' ')
 
             for (pattern in set.patterns) {
-                if (pattern.include) {
-                    sb.append(" include(")
-                } else {
-                    sb.append(" exclude(")
-                }
-                sb.format().append(pattern.pattern).format(Color.White).append(")")
+                sb.append(' ').append(pattern.type).append('(').format()
+                pattern.patterns.joinTo(sb, ", ")
+                sb.format(Color.White).append(')')
             }
             if (!set.defaultExcludes) {
                 sb.append(" (without default excludes)")
@@ -213,12 +229,15 @@ fun Path.fileSet(vararg patterns: FileSet.Pattern,
     return FileSet(this, *patterns, defaultExcludes = defaultExcludes, caseSensitive = caseSensitive, next = null)
 }
 
-/** Create an including pattern for [FileSet].
- * @see [FileSet.Pattern] for syntax */
-fun include(pattern:String): FileSet.Pattern = FileSet.Pattern(true, pattern)
-/** Create an excluding pattern for [FileSet].
- * @see [FileSet.Pattern] for syntax */
-fun exclude(pattern:String): FileSet.Pattern = FileSet.Pattern(false, pattern)
+/** Shortcut for [FileSet.Pattern] with [Pattern.Type.Include]. */
+@Suppress("UNCHECKED_CAST")
+fun include(vararg pattern:String): FileSet.Pattern = FileSet.Pattern(Pattern.Type.Include, pattern as Array<String>)
+/** Shortcut for [FileSet.Pattern] with [Pattern.Type.Exclude]. */
+@Suppress("UNCHECKED_CAST")
+fun exclude(vararg pattern:String): FileSet.Pattern = FileSet.Pattern(Pattern.Type.Exclude, pattern as Array<String>)
+/** Shortcut for [FileSet.Pattern] with [Pattern.Type.Filter]. */
+@Suppress("UNCHECKED_CAST")
+fun filter(vararg pattern:String): FileSet.Pattern = FileSet.Pattern(Pattern.Type.Filter, pattern as Array<String>)
 
 /** Combine two [FileSet]s. File will be in the resulting [FileSet], if it were in the first or the second one.
  * Note that if a file is matched by both, it **may** appear in [matchingFiles]. */
@@ -234,6 +253,12 @@ operator fun FileSet?.plus(fileSet:FileSet?):FileSet? {
         other = other.next ?: break
     }
     return me
+}
+
+/** Return receiver with given [patterns] appended. */
+fun FileSet?.appendPatterns(vararg patterns:Pattern):FileSet? {
+    if (this == null || patterns.isEmpty()) return this
+    return FileSet(root, *this.patterns, *patterns, defaultExcludes = defaultExcludes, caseSensitive = defaultExcludes, next = this.next.appendPatterns(*patterns))
 }
 
 /** Find all files which are matched by the receiver. */
@@ -465,12 +490,17 @@ internal fun matches(patterns: Array<out FileSet.Pattern>, defaultExcludes:Boole
 
     for (i in patterns.indices.reversed()) {
         val pattern = patterns[i]
-        if (patternMatches(pattern.pattern, path, caseSensitive)) {
-            return pattern.include
+        when (pattern.type) {
+            Pattern.Type.Include ->
+                if (pattern.patterns.all { patternMatches(it, path, caseSensitive) }) return true
+            Pattern.Type.Exclude ->
+                if (pattern.patterns.all { patternMatches(it, path, caseSensitive) }) return false
+            Pattern.Type.Filter ->
+                if (pattern.patterns.all { !patternMatches(it, path, caseSensitive) }) return false
         }
     }
 
-    if (patterns.isEmpty() || !patterns[0].include) {
+    if (patterns.isEmpty() || patterns[0].type != Pattern.Type.Include) {
         // If there are no patterns at all, or if the first pattern is exclude, path is included by default
         return true
     }

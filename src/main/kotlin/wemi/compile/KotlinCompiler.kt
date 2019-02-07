@@ -123,9 +123,7 @@ enum class KotlinCompilerVersion (
 }
 
 /** Valid Kotlin source file extensions */
-val KotlinSourceFileExtensions = setOf("kt", "kts")
-/** Includes needed to match Kotlin files */
-val KotlinSourceFileIncludes = arrayOf(include("**.kt"), include("**.kts"))
+val KotlinSourceFileExtensions = listOf("kt", "kts")
 
 /**
  * General Kotlin compiler flags.
