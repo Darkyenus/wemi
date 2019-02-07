@@ -180,12 +180,12 @@ fun dependency(groupNameVersion: String, preferredRepository: Repository?, varar
  * If the [url] is local, no cache is used. If it is not local (that is, not `file:`),
  * [LocalM2Repository] is used as cache.
  */
-fun repository(name: String, url: String, checksum: Repository.M2.Checksum = Repository.M2.Checksum.SHA1): Repository.M2 {
+fun repository(name: String, url: String, checksum: Repository.M2.Checksum = Repository.M2.Checksum.SHA1, releases:Boolean = true, snapshots:Boolean = true): Repository.M2 {
     val usedUrl = URL(url)
     return Repository.M2(name,
             usedUrl,
             if (usedUrl.protocol.equals("file", ignoreCase = true)) null else LocalM2Repository,
-            checksum)
+            checksum, releases, snapshots)
 }
 
 /**

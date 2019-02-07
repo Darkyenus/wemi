@@ -21,7 +21,8 @@ import kotlin.collections.HashMap
  * Manages resolution of dependencies through [Repository.M2] Maven repository.
  *
  * Maven repository layout is described
- * [here](https://cwiki.apache.org/confluence/display/MAVENOLD/Repository+Layout+-+Final).
+ * [here](https://cwiki.apache.org/confluence/display/MAVENOLD/Repository+Layout+-+Final)
+ * or [here](https://blog.packagecloud.io/eng/2017/03/09/how-does-a-maven-repository-work/).
  */
 internal object Maven2 {
 

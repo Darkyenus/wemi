@@ -48,13 +48,15 @@ sealed class Repository(val name: String) {
 
     /** Maven repository.
      *
-     * @param name of this repository, arbitrary
+     * @param name of this repository, arbitrary (but should be consistent, as it is used for internal bookkeeping)
      * @param url of this repository
      * @param cache of this repository
      * @param checksum to use when retrieving artifacts from here
+     * @param releases whether this repository should be used to query for release versions (non-SNAPSHOT)
+     * @param snapshots whether this repository should be used to query for snapshot versions (versions ending with -SNAPSHOT)
      */
     @Json(Repository.Serializer::class)
-    class M2(name: String, val url: URL, override val cache: M2? = null, val checksum: Checksum = M2.Checksum.SHA1) : Repository(name) {
+    class M2(name: String, val url: URL, override val cache: M2? = null, val checksum: Checksum = M2.Checksum.SHA1, val releases:Boolean = true, val snapshots:Boolean = true) : Repository(name) {
 
         override val local: Boolean
             get() = "file".equals(url.protocol, ignoreCase = true)
@@ -359,32 +361,38 @@ fun createRepositoryChain(repositories: Collection<Repository>): RepositoryChain
 }
 
 // Default repositories
-/**
- * Local Maven repository stored in ~/.m2/repository
- */
+/** Default local Maven repository stored in `~/.m2/repository`. Typically used as a local cache or for local releases. */
 val LocalM2Repository = Repository.M2("local", (Paths.get(System.getProperty("user.home")) / ".m2/repository/").toUri().toURL(), null)
 
-/**
- * Maven Central repository at [maven.org](https://maven.org)
- *
- * Cached by [LocalM2Repository].
- */
-val MavenCentral = Repository.M2("central", URL("https://repo1.maven.org/maven2/"), LocalM2Repository)
+/** Maven Central repository at [maven.org](https://maven.org). Cached by [LocalM2Repository]. */
+val MavenCentral = Repository.M2("central", URL("https://repo1.maven.org/maven2/"), LocalM2Repository, snapshots = false)
 
-/**
- * JCenter repository at [bintray.com](https://bintray.com/bintray/jcenter)
- *
- * Cached by [LocalM2Repository].
- */
-val JCenter = Repository.M2("jcenter", URL("https://jcenter.bintray.com/"), LocalM2Repository)
+/** [Bintray JCenter repository](https://bintray.com/bintray/jcenter). Cached by [LocalM2Repository]. */
+val JCenter = Repository.M2("jcenter", URL("https://jcenter.bintray.com/"), LocalM2Repository, snapshots = false)
 
-/**
- * Jitpack repository at [jitpack.io](https://jitpack.io)
- *
- * Cached by [LocalM2Repository].
- */
+/** [Jitpack repository](https://jitpack.io). Cached by [LocalM2Repository]. */
 @Suppress("unused")
 val Jitpack = Repository.M2("jitpack", URL("https://jitpack.io/"), LocalM2Repository)
+
+/** [Sonatype Oss](https://oss.sonatype.org/) repository. Cached by [LocalM2Repository].
+ * Most used [repository]-ies are `"releases"` and `"snapshots"`. */
+@Suppress("unused")
+fun sonatypeOss(repository:String):Repository.M2 {
+    val releases:Boolean
+    val snapshots:Boolean
+    if (repository.contains("release", ignoreCase = true)) {
+        releases = true
+        snapshots = false
+    } else if (repository.contains("snapshot", ignoreCase = true)) {
+        releases = false
+        snapshots = true
+    } else {
+        releases = true
+        snapshots = true
+    }
+
+    return Repository.M2("sonatype-oss-$repository", URL("https://oss.sonatype.org/content/repositories/$repository/"), LocalM2Repository, releases = releases, snapshots = snapshots)
+}
 
 /**
  * Repositories to use by default.

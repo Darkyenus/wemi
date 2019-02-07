@@ -1,7 +1,7 @@
 # Things to do next
 
 ## For next release
-- nice maven writeup: https://blog.packagecloud.io/eng/2017/03/09/how-does-a-maven-repository-work/
+- Maven snapshots
 
 ## For later
 - Rewrite directorySynchronized based on exclusive file creation and timestamp
