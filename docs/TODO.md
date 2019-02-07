@@ -1,8 +1,6 @@
 # Things to do next
 
 ## For next release
-- IDE: Convert to Wemi is still using old (re)sourceFiles keys
-	- It determined that the module's root is in .idea/modules, so perhaps we should rather look at module's content root
 - nice maven writeup: https://blog.packagecloud.io/eng/2017/03/09/how-does-a-maven-repository-work/
 
 ## For later

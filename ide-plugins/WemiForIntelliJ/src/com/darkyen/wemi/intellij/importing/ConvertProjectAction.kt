@@ -87,6 +87,7 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
 
         val buildScript = StringBuilder()
         buildScript.append("@file:Suppress(\"unused\")\n")
+        buildScript.append("import wemi.util.*\n")
 
         if (modules.isEmpty()) {
             buildScript.append("\n")
@@ -135,56 +136,56 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
         append("\tprojectVersion set { \"").append(version.escapeStringLiteral()).append("\" }\n")
         append("\n")
         // Content roots
-        val sourceRoots = ArrayList<CharSequence>()
-        val testSourceRoots = ArrayList<CharSequence>()
-        val resourceRoots = ArrayList<CharSequence>()
-        val testResourceRoots = ArrayList<CharSequence>()
+        val sourceFileSets = ArrayList<CharSequence>()
+        val testSourceFileSets = ArrayList<CharSequence>()
+        val resourceFileSets = ArrayList<CharSequence>()
+        val testResourceFileSets = ArrayList<CharSequence>()
 
         val moduleRootManager = ModuleRootManager.getInstance(module)
         for (entry in moduleRootManager.contentEntries) {
             for (sourceFolder in entry.sourceFolders) {
                 val rootList = when (sourceFolder.rootType) {
-                    JavaSourceRootType.SOURCE -> sourceRoots
-                    JavaSourceRootType.TEST_SOURCE -> testSourceRoots
-                    JavaResourceRootType.RESOURCE -> resourceRoots
-                    JavaResourceRootType.TEST_RESOURCE -> testResourceRoots
+                    JavaSourceRootType.SOURCE -> sourceFileSets
+                    JavaSourceRootType.TEST_SOURCE -> testSourceFileSets
+                    JavaResourceRootType.RESOURCE -> resourceFileSets
+                    JavaResourceRootType.TEST_RESOURCE -> testResourceFileSets
                     else -> null
                 } ?: continue
 
                 val path = sourceFolder.file?.toPath()?.toAbsolutePath() ?: continue
                 if (path.startsWith(projectRoot)) {
-                    rootList.add("projectRoot.get() / \"${moduleRoot.relativize(path).toString().escapeStringLiteral()}\"")
+                    rootList.add("FileSet(projectRoot.get() / \"${moduleRoot.relativize(path).toString().escapeStringLiteral()}\")")
                 } else {
-                    rootList.add("\"${path.toString().escapeStringLiteral()}\"")
+                    rootList.add("FileSet(path(\"${path.toString().escapeStringLiteral()}\"))")
                 }
             }
         }
-        if (sourceRoots.isNotEmpty()) {
-            append("\textend(compilingJava) {\n")
-            append("\t\tsourceRoots set { setOf(")
-            sourceRoots.joinTo(this, ", ")
-            append(") }\n")
+        if (sourceFileSets.isNotEmpty()) {
+            append("\tsources set { ")
+            sourceFileSets.joinTo(this, " + ")
+            append(" }\n\n")
+        }
+        if (resourceFileSets.isNotEmpty()) {
+            append("\tresources set { ")
+            resourceFileSets.joinTo(this, " + ")
+            append(" }\n\n")
+        }
+        if (testSourceFileSets.isNotEmpty()) {
+            append("\textend(testing) {\n")
+            append("\t\tsources modify { it")
+            for (set in testSourceFileSets) {
+                append(" + ").append(set)
+            }
+            append(" }\n")
             append("\t}\n\n")
         }
-        if (resourceRoots.isNotEmpty()) {
-            append("\tresourceRoots set { setOf(")
-            sourceRoots.joinTo(this, ", ")
-            append(") }\n\n")
-        }
-        if (testSourceRoots.isNotEmpty()) {
+        if (testResourceFileSets.isNotEmpty()) {
             append("\textend(testing) {\n")
-            append("\t\textend(compilingJava) {\n")
-            append("\t\t\tresourceRoots set { setOf(")
-            testSourceRoots.joinTo(this, ", ")
-            append(") }\n")
-            append("\t\t}\n")
-            append("\t}\n\n")
-        }
-        if (testResourceRoots.isNotEmpty()) {
-            append("\textend(testing) {\n")
-            append("\t\tresourceRoots set { setOf(")
-            testResourceRoots.joinTo(this, ", ")
-            append(") }\n")
+            append("\t\tresources modify { it")
+            for (set in testResourceFileSets) {
+                append(" + ").append(set)
+            }
+            append(" }\n")
             append("\t}\n\n")
         }
 
