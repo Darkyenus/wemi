@@ -222,7 +222,7 @@ private val DUPLICATE_FILE_SEPARATORS = Regex("(?:/\\.?)+/")
 private val EXTRA_BLOBS = Regex("\\*{3,}")
 
 /** Create a [FileSet] with this path as its [FileSet.root]. */
-@Deprecated("Use FileSet constructor directly", ReplaceWith("FileSet(this, patterns)", "wemi.util.FileSet"))
+@Deprecated("Use FileSet constructor directly (REMOVE IN 0.9)", ReplaceWith("FileSet(this, patterns)", "wemi.util.FileSet"))
 fun Path.fileSet(vararg patterns: FileSet.Pattern,
                  defaultExcludes:Boolean = true,
                  caseSensitive:Boolean = true): FileSet {

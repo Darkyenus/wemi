@@ -6,7 +6,7 @@ import wemi.Project
 import wemi.util.*
 
 /**
- * Defines a dependency on a project defined in the same build script.
+ * Defines a dependency on a [project] defined in the same build script.
  *
  * Dependency pulls [project]s [wemi.Keys.internalClasspath] and [wemi.Keys.externalClasspath] into
  * this project's external classpath.
@@ -14,9 +14,8 @@ import wemi.util.*
  * @param aggregate if `true`, [project]'s internal classpath will be considered a part of this project's
  *          internal classpath when creating artifact archive. If `false`, this dependency will have to be
  *          represented through metadata and both projects will have to be archived separately.
- * @see dependency
  */
-class ProjectDependency internal constructor(val project: Project, val aggregate:Boolean, val configurations: Array<out Configuration>)
+class ProjectDependency(val project: Project, val aggregate:Boolean, vararg val configurations: Configuration)
     : JsonWritable {
 
     override fun JsonWriter.write() {
@@ -50,6 +49,7 @@ class ProjectDependency internal constructor(val project: Project, val aggregate
  *
  * @param aggregate see [ProjectDependency.aggregate]
  */
+@Deprecated("Use ProjectDependency constructor directly (REMOVE IN 0.9)", ReplaceWith("ProjectDependency(project, aggregate, configurations)", "wemi.dependency.ProjectDependency"))
 fun dependency(project:Project, aggregate:Boolean, vararg configurations: Configuration): ProjectDependency {
-    return ProjectDependency(project, aggregate, configurations)
+    return ProjectDependency(project, aggregate, *configurations)
 }

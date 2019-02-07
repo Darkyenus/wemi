@@ -7,11 +7,13 @@ import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingClasspathModifier
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.KeyDefaults.inProjectDependencies
+import wemi.collections.WMutableSet
 import wemi.collections.toMutable
 import wemi.compile.*
 import wemi.dependency.Dependency
-import wemi.dependency.Repository.M2.Companion.JavadocClassifier
-import wemi.dependency.Repository.M2.Companion.SourcesClassifier
+import wemi.dependency.MavenRepository.Companion.JavadocClassifier
+import wemi.dependency.MavenRepository.Companion.SourcesClassifier
+import wemi.dependency.Repository
 import wemi.test.JUnitPlatformLauncher
 import wemi.util.*
 
@@ -130,8 +132,14 @@ object Configurations {
      */
     val offline by configuration("Disables features that are not available when offline") {
         // Disable non-local repositories
-        Keys.repositoryChain modify { oldChain ->
-            oldChain.filter { it.local }
+        Keys.repositories modify { oldChain ->
+            WMutableSet<Repository>().apply {
+                for (repository in oldChain) {
+                    if (repository.local) {
+                        add(repository)
+                    }
+                }
+            }
         }
 
         // Remove external documentation links if they don't have explicit package and don't point to 'file:' url

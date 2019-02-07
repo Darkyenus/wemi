@@ -22,7 +22,7 @@ import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.internal.MessageLocation
 import wemi.compile.internal.render
 import wemi.dependency.*
-import wemi.dependency.Repository.M2.Companion.joinClassifiers
+import wemi.dependency.MavenRepository.Companion.joinClassifiers
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
@@ -54,8 +54,8 @@ object KeyDefaults {
     /** Create value for [Keys.libraryDependencyProjectMapper] that appends given classifier to sources. */
     fun classifierAppendingLibraryDependencyProjectMapper(appendClassifier:String):(Dependency) -> Dependency = {
         (projectId, exclusions): Dependency ->
-            val classifier = joinClassifiers(projectId.attribute(Repository.M2.Classifier), appendClassifier)!!
-            val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (Repository.M2.Classifier to classifier))
+            val classifier = joinClassifiers(projectId.attribute(MavenRepository.Classifier), appendClassifier)!!
+            val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (MavenRepository.Classifier to classifier))
             Dependency(sourcesProjectId, exclusions)
         }
 
@@ -98,12 +98,12 @@ object KeyDefaults {
 
 
     val ResolvedLibraryDependencies: Value<Partial<Map<DependencyId, ResolvedDependency>>> =  {
-        val repositories = Keys.repositoryChain.get()
+        val repositories = Keys.repositories.get()
         val libraryDependencies = Keys.libraryDependencies.get()
         val libraryDependencyProjectMapper = Keys.libraryDependencyProjectMapper.get()
 
         val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
-        val complete = DependencyResolver.resolve(resolved, libraryDependencies, repositories, libraryDependencyProjectMapper)
+        val complete = LibraryDependencyResolver.resolve(resolved, libraryDependencies, repositories, libraryDependencyProjectMapper)
         Partial(resolved, complete)
     }
 
@@ -134,7 +134,7 @@ object KeyDefaults {
 
         val resolved = Keys.resolvedLibraryDependencies.get()
         if (!resolved.complete) {
-            throw WemiException("Failed to resolve all artifacts\n${resolved.value.prettyPrint(null)}", showStacktrace = false)
+            throw WemiException("Failed to resolve all artifacts\n${resolved.value.prettyPrint(Keys.libraryDependencies.get().map { it.dependencyId })}", showStacktrace = false)
         }
         for ((_, resolvedDependency) in resolved.value) {
             result.add(LocatedPath(resolvedDependency.artifact ?: continue))
@@ -793,7 +793,7 @@ object KeyDefaults {
 
     val ArchiveDokkaInterface: Value<DokkaInterface> = {
         val javaHome = Keys.javaHome.get()
-        val artifacts = DependencyResolver.resolveArtifacts(DokkaFatJar, emptyList())?.toMutableList()
+        val artifacts = LibraryDependencyResolver.resolveArtifacts(DokkaFatJar, emptyList())?.toMutableList()
                 ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
         jdkToolsJar(javaHome)?.let { artifacts.add(it) }
@@ -959,13 +959,13 @@ object KeyDefaults {
                         newChild("groupId", dependency.dependencyId.group)
                         newChild("artifactId", dependency.dependencyId.name)
                         newChild("version", dependency.dependencyId.version)
-                        dependency.dependencyId.attribute(Repository.M2.Type)?.let {
+                        dependency.dependencyId.attribute(MavenRepository.Type)?.let {
                             newChild("type", it)
                         }
-                        dependency.dependencyId.attribute(Repository.M2.Classifier)?.let {
+                        dependency.dependencyId.attribute(MavenRepository.Classifier)?.let {
                             newChild("classifier", it)
                         }
-                        dependency.dependencyId.attribute(Repository.M2.Scope)?.let {
+                        dependency.dependencyId.attribute(MavenRepository.Scope)?.let {
                             newChild("scope", it)
                         }
                         newChild("exclusions") {
@@ -989,7 +989,7 @@ object KeyDefaults {
                                 }
                             }
                         }
-                        dependency.dependencyId.attribute(Repository.M2.Optional)?.let {
+                        dependency.dependencyId.attribute(MavenRepository.Optional)?.let {
                             newChild("optional", it)
                         }
                     }
@@ -1002,7 +1002,7 @@ object KeyDefaults {
                         // Added by default
                         continue
                     }
-                    if (repository !is Repository.M2) {
+                    if (repository !is MavenRepository) {
                         PUBLISH_MODEL_LOG.warn("Omitting repository {}, only M2 repositories are supported", repository)
                         continue
                     }

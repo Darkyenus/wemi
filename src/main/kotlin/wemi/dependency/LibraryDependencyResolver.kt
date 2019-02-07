@@ -8,9 +8,9 @@ import java.util.concurrent.TimeUnit
 /**
  * Provides entry points to the DependencyResolver API for resolving library dependencies.
  */
-object DependencyResolver {
+object LibraryDependencyResolver {
 
-    private val LOG = LoggerFactory.getLogger(DependencyResolver.javaClass)
+    private val LOG = LoggerFactory.getLogger(LibraryDependencyResolver.javaClass)
 
     /**
      * Resolve [dependency] using the [repositories] repository chain.
@@ -19,7 +19,7 @@ object DependencyResolver {
      * Does not resolve transitively.
      * When resolution fails, returns ResolvedDependency with [ResolvedDependency.hasError] = true.
      */
-    internal fun resolveSingleDependency(dependencyId: DependencyId, repositories: RepositoryChain): ResolvedDependency {
+    internal fun resolveSingleDependency(dependencyId: DependencyId, repositories: Collection<Repository>): ResolvedDependency {
         var log: StringBuilder? = null
         val startTime = System.nanoTime()
 
@@ -87,7 +87,7 @@ object DependencyResolver {
     private fun doResolveArtifacts(dependencyStack:ArrayList<DependencyId>,
                                    exclusionStack:ArrayList<DependencyExclusion>,
                                    resolved: MutableMap<DependencyId, ResolvedDependency>,
-                                   dependency: Dependency, repositories: RepositoryChain,
+                                   dependency: Dependency, repositories: Collection<Repository>,
                                    mapper: (Dependency) -> Dependency): Boolean {
 
         val (dependencyId, exclusions) = mapper(dependency)
@@ -160,7 +160,7 @@ object DependencyResolver {
      *
      * If any dependency fails to resolve, returns null.
      */
-    fun resolveArtifacts(projects: Collection<Dependency>, repositories: RepositoryChain): List<Path>? {
+    fun resolveArtifacts(projects: Collection<Dependency>, repositories: Collection<Repository>): List<Path>? {
         val resolved = mutableMapOf<DependencyId, ResolvedDependency>()
         val ok = resolve(resolved, projects, repositories)
 
@@ -188,7 +188,7 @@ object DependencyResolver {
      *
      * @return true if all [dependencies] resolve correctly without error
      */
-    fun resolve(resolved: MutableMap<DependencyId, ResolvedDependency>, dependencies: Collection<Dependency>, repositories: RepositoryChain, mapper: ((Dependency) -> Dependency) = { it }): Boolean {
+    fun resolve(resolved: MutableMap<DependencyId, ResolvedDependency>, dependencies: Collection<Dependency>, repositories: Collection<Repository>, mapper: ((Dependency) -> Dependency) = { it }): Boolean {
         val directoriesToLock = repositories.mapNotNull { it.cache?.directoryToLock() }.distinct()
 
         fun <Result> locked(level:Int, action:()->Result):Result {

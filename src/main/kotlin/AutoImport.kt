@@ -6,10 +6,10 @@ import wemi.boot.Task
 import wemi.boot.WemiRootFolder
 import wemi.boot.autoRunTasks
 import wemi.dependency.DependencyAttribute
+import wemi.dependency.MavenRepository
 import wemi.dependency.Repository
 import java.net.URL
 import java.nio.file.Paths
-import wemi.dependency.dependency as _dependency
 import wemi.kotlinDependency as _kotlinDependency
 import wemi.test.JUnitAPI as _JUnitAPI
 import wemi.test.JUnitEngine as _JUnitEngine
@@ -50,7 +50,7 @@ inline fun dependency(group: String, name: String, version: String, vararg attri
 inline fun dependency(groupNameVersion: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(groupNameVersion, preferredRepository, *attributes)
 inline fun dependency(groupNameVersion: String, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(groupNameVersion, null, *attributes)
 
-inline fun repository(name: String, url: String, checksum: Repository.M2.Checksum = Repository.M2.Checksum.SHA1) = wemi.repository(name, url, checksum)
+inline fun repository(name: String, url: String, checksum: MavenRepository.Checksum = MavenRepository.Checksum.SHA1) = wemi.repository(name, url, checksum)
 
 // Helper functions
 inline fun EvalScope.kotlinDependency(name: String) = _kotlinDependency(name)
@@ -58,10 +58,12 @@ inline val EvalScope.JUnitAPI
     inline get() = _JUnitAPI
 val EvalScope.JUnitEngine
     inline get() = _JUnitEngine
-inline fun dependency(project:Project, aggregate:Boolean, vararg configurations:Configuration) = _dependency(project, aggregate, *configurations)
 
-@Deprecated("User version with explicit aggregate=true parameter.")
-inline fun dependency(project:Project, vararg configurations:Configuration) = _dependency(project, true, *configurations)
+@Deprecated("Use ProjectDependency constructor directly (REMOVE IN 0.9)", ReplaceWith("ProjectDependency(project, aggregate, configurations)"))
+inline fun dependency(project:Project, aggregate:Boolean, vararg configurations:Configuration) = wemi.dependency.dependency(project, aggregate, *configurations)
+
+@Deprecated("User version with explicit aggregate=true parameter. (REMOVE IN 0.9)", ReplaceWith("dependency(project, true, configurations)"))
+inline fun dependency(project:Project, vararg configurations:Configuration) = wemi.dependency.dependency(project, true, *configurations)
 
 // Path helpers
 /**
@@ -133,8 +135,6 @@ val resources
 
 val repositories
     inline get() = wemi.Keys.repositories
-val repositoryChain
-    inline get() = wemi.Keys.repositoryChain
 val libraryDependencies
     inline get() = wemi.Keys.libraryDependencies
 val libraryDependencyProjectMapper

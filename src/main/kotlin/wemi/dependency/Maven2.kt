@@ -3,22 +3,306 @@ package wemi.dependency
 import com.darkyen.dave.Response
 import com.darkyen.dave.Webb
 import com.darkyen.dave.WebbException
+import com.esotericsoftware.jsonbeans.JsonValue
+import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
 import org.xml.sax.*
 import org.xml.sax.helpers.DefaultHandler
 import org.xml.sax.helpers.XMLReaderFactory
 import wemi.dependency.Maven2.PomBuildingXMLHandler.Companion.SupportedModelVersion
+import wemi.publish.InfoNode
 import wemi.util.*
 import java.io.ByteArrayInputStream
 import java.io.FileNotFoundException
+import java.net.URI
 import java.net.URL
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 import java.util.*
 import kotlin.collections.HashMap
 
 /**
- * Manages resolution of dependencies through [Repository.M2] Maven repository.
+ * Artifact classifier.
+ * @see MavenRepository.Classifier
+ */
+typealias Classifier = String
+
+/** Maven version 2 or 3 repository.
+ * As described [here](https://cwiki.apache.org/confluence/display/MAVENOLD/Repository+Layout+-+Final).
+ *
+ * @param name of this repository, arbitrary (but should be consistent, as it is used for internal bookkeeping)
+ * @param url of this repository
+ * @param cache of this repository
+ * @param checksum to use when retrieving artifacts from here
+ * @param releases whether this repository should be used to query for release versions (non-SNAPSHOT)
+ * @param snapshots whether this repository should be used to query for snapshot versions (versions ending with -SNAPSHOT)
+ */
+class MavenRepository(name: String, val url: URL, override val cache: MavenRepository? = null, val checksum: Checksum = MavenRepository.Checksum.SHA1, val releases:Boolean = true, val snapshots:Boolean = true) : Repository(name) {
+
+    init {
+        if (!releases && !snapshots) {
+            LOG.warn("{} is not used for releases nor snapshots, so it will be always skipped", this)
+        }
+    }
+
+    override val local: Boolean
+        get() = "file".equals(url.protocol, ignoreCase = true)
+
+    override fun resolveInRepository(dependency: DependencyId, repositories: Collection<Repository>): ResolvedDependency {
+        return Maven2.resolveInM2Repository(dependency, this, repositories)
+    }
+
+    override fun directoryToLock(): Path? {
+        return directoryPath()
+    }
+
+    /**
+     * @return Path to the directory root, if on this filesystem
+     */
+    private fun directoryPath(): Path? {
+        try {
+            if (local) {
+                return FileSystems.getDefault().getPath(url.path)
+            }
+        } catch (ignored:Exception) { }
+        return null
+    }
+
+    override fun publish(metadata: InfoNode, artifacts: List<Pair<Path, String?>>): URI {
+        val lock = directoryToLock()
+
+        return if (lock != null) {
+            directorySynchronized(lock) {
+                publishLocked(metadata, artifacts)
+            }
+        } else {
+            publishLocked(metadata, artifacts)
+        }
+    }
+
+    private fun Path.checkValidForPublish(snapshot:Boolean) {
+        if (Files.exists(this)) {
+            if (snapshot) {
+                LOG.info("Overwriting {}", this)
+            } else {
+                throw UnsupportedOperationException("Can't overwrite published non-snapshot file $this")
+            }
+        } else {
+            Files.createDirectories(this.parent)
+        }
+    }
+
+    private fun publishLocked(metadata: InfoNode, artifacts: List<Pair<Path, String?>>): URI {
+        val path = directoryPath() ?: throw UnsupportedOperationException("Can't publish to non-local repository")
+
+        val groupId = metadata.findChild("groupId")?.text ?: throw IllegalArgumentException("Metadata is missing a groupId:\n$metadata")
+        val artifactId = metadata.findChild("artifactId")?.text ?: throw IllegalArgumentException("Metadata is missing a artifactId:\n$metadata")
+        val version = metadata.findChild("version")?.text ?: throw IllegalArgumentException("Metadata is missing a version:\n$metadata")
+
+        val snapshot = version.endsWith("-SNAPSHOT")
+
+        val pomPath = path / Maven2.pomPath(groupId, artifactId, version)
+        LOG.debug("Publishing metadata to {}", pomPath)
+        pomPath.checkValidForPublish(snapshot)
+        val pomXML = metadata.toXML()
+        Files.newBufferedWriter(pomPath, Charsets.UTF_8).use {
+            it.append(pomXML)
+        }
+        // Create pom.xml hashes
+        run {
+            val pomXMLBytes = pomXML.toString().toByteArray(Charsets.UTF_8)
+            for (checksum in PublishChecksums) {
+                val digest = checksum.digest()!!.digest(pomXMLBytes)
+
+                val publishedName = pomPath.name
+                val checksumFile = pomPath.parent.resolve("$publishedName${checksum.suffix}")
+                checksumFile.checkValidForPublish(snapshot)
+
+                checksumFile.writeText(createHashSum(digest, publishedName))
+                LOG.debug("Publishing metadata {} to {}", checksum, checksumFile)
+            }
+        }
+
+
+        for ((artifact, classifier) in artifacts) {
+            val publishedArtifact = path / Maven2.artifactPath(groupId, artifactId, version, classifier, artifact.name.pathExtension())
+            LOG.debug("Publishing {} to {}", artifact, publishedArtifact)
+            publishedArtifact.checkValidForPublish(snapshot)
+
+            Files.copy(artifact, publishedArtifact, StandardCopyOption.REPLACE_EXISTING)
+            // Create hashes
+            val checksums = PublishChecksums
+            val digests = Array(checksums.size) { checksums[it].digest()!! }
+
+            Files.newInputStream(artifact).use { input ->
+                val buffer = ByteArray(4096)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read == -1) {
+                        break
+                    }
+                    for (digest in digests) {
+                        digest.update(buffer, 0, read)
+                    }
+                }
+            }
+            for (i in checksums.indices) {
+                val digest = digests[i].digest()
+
+                val publishedName = publishedArtifact.name
+                val checksumFile = publishedArtifact.parent.resolve("$publishedName${checksums[i].suffix}")
+                checksumFile.checkValidForPublish(snapshot)
+
+                checksumFile.writeText(createHashSum(digest, publishedName))
+                LOG.debug("Publishing {} {} to {}", publishedArtifact, checksum, checksumFile)
+            }
+
+            LOG.info("Published {} with {} checksum(s)", publishedArtifact, checksums.size)
+        }
+
+        return pomPath.parent.toUri()
+    }
+
+    companion object {
+        private val LOG = LoggerFactory.getLogger(MavenRepository::class.java)
+
+        /**
+         * Various variants of the same dependency.
+         * Examples: jdk15, sources, javadoc, linux
+         */
+        val Classifier = DependencyAttribute("m2-classifier", true)
+        /**
+         * Corresponds to the packaging of the dependency (and overrides it).
+         * Determines what sort of artifact is retrieved.
+         *
+         * Examples: jar (default), pom (returns pom.xml, used internally)
+         */
+        val Type = DependencyAttribute("m2-type", true, "jar")
+        /**
+         * Scope of the dependency.
+         *
+         * Examples: compile, provided, test
+         * See https://maven.apache.org/pom.html#Dependencies
+         *
+         * In Wemi used only when filtering.
+         */
+        val Scope = DependencyAttribute("m2-scope", false, "compile")
+        /**
+         * Optional dependencies are skipped by default by Wemi.
+         */
+        val Optional = DependencyAttribute("m2-optional", false, "false")
+
+        /**
+         * Concatenate two classifiers.
+         */
+        internal fun joinClassifiers(first:String?, second:String?):String? {
+            return when {
+                first == null -> second
+                second == null -> first
+                else -> "$first-$second"
+            }
+        }
+
+        /**
+         * Classifier appended to artifacts with sources
+         */
+        const val SourcesClassifier = "sources"
+        /**
+         * Classifier appended to artifacts with Javadoc
+         */
+        const val JavadocClassifier = "javadoc"
+
+        /**
+         * [Checksum]s to generate when publishing an artifact.
+         */
+        val PublishChecksums = arrayOf(Checksum.MD5, Checksum.SHA1)
+
+        init {
+
+        }
+    }
+
+    internal object Serializer : JsonSerializer<MavenRepository> {
+        override fun JsonWriter.write(value: MavenRepository) {
+            field("name", value.name)
+            field("url", value.url)
+
+            field("cache", value.cache)
+            field("checksum", value.checksum)
+            field("releases", value.releases)
+            field("snapshots", value.snapshots)
+        }
+
+        override fun read(value: JsonValue): MavenRepository {
+            return MavenRepository(
+                    value.field("name"),
+                    value.field("url"),
+                    value.field("cache"),
+                    value.field("checksum"),
+                    value.field("releases"),
+                    value.field("snapshots"))
+        }
+    }
+
+    /**
+     * Types of checksum in Maven repositories.
+     *
+     * @param suffix of files with this checksum (extension with dot)
+     * @param algo Java digest algorithm name to use when computing this checksum
+     */
+    enum class Checksum(val suffix: String, private val algo: String) {
+        /**
+         * Special value for no checksum.
+         *
+         * Not recommended for general use - use only in extreme cases.
+         */
+        None(".no-checksum", "no-op"),
+        // https://en.wikipedia.org/wiki/File_verification
+        /**
+         * Standard SHA1 algorithm with .md5 suffix.
+         */
+        MD5(".md5", "MD5"),
+        /**
+         * Standard SHA1 algorithm with .sha1 suffix.
+         */
+        SHA1(".sha1", "SHA-1");
+
+        /**
+         * Creates a [MessageDigest] for this [Checksum].
+         * @return null if [None]
+         * @throws java.security.NoSuchAlgorithmException if not installed
+         */
+        fun digest(): MessageDigest? {
+            if (this == None) {
+                return null
+            }
+            val digest = MessageDigest.getInstance(algo)
+            digest.reset()
+            return digest
+        }
+
+        fun checksum(data: ByteArray): ByteArray {
+            val digest = digest() ?: return ByteArray(0)
+            digest.update(data)
+            return digest.digest()
+        }
+    }
+
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.append("M2: ").append(name).append(" at ").append(url)
+        if (cache != null) {
+            sb.append(" (cached by ").append(cache.name).append(')')
+        }
+        return sb.toString()
+    }
+}
+
+/**
+ * Manages resolution of dependencies through [MavenRepository] Maven repository.
  *
  * Maven repository layout is described
  * [here](https://cwiki.apache.org/confluence/display/MAVENOLD/Repository+Layout+-+Final)
@@ -33,14 +317,43 @@ internal object Maven2 {
     private val KPom = ArtifactKey<Pom>("pom", false)
     private val KPomUrl = ArtifactKey<URL>("pomUrl", true)
 
-    fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository.M2, chain: RepositoryChain): ResolvedDependency {
-
-        // Just retrieving raw pom file
-        if (dependencyId.attribute(Repository.M2.Type) == "pom") {
-            return retrievePom(dependencyId, repository, chain)
+    fun resolveInM2Repository(dependencyId: DependencyId, repository: MavenRepository, repositories: Collection<Repository>): ResolvedDependency {
+        val snapshot = dependencyId.isSnapshot
+        if (snapshot && !repository.snapshots) {
+            return ResolvedDependency(dependencyId, emptyList(), repository, true, "Release only repository skipped for snapshot dependency")
+        } else if (!snapshot && !repository.releases) {
+            return ResolvedDependency(dependencyId, emptyList(), repository, true, "Snapshot only repository skipped for release dependency")
         }
 
-        val resolvedPom = retrievePom(dependencyId, repository, chain)
+        // Just retrieving raw pom file
+        val resolvedPom = retrievePom(dependencyId, repository, repositories)
+
+        /*
+        TODO Implement:
+        Snapshot resolution logic abstract:
+        - Some snapshots ("non-unique snapshots") are overwritten on publish, so the resolution schema is the same
+            - but we need to check remote before local copy
+        - Other snapshots ("unique snapshots") use maven-metadata.xml, we need to download that to cache first
+
+        Steps (for snapshots):
+        1. Look into cache, if it contains POM or maven-metadata.xml
+            1. If it contains either, note its last modified date
+        2. Download the POM or maven-metadata.xml (preferring maven-metadata.xml)
+            - If cache contained one of the two, try that first
+            - If cache contained one of the two, make the query with cache control,
+                so that in the best case we don't have to re-download anything
+            - If both download attempts fail, resolution failed
+        3. If neither was downloaded fresh, resolve completely from cache
+        4. Otherwise
+            - (POM) continue resolution normally for the POM, overriding the cache
+            - (metadata) parse metadata, select newest version (TODO: Maybe some control over this through DependencyId attributes)
+                download that. Metadata should be overridden in the cache, rest must not be.
+         */
+
+        if (dependencyId.attribute(MavenRepository.Type) == "pom") {
+            return resolvedPom
+        }
+
         val pom = resolvedPom.getKey(KPom) ?:
                 return ResolvedDependency(dependencyId, emptyList(), repository, true,
                         "Failed to resolve pom: " + resolvedPom.log)
@@ -49,7 +362,7 @@ internal object Maven2 {
             LOG.warn("Retrieved pom for {} from {}, but resolution claims error ({}). Something may go wrong.", dependencyId, repository, resolvedPom.log)
         }
 
-        val packaging = dependencyId.attribute(Repository.M2.Type) ?: pom.packaging
+        val packaging = dependencyId.attribute(MavenRepository.Type) ?: pom.packaging
 
         when (packaging) {
             "pom" -> {
@@ -220,8 +533,8 @@ internal object Maven2 {
                     val tempDepId = templateDep.dependencyId
                     if (depId.group == tempDepId.group
                             && depId.name == tempDepId.name
-                            && depId.attribute(Repository.M2.Type) == tempDepId.attribute(Repository.M2.Type)
-                            && depId.attribute(Repository.M2.Classifier) == tempDepId.attribute(Repository.M2.Classifier)
+                            && depId.attribute(MavenRepository.Type) == tempDepId.attribute(MavenRepository.Type)
+                            && depId.attribute(MavenRepository.Classifier) == tempDepId.attribute(MavenRepository.Classifier)
                             && (depId.version.isBlank() || depId.version == tempDepId.version)) {
                         // Check for full attribute subset
                         for ((attrKey, attrValue) in depId.attributes) {
@@ -261,7 +574,7 @@ internal object Maven2 {
 
                     // Check if the scope it is in is transitive
                     // https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope
-                    val scope = resolved.dependencyId.attribute(Repository.M2.Scope)?.toLowerCase()
+                    val scope = resolved.dependencyId.attribute(MavenRepository.Scope)?.toLowerCase()
                     when (scope) {
                         "compile", "runtime" -> {
                             // Kept
@@ -284,7 +597,7 @@ internal object Maven2 {
         }
     }
 
-    private fun retrieveFile(path: String, repository: Repository.M2): Pair<ByteArray?, Path?> {
+    private fun retrieveFile(path: String, repository: MavenRepository): Pair<ByteArray?, Path?> {
         val url = repository.url / path
         if (repository.local) {
             LOG.debug("Retrieving file '{}' from {}", path, repository)
@@ -314,7 +627,7 @@ internal object Maven2 {
         // Checksum
         val checksum = repository.checksum
         var computedChecksum:ByteArray? = null
-        if (checksum != Repository.M2.Checksum.None) {
+        if (checksum != MavenRepository.Checksum.None) {
             // Compute checksum
             computedChecksum = checksum.checksum(response.body)
 
@@ -382,7 +695,7 @@ internal object Maven2 {
                     LOG.warn("Error trying to save '{}' from {} into cache at {} - file '{}'", path, repository, cache, dataFile, e)
                 }
 
-                if (dataFileWritten && cache.checksum != Repository.M2.Checksum.None) {
+                if (dataFileWritten && cache.checksum != MavenRepository.Checksum.None) {
                     val checksumFile: Path = (cache.url / (path + cache.checksum.suffix)).toPath()!!
                     if (computedChecksum == null) {
                         computedChecksum = cache.checksum.checksum(response.body)
@@ -410,8 +723,8 @@ internal object Maven2 {
     }
 
     private fun retrievePom(dependencyId:DependencyId,
-                            repository: Repository.M2,
-                            chain: RepositoryChain,
+                            repository: MavenRepository,
+                            chain: Collection<Repository>,
                             pomPath:String = pomPath(dependencyId.group, dependencyId.name, dependencyId.version)): ResolvedDependency {
         // Create path to pom
         val pomUrl = repository.url / pomPath
@@ -450,7 +763,7 @@ internal object Maven2 {
                     pomBuilder.parentArtifactId,
                     pomBuilder.parentVersion,
                     preferredRepository = repository,
-                    attributes = mapOf(Repository.M2.Type to "pom"))
+                    attributes = mapOf(MavenRepository.Type to "pom"))
 
             if (pomBuilder.parentRelativePath.isNotBlank()) {
                 // Create new pom-path
@@ -461,7 +774,7 @@ internal object Maven2 {
 
             if (parent == null || parent.hasError) {
                 LOG.trace("Retrieving parent pom of '{}' by coordinates '{}'", pomPath, parentPomId)
-                parent = DependencyResolver.resolveSingleDependency(parentPomId, chain)
+                parent = LibraryDependencyResolver.resolveSingleDependency(parentPomId, chain)
             }
 
             val parentPom = parent.getKey(KPom)
@@ -484,8 +797,8 @@ internal object Maven2 {
             var i = 0
             while (i < dependencyManagement.size) {
                 val dep = dependencyManagement[i].dependencyId
-                if (!dep.attribute(Repository.M2.Type).equals("pom", ignoreCase = true)
-                        || !dep.attribute(Repository.M2.Scope).equals("import", ignoreCase = true)) {
+                if (!dep.attribute(MavenRepository.Type).equals("pom", ignoreCase = true)
+                        || !dep.attribute(MavenRepository.Scope).equals("import", ignoreCase = true)) {
                     i++
                     continue
                 }
@@ -600,13 +913,13 @@ internal object Maven2 {
             } else if (atElement(DependencyVersion) || atElement(DependencyManagementVersion)) {
                 lastDependencyVersion = characters()
             } else if (atElement(DependencyClassifier) || atElement(DependencyManagementClassifier)) {
-                lastDependencyAttributes[Repository.M2.Classifier] = characters()
+                lastDependencyAttributes[MavenRepository.Classifier] = characters()
             } else if (atElement(DependencyOptional) || atElement(DependencyManagementOptional)) {
-                lastDependencyAttributes[Repository.M2.Optional] = characters()
+                lastDependencyAttributes[MavenRepository.Optional] = characters()
             } else if (atElement(DependencyScope) || atElement(DependencyManagementScope)) {
-                lastDependencyAttributes[Repository.M2.Scope] = characters()
+                lastDependencyAttributes[MavenRepository.Scope] = characters()
             } else if (atElement(DependencyType) || atElement(DependencyManagementType)) {
-                lastDependencyAttributes[Repository.M2.Type] = characters()
+                lastDependencyAttributes[MavenRepository.Type] = characters()
             } else if (atElement(Dependency)) {
                 val projectId = DependencyId(lastDependencyGroupId, lastDependencyArtifactId, lastDependencyVersion, attributes = lastDependencyAttributes)
                 val pomDependency = Dependency(projectId, lastDependencyExclusions)
@@ -747,7 +1060,7 @@ internal object Maven2 {
     }
 
     private fun DependencyId.artifactPath(extension: String): String {
-        val classifier = attribute(Repository.M2.Classifier)
+        val classifier = attribute(MavenRepository.Classifier)
         return Maven2.artifactPath(group, name, version, classifier, extension)
     }
 

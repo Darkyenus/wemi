@@ -9,7 +9,6 @@ import wemi.boot.WemiCacheFolder
 import wemi.compile.CompilerFlags
 import wemi.dependency.DefaultRepositories
 import wemi.dependency.LocalM2Repository
-import wemi.dependency.createRepositoryChain
 import wemi.publish.artifacts
 import wemi.run.javaExecutable
 import wemi.util.FileSet
@@ -44,7 +43,6 @@ object Archetypes {
         Keys.buildDirectory set Static(WemiBuildFolder)
         Keys.cacheDirectory set Static(WemiCacheFolder)
 
-        Keys.repositoryChain set { createRepositoryChain(Keys.repositories.get()) }
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
         Keys.internalClasspath set KeyDefaults.InternalClasspath
         Keys.externalClasspath set KeyDefaults.ExternalClasspath

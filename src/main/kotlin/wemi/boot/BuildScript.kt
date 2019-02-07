@@ -190,6 +190,7 @@ class BuildScriptInfo internal constructor(
         /** Jars with wemi, kotlin runtime, etc. */
         private val runtimeClasspath: List<Path>) : JsonReadable, JsonWritable {
 
+    // NOTE: Only these fields are (de)serialized to/from json
     private val _repositories = HashSet<Repository>()
     private val _dependencies = HashSet<Dependency>()
     // WemiLauncherFile is the first entry of this list
@@ -221,7 +222,7 @@ class BuildScriptInfo internal constructor(
             BuildDependencyRepository::class.java -> {
                 val (name, url) = fields
 
-                _repositories.add(Repository.M2(name, URL(url), LocalM2Repository))
+                _repositories.add(MavenRepository(name, URL(url), LocalM2Repository))
             }
             BuildClasspathDependency::class.java -> {
                 val (file) = fields
@@ -273,7 +274,7 @@ class BuildScriptInfo internal constructor(
         }
 
         val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
-        if (!DependencyResolver.resolve(resolved, dependencies, createRepositoryChain(repositories))) {
+        if (!LibraryDependencyResolver.resolve(resolved, dependencies, repositories)) {
             // Dependencies failed to resolve
             // TODO Is this logged properly & nicely?
             return false

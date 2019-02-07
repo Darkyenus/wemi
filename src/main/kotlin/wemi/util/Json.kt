@@ -30,6 +30,13 @@ interface JsonSerializer<T> {
     fun read(value:JsonValue):T
 }
 
+/** Convenience shortcut for calling [JsonSerializer.write]. */
+fun <T> JsonSerializer<T>.writeTo(writer:JsonWriter, item:T) {
+    writer.apply {
+        write(item)
+    }
+}
+
 /**
  * Lightweight version of [JsonSerializer] for classes that can be only serialized, not deserialized.
  * (Unless [JsonReadable] is also implemented.)
