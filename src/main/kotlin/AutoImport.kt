@@ -131,9 +131,6 @@ val sources
 val resources
     inline get() = wemi.Keys.resources
 
-val compilingConfigurations
-    inline get() = wemi.Keys.compilingConfigurations
-
 val repositories
     inline get() = wemi.Keys.repositories
 val repositoryChain

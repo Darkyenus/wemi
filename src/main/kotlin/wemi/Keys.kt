@@ -59,10 +59,6 @@ object Keys {
     @Deprecated("Use sources instead")
     val resourceFiles by key<List<LocatedPath>>("Files that are not compiled but are still part of internal classpath. Usually derived from resourceRoots. Maps resource root -> resource files", defaultValue = emptyList())
 
-    /** Used to generalize keys like [sources] to union of distinct subsets.
-     * Is typically not used to implement the compilation itself, as it usually needs specialized inter-operation of languages. */
-    val compilingConfigurations by key<Set<Configuration>>("Configurations that are used when compiling the sources, such as `compilingJava`.", defaultValue = emptySet())
-
     val repositories by key<Set<Repository>>("Repositories to be used when resolving dependencies", defaultValue = emptySet())
     val repositoryChain by key<RepositoryChain>("ADVANCED - Resolved repository chain from 'repositories'")
     val libraryDependencies by key<Set<Dependency>>("Libraries that the project depends on", defaultValue = emptySet())

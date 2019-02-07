@@ -128,8 +128,6 @@ object Archetypes {
             Keys.sources modify { FileSet(Keys.projectRoot.get() / "src/test/java", next = it) }
         }
 
-        Keys.compilingConfigurations set Static(setOf(Configurations.compilingJava))
-
         Keys.compile set KeyDefaults.CompileJava
 
         Keys.archiveJavadocOptions set KeyDefaults.ArchiveJavadocOptions
@@ -153,8 +151,6 @@ object Archetypes {
                 FileSet(root / "src/test/java", next = FileSet(root / "src/test/kotlin", next = it))
             }
         }
-
-        Keys.compilingConfigurations set Static(setOf(Configurations.compilingJava, Configurations.compilingKotlin))
 
         Keys.libraryDependencies add { kotlinDependency("stdlib") }
         Keys.compile set KeyDefaults.CompileJavaKotlin
