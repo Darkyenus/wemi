@@ -169,11 +169,15 @@ fun <T : JsonReadable> Reader.readJsonTo(targetValue:T) {
     targetValue.read(JsonReader().parse(this))
 }
 
-/**
- * Convenience method, same as `get(name).to(T::class.java)`.
- */
+/** Convenience method, same as `get(name).to(T::class.java)`. */
 inline fun <reified T> JsonValue?.field(name:String):T {
     return this?.get(name).to(T::class.java)
+}
+
+/** Same as the other [field], but if the field does't exist, returns [default]. */
+inline fun <reified T> JsonValue?.field(name:String, default:T):T {
+    val value = this?.get(name) ?: return default
+    return value.to(T::class.java)
 }
 
 fun <T : JsonReadable> JsonValue?.fieldTo(name:String, targetValue:T) {

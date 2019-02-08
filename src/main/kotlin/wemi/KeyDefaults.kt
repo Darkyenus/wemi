@@ -22,7 +22,6 @@ import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.internal.MessageLocation
 import wemi.compile.internal.render
 import wemi.dependency.*
-import wemi.dependency.MavenRepository.Companion.joinClassifiers
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
@@ -54,8 +53,8 @@ object KeyDefaults {
     /** Create value for [Keys.libraryDependencyProjectMapper] that appends given classifier to sources. */
     fun classifierAppendingLibraryDependencyProjectMapper(appendClassifier:String):(Dependency) -> Dependency = {
         (projectId, exclusions): Dependency ->
-            val classifier = joinClassifiers(projectId.attribute(MavenRepository.Classifier), appendClassifier)!!
-            val sourcesProjectId = projectId.copy(attributes = projectId.attributes + (MavenRepository.Classifier to classifier))
+            val classifier = joinClassifiers(projectId.classifier, appendClassifier)
+            val sourcesProjectId = projectId.copy(classifier = classifier)
             Dependency(sourcesProjectId, exclusions)
         }
 
@@ -959,14 +958,17 @@ object KeyDefaults {
                         newChild("groupId", dependency.dependencyId.group)
                         newChild("artifactId", dependency.dependencyId.name)
                         newChild("version", dependency.dependencyId.version)
-                        dependency.dependencyId.attribute(MavenRepository.Type)?.let {
-                            newChild("type", it)
+                        if (dependency.dependencyId.type != DEFAULT_TYPE) {
+                            newChild("type", dependency.dependencyId.type)
                         }
-                        dependency.dependencyId.attribute(MavenRepository.Classifier)?.let {
-                            newChild("classifier", it)
+                        if (dependency.dependencyId.classifier != NoClassifier) {
+                            newChild("classifier", dependency.dependencyId.classifier)
                         }
-                        dependency.dependencyId.attribute(MavenRepository.Scope)?.let {
-                            newChild("scope", it)
+                        if (dependency.dependencyId.scope != DEFAULT_SCOPE) {
+                            newChild("scope", dependency.dependencyId.scope)
+                        }
+                        if (dependency.dependencyId.optional != DEFAULT_OPTIONAL) {
+                            newChild("optional", dependency.dependencyId.optional.toString())
                         }
                         newChild("exclusions") {
                             for (exclusion in dependency.exclusions) {
@@ -974,23 +976,23 @@ object KeyDefaults {
                                     continue
                                 }
                                 // Check if Maven compatible (only group and name is set)
-                                val mavenCompatible = exclusion.group != "*"
-                                        && exclusion.name != "*"
-                                        && exclusion.version == "*"
-                                        && exclusion.attributes.isEmpty()
+                                val mavenCompatible = exclusion.group != null
+                                        && exclusion.name != null
+                                        && exclusion.version == null
+                                        && exclusion.classifier == null
+                                        && exclusion.type == null
+                                        && exclusion.scope == null
+                                        && exclusion.optional == null
 
                                 if (mavenCompatible) {
                                     newChild("exclusion") {
-                                        newChild("artifactId", exclusion.name)
-                                        newChild("groupId", exclusion.group)
+                                        newChild("groupId", exclusion.group!!)
+                                        newChild("artifactId", exclusion.name!!)
                                     }
                                 } else {
                                     PUBLISH_MODEL_LOG.warn("Exclusion {} on {} is not supported by pom.xml and will be omitted", exclusion, dependency.dependencyId)
                                 }
                             }
-                        }
-                        dependency.dependencyId.attribute(MavenRepository.Optional)?.let {
-                            newChild("optional", it)
                         }
                     }
                 }
@@ -1000,10 +1002,6 @@ object KeyDefaults {
                 for (repository in Keys.repositories.get()) {
                     if (repository == MavenCentral) {
                         // Added by default
-                        continue
-                    }
-                    if (repository !is MavenRepository) {
-                        PUBLISH_MODEL_LOG.warn("Omitting repository {}, only M2 repositories are supported", repository)
                         continue
                     }
                     if (repository.local) {
@@ -1037,7 +1035,7 @@ object KeyDefaults {
             val metadata = Keys.publishMetadata.get()
             val artifacts = Keys.publishArtifacts.get()
 
-            val result = repository.publish(metadata, artifacts)
+            val result = publish(repository, metadata, artifacts)
 
             try {
                 expiresWith(Paths.get(result))

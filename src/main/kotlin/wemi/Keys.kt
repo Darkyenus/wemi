@@ -15,10 +15,7 @@ import wemi.publish.InfoNode
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.prettyPrint
-import wemi.util.FILE_SET_PRETTY_PRINTER
-import wemi.util.FileSet
-import wemi.util.LocatedPath
-import wemi.util.Partial
+import wemi.util.*
 import java.net.URI
 import java.nio.file.Path
 import javax.tools.JavaCompiler

@@ -2,6 +2,7 @@ package wemi
 
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
+import wemi.dependency.Checksum
 import java.net.URL
 import java.nio.file.Path
 import kotlin.reflect.KProperty0
@@ -102,12 +103,6 @@ fun configuration(description: String, parent: Configuration? = null, initialize
     return ConfigurationDelegate(description, parent, initializer)
 }
 
-/** Convenience Dependency creator.
- * Creates [Dependency] with default exclusions. */
-fun dependency(group: String, name: String, version: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>): Dependency {
-    return Dependency(DependencyId(group, name, version, preferredRepository, attributes = mapOf(*attributes)))
-}
-
 /**
  * Create a new [Archetype].
  * To be used as a variable delegate target, example:
@@ -150,7 +145,8 @@ fun KProperty0<Archetype>.inject(injectedInitializer:Archetype.() -> Unit) {
  * @param groupNameVersion Gradle-like semicolon separated group, name and version of the dependency.
  *          If the amount of ':'s isn't exactly 2, or one of the triplet is empty, runtime exception is thrown.
  */
-fun dependencyId(groupNameVersion:String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>):DependencyId {
+fun dependencyId(groupNameVersion:String, preferredRepository: Repository? = null,
+                 classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL):DependencyId {
     val first = groupNameVersion.indexOf(':')
     val second = groupNameVersion.indexOf(':', startIndex = maxOf(first + 1, 0))
     val third = groupNameVersion.indexOf(':', startIndex = maxOf(second + 1, 0))
@@ -165,26 +161,31 @@ fun dependencyId(groupNameVersion:String, preferredRepository: Repository?, vara
     val name = groupNameVersion.substring(first + 1, second)
     val version = groupNameVersion.substring(second + 1)
 
-    return DependencyId(group, name, version, preferredRepository, attributes = mapOf(*attributes))
+    return DependencyId(group, name, version, preferredRepository, classifier, type, scope, optional)
 }
 
-/** Convenience Dependency creator using [dependencyId].
- */
-fun dependency(groupNameVersion: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>): Dependency {
-    return Dependency(dependencyId(groupNameVersion, preferredRepository, *attributes))
+/** Convenience Dependency creator.
+ * Creates [Dependency] with default exclusions. */
+fun dependency(group: String, name: String, version: String, preferredRepository: Repository? = null, classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL): Dependency {
+    return Dependency(DependencyId(group, name, version, preferredRepository, classifier, type, scope, optional))
+}
+
+/** Convenience Dependency creator using [dependencyId]. */
+fun dependency(groupNameVersion: String, preferredRepository: Repository? = null, classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL): Dependency {
+    return Dependency(dependencyId(groupNameVersion, preferredRepository, classifier, type, scope, optional))
 }
 
 /**
- * Convenience [Repository.MavenRepository] creator.
+ * Convenience [Repository] creator.
  *
  * If the [url] is local, no cache is used. If it is not local (that is, not `file:`),
  * [LocalM2Repository] is used as cache.
  */
-fun repository(name: String, url: String, checksum: MavenRepository.Checksum = MavenRepository.Checksum.SHA1, releases:Boolean = true, snapshots:Boolean = true): MavenRepository {
+fun repository(name: String, url: String, checksum: Checksum = Checksum.SHA1, releases:Boolean = true, snapshots:Boolean = true): Repository {
     val usedUrl = URL(url)
-    return MavenRepository(name,
+    return Repository(name,
             usedUrl,
-            if (usedUrl.protocol.equals("file", ignoreCase = true)) null else LocalM2Repository,
+            if (usedUrl.protocol.equals("file", ignoreCase = true)) null else LocalCacheM2Repository,
             checksum, releases, snapshots)
 }
 

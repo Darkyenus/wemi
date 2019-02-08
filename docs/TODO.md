@@ -2,6 +2,7 @@
 
 ## For next release
 - Maven snapshots
+- Remove ArrayMap
 
 ## For later
 - Rewrite directorySynchronized based on exclusive file creation and timestamp

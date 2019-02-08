@@ -2,7 +2,6 @@
 
 package wemi
 
-import configuration
 import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingClasspathModifier
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
@@ -11,8 +10,8 @@ import wemi.collections.WMutableSet
 import wemi.collections.toMutable
 import wemi.compile.*
 import wemi.dependency.Dependency
-import wemi.dependency.MavenRepository.Companion.JavadocClassifier
-import wemi.dependency.MavenRepository.Companion.SourcesClassifier
+import wemi.dependency.JavadocClassifier
+import wemi.dependency.SourcesClassifier
 import wemi.dependency.Repository
 import wemi.test.JUnitPlatformLauncher
 import wemi.util.*

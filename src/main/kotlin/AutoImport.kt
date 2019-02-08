@@ -5,9 +5,6 @@ import wemi.Configurations
 import wemi.boot.Task
 import wemi.boot.WemiRootFolder
 import wemi.boot.autoRunTasks
-import wemi.dependency.DependencyAttribute
-import wemi.dependency.MavenRepository
-import wemi.dependency.Repository
 import java.net.URL
 import java.nio.file.Paths
 import wemi.kotlinDependency as _kotlinDependency
@@ -27,9 +24,9 @@ typealias Project = wemi.Project
 typealias Scope = wemi.Scope
 typealias EvalScope = wemi.EvalScope
 typealias Repository = wemi.dependency.Repository
-typealias ProjectId = wemi.dependency.DependencyId
-typealias ProjectDependency = wemi.dependency.Dependency
-typealias ProjectExclusion = wemi.dependency.DependencyExclusion
+typealias DependencyId = wemi.dependency.DependencyId
+typealias Dependency = wemi.dependency.Dependency
+typealias DependencyExclusion = wemi.dependency.DependencyExclusion
 
 typealias Path = java.nio.file.Path
 
@@ -39,18 +36,6 @@ val WemiVersion
 // Core Functions
 inline fun project(vararg archetypes: Archetype = arrayOf(Archetypes.DefaultArchetype), noinline initializer: Project.() -> Unit) = wemi.project(path("."), archetypes = *archetypes, initializer = initializer)
 inline fun project(projectRoot: Path? = path("."), vararg archetypes: Archetype = arrayOf(Archetypes.DefaultArchetype), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, *archetypes, initializer = initializer)
-
-inline fun <Value> key(description: String, defaultValue: Value) = wemi.key(description, defaultValue)
-inline fun <Value> key(description: String) = wemi.key<Value>(description)
-
-inline fun configuration(description: String, parent: Configuration? = null, noinline initializer: Configuration.() -> Unit) = wemi.configuration(description, parent, initializer)
-
-inline fun dependency(group: String, name: String, version: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(group, name, version, preferredRepository, *attributes)
-inline fun dependency(group: String, name: String, version: String, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(group, name, version, null, *attributes)
-inline fun dependency(groupNameVersion: String, preferredRepository: Repository?, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(groupNameVersion, preferredRepository, *attributes)
-inline fun dependency(groupNameVersion: String, vararg attributes: Pair<DependencyAttribute, String>) = wemi.dependency(groupNameVersion, null, *attributes)
-
-inline fun repository(name: String, url: String, checksum: MavenRepository.Checksum = MavenRepository.Checksum.SHA1) = wemi.repository(name, url, checksum)
 
 // Helper functions
 inline fun EvalScope.kotlinDependency(name: String) = _kotlinDependency(name)

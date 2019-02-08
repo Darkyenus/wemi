@@ -5,25 +5,25 @@ import java.net.URL
 import java.nio.file.Paths
 
 /** Default local Maven repository stored in `~/.m2/repository`. Used for local releases. */
-val LocalM2Repository = MavenRepository("local", (Paths.get(System.getProperty("user.home")) / ".m2/repository/").toUri().toURL(), null)
+val LocalM2Repository = Repository("local", (Paths.get(System.getProperty("user.home")) / ".m2/repository/").toUri().toURL(), null)
 
 /** Default Wemi cache repository stored in `~/.m2/wemi-cache`. Used as a local cache. */
-val LocalCacheM2Repository = MavenRepository("local", (Paths.get(System.getProperty("user.home")) / ".m2/wemi-cache/").toUri().toURL(), null)
+val LocalCacheM2Repository = Repository("local", (Paths.get(System.getProperty("user.home")) / ".m2/wemi-cache/").toUri().toURL(), null)
 
 /** Maven Central repository at [maven.org](https://maven.org). Cached by [LocalM2Repository]. */
-val MavenCentral = MavenRepository("central", URL("https://repo1.maven.org/maven2/"), LocalCacheM2Repository, snapshots = false)
+val MavenCentral = Repository("central", URL("https://repo1.maven.org/maven2/"), LocalCacheM2Repository, snapshots = false)
 
 /** [Bintray JCenter repository](https://bintray.com/bintray/jcenter). Cached by [LocalM2Repository]. */
-val JCenter = MavenRepository("jcenter", URL("https://jcenter.bintray.com/"), LocalCacheM2Repository, snapshots = false)
+val JCenter = Repository("jcenter", URL("https://jcenter.bintray.com/"), LocalCacheM2Repository, snapshots = false)
 
 /** [Jitpack repository](https://jitpack.io). Cached by [LocalM2Repository]. */
 @Suppress("unused")
-val Jitpack = MavenRepository("jitpack", URL("https://jitpack.io/"), LocalCacheM2Repository)
+val Jitpack = Repository("jitpack", URL("https://jitpack.io/"), LocalCacheM2Repository)
 
 /** [Sonatype Oss](https://oss.sonatype.org/) repository. Cached by [LocalM2Repository].
  * Most used [repository]-ies are `"releases"` and `"snapshots"`. */
 @Suppress("unused")
-fun sonatypeOss(repository:String): MavenRepository {
+fun sonatypeOss(repository:String): Repository {
     val releases:Boolean
     val snapshots:Boolean
     if (repository.contains("release", ignoreCase = true)) {
@@ -37,7 +37,7 @@ fun sonatypeOss(repository:String): MavenRepository {
         snapshots = true
     }
 
-    return MavenRepository("sonatype-oss-$repository", URL("https://oss.sonatype.org/content/repositories/$repository/"), LocalCacheM2Repository, releases = releases, snapshots = snapshots)
+    return Repository("sonatype-oss-$repository", URL("https://oss.sonatype.org/content/repositories/$repository/"), LocalCacheM2Repository, releases = releases, snapshots = snapshots)
 }
 
 /**

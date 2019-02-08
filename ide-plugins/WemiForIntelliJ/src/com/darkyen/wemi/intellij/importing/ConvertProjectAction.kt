@@ -87,6 +87,7 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
 
         val buildScript = StringBuilder()
         buildScript.append("@file:Suppress(\"unused\")\n")
+        buildScript.append("import wemi.*\n")
         buildScript.append("import wemi.util.*\n")
 
         if (modules.isEmpty()) {

@@ -31,7 +31,7 @@ object LibraryDependencyResolver {
             }
 
             LOG.debug("Trying in {}", repository)
-            val resolved = repository.resolveInRepository(dependencyId, repositories)
+            val resolved = resolveInM2Repository(dependencyId, repository, repositories)
             if (!resolved.hasError) {
                 LOG.debug("Resolution success {} ({} ms)", resolved, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime))
                 return resolved
@@ -189,7 +189,7 @@ object LibraryDependencyResolver {
      * @return true if all [dependencies] resolve correctly without error
      */
     fun resolve(resolved: MutableMap<DependencyId, ResolvedDependency>, dependencies: Collection<Dependency>, repositories: Collection<Repository>, mapper: ((Dependency) -> Dependency) = { it }): Boolean {
-        val directoriesToLock = repositories.mapNotNull { it.cache?.directoryToLock() }.distinct()
+        val directoriesToLock = repositories.mapNotNull { it.cache?.directoryPath() }.distinct()
 
         fun <Result> locked(level:Int, action:()->Result):Result {
             return if (level == directoriesToLock.size) {
