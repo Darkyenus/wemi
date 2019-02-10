@@ -393,19 +393,41 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         }
 
         try {
-            session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies?", orNull = true).get("value")?.forEach { resolvedValue ->
-                val projectId = resolvedValue.get("key")
-                val artifact = resolvedValue.get("value")?.get("data")?.find { it.getString("name") == "artifactFile" }?.get("value")?.asString() ?: return@forEach
+            if (session.wemiVersion < Version.WEMI_0_8) {
+                // ResolvedDependency contained map of generic attributes, which could also contain a classifier.
+                // This was flattened in 0.8 and classifier is now a direct (optional) property.
+                // Similarly, artifact path structure has been simplified.
+                session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies?", orNull = true).get("value")?.forEach { resolvedValue ->
+                    val projectId = resolvedValue.get("key")
+                    val artifact = resolvedValue.get("value")?.get("data")?.find { it.getString("name") == "artifactFile" }?.get("value")?.asString()
+                            ?: return@forEach
 
-                val group = projectId.getString("group")!!
-                val name = projectId.getString("name")!!
-                val version = projectId.getString("version")!!
-                val classifier = projectId.get("attributes").find { it.getString("key") == "m2-classifier" }?.get("value")?.asString() ?: ""
+                    val group = projectId.getString("group")!!
+                    val name = projectId.getString("name")!!
+                    val version = projectId.getString("version")!!
+                    val classifier = projectId.get("attributes").find { it.getString("key") == "m2-classifier" }?.get("value")?.asString()
+                            ?: ""
 
-                add("$group:$name:$version",
-                        WemiLibraryDependency(
-                                "$group:$name:$version${if (classifier.isBlank()) "" else "-$classifier"}",
-                                File(artifact).absoluteFile))
+                    add("$group:$name:$version",
+                            WemiLibraryDependency(
+                                    "$group:$name:$version${if (classifier.isBlank()) "" else "-$classifier"}",
+                                    File(artifact).absoluteFile))
+                }
+            } else {
+                session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies?", orNull = true).get("value")?.forEach { resolvedValue ->
+                    val projectId = resolvedValue.get("key")
+                    val group = projectId.getString("group")!!
+                    val name = projectId.getString("name")!!
+                    val version = projectId.getString("version")!!
+                    val classifier = projectId.getString("classifier", "")!!
+
+                    val artifact = resolvedValue.get("value")?.getString("artifact", null) ?: return@forEach
+
+                    add("$group:$name:$version",
+                            WemiLibraryDependency(
+                                    "$group:$name:$version${if (classifier.isBlank()) "" else "-$classifier"}",
+                                    File(artifact).absoluteFile))
+                }
             }
 
             session.jsonArray(projectName, *config, task = "unmanagedDependencies?", orNull = true).forEach {
