@@ -590,63 +590,47 @@ sealed class BindingHolder : WithDescriptiveString {
     }
 
     //region Modify utility methods
-    /**
-     * Add a modifier that will add the result of [additionalValue] to the resulting collection.
-     *
-     * @see modify
-     */
-    inline infix fun <V, Coll : Collection<V>> Key<Coll>.add(crossinline additionalValue: Value<V>) {
-        this.modify { collection ->
-            val mutable = collection.toMutable()
-            mutable.add(additionalValue())
-            @Suppress("UNCHECKED_CAST")
-            mutable as Coll
-        }
+    /** [modify] receiver to also contain [additionalValue]'s result */
+    @JvmName("addSet")
+    inline infix fun <V> Key<List<V>>.add(crossinline additionalValue: Value<V>) {
+        this.modify { it.toMutable().apply { add(additionalValue()) } }
+    }
+
+    @JvmName("addList")
+    inline infix fun <V> Key<Set<V>>.add(crossinline additionalValue: Value<V>) {
+        this.modify { it.toMutable().apply { add(additionalValue()) } }
+    }
+
+    /** [modify] receiver to also contain [additionalValues]'s result */
+    @JvmName("addAllList")
+    inline infix fun <V> Key<List<V>>.addAll(crossinline additionalValues: Value<Iterable<V>>) {
+        this.modify { it.toMutable().apply { addAll(additionalValues()) } }
+    }
+
+    @JvmName("addAllSet")
+    inline infix fun <V> Key<Set<V>>.addAll(crossinline additionalValues: Value<Iterable<V>>) {
+        this.modify { it.toMutable().apply { addAll(additionalValues()) } }
     }
 
     /**
-     * Add a modifier that will add elements of the result of [additionalValues] to the resulting collection.
-     *
-     * @see modify
-     */
-    inline infix fun <V, Coll : Collection<V>> Key<Coll>.addAll(crossinline additionalValues: Value<Iterable<V>>) {
-        this.modify { collection ->
-            val mutable = collection.toMutable()
-            mutable.addAll(additionalValues())
-            @Suppress("UNCHECKED_CAST")
-            mutable as Coll
-        }
-    }
-
-    /**
-     * Add a modifier that will remove the result of [valueToRemove] from the resulting collection.
+     * [modify] receiver to remove the result of [valueToRemove] from the resulting [Set].
      *
      * Defined on [Set] only, because operating on [List] may have undesired effect of removing
      * only one occurrence of [valueToRemove].
-     *
-     * @see modify
      */
-    inline infix fun <V, Coll : Set<V>> Key<Coll>.remove(crossinline valueToRemove: Value<V>) {
-        this.modify { collection ->
-            val mutable = collection.toMutable()
-            mutable.remove(valueToRemove())
-            @Suppress("UNCHECKED_CAST")
-            mutable as Coll
-        }
+    inline infix fun <V> Key<Set<V>>.remove(crossinline valueToRemove: Value<V>) {
+        this.modify { it.toMutable().apply { remove(valueToRemove()) } }
     }
 
-    /**
-     * Add a modifier that will remove elements of the result of [valuesToRemove] from the resulting collection.
-     *
-     * @see modify
-     */
-    inline infix fun <V, Coll : Collection<V>> Key<Coll>.removeAll(crossinline valuesToRemove: Value<Iterable<V>>) {
-        this.modify { collection ->
-            val mutable = collection.toMutable()
-            mutable.removeAll(valuesToRemove())
-            @Suppress("UNCHECKED_CAST")
-            mutable as Coll
-        }
+    /** [modify] receiver to remove any values which also are in [valuesToRemove]'s result */
+    @JvmName("removeAllList")
+    inline infix fun <V> Key<List<V>>.removeAll(crossinline valuesToRemove: Value<Iterable<V>>) {
+        this.modify { it.toMutable().apply { removeAll(valuesToRemove()) } }
+    }
+
+    @JvmName("removeAllSet")
+    inline infix fun <V> Key<Set<V>>.removeAll(crossinline valuesToRemove: Value<Iterable<V>>) {
+        this.modify { it.toMutable().apply { removeAll(valuesToRemove()) } }
     }
     //endregion
 
