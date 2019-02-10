@@ -4,7 +4,6 @@
 - Maven snapshots
 	- Publish snapshots as unique
 	- Test snapshots of both types
-- Tests for URL.parent()
 - --log=<> doesn't seem to work
 
 ## For later

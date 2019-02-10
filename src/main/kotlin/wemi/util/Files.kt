@@ -21,26 +21,6 @@ inline operator fun URL.div(path: CharSequence): URL {
     return URL(this, path.toString())
 }
 
-/** Creates an URL which refers to the directory of the file to at which the path is pointing to.
- * I.e. from "example.com/foo/bar", creates "example.com/foo". */
-fun URL.parent(): URL {
-    val newPath = (this.path ?: "").pathParent()
-    val query = this.query
-    val ref = this.ref
-    val newFile = if (query == null){
-        if (ref == null)
-            newPath
-        else
-            "$newPath#$ref"
-    } else {
-        if (ref == null)
-            "$newPath?$query"
-        else
-            "$newPath?$query#$ref"
-    }
-    return URL(protocol, host, port, newFile)
-}
-
 /**
  * Appends given path to the receiver path.
  *
