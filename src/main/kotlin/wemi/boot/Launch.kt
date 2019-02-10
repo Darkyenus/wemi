@@ -105,6 +105,13 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
     val taskArguments = rawOptions[OPTION_LIST_OF_STRING_TASKS] as List<String>
     @Suppress("UNCHECKED_CAST")
     WemiRuntimeClasspath = rawOptions[OPTION_LIST_OF_PATH_RUNTIME_CLASSPATH] as List<Path>
+    when (rawOptions[OPTION_LOG_LEVEL] as Byte) {
+        TPLogger.TRACE -> TPLogger.TRACE()
+        TPLogger.DEBUG -> TPLogger.DEBUG()
+        TPLogger.INFO -> TPLogger.INFO()
+        TPLogger.WARN -> TPLogger.WARN()
+        TPLogger.ERROR -> TPLogger.ERROR()
+    }
 
     TPLogger.attachUnhandledExceptionLogger()
     JavaLoggingIntegration.enable()

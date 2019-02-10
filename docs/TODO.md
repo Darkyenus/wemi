@@ -4,7 +4,6 @@
 - Maven snapshots
 	- Publish snapshots as unique
 	- Test snapshots of both types
-- --log=<> doesn't seem to work
 
 ## For later
 - Rewrite directorySynchronized based on exclusive file creation and timestamp

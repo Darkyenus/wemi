@@ -64,7 +64,8 @@ public class Main {
 	static final int OPTION_BOOL_RELOAD_SUPPORTED = 7;
 	static final int OPTION_LIST_OF_STRING_TASKS = 8;
 	static final int OPTION_LIST_OF_PATH_RUNTIME_CLASSPATH = 9;
-	static final int OPTIONS_SIZE = 10;
+	static final int OPTION_LOG_LEVEL = 10;
+	static final int OPTIONS_SIZE = 11;
 
 	@SuppressWarnings("unchecked")
 	public static void main(String[] args) throws Throwable {
@@ -74,6 +75,7 @@ public class Main {
 		final boolean[] allowBrokenBuildScripts = {false};
 		final boolean[] reloadSupported = {false};
 		final Path[] rootDirectory = {null};
+		final byte[] logLevel = {-1};
 
 		final Option[][] options = {null}; // To be accessible inside its declaration
 		options[0] = new Option[]{
@@ -84,24 +86,24 @@ public class Main {
 					switch (level.toLowerCase()) {
 						case "trace":
 						case "t":
-							TPLogger.TRACE();
+							logLevel[0] = TPLogger.TRACE;
 							break;
 						case "debug":
 						case "d":
-							TPLogger.DEBUG();
+							logLevel[0] = TPLogger.DEBUG;
 							break;
 						case "info":
 						case "i":
-							TPLogger.INFO();
+							logLevel[0] = TPLogger.INFO;
 							break;
 						case "warning":
 						case "warn":
 						case "w":
-							TPLogger.WARN();
+							logLevel[0] = TPLogger.WARN;
 							break;
 						case "error":
 						case "e":
-							TPLogger.ERROR();
+							logLevel[0] = TPLogger.ERROR;
 							break;
 						default:
 							System.err.println("Unknown log level: " + level);
@@ -113,7 +115,7 @@ public class Main {
 				new Option(Option.NO_SHORT_NAME, "non-interactive", "disable interactive mode even when no tasks are present",
 						false, null, arg -> interactive[0] = false),
 				new Option('v', "verbose", "verbose mode, same as --log=debug",
-						false, null, arg -> TPLogger.DEBUG()),
+						false, null, arg -> logLevel[0] = TPLogger.DEBUG),
 				new Option(Option.NO_SHORT_NAME, "root", "set the root directory of the built project",
 						true, "DIR", root -> {
 					Path newRoot = Paths.get(root).toAbsolutePath();
@@ -197,6 +199,7 @@ public class Main {
 		launchOptions[OPTION_BOOL_RELOAD_SUPPORTED] = reloadSupported[0];
 		launchOptions[OPTION_LIST_OF_STRING_TASKS] = taskArguments;
 		launchOptions[OPTION_LIST_OF_PATH_RUNTIME_CLASSPATH] = paths;
+		launchOptions[OPTION_LOG_LEVEL] = logLevel[0];
 
 		final Consumer<Object[]> launch;
 
