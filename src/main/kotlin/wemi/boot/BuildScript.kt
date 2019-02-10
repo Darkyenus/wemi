@@ -280,7 +280,7 @@ class BuildScriptInfo internal constructor(
             return false
         }
         for ((_, r) in resolved) {
-            _managedDependencies.add(r.artifact ?: continue)
+            _managedDependencies.add(r.artifact?.path ?: continue)
         }
 
         return true

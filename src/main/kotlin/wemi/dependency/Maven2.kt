@@ -3,6 +3,7 @@ package wemi.dependency
 import com.darkyen.dave.Response
 import com.darkyen.dave.Webb
 import com.darkyen.dave.WebbException
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.xml.sax.*
 import org.xml.sax.helpers.DefaultHandler
@@ -11,20 +12,462 @@ import wemi.dependency.PomBuildingXMLHandler.Companion.SupportedModelVersion
 import wemi.publish.InfoNode
 import wemi.util.*
 import java.io.ByteArrayInputStream
-import java.io.FileNotFoundException
+import java.io.IOException
 import java.net.URI
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.attribute.FileTime
 import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlin.collections.HashMap
-
 
 private val LOG = LoggerFactory.getLogger("Maven2")
 
-/** [Checksum]s to generate when publishing an artifact. */
-private val PublishChecksums = arrayOf(Checksum.MD5, Checksum.SHA1)
+/*
+TODO Implement:
+Snapshot resolution logic abstract:
+- Some snapshots ("non-unique snapshots") are overwritten on publish, so the resolution schema is the same
+    - but we need to check remote before local copy
+- Other snapshots ("unique snapshots") use maven-metadata.xml, we need to download that to cache first
+
+Steps (for snapshots):
+1. Look into cache, if it contains POM or maven-metadata.xml
+    1. If it contains either, note its last modified date
+2. Download the POM or maven-metadata.xml (preferring maven-metadata.xml)
+    - If cache contained one of the two, try that first
+    - If cache contained one of the two, make the query with cache control,
+        so that in the best case we don't have to re-download anything
+    - If both download attempts fail, resolution failed
+3. If neither was downloaded fresh, resolve completely from cache
+4. Otherwise
+    - (POM) continue resolution normally for the POM, overriding the cache
+    - (metadata) parse metadata, select newest version (TODO: Maybe some control over this through DependencyId attributes)
+        download that. Metadata should be overridden in the cache, rest must not be.
+
+Steps (for non-snapshots):
+1. Look for pom, first in the cache
+    - then try the repo itself
+    1. Pom not in cache:
+        1. Download all raw poms in the parental hierarchy and store them in the cache
+
+ */
+
+/** Attempt to resolve [dependencyId] in [repository], using [repositories] for direct immediate dependencies. */
+fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository, repositories: Collection<Repository>): ResolvedDependency {
+    val snapshot = dependencyId.isSnapshot
+    if (snapshot && !repository.snapshots) {
+        return ResolvedDependency(dependencyId, "Release only repository skipped for snapshot dependency", repository)
+    } else if (!snapshot && !repository.releases) {
+        return ResolvedDependency(dependencyId, "Snapshot only repository skipped for release dependency", repository)
+    }
+
+    // Retrieve basic POM data
+    val pomPath = pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion)
+    LOG.trace("Retrieving pom at '{}' for {}", repository, dependencyId)
+    val retrievedPom = retrieveFile(repository, pomPath, dependencyId.isSnapshot)
+            ?: if (snapshot && dependencyId.snapshotVersion.isEmpty()) {
+                // Query for maven-metadata.xml (https://github.com/strongbox/strongbox/wiki/Maven-Metadata)
+                val mavenMetadataPath = mavenMetadataPath(dependencyId, null)
+                val mavenMetadataCachePath = mavenMetadataPath(dependencyId, repository)
+                val metadataFileArtifact = retrieveFile(repository, mavenMetadataPath, true, mavenMetadataCachePath)
+                        ?: return ResolvedDependency(dependencyId, "Failed to resolve snapshot metadata", repository)
+                val metadataBuilder = MavenMetadataBuildingXMLHandler.buildFrom(metadataFileArtifact)
+                val snapshotVersion = metadataBuilder.use({ metadata ->
+                    val timestamp = metadata.versioningSnapshotTimestamp
+                            ?: return ResolvedDependency(dependencyId, "Failed to parse metadata xml: timestamp is missing", repository)
+                    val buildNumber = metadata.versioningSnapshotBuildNumber
+                    "$timestamp-$buildNumber"
+                }, { log ->
+                    return ResolvedDependency(dependencyId, "Failed to parse metadata xml: $log", repository)
+                })
+
+                LOG.info("Resolving {} in {} with snapshot version {}", dependencyId, repository, snapshotVersion)
+
+                // TODO(jp): This recursion is ugly
+                return resolveInM2Repository(dependencyId.copy(snapshotVersion = snapshotVersion), repository, repositories)
+            } else {
+                // Failed
+                return ResolvedDependency(dependencyId, "Failed to resolve pom xml", repository)
+            }
+
+    if (dependencyId.type.equals("pom", ignoreCase = true)) {
+        return ResolvedDependency(dependencyId, emptyList(), repository, retrievedPom)
+    }
+
+    val resolvedPom = resolveRawPom(retrievedPom.originalUrl, retrievedPom.data!!, repository, repositories).fold { rawPom ->
+        resolvePom(rawPom, repository, repositories)
+    }
+
+    val pom = resolvedPom.use( { it }, {  log ->
+        LOG.debug("Failed to resolve POM for {} from {}: {}", dependencyId, repository, log)
+        return ResolvedDependency(dependencyId, log, repository)
+    })
+
+    when (dependencyId.type) {
+        "jar", "bundle" -> { // TODO Should osgi bundles have different handling?
+            val jarPath = artifactPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.classifier, "jar", dependencyId.snapshotVersion)
+            val retrieved = retrieveFile(repository, jarPath, snapshot)
+
+            if (retrieved == null) {
+                LOG.warn("Failed to retrieve jar at '{}' in {}", jarPath, repository)
+                return ResolvedDependency(dependencyId, "Failed to retrieve jar", repository)
+            } else {
+                // Purge retrieved data, storing it would only create a memory leak, as the value is rarely used,
+                // can always be lazily loaded and the size of all dependencies can be quite big.
+                retrieved.data = null
+                return ResolvedDependency(dependencyId, pom.dependencies, repository, retrieved)
+            }
+        }
+        else -> {
+            LOG.warn("Unsupported packaging {} of {}", dependencyId.type, dependencyId)
+            return ResolvedDependency(dependencyId, "Unsupported dependency type \"${dependencyId.type}\"", repository)
+        }
+    }
+}
+
+/**
+ * Retrieve file from repository, handling cache and checksums (TODO: And signatures).
+ * NOTE: Does not check whether [repository] holds snapshots and/or releases.
+ * Will fail if the file is a directory.
+ *
+ * @param repository to retrieve from. It's [Repository.cache] will be checked too.
+ * @param path to the file in a repository
+ * @param snapshot resolve as if this file was a snapshot file? (i.e. may change on the remote)
+ */
+private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean, cachePath:String = path): ArtifactPath? {
+    /*
+    File retrieval logic:
+    1. If repository is local: (Local) file exists?
+        1. Yes: Return it, done
+        2. No: Fail
+    2. (Repository is remote) Cache local path exists?
+        1. Yes && snapshot: Still fresh? (snapshotControlSec)
+            1. Yes: Return it, done
+            2. No: Note the last modification time for cache control
+        2. Yes && !snapshot: Return it, done
+        3. No: Continue
+    3. Download remote path to memory (possibly with cache control from 2.1), note response time
+        1. Skipped, cache valid: Return cache local path, done
+        2. Succeeded: continue
+        3. Failed: Fail
+    4. Download checksums one by one and verify
+        1. All checksums 404: Warn, continue
+        2. Any checksum mismatch: Warn, fail, try again! TODO: Allow to control this
+        3. All checksums match (or 404): continue
+    5. Store downloaded checksums locally
+    6. Store downloaded artifact locally, overwriting existing if it is known that it exists (2.1)
+    7. Done
+     */
+
+    val repositoryArtifactUrl = repository.url / path
+
+    // Step 1: check if local repository
+    if (repository.local) {
+        val localFile = repositoryArtifactUrl.toPath() ?: throw AssertionError("local repository URL is not valid Path")
+        LOG.debug("Retrieving local artifact: {}", localFile)
+        try {
+            val attributes = Files.readAttributes<BasicFileAttributes>(localFile, BasicFileAttributes::class.java)
+            if (attributes.isDirectory) {
+                LOG.warn("Local artifact is a directory: {}", localFile)
+                return null
+            }
+            LOG.trace("Using local artifact: {}", localFile)
+            return ArtifactPath(localFile, repositoryArtifactUrl,null)
+        } catch (fileDoesNotExist: IOException) {
+            LOG.debug("Failed to retrieve local artifact: {}", localFile, fileDoesNotExist)
+            return null
+        }
+
+        // unreachable
+    }
+
+    // This will not fail, due to constraints imposed by repository.cache initializer
+    val cacheRepositoryRoot = repository.cache?.url ?: throw AssertionError("non local repository does not have cache repository")
+    val cacheFile = (cacheRepositoryRoot / cachePath).toPath() ?: throw AssertionError("cache repository URL is not valid Path")
+    var cacheFileExists = false
+
+    // Step 2: check local cache
+    var cacheControlMs:Long = -1
+    try {
+        LOG.debug("Checking local artifact cache: {}", cacheFile)
+        val attributes = Files.readAttributes<BasicFileAttributes>(cacheFile, BasicFileAttributes::class.java)
+        if (attributes.isDirectory) {
+            LOG.warn("Local artifact cache is a directory: {}", cacheFile)
+            return null
+        }
+        if (!snapshot) {
+            LOG.trace("Using local artifact cache (not snapshot): {}", cacheFile)
+            return ArtifactPath(cacheFile, repositoryArtifactUrl, null)
+        }
+        val modified = attributes.lastModifiedTime().toMillis()
+        if (modified + TimeUnit.SECONDS.toMillis(repository.snapshotUpdateDelaySeconds) < System.currentTimeMillis()) {
+            LOG.trace("Using local artifact cache (snapshot still fresh): {}", cacheFile)
+            return ArtifactPath(cacheFile, repositoryArtifactUrl, null)
+        }
+
+        cacheFileExists = true
+        cacheControlMs = modified
+    } catch (fileDoesNotExist: IOException) {
+        LOG.trace("Local artifact cache does not exist: {}", cacheFile, fileDoesNotExist)
+    }
+
+    // Step 3: download from remote to memory
+    LOG.info("Retrieving file '{}' from {}", path, repository)
+
+    val webb = Webb(null)
+    val response: Response<ByteArray>
+    // Fallbacks to current time if headers are invalid/missing, we don't have any better metric
+    var remoteLastModifiedTime:Long = System.currentTimeMillis()
+    try {
+        val request = webb.get(repositoryArtifactUrl.toExternalForm())
+        if (cacheControlMs > 0) {
+            request.ifModifiedSince(cacheControlMs)
+        }
+        response = request.executeBytes()
+
+        val lastModified = response.lastModified
+        val date = response.date
+        if (lastModified > 0) {
+            remoteLastModifiedTime = lastModified
+        } else if (date > 0) {
+            remoteLastModifiedTime = date
+        }
+    } catch (e: WebbException) {
+        LOG.debug("Failed to retrieve '{}' from {}", path, repository, e)
+        return null
+    }
+
+    if (snapshot && response.statusCode == 304 /* Not modified */) {
+        LOG.trace("Using local artifact cache (snapshot not modified): {}", cacheFile)
+        return ArtifactPath(cacheFile, repositoryArtifactUrl, null)
+    } else if (!response.isSuccess) {
+        LOG.debug("Failed to retrieve '{}' from {} - status code {}", path, repository, response.statusCode)
+        return null
+    }
+    val remoteArtifactData:ByteArray = response.body
+
+    // Step 4: download and verify checksums
+    val validChecksums = HashMap<String /* path */, String /* file content */>()
+    for (checksum in CHECKSUMS) {
+        val checksumPath = path + checksum.suffix
+        val checksumUrl = repository.url / checksumPath
+        val checksumFileBody:String? = try {
+            val checksumResponse = webb.get(checksumUrl.toExternalForm()).executeString()
+            if (!checksumResponse.isSuccess) {
+                LOG.debug("Failed to retrieve checksum '{}' (code: {})", checksumUrl, checksumResponse.statusCode)
+                continue
+            }
+            checksumResponse.body
+        } catch (e: WebbException) {
+            LOG.warn("Failed to retrieve checksum '{}'", checksumUrl, e)
+            continue
+        }
+
+        val expectedChecksum = parseHashSum(checksumFileBody)
+        if (checksumFileBody == null || expectedChecksum.isEmpty()) {
+            LOG.warn("Failed to retrieve checksum '{}': file is malformed, retrying", checksumUrl)
+            TODO("RETRY, use "+repository.tolerateChecksumMismatch)
+        }
+
+        // Compute checksum
+        val computedChecksum = checksum.checksum(remoteArtifactData)
+
+        if (hashMatches(expectedChecksum, computedChecksum, path.takeLastWhile { it != '/' })) {
+            LOG.trace("Checksum of '{}' in {} is valid", path, repository)
+            val checksumCachePath = if (path === cachePath) checksumPath else cachePath + checksum.suffix
+            validChecksums[checksumCachePath] = checksumFileBody
+        } else {
+            LOG.warn("Checksum '{}' mismatch! Computed {}, got {}, retrying", checksumUrl, computedChecksum, expectedChecksum)
+            TODO("RETRY, use "+repository.tolerateChecksumMismatch)
+        }
+    }
+
+    // Step 5: Store downloaded checksums locally
+    Files.createDirectories(cacheFile.parent)
+    if (validChecksums.isEmpty()) {
+        LOG.warn("No checksums found for {}, can't verify its correctness", repositoryArtifactUrl)
+    } else {
+        for ((checksumFilePath, content) in validChecksums) {
+            val filePath = (cacheRepositoryRoot / checksumFilePath).toPath() ?: throw AssertionError("cache repository checksum path is not a valid path")
+            filePath.writeText(content)
+        }
+    }
+
+    // Step 6: Store downloaded artifact
+    try {
+        val openOptions =
+                if (cacheFileExists) {
+                    arrayOf(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
+                } else {
+                    arrayOf(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+                }
+        Files.newOutputStream(cacheFile, *openOptions).use {
+            it.write(remoteArtifactData, 0, remoteArtifactData.size)
+        }
+        LOG.debug("Artifact from {} cached successfully", repositoryArtifactUrl)
+    } catch (e: IOException) {
+        LOG.warn("Failed to save artifact from {} to cache in {}", repositoryArtifactUrl, cacheFile, e)
+        return null
+    }
+    if (snapshot) {
+        try {
+            Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(remoteLastModifiedTime))
+        } catch (e: IOException) {
+            LOG.warn("Failed to change artifact's '{}' modify time, snapshot cache control may be slightly off", cacheFile, e)
+        }
+    }
+
+    // Done
+    return ArtifactPath(cacheFile, repositoryArtifactUrl, remoteArtifactData)
+}
+
+private fun retrieveRawPom(dependencyId: DependencyId,
+                           repository: Repository,
+                           chain: Collection<Repository>,
+                           pomPath:String = pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion)): Failable<RawPom, String> {
+    // Create path to pom
+    val pomUrl = repository.url / pomPath
+    LOG.trace("Retrieving pom at '{}' in {} for {}", pomPath, repository, dependencyId)
+    val pomData = retrieveFile(repository, pomPath, dependencyId.isSnapshot)?.data
+            ?: return Failable.failure("File not retrieved")
+
+    return resolveRawPom(pomUrl, pomData, repository, chain)
+}
+
+private fun resolveRawPom(pomUrl:URL, pomData:ByteArray,
+                          repository: Repository, chain: Collection<Repository>): Failable<RawPom, String> {
+    val rawPom = RawPom(pomUrl)
+
+    val reader = XMLReaderFactory.createXMLReader()
+    val pomBuilder = PomBuildingXMLHandler(rawPom)
+    reader.contentHandler = pomBuilder
+    reader.errorHandler = pomBuilder
+    try {
+        reader.parse(InputSource(ByteArrayInputStream(pomData)))
+    } catch (se: SAXException) {
+        LOG.warn("Error during parsing {}", pomUrl, se)
+        return Failable.failure("Malformed xml")
+    }
+
+    if (pomBuilder.hasParent) {
+        var parent: RawPom? = null
+        val parentPomId = DependencyId(pomBuilder.parentGroupId,
+                pomBuilder.parentArtifactId,
+                pomBuilder.parentVersion,
+                preferredRepository = repository,
+                type = "pom")
+
+        if (pomBuilder.parentRelativePath.isNotBlank()) {
+            // Create new pom-path
+            val parentPomPath = (pomUrl.path.pathParent() / pomBuilder.parentRelativePath).toString()
+            LOG.trace("Retrieving parent pom of '{}' from relative '{}'", pomUrl, parentPomPath)
+            retrieveRawPom(parentPomId, repository, chain, parentPomPath).success {
+                parent = it
+            }
+        }
+
+        if (parent == null) {
+            LOG.trace("Retrieving parent pom of '{}' by coordinates '{}', in same repository", pomUrl, parentPomId)
+            val resolvedPom = LibraryDependencyResolver.resolveSingleDependency(parentPomId, chain)
+            val artifact = resolvedPom.artifact
+            if (artifact != null) {
+                resolveRawPom(artifact.originalUrl, artifact.data!!, resolvedPom.resolvedFrom!!, chain)
+                        .success { pom ->
+                            parent = pom
+                        }
+            }
+        }
+
+        if (parent == null) {
+            LOG.warn("Pom at '{}' in {} claims to have a parent, but it has not been found (resolved to {})", pomUrl, repository, parentPomId)
+        } else {
+            rawPom.parent = parent
+        }
+    }
+
+    return Failable.success(rawPom)
+}
+
+private fun resolvePom(rawPom:RawPom, repository: Repository, chain: Collection<Repository>): Failable<Pom, String> {
+    val pom = rawPom.resolve(repository)
+
+    // Resolve <dependencyManagement> <scope>import
+    // http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope
+    //TODO Untested, no known project that uses it
+    val flatDependencyManagement = ArrayList<Dependency>(pom.dependencyManagement.size * 2)
+
+    for (dependency in pom.dependencyManagement) {
+        val dep = dependency.dependencyId
+        if (!dep.type.equals("pom", ignoreCase = true)
+                || !dep.scope.equals("import", ignoreCase = true)) {
+            flatDependencyManagement.add(dependency)
+            continue
+        }
+
+        LOG.trace("Resolving dependencyManagement import {} in '{}'", dep, rawPom.url)
+        retrieveRawPom(dep, repository, chain).fold { retrievedRawPom ->
+            resolvePom(retrievedRawPom, repository, chain)
+        }.use({ importedPom ->
+            val imported = importedPom.dependencyManagement
+            if (imported.isNotEmpty()) {
+                LOG.trace("dependencyManagement of {} imported {} from {}", rawPom.url, imported, dep)
+
+                // Specification says, that it should be replaced
+                flatDependencyManagement.addAll(imported)
+            }
+        }, { error ->
+            LOG.warn("dependencyManagement import in {} of {} failed: '{}'", rawPom.url, dep, error)
+        })
+    }
+    val fullyResolvedPom = pom.resolveEffectiveDependencies(flatDependencyManagement)
+
+    return Failable.success(fullyResolvedPom)
+}
+
+fun pomPath(group:String, name:String, version:String, snapshotVersion:String):String {
+    val sb = group.replace('.', '/') / name / version
+    sb.append('/').append(name).append('-')
+    val SNAPSHOT = "SNAPSHOT"
+    if (version.endsWith(SNAPSHOT) && snapshotVersion.isNotEmpty()) {
+        sb.append(version, 0, version.length - SNAPSHOT.length).append(snapshotVersion)
+    } else {
+        sb.append(version)
+    }
+    sb.append(".pom")
+    return sb.toString()
+}
+
+private fun artifactPath(group:String, name:String, version:String, classifier:Classifier, extension: String, snapshotVersion:String):String {
+    val fileName = StringBuilder()
+    fileName.append(name).append('-')
+
+    val SNAPSHOT = "SNAPSHOT"
+    if (version.endsWith(SNAPSHOT) && snapshotVersion.isNotEmpty()) {
+        fileName.append(version, 0, version.length - SNAPSHOT.length).append(snapshotVersion)
+    } else {
+        fileName.append(version)
+    }
+    if (classifier.isNotEmpty()) {
+        fileName.append('-').append(classifier)
+    }
+    fileName.append('.').append(extension)
+
+    return (group.replace('.', '/') / name / version / fileName).toString()
+}
+
+private fun mavenMetadataPath(dependencyId: DependencyId, repositoryIfCache:Repository?):String {
+    val base = (dependencyId.group.replace('.', '/') / dependencyId.name / dependencyId.version)
+    base.append("/maven-metadata")
+    if (repositoryIfCache != null) {
+        base.append('-').append(repositoryIfCache.name)
+    }
+    base.append(".xml")
+    return base.toString()
+}
 
 /**
  * Publish [artifacts]s to this [repository], under given [metadata]
@@ -42,353 +485,6 @@ internal fun publish(repository:Repository, metadata: InfoNode, artifacts: List<
     } else {
         repository.publishLocked(metadata, artifacts)
     }
-}
-
-/** Attempt to resolve [dependencyId] in [repository], using [repositories] for direct immediate dependencies. */
-fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository, repositories: Collection<Repository>): ResolvedDependency {
-    val snapshot = dependencyId.isSnapshot
-    if (snapshot && !repository.snapshots) {
-        return ResolvedDependency(dependencyId, emptyList(), repository, true, "Release only repository skipped for snapshot dependency")
-    } else if (!snapshot && !repository.releases) {
-        return ResolvedDependency(dependencyId, emptyList(), repository, true, "Snapshot only repository skipped for release dependency")
-    }
-
-    // Just retrieving raw pom file
-    val resolvedPom = retrievePom(dependencyId, repository, repositories)
-
-    /*
-    TODO Implement:
-    Snapshot resolution logic abstract:
-    - Some snapshots ("non-unique snapshots") are overwritten on publish, so the resolution schema is the same
-        - but we need to check remote before local copy
-    - Other snapshots ("unique snapshots") use maven-metadata.xml, we need to download that to cache first
-
-    Steps (for snapshots):
-    1. Look into cache, if it contains POM or maven-metadata.xml
-        1. If it contains either, note its last modified date
-    2. Download the POM or maven-metadata.xml (preferring maven-metadata.xml)
-        - If cache contained one of the two, try that first
-        - If cache contained one of the two, make the query with cache control,
-            so that in the best case we don't have to re-download anything
-        - If both download attempts fail, resolution failed
-    3. If neither was downloaded fresh, resolve completely from cache
-    4. Otherwise
-        - (POM) continue resolution normally for the POM, overriding the cache
-        - (metadata) parse metadata, select newest version (TODO: Maybe some control over this through DependencyId attributes)
-            download that. Metadata should be overridden in the cache, rest must not be.
-     */
-
-    if (dependencyId.type == "pom") {
-        return resolvedPom
-    }
-
-    val pom = resolvedPom.pom ?: return ResolvedDependency(dependencyId, emptyList(), repository, true,
-            "Failed to resolve pom: " + resolvedPom.log)
-
-    if (resolvedPom.hasError) {
-        LOG.warn("Retrieved pom for {} from {}, but resolution claims error ({}). Something may go wrong.", dependencyId, repository, resolvedPom.log)
-    }
-
-    val packaging = if (dependencyId.type == DEFAULT_TYPE) pom.packaging else dependencyId.type
-
-    when (packaging) {
-        "pom" -> {
-            return resolvedPom
-        }
-        "jar", "bundle" -> { // TODO Should osgi bundles have different handling?
-            val jarPath = dependencyId.artifactPath("jar")
-            val (data, file) = retrieveFile(jarPath, repository)
-
-            if (file == null) {
-                if (data == null) {
-                    LOG.warn("Failed to retrieve jar at '{}' in {}", jarPath, repository)
-                } else {
-                    LOG.warn("Jar at '{}' in {} retrieved, but is not on local filesystem. Cache repository may be missing.", jarPath, repository)
-                }
-            }
-
-            return ResolvedDependency(dependencyId, pom.dependencies, repository, file == null).apply {
-                this.artifact = file
-                if (file == null) {
-                    // Do not store artifact's data, unless strictly necessary.
-                    // Storing it always would only create a memory leak, as the value is rarely used,
-                    // can always be lazily loaded and the size of all dependencies can be quite big.
-                    this.artifactData = data
-                }
-
-            }
-        }
-        else -> {
-            LOG.warn("Unsupported packaging {} of {}", packaging, dependencyId)
-            return ResolvedDependency(dependencyId, pom.dependencies, repository, true)
-        }
-    }
-}
-
-
-private fun retrieveFile(path: String, repository: Repository): Pair<ByteArray?, Path?> {
-    val url = repository.url / path
-    if (repository.local) {
-        LOG.debug("Retrieving file '{}' from {}", path, repository)
-    } else {
-        LOG.info("Retrieving file '{}' from {}", path, repository)
-    }
-
-    // Download
-    val webb = Webb(null)
-    val response: Response<ByteArray>
-    try {
-        response = webb.get(url.toExternalForm()).executeBytes()
-    } catch (e: WebbException) {
-        if (e.cause is FileNotFoundException) {
-            LOG.debug("Failed to retrieve '{}' from {}, file does not exist", path, repository)
-        } else {
-            LOG.debug("Failed to retrieve '{}' from {}", path, repository, e)
-        }
-        return Pair(null, null)
-    }
-
-    if (!response.isSuccess) {
-        LOG.debug("Failed to retrieve '{}' from {} - status code {}", path, repository, response.statusCode)
-        return Pair(null, null)
-    }
-
-    // Checksum
-    val checksum = repository.checksum
-    var computedChecksum:ByteArray? = null
-    if (checksum != Checksum.None) {
-        // Compute checksum
-        computedChecksum = checksum.checksum(response.body)
-
-        try {
-            // Retrieve checksum
-            val expectedChecksumData = webb.get((repository.url / (path + checksum.suffix)).toExternalForm()).executeString().body
-            val expectedChecksum = parseHashSum(expectedChecksumData)
-
-            when {
-                expectedChecksum.isEmpty() ->
-                    LOG.warn("Checksum of '{}' in {} is malformed ('{}'), continuing without checksum", path, repository, expectedChecksumData)
-                hashMatches(expectedChecksum, computedChecksum, path.takeLastWhile { it != '/' }) ->
-                    LOG.trace("Checksum of '{}' in {} is valid", path, repository)
-                else -> {
-                    LOG.warn("Checksum of '{}' in {} is wrong! Expected {}, got {}", path, repository, computedChecksum, expectedChecksumData)
-                    return Pair(null, null)
-                }
-            }
-        } catch (e: WebbException) {
-            if (e.cause is FileNotFoundException) {
-                LOG.warn("Failed to retrieve {} checksum '{}' from {}, file does not exist, continuing without checksum", checksum, path, repository)
-            } else {
-                LOG.warn("Failed to retrieve {} checksum '{}' from {}, continuing without checksum", checksum, path, repository, e)
-            }
-        } catch (e: Exception) {
-            LOG.warn("Failed to verify checksum of '{}' in {}, continuing without checksum", path, repository, e)
-        }
-    } else {
-        LOG.debug("Not computing checksum for '{}' in {}", path, repository)
-    }
-
-    var retrievedFile: Path? = null
-
-    val cache = repository.cache
-    if (cache != null) {
-        // We should cache it!
-        val dataFile: Path? = (cache.url / path).toPath()
-
-        if (dataFile == null) {
-            LOG.warn("Can't save '{}' from {} into cache at {} - cache is not local?", path, repository, cache)
-        } else if (dataFile.exists()) {
-            var fileIsEqual = true
-
-            if (dataFile.size != response.body.size.toLong()) {
-                fileIsEqual = false
-            }
-
-            if (fileIsEqual) {
-                retrievedFile = dataFile
-                LOG.trace("Not saving '{}' from {} into cache at {} - file '{}' already exists", path, repository, cache, dataFile)
-            } else {
-                LOG.warn("Not saving '{}' from {} into cache at {} - file '{}' already exists and is different!", path, repository, cache, dataFile)
-            }
-        } else {
-            var dataFileWritten = false
-            try {
-                Files.createDirectories(dataFile.parent)
-                Files.newOutputStream(dataFile).use {
-                    it.write(response.body, 0, response.body.size)
-                }
-                LOG.debug("File '{}' from {} cached successfully", path, repository)
-                retrievedFile = dataFile
-                dataFileWritten = true
-            } catch (e: Exception) {
-                LOG.warn("Error trying to save '{}' from {} into cache at {} - file '{}'", path, repository, cache, dataFile, e)
-            }
-
-            if (dataFileWritten && cache.checksum != Checksum.None) {
-                val checksumFile: Path = (cache.url / (path + cache.checksum.suffix)).toPath()!!
-                if (computedChecksum == null) {
-                    computedChecksum = cache.checksum.checksum(response.body)
-                }
-
-                try {
-                    checksumFile.writeText(createHashSum(computedChecksum, path.takeLastWhile { it != '/' }))
-                    LOG.debug("Checksum of file '{}' from {} cached successfully", path, repository)
-                } catch (e: Exception) {
-                    LOG.warn("Error trying to save checksum of '{}' from {} into cache at {} - file '{}'", path, repository, cache, checksumFile, e)
-                }
-            }
-
-        }
-    } else {
-        try {
-            retrievedFile = (repository.url / path).toPath()
-        } catch (e: IllegalArgumentException) {
-            LOG.debug("File '{}' from {} does not have local representation", path, repository, e)
-        }
-    }
-
-    // Done
-    return Pair(response.body, retrievedFile)
-}
-
-
-private fun retrieveRawPom(dependencyId: DependencyId,
-                           repository: Repository,
-                           chain: Collection<Repository>,
-                           pomPath:String = pomPath(dependencyId.group, dependencyId.name, dependencyId.version)): ResolvedDependency {
-    // Create path to pom
-    val pomUrl = repository.url / pomPath
-    LOG.trace("Retrieving pom at '{}' in {} for {}", pomPath, repository, dependencyId)
-    val (pomData, pomFile) = retrieveFile(pomPath, repository)
-    if (pomData == null) {
-        return ResolvedDependency(dependencyId, emptyList(), repository, true, "File not retrieved").apply {
-            this.pomFile = pomFile
-            this.pomUrl = pomUrl
-        }
-    }
-    val rawPom = RawPom(pomUrl)
-
-    val reader = XMLReaderFactory.createXMLReader()
-    val pomBuilder = PomBuildingXMLHandler(rawPom)
-    reader.contentHandler = pomBuilder
-    reader.errorHandler = pomBuilder
-    try {
-        reader.parse(InputSource(ByteArrayInputStream(pomData)))
-    } catch (se: SAXException) {
-        LOG.warn("Error during parsing {}", pomUrl, se)
-        return ResolvedDependency(dependencyId, emptyList(), repository, true, "Malformed xml").apply {
-            this.pomFile = pomFile
-            this.pomData = pomData
-            this.pomUrl = pomUrl
-        }
-    }
-
-    if (pomBuilder.hasParent) {
-        var parent: ResolvedDependency? = null
-        val parentPomId = DependencyId(pomBuilder.parentGroupId,
-                pomBuilder.parentArtifactId,
-                pomBuilder.parentVersion,
-                preferredRepository = repository,
-                type = "pom")
-
-        if (pomBuilder.parentRelativePath.isNotBlank()) {
-            // Create new pom-path
-            val parentPomPath = (pomPath.dropLastWhile { c -> c != '/' } / pomBuilder.parentRelativePath).toString()
-            LOG.trace("Retrieving parent pom of '{}' from relative '{}'", pomPath, parentPomPath)
-            parent = retrieveRawPom(parentPomId, repository, chain, parentPomPath)
-        }
-
-        if (parent == null || parent.hasError) {
-            LOG.trace("Retrieving parent pom of '{}' by coordinates '{}'", pomPath, parentPomId)
-            // TODO(jp): Needs to resolve only raw pom!
-            parent = LibraryDependencyResolver.resolveSingleDependency(parentPomId, chain)
-        }
-
-        val parentPom = parent.rawPom
-        if (parent.hasError || parentPom == null) {
-            LOG.warn("Pom at '{}' in {} claims to have a parent, but it has not been found (resolved to {})", pomPath, repository, parent)
-        } else {
-            rawPom.parent = parentPom
-        }
-    }
-
-    return ResolvedDependency(dependencyId, emptyList(), repository, false).apply {
-        this.pomFile = pomFile
-        this.pomData = pomData
-        this.pomUrl = pomUrl
-        this.rawPom = rawPom
-    }
-}
-
-private fun retrievePom(dependencyId: DependencyId,
-                        repository: Repository,
-                        chain: Collection<Repository>,
-                        pomPath:String = pomPath(dependencyId.group, dependencyId.name, dependencyId.version)): ResolvedDependency {
-    val retrievedRawPom = retrieveRawPom(dependencyId, repository, chain)
-    if (retrievedRawPom.hasError) {
-        return retrievedRawPom
-    }
-    val rawPom = retrievedRawPom.rawPom ?: return ResolvedDependency(retrievedRawPom.id, retrievedRawPom.dependencies, retrievedRawPom.resolvedFrom, true, "No raw pom found!")
-
-    val pom = rawPom.resolve()
-
-    // Resolve <dependencyManagement> <scope>import
-    // http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope
-    //TODO Untested, no known project that uses it
-    val flatDependencyManagement = ArrayList<Dependency>(pom.dependencyManagement.size * 2)
-
-    for (dependency in pom.dependencyManagement) {
-        val dep = dependency.dependencyId
-        if (!dep.type.equals("pom", ignoreCase = true)
-                || !dep.scope.equals("import", ignoreCase = true)) {
-            flatDependencyManagement.add(dependency)
-            continue
-        }
-
-        LOG.trace("Resolving dependencyManagement import {} in '{}'", dep, pomPath)
-        val importPom = retrievePom(dep, repository, chain)
-        if (importPom.hasError) {
-            LOG.warn("dependencyManagement import in {} of {} failed: '{}'", pomPath, dep, importPom.log)
-        }
-
-        val imported = importPom.pom?.dependencyManagement
-        if (imported != null && imported.isNotEmpty()) {
-            LOG.trace("dependencyManagement of {} imported {} from {}", pomPath, imported, dep)
-
-            // Specification says, that it should be replaced
-            flatDependencyManagement.addAll(imported)
-        }
-    }
-    val fullyResolvedPom = pom.resolveEffectiveDependencies(flatDependencyManagement)
-
-    return ResolvedDependency(dependencyId, emptyList(), repository, false).apply {
-        this.pomFile = retrievedRawPom.pomFile
-        this.pomData = retrievedRawPom.pomData
-        this.pomUrl = retrievedRawPom.pomUrl
-        this.rawPom = retrievedRawPom.rawPom
-        this.pom = fullyResolvedPom
-    }
-}
-
-fun pomPath(group:String, name:String, version:String):String {
-    val sb = group.replace('.', '/') / name / version
-    sb.append('/').append(name).append('-').append(version).append(".pom")
-    return sb.toString()
-}
-
-private fun DependencyId.artifactPath(extension: String): String {
-    return artifactPath(group, name, version, classifier, extension)
-}
-
-private fun artifactPath(group:String, name:String, version:String, classifier:Classifier, extension: String):String {
-    val fileName = StringBuilder()
-    fileName.append(name).append('-').append(version)
-    if (classifier.isNotEmpty()) {
-        fileName.append('-').append(classifier)
-    }
-    fileName.append('.').append(extension)
-
-    return (group.replace('.', '/') / name / version / fileName).toString()
 }
 
 // TODO(jp): This should be replaced with Files.exists and use unique snapshots
@@ -413,7 +509,7 @@ private fun Repository.publishLocked(metadata: InfoNode, artifacts: List<Pair<Pa
 
     val snapshot = version.endsWith("-SNAPSHOT")
 
-    val pomPath = path / pomPath(groupId, artifactId, version)
+    val pomPath = path / pomPath(groupId, artifactId, version, DEFAULT_SNAPSHOT_VERSION)
     LOG.debug("Publishing metadata to {}", pomPath)
     checkValidForPublish(pomPath, snapshot)
     val pomXML = metadata.toXML()
@@ -423,8 +519,8 @@ private fun Repository.publishLocked(metadata: InfoNode, artifacts: List<Pair<Pa
     // Create pom.xml hashes
     run {
         val pomXMLBytes = pomXML.toString().toByteArray(Charsets.UTF_8)
-        for (checksum in PublishChecksums) {
-            val digest = checksum.digest()!!.digest(pomXMLBytes)
+        for (checksum in CHECKSUMS) {
+            val digest = checksum.digest().digest(pomXMLBytes)
 
             val publishedName = pomPath.name
             val checksumFile = pomPath.parent.resolve("$publishedName${checksum.suffix}")
@@ -437,14 +533,14 @@ private fun Repository.publishLocked(metadata: InfoNode, artifacts: List<Pair<Pa
 
 
     for ((artifact, classifier) in artifacts) {
-        val publishedArtifact = path / artifactPath(groupId, artifactId, version, classifier, artifact.name.pathExtension())
+        val publishedArtifact = path / artifactPath(groupId, artifactId, version, classifier, artifact.name.pathExtension(), DEFAULT_SNAPSHOT_VERSION)
         LOG.debug("Publishing {} to {}", artifact, publishedArtifact)
         checkValidForPublish(publishedArtifact, snapshot)
 
         Files.copy(artifact, publishedArtifact, StandardCopyOption.REPLACE_EXISTING)
         // Create hashes
-        val checksums = PublishChecksums
-        val digests = Array(checksums.size) { checksums[it].digest()!! }
+        val checksums = CHECKSUMS
+        val digests = Array(checksums.size) { checksums[it].digest() }
 
         Files.newInputStream(artifact).use { input ->
             val buffer = ByteArray(4096)
@@ -466,7 +562,7 @@ private fun Repository.publishLocked(metadata: InfoNode, artifacts: List<Pair<Pa
             checkValidForPublish(checksumFile, snapshot)
 
             checksumFile.writeText(createHashSum(digest, publishedName))
-            LOG.debug("Publishing {} {} to {}", publishedArtifact, checksum, checksumFile)
+            LOG.debug("Publishing {} to {}", publishedArtifact, checksumFile)
         }
 
         LOG.info("Published {} with {} checksum(s)", publishedArtifact, checksums.size)
@@ -518,7 +614,7 @@ internal class Pom(val groupId:String?, val artifactId:String?, val version:Stri
      * TODO: dependencyManagement of transitive dependencies is not handled to be Maven-like
      */
     fun resolveEffectiveDependencies(dependencyManagement:List<Dependency>):Pom {
-        val dependencies = ArrayList<Dependency>()
+        val newDependencies = ArrayList<Dependency>()
         for (dependency in dependencies) {
             val resolved = resolveDependencyManagement(dependency, dependencyManagement)
 
@@ -527,7 +623,7 @@ internal class Pom(val groupId:String?, val artifactId:String?, val version:Stri
             when (resolved.dependencyId.scope.toLowerCase()) {
                 "compile", "runtime" -> {
                     // Kept
-                    dependencies.add(resolved)
+                    newDependencies.add(resolved)
                 }
                 "provided", "test", "system" -> {
                     // Omitted
@@ -540,7 +636,7 @@ internal class Pom(val groupId:String?, val artifactId:String?, val version:Stri
             }
         }
 
-        return Pom(groupId, artifactId, version, packaging, dependencies, dependencyManagement)
+        return Pom(groupId, artifactId, version, packaging, newDependencies, dependencyManagement)
     }
 }
 
@@ -562,7 +658,7 @@ internal class RawPom(
     val dependencies = ArrayList<RawPomDependency>()
     val dependencyManagement = ArrayList<RawPomDependency>()
 
-    fun resolve():Pom {
+    fun resolve(repository:Repository):Pom {
         val dependencies = ArrayList<Dependency>()
         val dependencyManagement = ArrayList<Dependency>()
         var pom = this
@@ -574,8 +670,8 @@ internal class RawPom(
                     LOG.warn("Parent of '{}' in {} has parent with invalid packaging {} (expected 'pom')", this, pom.url, packaging)
                 }
             }
-            pom.dependencies.mapTo(dependencies) { translate(it) }
-            pom.dependencyManagement.mapTo(dependencyManagement) { translate(it) }
+            pom.dependencies.mapTo(dependencies) { translate(it, repository) }
+            pom.dependencyManagement.mapTo(dependencyManagement) { translate(it, repository) }
             pom = pom.parent ?: break
             pomIsParent = true
         }
@@ -663,11 +759,12 @@ internal class RawPom(
         return this
     }
 
-    private fun translate(raw:RawPomDependency): Dependency {
+    private fun translate(raw:RawPomDependency, repository:Repository): Dependency {
         val translatedDependencyId = DependencyId(
                 raw.group?.translate() ?: "",
                 raw.name?.translate() ?: "",
                 raw.version?.translate() ?: "",
+                preferredRepository = repository,
                 classifier = raw.classifier?.translate() ?: NoClassifier,
                 type = raw.type?.translate() ?: DEFAULT_TYPE,
                 scope = raw.scope?.translate() ?: DEFAULT_SCOPE,
@@ -692,7 +789,7 @@ internal class RawPom(
     }
 }
 
-private class PomBuildingXMLHandler(private val pom: RawPom) : DefaultHandler(), ErrorHandler {
+private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, pom.url) {
 
     var parentGroupId = ""
     var parentArtifactId = ""
@@ -713,33 +810,12 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : DefaultHandler(),
     private var lastDependencyExclusionArtifactId = ""
     private var lastDependencyExclusionVersion = "*"
 
-    private val elementStack = ArrayList<String>()
-    private val elementCharacters = StringBuilder()
-
-    private fun atElement(path: Array<String>, ignoreLast: Int = 0): Boolean {
-        if (elementStack.size - ignoreLast != path.size) {
-            return false
-        }
-        var i = path.size - 1
-        while (i >= 0) {
-            if (!elementStack[i].equals(path[i], ignoreCase = true)) {
-                return false
-            }
-            i--
-        }
-        return true
-    }
-
-    override fun startElement(uri: String, localName: String, qName: String, attributes: Attributes) {
-        elementStack.add(localName)
-        elementCharacters.setLength(0)
-    }
-
-    override fun endElement(uri: String, localName: String, qName: String) {
+    override fun doElement() {
         // Version
         if (atElement(ModelVersion)) {
-            if (characters().trim() != SupportedModelVersion) {
-                throw SAXException("Unsupported modelVersion: $elementCharacters")
+            val characters = characters()
+            if (characters != SupportedModelVersion) {
+                throw SAXException("Unsupported modelVersion: $characters")
             }
         }
 
@@ -807,14 +883,14 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : DefaultHandler(),
             lastDependencyExclusions = ArrayList()
         } else if (atElement(DependencyManagementDependency)) {
             pom.dependencyManagement.add(RawPom.RawPomDependency(
-                lastDependencyGroupId,
-                lastDependencyArtifactId,
-                lastDependencyVersion,
-                lastDependencyClassifier,
-                lastDependencyType,
-                lastDependencyScope,
-                lastDependencyOptional,
-                lastDependencyExclusions
+                    lastDependencyGroupId,
+                    lastDependencyArtifactId,
+                    lastDependencyVersion,
+                    lastDependencyClassifier,
+                    lastDependencyType,
+                    lastDependencyScope,
+                    lastDependencyOptional,
+                    lastDependencyExclusions
             ))
 
             lastDependencyGroupId = null
@@ -846,7 +922,7 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : DefaultHandler(),
         // Properties
         else if (atElement(Property, 1)) {
             val propertyName = elementStack.last()
-            val propertyContent = elementCharacters.toString()
+            val propertyContent = characters()
 
             pom.properties[propertyName] = propertyContent
         }
@@ -868,23 +944,6 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : DefaultHandler(),
             //TODO Add support
             LOG.debug("Pom at {} uses custom repositories, which are not supported yet", pom.url)
         }
-
-        elementStack.removeAt(elementStack.size - 1)
-        elementCharacters.setLength(0)
-    }
-
-    private fun characters() = elementCharacters.toString()
-
-    override fun characters(ch: CharArray, start: Int, length: Int) {
-        elementCharacters.append(ch, start, length)
-    }
-
-    override fun warning(exception: SAXParseException?) {
-        LOG.warn("warning during parsing {}", pom.url, exception)
-    }
-
-    override fun error(exception: SAXParseException?) {
-        LOG.warn("error during parsing {}", pom.url, exception)
     }
 
     companion object {
@@ -942,5 +1001,105 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : DefaultHandler(),
         val RepoName = arrayOf("project", "repositories", "repository", "name")
         val RepoUrl = arrayOf("project", "repositories", "repository", "url")
         val RepoLayout = arrayOf("project", "repositories", "repository", "layout")
+    }
+}
+
+private class MavenMetadataBuildingXMLHandler(metadataUrl:URL) : XMLHandler(LOG, metadataUrl) {
+
+    var groupId:String? = null
+    var artifactId:String? = null
+    var version:String? = null
+
+    var versioningSnapshotTimestamp:String? = null
+    var versioningSnapshotBuildNumber:String = "0"
+    var versioningSnapshotLocalCopy:String = "false"
+
+    override fun doElement() {
+        when {
+            atElement(GroupId) -> groupId = characters()
+            atElement(ArtifactId) -> artifactId = characters()
+            atElement(Version) -> version = characters()
+            atElement(VersioningSnapshotTimestamp) -> versioningSnapshotTimestamp = characters()
+            atElement(VersioningSnapshotBuildNumber) -> versioningSnapshotBuildNumber = characters()
+            atElement(VersioningSnapshotLocalCopy) -> versioningSnapshotLocalCopy = characters()
+        }
+    }
+
+    companion object {
+        private val LOG = LoggerFactory.getLogger(MavenMetadataBuildingXMLHandler::class.java)
+
+        private val GroupId = arrayOf("metadata", "groupId")
+        private val ArtifactId = arrayOf("metadata", "artifactId")
+        private val Version = arrayOf("metadata", "version")
+
+        private val VersioningSnapshotTimestamp = arrayOf("metadata", "versioning", "snapshot", "timestamp")
+        private val VersioningSnapshotBuildNumber = arrayOf("metadata", "versioning", "snapshot", "buildNumber")
+        private val VersioningSnapshotLocalCopy = arrayOf("metadata", "versioning", "snapshot", "localCopy")
+
+        fun buildFrom(file:ArtifactPath):Failable<MavenMetadataBuildingXMLHandler, String> {
+            val xmlData = file.data ?: return Failable.failure("Failed to load xml content")
+
+            val reader = XMLReaderFactory.createXMLReader()
+            val metadataBuilder = MavenMetadataBuildingXMLHandler(file.originalUrl)
+            reader.contentHandler = metadataBuilder
+            reader.errorHandler = metadataBuilder
+            try {
+                reader.parse(InputSource(ByteArrayInputStream(xmlData)))
+            } catch (se: SAXException) {
+                LOG.warn("Error during parsing {}", file.originalUrl, se)
+                return Failable.failure("Malformed xml")
+            }
+
+            return Failable.success(metadataBuilder)
+        }
+    }
+}
+
+private abstract class XMLHandler(private val LOG: Logger, private val parsing:Any) : DefaultHandler(), ErrorHandler {
+    protected val elementStack = ArrayList<String>()
+    protected val elementCharacters = StringBuilder()
+
+    protected fun atElement(path: Array<String>, ignoreLast: Int = 0): Boolean {
+        if (elementStack.size - ignoreLast != path.size) {
+            return false
+        }
+        var i = path.size - 1
+        while (i >= 0) {
+            if (!elementStack[i].equals(path[i], ignoreCase = true)) {
+                return false
+            }
+            i--
+        }
+        return true
+    }
+
+    final override fun startElement(uri: String, localName: String, qName: String, attributes: Attributes) {
+        elementStack.add(localName)
+        elementCharacters.setLength(0)
+    }
+
+    abstract fun doElement()
+
+    final override fun endElement(uri: String, localName: String, qName: String) {
+        doElement()
+        elementStack.removeAt(elementStack.size - 1)
+        elementCharacters.setLength(0)
+    }
+
+    protected fun characters(): String {
+        // in default implementation trim() returns itself, so toString() returns itself
+        return elementCharacters.trim().toString()
+    }
+
+    final override fun characters(ch: CharArray, start: Int, length: Int) {
+        elementCharacters.append(ch, start, length)
+    }
+
+    override fun warning(exception: SAXParseException?) {
+        LOG.warn("warning during parsing {}", parsing, exception)
+    }
+
+    override fun error(exception: SAXParseException?) {
+        LOG.warn("error during parsing {}", parsing, exception)
     }
 }

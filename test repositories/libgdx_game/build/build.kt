@@ -3,8 +3,9 @@
 @file:BuildClasspathDependency("../../build/wemi-plugin-jvm-hotswap-0.7-SNAPSHOT.jar")
 
 import wemi.Keys.runOptions
-import wemi.dependency.Repository
 import wemi.util.executable
+import wemi.dependency.*
+import wemi.*
 
 val gdxVersion = "1.9.7"
 
@@ -23,9 +24,9 @@ val lwjgl3 by project(path("lwjgl3")) {
     projectVersion set {"1.0"}
 
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-backend-lwjgl3", gdxVersion) }
-    libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-platform", gdxVersion, Repository.M2.Classifier to "natives-desktop") }
+    libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-platform", gdxVersion, classifier = "natives-desktop") }
 
-    projectDependencies add { dependency(core, true) }
+    projectDependencies add { ProjectDependency(core, true) }
 
     runOptions add {"-XstartOnFirstThread"}
     mainClass set {"game.Main"}
@@ -49,15 +50,11 @@ val lwjgl2 by project(path("./lwjgl2/")) {
     projectGroup set {"wemi"}
     projectVersion set {"1.0"}
 
-    //val LocalM2Repository = Repository.M2("local", URL("file", "localhost", (projectRoot / "m2/").absolutePath + "/"), null)
-    //val CentralM2Repository = Repository.M2("central", URL("https://repo1.maven.org/maven2/"), LocalM2Repository)
-
-    //repositories set { listOf(CentralM2Repository, LocalM2Repository) }
 
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-backend-lwjgl", gdxVersion) }
-    libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-platform", gdxVersion, Repository.M2.Classifier to "natives-desktop") }
+    libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-platform", gdxVersion, classifier = "natives-desktop") }
 
-    projectDependencies add { dependency(core, true) }
+    projectDependencies add { ProjectDependency(core, true) }
 
     mainClass set {"game.Main"}
 }

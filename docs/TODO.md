@@ -2,7 +2,11 @@
 
 ## For next release
 - Maven snapshots
+	- Publish snapshots as unique
 - Remove ArrayMap
+- Fix WemiProjectResolver:396
+- Tests for URL.parent()
+- --log=<> doesn't seem to work
 
 ## For later
 - Rewrite directorySynchronized based on exclusive file creation and timestamp

@@ -4,6 +4,7 @@ import com.esotericsoftware.jsonbeans.JsonValue
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
 import wemi.util.*
+import java.io.IOException
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
@@ -34,6 +35,7 @@ const val JavadocClassifier: Classifier = "javadoc"
 internal const val DEFAULT_TYPE:String = "jar"
 internal const val DEFAULT_SCOPE:String = "compile"
 internal const val DEFAULT_OPTIONAL:Boolean = false
+internal const val DEFAULT_SNAPSHOT_VERSION:String = ""
 
 /**
  * Unique identifier for project/module to be resolved.
@@ -65,7 +67,7 @@ data class DependencyId(val group: String,
                          *
                          * Examples: jar (default), pom (returns pom.xml, used internally)
                          */
-                        val type:String = DEFAULT_TYPE,
+                        val type:String = DEFAULT_TYPE, // https://maven.apache.org/ref/3.6.0/maven-core/artifact-handlers.html
                         /**
                          * Scope of the dependency.
                          *
@@ -76,7 +78,12 @@ data class DependencyId(val group: String,
                          */
                         val scope:String = DEFAULT_SCOPE,
                         /** Optional transitive dependencies are skipped by default by Wemi. */
-                        val optional:Boolean = DEFAULT_OPTIONAL) {
+                        val optional:Boolean = DEFAULT_OPTIONAL,
+                        /** When [isSnapshot] and repository uses unique snapshots, `SNAPSHOT` in the [version]
+                         * is replaced by this string for the last resolution pass. Resolver (Wemi) will automatically
+                         * replace it with the newest snapshot version (in format: `timestamp-buildNumber`),
+                         * but if you need a specific snapshot version, it can be set here. */
+                        val snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION) {
 
     /** Snapshot [version]s end with `-SNAPSHOT` suffix. */
     val isSnapshot:Boolean
@@ -101,6 +108,9 @@ data class DependencyId(val group: String,
         if (optional != DEFAULT_OPTIONAL) {
             result.append(" optional")
         }
+        if (snapshotVersion != DEFAULT_SNAPSHOT_VERSION) {
+            result.append(" snapshotVersion:").append(snapshotVersion)
+        }
         return result.toString()
     }
 
@@ -115,6 +125,7 @@ data class DependencyId(val group: String,
         if (version != other.version) return false
         if (classifier != other.classifier) return false
         if (type != other.type) return false
+        if (snapshotVersion != other.snapshotVersion) return false
 
         return true
     }
@@ -125,6 +136,7 @@ data class DependencyId(val group: String,
         result = 31 * result + version.hashCode()
         result = 31 * result + classifier.hashCode()
         result = 31 * result + type.hashCode()
+        result = 31 * result + snapshotVersion.hashCode()
         return result
     }
 
@@ -150,6 +162,9 @@ data class DependencyId(val group: String,
                 if (value.optional != DEFAULT_OPTIONAL) {
                     field("optional", value.optional)
                 }
+                if (value.snapshotVersion != DEFAULT_SNAPSHOT_VERSION) {
+                    field("snapshotVersion", value.snapshotVersion)
+                }
             }
         }
 
@@ -163,7 +178,8 @@ data class DependencyId(val group: String,
                     value.field("classifier", NoClassifier),
                     value.field("type", DEFAULT_TYPE),
                     value.field("scope", DEFAULT_SCOPE),
-                    value.field("optional", DEFAULT_OPTIONAL)
+                    value.field("optional", DEFAULT_OPTIONAL),
+                    value.field("snapshotVersion", DEFAULT_SNAPSHOT_VERSION)
             )
         }
     }
@@ -269,64 +285,74 @@ data class Dependency(val dependencyId: DependencyId, val exclusions: List<Depen
     }
 }
 
-private val RESOLVED_DEPENDENCY_LOG = LoggerFactory.getLogger(ResolvedDependency::class.java)
+private val ARTIFACT_PATH_LOG = LoggerFactory.getLogger(ArtifactPath::class.java)
+
+/** Represents a [path] with lazily loaded [data].
+ * @param originalUrl from which the file originated
+ *          (typically points at file inside (non-cache) repository in which the artifact was resolved) */
+class ArtifactPath(val path:Path, val originalUrl:URL, data:ByteArray?) {
+
+    /** When null, but [path] exists, getter will attempt to load it and store the result for later queries. */
+    var data: ByteArray? = data
+        get() {
+            if (field == null) {
+                try {
+                    field = Files.readAllBytes(path)
+                } catch (e: IOException) {
+                    ARTIFACT_PATH_LOG.warn("Failed to load data from '{}' which was supposed to be there", path, e)
+                }
+            }
+
+            return field
+        }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as ArtifactPath
+
+        if (path != other.path) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return path.hashCode()
+    }
+
+    override fun toString(): String {
+        return path.toString()
+    }
+}
 
 /**
  * Data retrieved by resolving a dependency.
  *
  * If successful, contains information about transitive [dependencies] and holds artifacts that were found.
- *
- * @param id that was resolved
- * @param dependencies of the [id] that were found
- * @param resolvedFrom in which repository was [id] ultimately found in
- * @param hasError true if this dependency failed to resolve (partially or completely), for any reason
- * @param log may contain a message explaining why did the dependency failed to resolve
  */
-class ResolvedDependency constructor(val id: DependencyId,
-                                     val dependencies: List<Dependency>,
-                                     val resolvedFrom: Repository?,
-                                     val hasError: Boolean,
-                                     val log: CharSequence = "") : JsonWritable {
+class ResolvedDependency private constructor(
+        /** That was being resolved */
+        val id: DependencyId,
+        /** Of the [id] that were found */
+        val dependencies: List<Dependency>,
+        /** In which (non-cache) repository was [id] ultimately found in */
+        val resolvedFrom: Repository?,
+        /** `true` if this dependency failed to resolve (partially or completely), for any reason */
+        val hasError: Boolean,
+        /** May contain a message explaining why did the dependency failed to resolve, if [hasError] */
+        val log: CharSequence,
+        /** If the artifact has been resolved to a file in a local filesystem, it is here. */
+        val artifact:ArtifactPath?
+) : JsonWritable {
 
-    /** If the artifact has been resolved to a file in a local filesystem,
-     * the path to such file will be stored under this key.
-     *
-     * @see artifactData will contain the data in this file */
-    var artifact: Path? = null
+    /** Error constructor */
+    constructor(id:DependencyId, log:CharSequence, resolvedFrom:Repository? = null)
+            : this(id, emptyList(), resolvedFrom, true, log, null)
 
-    /**
-     * Data of the artifact. Convenience accessor.
-     * If the data of the artifact has been resolved, it will be stored under this key.
-     *
-     * When null, but [artifact] is set and exists, getter will attempt to load it
-     * and store the result here.
-     */
-    var artifactData: ByteArray? = null
-        get() {
-            val data = field
-            if (data != null) {
-                return data
-            }
-
-            val artifact = this.artifact
-            if (artifact != null) {
-                try {
-                    val bytes = Files.readAllBytes(artifact)
-                    field = bytes
-                    return bytes
-                } catch (e: Exception) {
-                    RESOLVED_DEPENDENCY_LOG.warn("Failed to load artifactData of {}", this, e)
-                }
-            }
-
-            return null
-        }
-
-    internal var pomFile:Path? = null
-    internal var pomData:ByteArray? = null
-    internal var pom:Pom? = null
-    internal var rawPom:RawPom? = null
-    internal var pomUrl: URL? = null
+    /** Success constructor */
+    constructor(id:DependencyId, dependencies:List<Dependency>, resolvedFrom:Repository, artifact:ArtifactPath)
+            :this(id, dependencies, resolvedFrom, false, "", artifact)
 
     override fun JsonWriter.write() {
         writeObject {
@@ -336,13 +362,7 @@ class ResolvedDependency constructor(val id: DependencyId,
             field("hasError", hasError)
             field("log", log.toString())
             if (artifact != null) {
-                field("artifact", artifact)
-            }
-            if (pomFile != null) {
-                field("pomFile", pomFile)
-            }
-            if (pomUrl != null) {
-                field("pomUrl", pomUrl)
+                field("artifact", artifact.path)
             }
         }
     }
@@ -357,13 +377,7 @@ class ResolvedDependency constructor(val id: DependencyId,
             result.append(", log=").append(log)
         }
         if (artifact != null) {
-            result.append(", artifact=").append(artifact)
-        }
-        if (pomFile != null) {
-            result.append(", pomFile=").append(pomFile)
-        }
-        if (pomUrl != null) {
-            result.append(", pomUrl=").append(pomUrl)
+            result.append(", artifact=").append(artifact.path)
         }
         return result.append(')').toString()
     }

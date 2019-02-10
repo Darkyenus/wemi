@@ -2,7 +2,6 @@ package wemi
 
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
-import wemi.dependency.Checksum
 import java.net.URL
 import java.nio.file.Path
 import kotlin.reflect.KProperty0
@@ -181,12 +180,12 @@ fun dependency(groupNameVersion: String, preferredRepository: Repository? = null
  * If the [url] is local, no cache is used. If it is not local (that is, not `file:`),
  * [LocalM2Repository] is used as cache.
  */
-fun repository(name: String, url: String, checksum: Checksum = Checksum.SHA1, releases:Boolean = true, snapshots:Boolean = true): Repository {
+fun repository(name: String, url: String, releases:Boolean = true, snapshots:Boolean = true): Repository {
     val usedUrl = URL(url)
     return Repository(name,
             usedUrl,
             if (usedUrl.protocol.equals("file", ignoreCase = true)) null else LocalCacheM2Repository,
-            checksum, releases, snapshots)
+            releases, snapshots)
 }
 
 /**

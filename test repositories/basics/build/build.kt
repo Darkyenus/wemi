@@ -8,6 +8,7 @@ import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.documentation.DokkaOptions.SourceLinkMapItem
+import wemi.*
 import com.esotericsoftware.jsonbeans.JsonValue
 
 val basics by project {

@@ -51,7 +51,7 @@ fun fromHexString(data: CharSequence): ByteArray? {
     return if (byteI == bytes.size) {
         bytes
     } else {
-        Arrays.copyOf(bytes, byteI)
+        bytes.copyOf(byteI)
     }
 }
 
@@ -61,7 +61,9 @@ fun fromHexString(data: CharSequence): ByteArray? {
  * @param content of the sum file
  * @return list of file entries, with read hashes (may be null if invalid) and file names
  */
-fun parseHashSum(content:CharSequence):List<Pair<ByteArray, String>> {
+fun parseHashSum(content:CharSequence?):List<Pair<ByteArray, String>> {
+    content ?: return emptyList()
+
     val result = ArrayList<Pair<ByteArray, String>>()
 
     // https://unix.stackexchange.com/a/310401

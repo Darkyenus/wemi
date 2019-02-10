@@ -16,11 +16,29 @@ import java.util.concurrent.Semaphore
 
 private val LOG = LoggerFactory.getLogger("Files")
 
-/**
- * Creates an URL with given path appended.
- */
+/** Creates an URL with given path appended. */
 inline operator fun URL.div(path: CharSequence): URL {
     return URL(this, path.toString())
+}
+
+/** Creates an URL which refers to the directory of the file to at which the path is pointing to.
+ * I.e. from "example.com/foo/bar", creates "example.com/foo". */
+fun URL.parent(): URL {
+    val newPath = (this.path ?: "").pathParent()
+    val query = this.query
+    val ref = this.ref
+    val newFile = if (query == null){
+        if (ref == null)
+            newPath
+        else
+            "$newPath#$ref"
+    } else {
+        if (ref == null)
+            "$newPath?$query"
+        else
+            "$newPath?$query#$ref"
+    }
+    return URL(protocol, host, port, newFile)
 }
 
 /**
@@ -161,6 +179,19 @@ fun String.pathHasExtension(extensions: Iterable<String>): Boolean {
         }
     }
     return false
+}
+
+/** Treating receiver as a filesystem path, remove the last file name, to get the path of its lexical parent. */
+fun String.pathParent():String {
+    val path = this
+    val searchStart:Int =
+            if (path.endsWith('/')) {
+                path.lastIndex - 1
+            } else {
+                path.lastIndex
+            }
+    val dividingSlash = path.lastIndexOf('/', searchStart)
+    return if (dividingSlash <= 0) "" else path.substring(0, dividingSlash)
 }
 
 /**

@@ -49,8 +49,7 @@ object LibraryDependencyResolver {
         }
 
         // Try preferred repository and its cache first
-        val preferred = (resolveInRepository(dependencyId.preferredRepository?.cache)
-                ?: resolveInRepository(dependencyId.preferredRepository))
+        val preferred = resolveInRepository(dependencyId.preferredRepository)
         if (preferred != null) {
             return preferred
         }
@@ -68,7 +67,7 @@ object LibraryDependencyResolver {
 
         // Fail
         LOG.debug("Failed to resolve {} ({} ms)", dependencyId, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime))
-        return ResolvedDependency(dependencyId, emptyList(), null, true, log ?: "no repositories to search in")
+        return ResolvedDependency(dependencyId, log ?: "no repositories to search in")
     }
 
     /**
@@ -176,7 +175,7 @@ object LibraryDependencyResolver {
      * Skips those without artifact. Does not check error status or anything else.
      */
     fun Map<DependencyId, ResolvedDependency>.artifacts(): List<Path> {
-        return mapNotNull { it.value.artifact }
+        return mapNotNull { it.value.artifact?.path }
     }
 
     /**

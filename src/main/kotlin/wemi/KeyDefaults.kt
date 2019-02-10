@@ -136,7 +136,7 @@ object KeyDefaults {
             throw WemiException("Failed to resolve all artifacts\n${resolved.value.prettyPrint(Keys.libraryDependencies.get().map { it.dependencyId })}", showStacktrace = false)
         }
         for ((_, resolvedDependency) in resolved.value) {
-            result.add(LocatedPath(resolvedDependency.artifact ?: continue))
+            result.add(LocatedPath(resolvedDependency.artifact?.path ?: continue))
         }
 
         inProjectDependencies(null) { projectDependency ->

@@ -1,3 +1,5 @@
+import wemi.*
+
 val hello by project {
 
     projectGroup set { "com.darkyen" }

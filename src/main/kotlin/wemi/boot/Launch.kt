@@ -77,8 +77,8 @@ internal val MainThread = Thread.currentThread()
  * This is because Wemi bundles some libraries already and we don't need to duplicate them.
  */
 internal val WemiBundledLibrariesExclude = DefaultExclusions + listOf(
-        DependencyExclusion("org.jetbrains.kotlin", "kotlin-stdlib", "*"),
-        DependencyExclusion("org.jetbrains.kotlin", "kotlin-reflect", "*")
+        DependencyExclusion("org.jetbrains.kotlin", "kotlin-stdlib"),
+        DependencyExclusion("org.jetbrains.kotlin", "kotlin-reflect")
         //TODO Add Wemi itself here!
 )
 

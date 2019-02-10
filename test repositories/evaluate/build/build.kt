@@ -3,7 +3,7 @@
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.*
 import wemi.util.*
-
+import wemi.*
 
 val someKey by key<String>("")
 val someConfig by configuration("") {

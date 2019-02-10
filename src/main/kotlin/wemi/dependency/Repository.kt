@@ -11,6 +11,12 @@ import java.security.MessageDigest
 
 private val LOG = LoggerFactory.getLogger(Repository::class.java)
 
+/** @see Repository.snapshotUpdateDelaySeconds */
+const val SnapshotCheckAlways = 0L
+const val SnapshotCheckHourly = 60L * 60L
+const val SnapshotCheckDaily = SnapshotCheckHourly * 24L
+const val SnapshotCheckNever = Long.MAX_VALUE
+
 /**
  * Describes Maven (version 2 or 3) repository from which [Dependency]-ies are retrieved.
  *
@@ -20,19 +26,22 @@ private val LOG = LoggerFactory.getLogger(Repository::class.java)
  */
 @Json(Repository.Serializer::class)
 class Repository(
-        /** Name of this repository, arbitrary (but should be consistent, as it is used for internal bookkeeping) */
+        /** Name of this repository, arbitrary (but should be consistent and valid filename, as it is used for internal bookkeeping) */
         val name: String,
         /** URL of this repository */
         val url: URL,
         /** Repository acting as a cache for this repository, if [local]` == false`, otherwise not used.
          * Must be [local]. Resolved dependencies will be stored here. */
         cache: Repository? = null,
-        /** Control checksum to use when retrieving artifacts from here */
-        val checksum: Checksum = Checksum.SHA1,
         /** Whether this repository should be used to query for release versions (non-SNAPSHOT) */
         val releases:Boolean = true,
         /** Whether this repository should be used to query for snapshot versions (versions ending with -SNAPSHOT) */
-        val snapshots:Boolean = true) {
+        val snapshots:Boolean = true,
+        /** When resolving snapshots, check for newer only if cached ones are older than this amount.
+         * @see SnapshotCheckDaily default, but other constants are available for convenience */
+        val snapshotUpdateDelaySeconds:Long = SnapshotCheckDaily,
+        /** When checksums mismatch, should the resolution fail or warn and continue? (After retrying.) */
+        val tolerateChecksumMismatch:Boolean = false) {
 
     /** Local repositories can be caches and may not be cached. Non-local repositories need caches and are not caches.
      * Considered local, if its [url] uses `file:` protocol. */
@@ -42,6 +51,7 @@ class Repository(
     /** Repository acting as a cache for this repository, if [local]` == false`, otherwise not used.
      * Must be [local]. Resolved dependencies will be stored here. */
     val cache: Repository? =
+            // This logic is relied on by Maven2.retrieveFile
             if (!local && cache == null) {
                 LOG.warn("{} is not local and has no cache, default cache will be used", this)
                 LocalCacheM2Repository
@@ -87,7 +97,6 @@ class Repository(
                 field("url", value.url)
 
                 field("cache", value.cache)
-                field("checksum", value.checksum)
                 field("releases", value.releases)
                 field("snapshots", value.snapshots)
             }
@@ -99,7 +108,6 @@ class Repository(
                     value.field("url"),
 
                     value.field("cache"),
-                    value.field("checksum"),
                     value.field("releases"),
                     value.field("snapshots"))
         }
@@ -113,12 +121,6 @@ class Repository(
  * @param algo Java digest algorithm name to use when computing this checksum
  */
 enum class Checksum(val suffix: String, private val algo: String) {
-    /**
-     * Special value for no checksum.
-     *
-     * Not recommended for general use - use only in extreme cases.
-     */
-    None(".no-checksum", "no-op"),
     // https://en.wikipedia.org/wiki/File_verification
     /**
      * Standard SHA1 algorithm with .md5 suffix.
@@ -131,21 +133,19 @@ enum class Checksum(val suffix: String, private val algo: String) {
 
     /**
      * Creates a [MessageDigest] for this [Checksum].
-     * @return null if [None]
      * @throws java.security.NoSuchAlgorithmException if not installed
      */
-    fun digest(): MessageDigest? {
-        if (this == None) {
-            return null
-        }
+    fun digest(): MessageDigest {
         val digest = MessageDigest.getInstance(algo)
         digest.reset()
         return digest
     }
 
     fun checksum(data: ByteArray): ByteArray {
-        val digest = digest() ?: return ByteArray(0)
+        val digest = digest()
         digest.update(data)
         return digest.digest()
     }
 }
+
+internal val CHECKSUMS = Checksum.values()
