@@ -3,8 +3,7 @@
 ## For next release
 - Maven snapshots
 	- Publish snapshots as unique
-- Remove ArrayMap
-- Fix WemiProjectResolver:396
+	- Test snapshots of both types
 - Tests for URL.parent()
 - --log=<> doesn't seem to work
 
