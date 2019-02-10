@@ -27,8 +27,15 @@ typealias Repository = wemi.dependency.Repository
 typealias DependencyId = wemi.dependency.DependencyId
 typealias Dependency = wemi.dependency.Dependency
 typealias DependencyExclusion = wemi.dependency.DependencyExclusion
+typealias LocatedPath = wemi.util.LocatedPath
+
+typealias Archetypes = wemi.Archetypes
+typealias Configurations = wemi.Configurations
+typealias Keys = wemi.Keys
 
 typealias Path = java.nio.file.Path
+typealias Paths = java.nio.file.Paths
+typealias Files = java.nio.file.Files
 
 val WemiVersion
     get() = wemi.boot.Main.WEMI_VERSION
