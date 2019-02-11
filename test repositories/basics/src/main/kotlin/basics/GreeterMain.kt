@@ -13,6 +13,8 @@ fun main(args: Array<String>) {
 
     println("Kotlin version is ${kotlin.KotlinVersion.CURRENT}")
 
-    Greeter("Hello {}!", "Hi {}", "{}, welcome!", "Ahoy, {}!")
-            .greet(System.getProperty("user.name"))
+    val greeter = Greeter("Hello {}!", "Hi {}", "{}, welcome!", "Ahoy, {}!")
+    greeter.greet(System.getProperty("user.name"))
+
+    println("Art for today is: ${greeter.artName}")
 }

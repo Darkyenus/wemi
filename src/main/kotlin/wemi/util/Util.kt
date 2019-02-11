@@ -542,6 +542,11 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
                 result.format(Color.White).append(" from ").format().append(resolvedFrom)
             }
         }
+
+        val log = resolved?.log
+        if (log != null && log.isNotBlank()) {
+            result.append(' ').format(Color.Red).append(log).format()
+        }
     }
 }
 //endregion

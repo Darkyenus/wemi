@@ -32,6 +32,11 @@ val basics by project {
     libraryDependencies add { dependency("com.h2database:h2:1.4.196") }
     libraryDependencies add { kotlinDependency("reflect") }
 
+    // -SNAPSHOT example
+    repositories add { repository("spigot-snapshots", "https://hub.spigotmc.org/nexus/content/repositories/snapshots", releases = false) }
+    repositories add { wemi.dependency.sonatypeOss("snapshots") }
+    libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.13.2-R0.1-SNAPSHOT") }
+
     extend(compilingJava) {
         compilerOptions[JavaCompilerFlags.customFlags] += "-Xlint:all"
     }

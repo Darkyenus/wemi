@@ -1,5 +1,7 @@
 package wemi.dependency
 
+import WemiVersion
+import com.darkyen.dave.Request
 import com.darkyen.dave.Response
 import com.darkyen.dave.Webb
 import com.darkyen.dave.WebbException
@@ -129,6 +131,30 @@ fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository, re
     }
 }
 
+private val WEBB = Webb(null).apply {
+    // NOTE: When User-Agent is not set, it defaults to "Java/<version>" and some servers (Sonatype Nexus)
+    // then return gutted version of some resources (at least maven-metadata.xml) for which the checksums don't match
+    // This seems to be due to: https://issues.sonatype.org/browse/NEXUS-6171 (not a bug, but a feature!)
+    setDefaultHeader("User-Agent", "Wemi/$WemiVersion")
+    // Just for consistency
+    setDefaultHeader("Accept", "*/*")
+    setDefaultHeader("Accept-Language", "*")
+}
+
+private fun httpGet(url:URL, ifModifiedSince:Long = -1): Request {
+    val request = WEBB.get(url.toExternalForm())
+    request.useCaches(false) // Do not use local caches, we do the caching ourselves
+    request.retry(2, true)
+    if (ifModifiedSince > 0) {
+        request.ifModifiedSince(ifModifiedSince)
+        request.header("Cache-Control", "no-transform")
+    } else {
+        request.header("Cache-Control", "no-transform, no-cache")
+    }
+
+    return request
+}
+
 /**
  * Retrieve file from repository, handling cache and checksums (TODO: And signatures).
  * NOTE: Does not check whether [repository] holds snapshots and/or releases.
@@ -218,16 +244,11 @@ private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean,
     // Step 3: download from remote to memory
     LOG.info("Retrieving file '{}' from {}", path, repository)
 
-    val webb = Webb(null)
     val response: Response<ByteArray>
     // Fallbacks to current time if headers are invalid/missing, we don't have any better metric
     var remoteLastModifiedTime:Long = System.currentTimeMillis()
     try {
-        val request = webb.get(repositoryArtifactUrl.toExternalForm())
-        if (cacheControlMs > 0) {
-            request.ifModifiedSince(cacheControlMs)
-        }
-        response = request.executeBytes()
+        response = httpGet(repositoryArtifactUrl, cacheControlMs).executeBytes()
 
         val lastModified = response.lastModified
         val date = response.date
@@ -256,7 +277,7 @@ private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean,
         val checksumPath = path + checksum.suffix
         val checksumUrl = repository.url / checksumPath
         val checksumFileBody:String? = try {
-            val checksumResponse = webb.get(checksumUrl.toExternalForm()).executeString()
+            val checksumResponse = httpGet(checksumUrl).executeString()
             if (!checksumResponse.isSuccess) {
                 LOG.debug("Failed to retrieve checksum '{}' (code: {})", checksumUrl, checksumResponse.statusCode)
                 continue
@@ -281,7 +302,9 @@ private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean,
             val checksumCachePath = if (path === cachePath) checksumPath else cachePath + checksum.suffix
             validChecksums[checksumCachePath] = checksumFileBody
         } else {
-            LOG.warn("Checksum '{}' mismatch! Computed {}, got {}, retrying", checksumUrl, computedChecksum, expectedChecksum)
+            if (LOG.isWarnEnabled) {
+                LOG.warn("Checksum '{}' mismatch! Computed {}, got {}, retrying", checksumUrl, toHexString(computedChecksum), toHexString(expectedChecksum))
+            }
             TODO("RETRY, use "+repository.tolerateChecksumMismatch)
         }
     }
@@ -363,7 +386,7 @@ private fun resolveRawPom(pomUrl:URL, pomData:ByteArray,
 
         if (pomBuilder.parentRelativePath.isNotBlank()) {
             // Create new pom-path
-            val parentPomPath = (pomUrl.path.pathParent() / pomBuilder.parentRelativePath).toString()
+            val parentPomPath = (pomUrl.path / ".." / pomBuilder.parentRelativePath).toString()
             LOG.trace("Retrieving parent pom of '{}' from relative '{}'", pomUrl, parentPomPath)
             retrieveRawPom(parentPomId, repository, chain, parentPomPath).success {
                 parent = it

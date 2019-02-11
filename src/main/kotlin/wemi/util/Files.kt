@@ -16,17 +16,191 @@ import java.util.concurrent.Semaphore
 
 private val LOG = LoggerFactory.getLogger("Files")
 
-/** Creates an URL with given path appended. */
-inline operator fun URL.div(path: CharSequence): URL {
-    return URL(this, path.toString())
+/** Creates an URL with given path appended, using logic similar to the one used in [pathAppend], with the addition that
+ * the path may end with `?<query>` and `#<fragment>` parts, (in this order),
+ * in which case the query is added to the existing query and fragment replaces existing fragment.  */
+operator fun URL.div(path: CharSequence): URL {
+    val oldPath = this.path ?: ""
+    val query = this.query ?: ""
+    var extraQuery:String? = null
+    var fragment:String? = this.ref
+
+    val newFile = StringBuilder(oldPath.length + query.length + (fragment?.length ?: 0) + path.length + 16)
+    var pathEnd = path.length
+
+    val fragmentStart = path.indexOf('#')
+    if (fragmentStart in 0 until pathEnd) {
+        fragment = path.substring(fragmentStart + 1)
+        pathEnd = fragmentStart
+    }
+
+    val queryStart = path.indexOf('?')
+    if (queryStart in 0 until pathEnd) {
+        extraQuery = path.substring(queryStart + 1, pathEnd)
+        pathEnd = queryStart
+    }
+
+    if (oldPath.isEmpty()) {
+        newFile.append('/')
+    } else {
+        newFile.append(oldPath)
+    }
+    newFile.pathAppend(path, 0, pathEnd)
+
+    var hadQuery = false
+    if (!query.isEmpty()) {
+        newFile.append('?').append(query)
+        hadQuery = true
+    }
+    if (!extraQuery.isNullOrEmpty()) {
+        newFile.append(if (hadQuery) '&' else '?').append(extraQuery)
+    }
+
+    if (fragment != null) {
+        newFile.append('#').append(fragment)
+    }
+    return URL(protocol, host, port, newFile.toString())
+}
+/** Treating receiver as a filesystem path, remove the last file name, to get the path of its lexical parent. */
+fun String.pathParent():String {
+    val path = this
+    val searchStart:Int =
+            if (path.endsWith('/')) {
+                path.lastIndex - 1
+            } else {
+                path.lastIndex
+            }
+    val dividingSlash = path.lastIndexOf('/', searchStart)
+    return if (dividingSlash <= 0) "" else path.substring(0, dividingSlash)
+}
+
+/** Remove all trailing `/`, `/.` and `/..` of this path.
+ * Retains one `/` if path is absolute.
+ * @return true if path is now empty ("" or "/") */
+private fun StringBuilder.pathNormalizeEnd(extraDropLevels:Int) {
+    var len = this.length
+    val absolute = if (len == 0) false else this[0] == '/'
+    var dropLevels = extraDropLevels
+
+    while (true) {
+        // Drop "//.///../../." salad, but no legitimate file levels
+        do {
+            // Trim trailing / (even if it is absolute)
+            while (len > 0 && this[len - 1] == '/') {
+                len--
+            }
+
+            // Check for trailing . and ..
+            if (len > 0 && this[len - 1] == '.') {
+                // This could be a . or .. situation
+                if (len == 1) {
+                    // "." situation
+                    len--
+                    continue
+                }
+                val beforeDot = this[len - 2]
+
+                if (beforeDot == '/') {
+                    // "/." situation
+                    len--
+                    continue
+                }
+
+                // ".." path is valid, we do not want to break that
+                if (beforeDot == '.' && len >= 3 && this[len - 3] == '/') {
+                    // "anything/.." situation
+
+                    len -= 3 // "/..".length
+                    // Now drop next element, simplifying the path
+                    dropLevels++
+                    continue
+                }
+            }
+
+            // Nothing requested to continue, therefore break
+            break
+        } while (len > 0)
+        // Salad dropped, now evaluate dropLevels
+
+        if (dropLevels <= 0 || len == 0) {
+            // No more levels to drop and end is normalized (or there is nothing to drop anymore), done
+            break
+        } else {
+            // Drop single normal file name
+            while (len > 0 && this[len - 1] != '/') {
+                len--
+            }
+            dropLevels--
+            // End is now messy, let the above deal with it
+        }
+    }
+
+    if (dropLevels > 0 && !absolute) {
+        // When path is absolute, we don't have to worry about extra drop levels, because "/.." == "/",
+        // but for relative paths, we have to deal with this
+        assert(len <= 0)
+        this.setLength(0)
+        this.append("..")
+        for (i in 1 until dropLevels) {
+            this.append("/..")
+        }
+    } else if (absolute && len <= 1) {
+        this.setLength(1)
+    } else {
+        this.setLength(len)
+    }
 }
 
 /**
- * Appends given path to the receiver path.
- *
+ * Appends given path to the path in receiver, resolving `..` and `.` of [path] in the process.
+ * Double `/` (`foo//bar`) are collapsed to single `/` (so that `"foo" / "/bar"` won't result in `"bar"`, but in `"foo/bar"`).
+ */
+internal fun StringBuilder.pathAppend(path:CharSequence, start:Int, end:Int) {
+    var i = start
+    while (i < end) {
+        // Eliminate leading '/'*
+        while (path[i] == '/') {
+            i++
+            if (i >= end) {
+                break
+            }
+        }
+
+        val elementStart = i
+
+        // Search up to next '/' or eof
+        while (i < end && path[i] != '/') {
+            i++
+        }
+        val elementEnd = i
+
+        val length = elementEnd - elementStart
+        if (length == 0 || (length == 1 && path[elementStart] == '.')) {
+            // Ignore empty element and self reference
+        } else if (length == 2 && path[elementStart] == '.' && path[elementStart+1] == '.') {
+            // Back reference
+            this.pathNormalizeEnd(1) // pathNormalizeEnd has logic to deal with this correctly
+        } else {
+            // Normal path append
+            this.pathNormalizeEnd(0)
+            val len = this.length
+            if (len > 0 && this[len - 1] != '/') {
+                // Situations
+                // 1. empty relative path - no /
+                // 2. empty absolute path - no /
+                // 3. non empty path - append /
+                this.append('/')
+            }
+            this.append(path, elementStart, elementEnd)
+        }
+    }
+}
+
+/**
+ * Appends given path to the receiver path, using [pathAppend].
  * Makes best effort to modify the receiver CharSequence, i.e.first it checks if it is a StringBuilder that can be used.
  *
- * @return this + '/' + [path], possibly in modified receiver this
+ * @return this with [path] appended like path, possibly in modified receiver this
  */
 operator fun CharSequence.div(path: CharSequence): StringBuilder {
     val sb: StringBuilder
@@ -38,8 +212,7 @@ operator fun CharSequence.div(path: CharSequence): StringBuilder {
         sb = StringBuilder(this.length + 1 + path.length)
         sb.append(this)
     }
-    sb.append('/')
-    sb.append(path)
+    sb.pathAppend(path, 0, path.length)
 
     return sb
 }
@@ -159,19 +332,6 @@ fun String.pathHasExtension(extensions: Iterable<String>): Boolean {
         }
     }
     return false
-}
-
-/** Treating receiver as a filesystem path, remove the last file name, to get the path of its lexical parent. */
-fun String.pathParent():String {
-    val path = this
-    val searchStart:Int =
-            if (path.endsWith('/')) {
-                path.lastIndex - 1
-            } else {
-                path.lastIndex
-            }
-    val dividingSlash = path.lastIndexOf('/', searchStart)
-    return if (dividingSlash <= 0) "" else path.substring(0, dividingSlash)
 }
 
 /**

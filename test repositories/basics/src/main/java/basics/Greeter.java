@@ -3,6 +3,7 @@ package basics;
 import java.util.Random;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
+import org.bukkit.Art;
 
 /**
  * This is a Java class for greeting people.
@@ -44,6 +45,12 @@ public class Greeter {
         final String greeting = createGreeting(name);
         System.out.println(greeting);
         LOG.warn("Greeted {}", name);
+    }
+
+    public String getArtName() {
+        final Random random = GreeterMainKt.getRandom();
+        final Art[] arts = Art.values();
+        return arts[random.nextInt(arts.length)].toString();
     }
 
     /**

@@ -75,4 +75,77 @@ class FilesTests {
         }
     }
 
+    private fun assertStringEquals(expected:CharSequence, actual:CharSequence) {
+        assertEquals(expected.toString(), actual.toString())
+    }
+
+    @Test
+    fun relativePathDivOperator() {
+        assertStringEquals("foo/bar", "foo" / "bar")
+        assertStringEquals("foo/bar", "foo" / "/bar")
+        assertStringEquals("foo/bar", "foo/" / "/bar")
+        assertStringEquals("foo/bar", "foo/." / "/bar")
+        assertStringEquals("foo/bar", "foo" / "./bar")
+        assertStringEquals("foo/bar", "foo/." / "./bar")
+        assertStringEquals("foo/bar", "foo/." / "./././bar")
+        assertStringEquals("bar", "foo" / "../bar")
+        assertStringEquals("bar", "foo/." / "../bar")
+        assertStringEquals("bar", "foo/./." / "../bar")
+        assertStringEquals("../bar", "foo/./." / "../../bar")
+        assertStringEquals("../bar", "foo/.." / "../bar")
+        assertStringEquals("foo/bar/baz", "foo" / "bar/baz")
+        assertStringEquals("foo/bar/baz", "foo" / "bar/baz/")
+        assertStringEquals("foo/bar/baz", "foo" / "///bar///baz///")
+        assertStringEquals("foo/bar/baz", "foo" / "bar/buzz" / "../baz")
+    }
+
+    @Test
+    fun absolutePathDivOperator() {
+        assertStringEquals("/foo/bar", "/foo" / "bar")
+        assertStringEquals("/foo/bar", "/foo" / "/bar")
+        assertStringEquals("/foo/bar", "/foo/" / "/bar")
+        assertStringEquals("/foo/bar", "/foo/." / "/bar")
+        assertStringEquals("/foo/bar", "/foo" / "./bar")
+        assertStringEquals("/foo/bar", "/foo/." / "./bar")
+        assertStringEquals("/foo/bar", "/foo/." / "./././bar")
+        assertStringEquals("/bar", "/foo" / "../bar")
+        assertStringEquals("/bar", "/foo/." / "../bar")
+        assertStringEquals("/bar", "/foo/./." / "../bar")
+        assertStringEquals("/bar", "/foo/./." / "../../bar")
+        assertStringEquals("/bar", "/foo/.." / "../bar")
+        assertStringEquals("/foo/bar/baz", "/foo" / "bar/baz")
+        assertStringEquals("/foo/bar/baz", "/foo" / "bar/baz/")
+        assertStringEquals("/foo/bar/baz", "/foo" / "///bar///baz///")
+        assertStringEquals("/foo/bar/baz", "/foo" / "bar/buzz" / "../baz")
+    }
+
+    @Test
+    fun urlDivOperator() {
+        val host = "http://example.com"
+
+        assertEquals(URL("$host/foo/bar"), URL("$host/foo") / "bar")
+        assertEquals(URL("$host/foo/bar"), URL("$host/foo") / "/bar")
+        // etc. same as pathDivOperator
+
+        assertEquals(URL("$host/?someQuery"), URL("$host/") / "?someQuery")
+        assertEquals(URL("$host/foo?someQuery"), URL("$host/foo") / "?someQuery")
+        assertEquals(URL("$host/foo?someQuery"), URL("$host/") / "foo?someQuery")
+        assertEquals(URL("$host/foo?someQuery"), URL(host) / "foo?someQuery")
+
+        assertEquals(URL("$host/#someFragment"), URL("$host/") / "#someFragment")
+        assertEquals(URL("$host/foo#someFragment"), URL("$host/foo") / "#someFragment")
+        assertEquals(URL("$host/foo#someFragment"), URL("$host/") / "foo#someFragment")
+
+        assertEquals(URL("$host/?query#frag"), URL("$host/#frag") / "?query")
+        assertEquals(URL("$host/?query#frag"), URL("$host/?query") / "#frag")
+        assertEquals(URL("$host/foo?query#frag"), URL("$host/foo#frag") / "?query")
+        assertEquals(URL("$host/foo?query#frag"), URL("$host/foo?query") / "#frag")
+        assertEquals(URL("$host/foo?query#frag"), URL("$host/#frag") / "foo?query")
+        assertEquals(URL("$host/foo?query#frag"), URL("$host/?query") / "foo#frag")
+
+        assertEquals(URL("$host/foo?query1&query2"), URL("$host/foo?query1") / "?query2")
+        assertEquals(URL("$host/foo?query1&query2"), URL("$host/?query1") / "foo?query2")
+        assertEquals(URL("$host/foo/bar?query1&query2"), URL("$host/foo?query1") / "bar?query2")
+    }
+
 }
