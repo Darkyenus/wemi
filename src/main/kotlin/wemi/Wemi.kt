@@ -2,6 +2,7 @@ package wemi
 
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
+import wemi.util.isLocal
 import java.net.URL
 import java.nio.file.Path
 import kotlin.reflect.KProperty0
@@ -145,7 +146,8 @@ fun KProperty0<Archetype>.inject(injectedInitializer:Archetype.() -> Unit) {
  *          If the amount of ':'s isn't exactly 2, or one of the triplet is empty, runtime exception is thrown.
  */
 fun dependencyId(groupNameVersion:String, preferredRepository: Repository? = null,
-                 classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL):DependencyId {
+                 classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE,
+                 optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION):DependencyId {
     val first = groupNameVersion.indexOf(':')
     val second = groupNameVersion.indexOf(':', startIndex = maxOf(first + 1, 0))
     val third = groupNameVersion.indexOf(':', startIndex = maxOf(second + 1, 0))
@@ -160,18 +162,22 @@ fun dependencyId(groupNameVersion:String, preferredRepository: Repository? = nul
     val name = groupNameVersion.substring(first + 1, second)
     val version = groupNameVersion.substring(second + 1)
 
-    return DependencyId(group, name, version, preferredRepository, classifier, type, scope, optional)
+    return DependencyId(group, name, version, preferredRepository, classifier, type, scope, optional, snapshotVersion)
 }
 
 /** Convenience Dependency creator.
  * Creates [Dependency] with default exclusions. */
-fun dependency(group: String, name: String, version: String, preferredRepository: Repository? = null, classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL): Dependency {
-    return Dependency(DependencyId(group, name, version, preferredRepository, classifier, type, scope, optional))
+fun dependency(group: String, name: String, version: String, preferredRepository: Repository? = null,
+               classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE,
+               optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION): Dependency {
+    return Dependency(DependencyId(group, name, version, preferredRepository, classifier, type, scope, optional, snapshotVersion))
 }
 
 /** Convenience Dependency creator using [dependencyId]. */
-fun dependency(groupNameVersion: String, preferredRepository: Repository? = null, classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL): Dependency {
-    return Dependency(dependencyId(groupNameVersion, preferredRepository, classifier, type, scope, optional))
+fun dependency(groupNameVersion: String, preferredRepository: Repository? = null,
+               classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE,
+               optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION): Dependency {
+    return Dependency(dependencyId(groupNameVersion, preferredRepository, classifier, type, scope, optional, snapshotVersion))
 }
 
 /**
@@ -180,12 +186,15 @@ fun dependency(groupNameVersion: String, preferredRepository: Repository? = null
  * If the [url] is local, no cache is used. If it is not local (that is, not `file:`),
  * [LocalM2Repository] is used as cache.
  */
-fun repository(name: String, url: String, releases:Boolean = true, snapshots:Boolean = true): Repository {
+@Deprecated("Use Repository constructor directly (REMOVE IN 0.10)", ReplaceWith("Repository(name, url, cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch)"))
+fun repository(name: String, url: String,
+               cache:Repository? = LocalCacheM2Repository, releases:Boolean = true, snapshots:Boolean = true,
+               snapshotUpdateDelaySeconds:Long = SnapshotCheckDaily, tolerateChecksumMismatch:Boolean = false): Repository {
     val usedUrl = URL(url)
     return Repository(name,
             usedUrl,
-            if (usedUrl.protocol.equals("file", ignoreCase = true)) null else LocalCacheM2Repository,
-            releases, snapshots)
+            if (usedUrl.isLocal()) null else cache,
+            releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch)
 }
 
 /**

@@ -3,6 +3,7 @@ package wemi.dependency
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
+import wemi.WemiException
 import wemi.util.*
 import java.net.URL
 import java.nio.file.FileSystems
@@ -41,12 +42,23 @@ class Repository(
          * @see SnapshotCheckDaily default, but other constants are available for convenience */
         val snapshotUpdateDelaySeconds:Long = SnapshotCheckDaily,
         /** When checksums mismatch, should the resolution fail or warn and continue? (After retrying.) */
-        val tolerateChecksumMismatch:Boolean = false) {
+        val tolerateChecksumMismatch:Boolean = false,
+        /** Local repositories can be caches and may not be cached. Non-local repositories need caches and are not caches.
+         * Considered local, if its [url] uses `file:` protocol.
+         * WARNING: Making non-local repository local will throw [WemiException].
+         * Marking local repository as non-local can be useful, if, for example, the repository is actually on
+         * a slow network drive, external drive which may not be present, etc. */
+        val local:Boolean = url.isLocal()) {
 
-    /** Local repositories can be caches and may not be cached. Non-local repositories need caches and are not caches.
-     * Considered local, if its [url] uses `file:` protocol. */
-    val local: Boolean
-        get() = "file".equals(url.protocol, ignoreCase = true)
+    /** Same as default constructor, but takes [path] instead of [url]. Useful for local repositories. */
+    constructor(name: String, path: Path, cache: Repository? = null, releases: Boolean = true, snapshots: Boolean = true,
+                snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = true)
+            : this(name, path.toUri().toURL(), cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch, local)
+
+    /** Same as default constructor, but takes [url] as a [String] instead of [URL]. */
+    constructor(name: String, url: String, cache: Repository? = null, releases: Boolean = true, snapshots: Boolean = true,
+                snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = url.startsWith("file:", ignoreCase = true))
+            : this(name, URL(url), cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch, local)
 
     /** Repository acting as a cache for this repository, if [local]` == false`, otherwise not used.
      * Must be [local]. Resolved dependencies will be stored here. */
@@ -68,6 +80,9 @@ class Repository(
     init {
         if (!releases && !snapshots) {
             LOG.warn("{} is not used for releases nor snapshots, so it will be always skipped", this)
+        }
+        if (local && !url.isLocal()) {
+            throw WemiException("Repository with url '$url' cannot be considered local")
         }
     }
 
@@ -105,7 +120,7 @@ class Repository(
         override fun read(value: JsonValue): Repository {
             return Repository(
                     value.field("name"),
-                    value.field("url"),
+                    value.field<URL>("url"),
 
                     value.field("cache"),
                     value.field("releases"),

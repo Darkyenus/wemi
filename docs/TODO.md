@@ -3,7 +3,6 @@
 ## For next release
 - Maven snapshots
 	- Publish snapshots as unique
-	- Test snapshots of both types
 - Do not check the cache repeatedly, if previous repository used it as well and failed
 - When retrieving, try all repositories at the same time - if cache folder contains relevant maven-metadata-id, use that immediately
 

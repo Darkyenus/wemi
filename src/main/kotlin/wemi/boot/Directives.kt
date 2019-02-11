@@ -47,7 +47,7 @@ annotation class BuildDependency(val groupOrFull:String, val name:String = "", v
  *
  * @param name of the repository
  * @param url of the repository
- * @see wemi.repository function, which has similar arguments
+ * @see wemi.dependency.Repository constructor, which has similar arguments
  * @see wemi.Keys.repositories key, which stores repositories for built projects
  * @see BuildDependency for important notes about build-script directive annotations.
  */

@@ -5,10 +5,10 @@ import java.net.URL
 import java.nio.file.Paths
 
 /** Default local Maven repository stored in `~/.m2/repository`. Used for local releases. */
-val LocalM2Repository = Repository("local", (Paths.get(System.getProperty("user.home")) / ".m2/repository/").toUri().toURL(), null)
+val LocalM2Repository = Repository("local", Paths.get(System.getProperty("user.home")) / ".m2/repository/", null)
 
 /** Default Wemi cache repository stored in `~/.m2/wemi-cache`. Used as a local cache. */
-val LocalCacheM2Repository = Repository("cache", (Paths.get(System.getProperty("user.home")) / ".m2/wemi-cache/").toUri().toURL(), null)
+val LocalCacheM2Repository = Repository("cache", Paths.get(System.getProperty("user.home")) / ".m2/wemi-cache/", null)
 
 /** Maven Central repository at [maven.org](https://maven.org). Cached by [LocalM2Repository]. */
 val MavenCentral = Repository("central", URL("https://repo1.maven.org/maven2/"), LocalCacheM2Repository, snapshots = false)

@@ -14,6 +14,7 @@ import wemi.dependency.PomBuildingXMLHandler.Companion.SupportedModelVersion
 import wemi.publish.InfoNode
 import wemi.util.*
 import java.io.ByteArrayInputStream
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.net.URI
 import java.net.URL
@@ -30,35 +31,13 @@ import kotlin.collections.HashMap
 private val LOG = LoggerFactory.getLogger("Maven2")
 
 /*
-TODO Implement:
 Snapshot resolution logic abstract:
-- Some snapshots ("non-unique snapshots") are overwritten on publish, so the resolution schema is the same
-    - but we need to check remote before local copy
-- Other snapshots ("unique snapshots") use maven-metadata.xml, we need to download that to cache first
-
-Steps (for snapshots):
-1. Look into cache, if it contains POM or maven-metadata.xml
-    1. If it contains either, note its last modified date
-2. Download the POM or maven-metadata.xml (preferring maven-metadata.xml)
-    - If cache contained one of the two, try that first
-    - If cache contained one of the two, make the query with cache control,
-        so that in the best case we don't have to re-download anything
-    - If both download attempts fail, resolution failed
-3. If neither was downloaded fresh, resolve completely from cache
-4. Otherwise
-    - (POM) continue resolution normally for the POM, overriding the cache
-    - (metadata) parse metadata, select newest version (TODO: Maybe some control over this through DependencyId attributes)
-        download that. Metadata should be overridden in the cache, rest must not be.
-
-Steps (for non-snapshots):
-1. Look for pom, first in the cache
-    - then try the repo itself
-    1. Pom not in cache:
-        1. Download all raw poms in the parental hierarchy and store them in the cache
-
+- Non-unique snapshots are overwritten on publish, so the resolution schema is the same
+    - Handled without any extra logic by retrieveFile
+- Unique snapshots use maven-metadata.xml, which is handled in resolveInM2Repository
  */
 
-/** Attempt to resolve [dependencyId] in [repository], using [repositories] for direct immediate dependencies. */
+/** Attempt to resolve [dependencyId] in [repository], using [repositories] for direct immediate dependencies (parent POMs, etc.). */
 fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository, repositories: Collection<Repository>): ResolvedDependency {
     val snapshot = dependencyId.isSnapshot
     if (snapshot && !repository.snapshots) {
@@ -70,7 +49,7 @@ fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository, re
     // Retrieve basic POM data
     val pomPath = pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion)
     LOG.trace("Retrieving pom at '{}' for {}", repository, dependencyId)
-    val retrievedPom = retrieveFile(repository, pomPath, dependencyId.isSnapshot)
+    val retrievedPom = retrieveFile(repository, pomPath, snapshot)
             ?: if (snapshot && dependencyId.snapshotVersion.isEmpty()) {
                 // Query for maven-metadata.xml (https://github.com/strongbox/strongbox/wiki/Maven-Metadata)
                 val mavenMetadataPath = mavenMetadataPath(dependencyId, null)
@@ -230,7 +209,7 @@ private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean,
             return ArtifactPath(cacheFile, repositoryArtifactUrl, null)
         }
         val modified = attributes.lastModifiedTime().toMillis()
-        if (modified + TimeUnit.SECONDS.toMillis(repository.snapshotUpdateDelaySeconds) < System.currentTimeMillis()) {
+        if (modified + TimeUnit.SECONDS.toMillis(repository.snapshotUpdateDelaySeconds) > System.currentTimeMillis()) {
             LOG.trace("Using local artifact cache (snapshot still fresh): {}", cacheFile)
             return ArtifactPath(cacheFile, repositoryArtifactUrl, null)
         }
@@ -258,7 +237,11 @@ private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean,
             remoteLastModifiedTime = date
         }
     } catch (e: WebbException) {
-        LOG.debug("Failed to retrieve '{}' from {}", path, repository, e)
+        if (e.cause is FileNotFoundException) {
+            LOG.debug("Failed to retrieve '{}' from {}, file not found", path, repository)
+        } else {
+            LOG.debug("Failed to retrieve '{}' from {}", path, repository, e)
+        }
         return null
     }
 
@@ -284,7 +267,11 @@ private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean,
             }
             checksumResponse.body
         } catch (e: WebbException) {
-            LOG.warn("Failed to retrieve checksum '{}'", checksumUrl, e)
+            if (e.cause is FileNotFoundException) {
+                LOG.debug("Failed to retrieve checksum '{}', file not found", checksumUrl)
+            } else {
+                LOG.debug("Failed to retrieve checksum '{}'", checksumUrl, e)
+            }
             continue
         }
 
@@ -595,8 +582,7 @@ private fun Repository.publishLocked(metadata: InfoNode, artifacts: List<Pair<Pa
 }
 
 /** Translated and resolved [RawPom], ready to be used. */
-internal class Pom(val groupId:String?, val artifactId:String?, val version:String?,
-                  val packaging:String,
+private class Pom(val groupId:String?, val artifactId:String?, val version:String?, val packaging:String,
                   val dependencies:List<Dependency>, val dependencyManagement:List<Dependency>) {
 
     /**
@@ -669,7 +655,7 @@ internal class Pom(val groupId:String?, val artifactId:String?, val version:Stri
  *
  * Before using, resolve with [resolve].
  */
-internal class RawPom(
+private class RawPom(
         val url:URL,
         var groupId: String? = null,
         var artifactId: String? = null,

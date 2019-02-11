@@ -60,11 +60,138 @@ val evaluationTest by project {
 
 val compileErrors by project(path("errors")) {
     extend(compilingJava) {
-        sources set { (projectRoot.get() / "src").fileSet(include("**.java")) }
+        sources set { FileSet(projectRoot.get() / "src") }
         compilerOptions[wemi.compile.JavaCompilerFlags.customFlags] += "-Xlint:all"
     }
 
     extend(compilingKotlin) {
-        sources set { (projectRoot.get() / "src").fileSet(include("**.kt")) }
+        sources set { FileSet(projectRoot.get() / "src") }
     }
+}
+
+val CacheRepository = (wemi.boot.WemiCacheFolder / "-test-cache-repository").let {
+    it.deleteRecursively()
+    Repository("test-cache", it)
+}
+
+val checkResolution by key<Unit>("Check if resolved files contain what they should")
+
+fun EvalScope.assertClasspathContains(vararg items:String) {
+    val got = externalClasspath.get().map { Files.readAllBytes(it.file).toString(Charsets.UTF_8) }.toSet()
+    val expected = items.toSet()
+    assertThat(expected, equalTo(got))
+}
+
+val release_1 by configuration("") {
+    repositories set { setOf(Repository("test-repo", projectRoot.get() / "release-1", CacheRepository, local = false)) }
+    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "1.0")) }
+
+    checkResolution set {
+        assertClasspathContains("v1.0")
+    }
+}
+
+val release_2 by configuration("") {
+    repositories set { setOf(Repository("test-repo", projectRoot.get() / "release-2", CacheRepository, local = false)) }
+    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "1.1")) }
+
+    checkResolution set {
+        assertClasspathContains("v1.0" /* through dependency in 1.1 */, "v1.1")
+    }
+}
+
+val non_unique_1 by configuration("") {
+    repositories set { setOf(Repository("test-repo", projectRoot.get() / "non-unique-1", CacheRepository, local = false)) }
+    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "1.0-SNAPSHOT")) }
+
+    checkResolution set {
+        assertClasspathContains("v1.0-SNAPSHOT-1")
+    }
+}
+
+val non_unique_2 by configuration("") {
+    repositories set { setOf(Repository("test-repo", projectRoot.get() / "non-unique-2", CacheRepository, local = false)) }
+    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "1.0-SNAPSHOT")) }
+
+    checkResolution set {
+        assertClasspathContains("v1.0-SNAPSHOT-1")
+    }
+}
+
+val non_unique_3 by configuration("") {
+    repositories set { setOf(Repository("test-repo", projectRoot.get() / "non-unique-2", CacheRepository, snapshotUpdateDelaySeconds = wemi.dependency.SnapshotCheckAlways, local = false)) }
+    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "1.0-SNAPSHOT")) }
+
+    checkResolution set {
+        assertClasspathContains("v1.0-SNAPSHOT-2")
+    }
+}
+
+val unique_1 by configuration("") {
+    repositories set { setOf(Repository("test-repo", projectRoot.get() / "unique-1", CacheRepository, local = false)) }
+    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "2.0-SNAPSHOT")) }
+
+    checkResolution set {
+        assertClasspathContains("v2.0-SNAPSHOT-1")
+    }
+}
+
+val unique_2 by configuration("") {
+    repositories set { setOf(Repository("test-repo", projectRoot.get() / "unique-2", CacheRepository, local = false)) }
+    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "2.0-SNAPSHOT")) }
+
+    checkResolution set {
+        assertClasspathContains("v2.0-SNAPSHOT-1")
+    }
+}
+
+val unique_3 by configuration("") {
+    repositories set { setOf(Repository("test-repo", projectRoot.get() / "unique-2", CacheRepository, snapshotUpdateDelaySeconds = wemi.dependency.SnapshotCheckAlways, local = false)) }
+    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "2.0-SNAPSHOT")) }
+
+    checkResolution set {
+        assertClasspathContains("v2.0-SNAPSHOT-2")
+    }
+}
+
+val unique_4 by configuration("") {
+    repositories set { setOf(Repository("test-repo", projectRoot.get() / "unique-2", CacheRepository, local = false)) }
+    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "2.0-SNAPSHOT", snapshotVersion = "20190101.123456-1")) }
+
+    checkResolution set {
+        assertClasspathContains("v2.0-SNAPSHOT-1")
+    }
+}
+
+val dependency_resolution by project(path("dependency-resolution")) {
+    // Test dependency resolution by resolving against changing repository 3 different libraries
+    /*
+    1. Release
+        1. Exists
+        2. Exists, with a new version which depends on the old one
+        3. Does not exist (offline) but should still resolve, as it is in the cache
+     */
+    autoRun(checkResolution, release_1)
+    autoRun(checkResolution, release_2)
+    autoRun(checkResolution, Configurations.offline, release_2)
+
+    /* 2. Non-unique snapshot
+        1. Exists
+        2. Exists, is different, but the cache is set to daily, so we still see the old one
+        3. Exists and see the new one, because re-check delay has been set to zero
+     */
+    autoRun(checkResolution, non_unique_1)
+    autoRun(checkResolution, non_unique_2)
+    autoRun(checkResolution, non_unique_3)
+
+    /* 3. Unique snapshot
+        1. Exists
+        2. Newer exists, but is not found yet due to recheck policy
+        3. Newer exists and is found
+        4. Newer exists and is ignored, because older version is forced
+     */
+    autoRun(checkResolution, unique_1)
+    autoRun(checkResolution, unique_2)
+    autoRun(checkResolution, unique_3)
+    autoRun(checkResolution, unique_4)
 }

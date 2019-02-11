@@ -253,6 +253,11 @@ fun URL.toPath(): Path? {
     }
 }
 
+/** Return true if this URL has `file` scheme. */
+fun URL.isLocal():Boolean {
+    return "file".equals(protocol, ignoreCase = true)
+}
+
 /** Append given path to the file. It is safe to use '/' slashes for directories
  * (this is preferred to chaining [div] calls). Do not use '\' backslash. */
 inline operator fun Path.div(path: CharSequence): Path = this.resolve(path.toString())
