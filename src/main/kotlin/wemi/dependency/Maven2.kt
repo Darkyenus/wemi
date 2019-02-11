@@ -34,7 +34,7 @@ private val LOG = LoggerFactory.getLogger("Maven2")
 Snapshot resolution logic abstract:
 - Non-unique snapshots are overwritten on publish, so the resolution schema is the same
     - Handled without any extra logic by retrieveFile
-- Unique snapshots use maven-metadata.xml, which is handled in resolveInM2Repository
+- Unique snapshots use maven-metadata.xml, which is handled in retrievePom
  */
 
 /** Attempt to resolve [dependencyId] in [repository], using [repositories] for direct immediate dependencies (parent POMs, etc.). */
@@ -47,36 +47,10 @@ fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository, re
     }
 
     // Retrieve basic POM data
-    val pomPath = pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion)
-    LOG.trace("Retrieving pom at '{}' for {}", repository, dependencyId)
-    val retrievedPom = retrieveFile(repository, pomPath, snapshot)
-            ?: if (snapshot && dependencyId.snapshotVersion.isEmpty()) {
-                // Query for maven-metadata.xml (https://github.com/strongbox/strongbox/wiki/Maven-Metadata)
-                val mavenMetadataPath = mavenMetadataPath(dependencyId, null)
-                val mavenMetadataCachePath = mavenMetadataPath(dependencyId, repository)
-                val metadataFileArtifact = retrieveFile(repository, mavenMetadataPath, true, mavenMetadataCachePath)
-                        ?: return ResolvedDependency(dependencyId, "Failed to resolve snapshot metadata", repository)
-                val metadataBuilder = MavenMetadataBuildingXMLHandler.buildFrom(metadataFileArtifact)
-                val snapshotVersion = metadataBuilder.use({ metadata ->
-                    val timestamp = metadata.versioningSnapshotTimestamp
-                            ?: return ResolvedDependency(dependencyId, "Failed to parse metadata xml: timestamp is missing", repository)
-                    val buildNumber = metadata.versioningSnapshotBuildNumber
-                    "$timestamp-$buildNumber"
-                }, { log ->
-                    return ResolvedDependency(dependencyId, "Failed to parse metadata xml: $log", repository)
-                })
+    val (retrievedPom, resolvedDependencyId) = retrievePom(repository, dependencyId, snapshot).use({ it }, { return it })
 
-                LOG.info("Resolving {} in {} with snapshot version {}", dependencyId, repository, snapshotVersion)
-
-                // TODO(jp): This recursion is ugly
-                return resolveInM2Repository(dependencyId.copy(snapshotVersion = snapshotVersion), repository, repositories)
-            } else {
-                // Failed
-                return ResolvedDependency(dependencyId, "Failed to resolve pom xml", repository)
-            }
-
-    if (dependencyId.type.equals("pom", ignoreCase = true)) {
-        return ResolvedDependency(dependencyId, emptyList(), repository, retrievedPom)
+    if (resolvedDependencyId.type.equals("pom", ignoreCase = true)) {
+        return ResolvedDependency(resolvedDependencyId, emptyList(), repository, retrievedPom)
     }
 
     val resolvedPom = resolveRawPom(retrievedPom.originalUrl, retrievedPom.data!!, repository, repositories).fold { rawPom ->
@@ -84,28 +58,28 @@ fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository, re
     }
 
     val pom = resolvedPom.use( { it }, {  log ->
-        LOG.debug("Failed to resolve POM for {} from {}: {}", dependencyId, repository, log)
-        return ResolvedDependency(dependencyId, log, repository)
+        LOG.debug("Failed to resolve POM for {} from {}: {}", resolvedDependencyId, repository, log)
+        return ResolvedDependency(resolvedDependencyId, log, repository)
     })
 
-    when (dependencyId.type) {
+    when (resolvedDependencyId.type) {
         "jar", "bundle" -> { // TODO Should osgi bundles have different handling?
-            val jarPath = artifactPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.classifier, "jar", dependencyId.snapshotVersion)
+            val jarPath = artifactPath(resolvedDependencyId.group, resolvedDependencyId.name, resolvedDependencyId.version, resolvedDependencyId.classifier, "jar", resolvedDependencyId.snapshotVersion)
             val retrieved = retrieveFile(repository, jarPath, snapshot)
 
             if (retrieved == null) {
                 LOG.warn("Failed to retrieve jar at '{}' in {}", jarPath, repository)
-                return ResolvedDependency(dependencyId, "Failed to retrieve jar", repository)
+                return ResolvedDependency(resolvedDependencyId, "Failed to retrieve jar", repository)
             } else {
                 // Purge retrieved data, storing it would only create a memory leak, as the value is rarely used,
                 // can always be lazily loaded and the size of all dependencies can be quite big.
                 retrieved.data = null
-                return ResolvedDependency(dependencyId, pom.dependencies, repository, retrieved)
+                return ResolvedDependency(resolvedDependencyId, pom.dependencies, repository, retrieved)
             }
         }
         else -> {
-            LOG.warn("Unsupported packaging {} of {}", dependencyId.type, dependencyId)
-            return ResolvedDependency(dependencyId, "Unsupported dependency type \"${dependencyId.type}\"", repository)
+            LOG.warn("Unsupported packaging {} of {}", resolvedDependencyId.type, resolvedDependencyId)
+            return ResolvedDependency(resolvedDependencyId, "Unsupported dependency type \"${resolvedDependencyId.type}\"", repository)
         }
     }
 }
@@ -400,6 +374,45 @@ private fun resolveRawPom(pomUrl:URL, pomData:ByteArray,
     }
 
     return Failable.success(rawPom)
+}
+
+
+/** Retrieve raw pom file for given [dependencyId] in [repository].
+ * If [snapshot] and it is unique snapshot, it resolves maven-metadata.xml and returns the pom for the newest version. */
+private fun retrievePom(repository:Repository, dependencyId:DependencyId, snapshot:Boolean):Failable<Pair<ArtifactPath, DependencyId>, ResolvedDependency> {
+    LOG.trace("Retrieving pom at '{}' for {}", repository, dependencyId)
+    val retrievedPom = retrieveFile(repository, pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion), snapshot)
+    if (retrievedPom != null) {
+        return Failable.success(retrievedPom to dependencyId)
+    }
+    if (snapshot && dependencyId.snapshotVersion.isEmpty()) {
+        // Query for maven-metadata.xml (https://github.com/strongbox/strongbox/wiki/Maven-Metadata)
+        val mavenMetadataPath = mavenMetadataPath(dependencyId, null)
+        val mavenMetadataCachePath = mavenMetadataPath(dependencyId, repository)
+        val metadataFileArtifact = retrieveFile(repository, mavenMetadataPath, true, mavenMetadataCachePath)
+                ?: return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve snapshot metadata", repository))
+        val metadataBuilder = MavenMetadataBuildingXMLHandler.buildFrom(metadataFileArtifact)
+        val snapshotVersion = metadataBuilder.use({ metadata ->
+            val timestamp = metadata.versioningSnapshotTimestamp
+                    ?: return Failable.failure(ResolvedDependency(dependencyId, "Failed to parse metadata xml: timestamp is missing", repository))
+            val buildNumber = metadata.versioningSnapshotBuildNumber
+            "$timestamp-$buildNumber"
+        }, { log ->
+            return Failable.failure(ResolvedDependency(dependencyId, "Failed to parse metadata xml: $log", repository))
+        })
+
+        LOG.info("Resolving {} in {} with snapshot version {}", dependencyId, repository, snapshotVersion)
+
+        val newRetrievedPom = retrieveFile(repository, pomPath(dependencyId.group, dependencyId.name, dependencyId.version, snapshotVersion), snapshot)
+
+        if (newRetrievedPom != null) {
+            return Failable.success(newRetrievedPom to dependencyId.copy(snapshotVersion = snapshotVersion))
+        }
+
+        return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve pom xml for deduced snapshot version \"$snapshotVersion\"", repository))
+    }
+
+    return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve pom xml", repository))
 }
 
 private fun resolvePom(rawPom:RawPom, repository: Repository, chain: Collection<Repository>): Failable<Pom, String> {
