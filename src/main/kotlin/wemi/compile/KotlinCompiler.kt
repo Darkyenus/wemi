@@ -93,7 +93,7 @@ enum class KotlinCompilerVersion (
         synchronized(this) {
             var kotlinCompiler = compilerCache
             if (kotlinCompiler == null) {
-                val artifacts = LibraryDependencyResolver.resolveArtifacts(compilerDependency, emptyList())
+                val artifacts = resolveDependencyArtifacts(compilerDependency, emptyList())
                         ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
                 LOG.trace("Classpath for {} compiler: {}", string, artifacts)

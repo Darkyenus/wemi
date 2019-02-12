@@ -274,7 +274,7 @@ class BuildScriptInfo internal constructor(
         }
 
         val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
-        if (!LibraryDependencyResolver.resolve(resolved, dependencies, repositories)) {
+        if (!resolveDependencies(resolved, dependencies, repositories)) {
             // Dependencies failed to resolve
             // TODO Is this logged properly & nicely?
             return false

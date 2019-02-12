@@ -38,7 +38,7 @@ Snapshot resolution logic abstract:
  */
 
 /** Attempt to resolve [dependencyId] in [repository], using [repositories] for direct immediate dependencies (parent POMs, etc.). */
-fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository, repositories: Collection<Repository>): ResolvedDependency {
+fun resolveInM2Repository(dependencyId: DependencyId, repository: Repository, repositories: List<Repository>): ResolvedDependency {
     val snapshot = dependencyId.isSnapshot
     if (snapshot && !repository.snapshots) {
         return ResolvedDependency(dependencyId, "Release only repository skipped for snapshot dependency", repository)
@@ -352,7 +352,7 @@ private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean,
 
 private fun retrieveRawPom(dependencyId: DependencyId,
                            repository: Repository,
-                           chain: Collection<Repository>,
+                           repositories: List<Repository>,
                            pomPath:String = pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion)): Failable<RawPom, String> {
     // Create path to pom
     val pomUrl = repository.url / pomPath
@@ -360,11 +360,11 @@ private fun retrieveRawPom(dependencyId: DependencyId,
     val pomData = retrieveFile(repository, pomPath, dependencyId.isSnapshot)?.data
             ?: return Failable.failure("File not retrieved")
 
-    return resolveRawPom(pomUrl, pomData, repository, chain)
+    return resolveRawPom(pomUrl, pomData, repository, repositories)
 }
 
 private fun resolveRawPom(pomUrl:URL, pomData:ByteArray,
-                          repository: Repository, chain: Collection<Repository>): Failable<RawPom, String> {
+                          repository: Repository, repositories: List<Repository>): Failable<RawPom, String> {
     val rawPom = RawPom(pomUrl)
 
     val reader = XMLReaderFactory.createXMLReader()
@@ -390,17 +390,17 @@ private fun resolveRawPom(pomUrl:URL, pomData:ByteArray,
             // Create new pom-path
             val parentPomPath = (pomUrl.path / ".." / pomBuilder.parentRelativePath).toString()
             LOG.trace("Retrieving parent pom of '{}' from relative '{}'", pomUrl, parentPomPath)
-            retrieveRawPom(parentPomId, repository, chain, parentPomPath).success {
+            retrieveRawPom(parentPomId, repository, repositories, parentPomPath).success {
                 parent = it
             }
         }
 
         if (parent == null) {
             LOG.trace("Retrieving parent pom of '{}' by coordinates '{}', in same repository", pomUrl, parentPomId)
-            val resolvedPom = LibraryDependencyResolver.resolveSingleDependency(parentPomId, chain)
+            val resolvedPom = resolveSingleDependency(parentPomId, repositories)
             val artifact = resolvedPom.artifact
             if (artifact != null) {
-                resolveRawPom(artifact.originalUrl, artifact.data!!, resolvedPom.resolvedFrom!!, chain)
+                resolveRawPom(artifact.originalUrl, artifact.data!!, resolvedPom.resolvedFrom!!, repositories)
                         .success { pom ->
                             parent = pom
                         }
@@ -456,7 +456,7 @@ private fun retrievePom(repository:Repository, dependencyId:DependencyId, snapsh
     return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve pom xml", repository))
 }
 
-private fun resolvePom(rawPom:RawPom, repository: Repository, chain: Collection<Repository>): Failable<Pom, String> {
+private fun resolvePom(rawPom:RawPom, repository: Repository, repositories: List<Repository>): Failable<Pom, String> {
     val pom = rawPom.resolve(repository)
 
     // Resolve <dependencyManagement> <scope>import
@@ -473,8 +473,8 @@ private fun resolvePom(rawPom:RawPom, repository: Repository, chain: Collection<
         }
 
         LOG.trace("Resolving dependencyManagement import {} in '{}'", dep, rawPom.url)
-        retrieveRawPom(dep, repository, chain).fold { retrievedRawPom ->
-            resolvePom(retrievedRawPom, repository, chain)
+        retrieveRawPom(dep, repository, repositories).fold { retrievedRawPom ->
+            resolvePom(retrievedRawPom, repository, repositories)
         }.use({ importedPom ->
             val imported = importedPom.dependencyManagement
             if (imported.isNotEmpty()) {
@@ -492,7 +492,7 @@ private fun resolvePom(rawPom:RawPom, repository: Repository, chain: Collection<
     return Failable.success(fullyResolvedPom)
 }
 
-fun pomPath(group:String, name:String, version:String, snapshotVersion:String):String {
+private fun pomPath(group:String, name:String, version:String, snapshotVersion:String):String {
     val sb = group.replace('.', '/') / name / version
     sb.append('/').append(name).append('-')
     val SNAPSHOT = "SNAPSHOT"

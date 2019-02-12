@@ -102,7 +102,7 @@ object KeyDefaults {
         val libraryDependencyProjectMapper = Keys.libraryDependencyProjectMapper.get()
 
         val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
-        val complete = LibraryDependencyResolver.resolve(resolved, libraryDependencies, repositories, libraryDependencyProjectMapper)
+        val complete = resolveDependencies(resolved, libraryDependencies, repositories, libraryDependencyProjectMapper)
         Partial(resolved, complete)
     }
 
@@ -792,7 +792,7 @@ object KeyDefaults {
 
     val ArchiveDokkaInterface: Value<DokkaInterface> = {
         val javaHome = Keys.javaHome.get()
-        val artifacts = LibraryDependencyResolver.resolveArtifacts(DokkaFatJar, emptyList())?.toMutableList()
+        val artifacts = resolveDependencyArtifacts(DokkaFatJar, emptyList())?.toMutableList()
                 ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
         jdkToolsJar(javaHome)?.let { artifacts.add(it) }
