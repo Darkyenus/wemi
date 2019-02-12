@@ -134,7 +134,7 @@ object Configurations {
         Keys.repositories modify { oldChain ->
             WMutableSet<Repository>().apply {
                 for (repository in oldChain) {
-                    if (repository.url.isLocal()) {
+                    if (repository.local) {
                         add(repository)
                     } else if (repository.cache != null) {
                         add(repository.cache)

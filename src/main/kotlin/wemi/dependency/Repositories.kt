@@ -40,10 +40,5 @@ fun sonatypeOss(repository:String): Repository {
     return Repository("sonatype-oss-$repository", URL("https://oss.sonatype.org/content/repositories/$repository/"), LocalCacheM2Repository, releases = releases, snapshots = snapshots)
 }
 
-/**
- * Repositories to use by default.
- *
- * @see MavenCentral
- * @see LocalM2Repository (included as cache of [MavenCentral])
- */
-val DefaultRepositories:Set<Repository> = setOf(MavenCentral)
+/** Repositories to use by default ([MavenCentral], [LocalM2Repository]) */
+val DefaultRepositories:Set<Repository> = setOf(MavenCentral, LocalM2Repository)

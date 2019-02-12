@@ -16,6 +16,30 @@ import java.util.concurrent.Semaphore
 
 private val LOG = LoggerFactory.getLogger("Files")
 
+/** Create a new [URL] with [extraPath] appended to the [URL.path].
+ * Useful for adding an extension to the file [URL] points to. */
+internal fun URL.appendToPath(extraPath:CharSequence):URL {
+    if (extraPath.isEmpty()) {
+        return this
+    }
+
+    val oldPath = this.path ?: ""
+    val query = this.query ?: ""
+    val fragment:String? = this.ref
+
+    val newFile = StringBuilder(oldPath.length + query.length + extraPath.length + (fragment?.length ?: 0) + 2)
+    newFile.append(oldPath).append(extraPath)
+
+    if (!query.isEmpty()) {
+        newFile.append('?').append(query)
+    }
+
+    if (fragment != null) {
+        newFile.append('#').append(fragment)
+    }
+    return URL(protocol, host, port, newFile.toString())
+}
+
 /** Creates an URL with given path appended, using logic similar to the one used in [pathAppend], with the addition that
  * the path may end with `?<query>` and `#<fragment>` parts, (in this order),
  * in which case the query is added to the existing query and fragment replaces existing fragment.  */

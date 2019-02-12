@@ -108,6 +108,87 @@ private fun httpGet(url:URL, ifModifiedSince:Long = -1): Request {
     return request
 }
 
+private sealed class DownloadResult {
+    object Failure:DownloadResult()
+    object UseCache:DownloadResult()
+    class Success(val remoteLastModifiedTime:Long, val remoteArtifactData:ByteArray, val checksums:Array<String?>, val checksumMismatches:Int):DownloadResult()
+}
+
+private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheControlMs: Long, snapshot: Boolean):DownloadResult {
+    val response: Response<ByteArray>
+    // Fallbacks to current time if headers are invalid/missing, we don't have any better metric
+    var remoteLastModifiedTime = System.currentTimeMillis()
+    try {
+        response = httpGet(repositoryArtifactUrl, cacheControlMs).executeBytes()
+
+        val lastModified = response.lastModified
+        val date = response.date
+        if (lastModified > 0) {
+            remoteLastModifiedTime = lastModified
+        } else if (date > 0) {
+            remoteLastModifiedTime = date
+        }
+    } catch (e: WebbException) {
+        if (e.cause is FileNotFoundException) {
+            LOG.debug("Failed to retrieve '{}', file not found", repositoryArtifactUrl)
+        } else {
+            LOG.debug("Failed to retrieve '{}'", repositoryArtifactUrl, e)
+        }
+        return DownloadResult.Failure
+    }
+
+    if (snapshot && response.statusCode == 304 /* Not modified */) {
+        return DownloadResult.UseCache
+    } else if (!response.isSuccess) {
+        LOG.debug("Failed to retrieve '{}' - status code {}", repositoryArtifactUrl, response.statusCode)
+        return DownloadResult.Failure
+    }
+    val remoteArtifactData = response.body
+
+    // Step 4: download and verify checksums
+    val checksums = arrayOfNulls<String>(CHECKSUMS.size) // checksum file content
+    var checksumMismatches = 0
+    for (checksum in CHECKSUMS) {
+        val checksumUrl = repositoryArtifactUrl.appendToPath(checksum.suffix)
+        val checksumFileBody: String? = try {
+            val checksumResponse = httpGet(checksumUrl).executeString()
+            if (!checksumResponse.isSuccess) {
+                LOG.debug("Failed to retrieve checksum '{}' (code: {})", checksumUrl, checksumResponse.statusCode)
+                continue
+            }
+            checksumResponse.body
+        } catch (e: WebbException) {
+            if (e.cause is FileNotFoundException) {
+                LOG.debug("Failed to retrieve checksum '{}', file not found", checksumUrl)
+            } else {
+                LOG.debug("Failed to retrieve checksum '{}'", checksumUrl, e)
+            }
+            continue
+        }
+
+        val expectedChecksum = parseHashSum(checksumFileBody)
+        if (checksumFileBody == null || expectedChecksum.isEmpty()) {
+            LOG.warn("Failed to retrieve checksum '{}': file is malformed", checksumUrl)
+            checksumMismatches++
+        }
+
+        // Compute checksum
+        val computedChecksum = checksum.checksum(remoteArtifactData)
+
+        if (hashMatches(expectedChecksum, computedChecksum, repositoryArtifactUrl.path.takeLastWhile { it != '/' })) {
+            LOG.trace("{} checksum of '{}' is valid", checksum, repositoryArtifactUrl)
+            checksums[checksum.ordinal] = checksumFileBody
+        } else {
+            if (LOG.isWarnEnabled) {
+                LOG.warn("{} checksum of '{}' mismatch! Computed {}, got {}", checksum, repositoryArtifactUrl, toHexString(computedChecksum), toHexString(expectedChecksum))
+            }
+            checksumMismatches++
+        }
+    }
+
+    return DownloadResult.Success(remoteLastModifiedTime, remoteArtifactData, checksums, checksumMismatches)
+}
+
 /**
  * Retrieve file from repository, handling cache and checksums (TODO: And signatures).
  * NOTE: Does not check whether [repository] holds snapshots and/or releases.
@@ -135,7 +216,7 @@ private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean,
         3. Failed: Fail
     4. Download checksums one by one and verify
         1. All checksums 404: Warn, continue
-        2. Any checksum mismatch: Warn, fail, try again! TODO: Allow to control this
+        2. Any checksum mismatch: Warn, fail, try again! (if repository allows to ignore checksums, do not fail completely)
         3. All checksums match (or 404): continue
     5. Store downloaded checksums locally
     6. Store downloaded artifact locally, overwriting existing if it is known that it exists (2.1)
@@ -194,94 +275,54 @@ private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean,
         LOG.trace("Local artifact cache does not exist: {}", cacheFile, fileDoesNotExist)
     }
 
-    // Step 3: download from remote to memory
+    // Step 3 & 4: download from remote to memory and verify checksums
     LOG.info("Retrieving file '{}' from {}", path, repository)
 
-    val response: Response<ByteArray>
-    // Fallbacks to current time if headers are invalid/missing, we don't have any better metric
-    var remoteLastModifiedTime:Long = System.currentTimeMillis()
-    try {
-        response = httpGet(repositoryArtifactUrl, cacheControlMs).executeBytes()
-
-        val lastModified = response.lastModified
-        val date = response.date
-        if (lastModified > 0) {
-            remoteLastModifiedTime = lastModified
-        } else if (date > 0) {
-            remoteLastModifiedTime = date
-        }
-    } catch (e: WebbException) {
-        if (e.cause is FileNotFoundException) {
-            LOG.debug("Failed to retrieve '{}' from {}, file not found", path, repository)
-        } else {
-            LOG.debug("Failed to retrieve '{}' from {}", path, repository, e)
-        }
-        return null
-    }
-
-    if (snapshot && response.statusCode == 304 /* Not modified */) {
-        LOG.trace("Using local artifact cache (snapshot not modified): {}", cacheFile)
-        return ArtifactPath(cacheFile, repositoryArtifactUrl, null)
-    } else if (!response.isSuccess) {
-        LOG.debug("Failed to retrieve '{}' from {} - status code {}", path, repository, response.statusCode)
-        return null
-    }
-    val remoteArtifactData:ByteArray = response.body
-
-    // Step 4: download and verify checksums
-    val validChecksums = HashMap<String /* path */, String /* file content */>()
-    for (checksum in CHECKSUMS) {
-        val checksumPath = path + checksum.suffix
-        val checksumUrl = repository.url / checksumPath
-        val checksumFileBody:String? = try {
-            val checksumResponse = httpGet(checksumUrl).executeString()
-            if (!checksumResponse.isSuccess) {
-                LOG.debug("Failed to retrieve checksum '{}' (code: {})", checksumUrl, checksumResponse.statusCode)
-                continue
+    // Download may fail, or checksums may fail, so try multiple times
+    var downloadFileSuccess:DownloadResult.Success? = null
+    val retries = 3
+    for (downloadTry in 1 .. retries) {
+        val downloadFileResult = retrieveFileDownloadAndVerify(repositoryArtifactUrl, cacheControlMs, snapshot)
+        when (downloadFileResult) {
+            DownloadResult.Failure -> return null
+            DownloadResult.UseCache -> {
+                LOG.trace("Using local artifact cache (snapshot not modified): {}", cacheFile)
+                return ArtifactPath(cacheFile, repositoryArtifactUrl, null)
             }
-            checksumResponse.body
-        } catch (e: WebbException) {
-            if (e.cause is FileNotFoundException) {
-                LOG.debug("Failed to retrieve checksum '{}', file not found", checksumUrl)
-            } else {
-                LOG.debug("Failed to retrieve checksum '{}'", checksumUrl, e)
+            is DownloadResult.Success -> {
+                val mismatches = downloadFileResult.checksumMismatches
+                if (mismatches > 0) {
+                    if (downloadTry < retries) {
+                        LOG.warn("Retrying download after {} checksum(s) mismatched", mismatches)
+                    } else if (repository.tolerateChecksumMismatch) {
+                        LOG.warn("Settling on download with {} mismatched checksum(s)", mismatches)
+                    } else {
+                        LOG.warn("Download failed due to {} mismatched checksum(s)", mismatches)
+                        return null
+                    }
+                }
+                downloadFileSuccess = downloadFileResult
             }
-            continue
-        }
-
-        val expectedChecksum = parseHashSum(checksumFileBody)
-        if (checksumFileBody == null || expectedChecksum.isEmpty()) {
-            LOG.warn("Failed to retrieve checksum '{}': file is malformed, retrying", checksumUrl)
-            TODO("RETRY, use "+repository.tolerateChecksumMismatch)
-        }
-
-        // Compute checksum
-        val computedChecksum = checksum.checksum(remoteArtifactData)
-
-        if (hashMatches(expectedChecksum, computedChecksum, path.takeLastWhile { it != '/' })) {
-            LOG.trace("Checksum of '{}' in {} is valid", path, repository)
-            val checksumCachePath = if (path === cachePath) checksumPath else cachePath + checksum.suffix
-            validChecksums[checksumCachePath] = checksumFileBody
-        } else {
-            if (LOG.isWarnEnabled) {
-                LOG.warn("Checksum '{}' mismatch! Computed {}, got {}, retrying", checksumUrl, toHexString(computedChecksum), toHexString(expectedChecksum))
-            }
-            TODO("RETRY, use "+repository.tolerateChecksumMismatch)
         }
     }
+    downloadFileSuccess!!
 
     // Step 5: Store downloaded checksums locally
     Files.createDirectories(cacheFile.parent)
-    if (validChecksums.isEmpty()) {
+    var validChecksums = 0
+    for ((i, checksum) in downloadFileSuccess.checksums.withIndex()) {
+        checksum ?: continue
+        val checksumCachePath = cachePath + CHECKSUMS[i].suffix
+        val filePath = (cacheRepositoryRoot / checksumCachePath).toPath() ?: throw AssertionError("cache repository checksum path is not a valid path")
+        filePath.writeText(checksum)
+        validChecksums++
+    }
+    if (validChecksums == 0) {
         LOG.warn("No checksums found for {}, can't verify its correctness", repositoryArtifactUrl)
-    } else {
-        for ((checksumFilePath, content) in validChecksums) {
-            val filePath = (cacheRepositoryRoot / checksumFilePath).toPath() ?: throw AssertionError("cache repository checksum path is not a valid path")
-            filePath.writeText(content)
-        }
     }
 
     // Step 6: Store downloaded artifact
+    val remoteArtifactData: ByteArray = downloadFileSuccess.remoteArtifactData
     try {
         val openOptions =
                 if (cacheFileExists) {
@@ -299,7 +340,7 @@ private fun retrieveFile(repository: Repository, path: String, snapshot:Boolean,
     }
     if (snapshot) {
         try {
-            Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(remoteLastModifiedTime))
+            Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(downloadFileSuccess.remoteLastModifiedTime))
         } catch (e: IOException) {
             LOG.warn("Failed to change artifact's '{}' modify time, snapshot cache control may be slightly off", cacheFile, e)
         }
