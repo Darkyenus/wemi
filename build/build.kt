@@ -1,4 +1,5 @@
 import wemi.Archetypes
+import wemi.Configurations
 import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.Keys
@@ -230,6 +231,14 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
 val kotlinStdlib by project(wemi.Archetypes.BlankJVMProject) {
     libraryDependencies set { setOf(kotlinDependency("stdlib"), kotlinDependency("reflect")) }
     assemblyOutputFile set { wemi.Keys.cacheDirectory.get() / "kotlin-stdlib-assembly.zip" } // TODO(jp): .jar, but now it gets flattened
+
+    // TODO Remove in next release, only here so that IDE does not create source root for this
+    Keys.sources set { null }
+    Keys.resources set { null }
+    extend (Configurations.testing) {
+        Keys.sources set { null }
+        Keys.resources set { null }
+    }
 }
 
 

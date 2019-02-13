@@ -168,7 +168,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
         for (project in projects.values) {
             tracker.stage = "Resolving project "+project.projectName
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, project.moduleData(projectPath))
-            moduleNode.createChild(ProjectKeys.CONTENT_ROOT, project.contentRoot())
+            project.contentRoot()?.let { moduleNode.createChild(ProjectKeys.CONTENT_ROOT, it) } // Do not add content root if it is empty
             moduleNode.createChild(WEMI_MODULE_DATA_KEY, WemiModuleComponentData(WemiModuleType.PROJECT))
             projectModules[project.projectName] = moduleNode
 
@@ -592,7 +592,11 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             }
         }
 
-        fun contentRoot():ContentRootData {
+        fun contentRoot():ContentRootData? {
+            if (sourceRoots.isEmpty() && resourceRoots.isEmpty() && sourceRootsTesting.isEmpty() && resourceRootsTesting.isEmpty()) {
+                // Do not create root if the project has no sources - overlapping source roots confuse IntelliJ and this is one way to prevent them
+                return null
+            }
             val contentRoot = ContentRootData(WemiProjectSystemId, rootPath)
             contentRoot.add(ExternalSystemSourceType.SOURCE, sourceRoots.toTypedArray())
             contentRoot.add(ExternalSystemSourceType.RESOURCE, resourceRoots.toTypedArray())

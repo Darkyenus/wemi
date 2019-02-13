@@ -118,6 +118,13 @@ object Archetypes {
      */
     val BlankJVMProject by archetype(::JVMBase) {
         Keys.internalClasspath set Static(emptyList())
+
+        Keys.sources set { null }
+        Keys.resources set { null }
+        extend (Configurations.testing) {
+            Keys.sources set { null }
+            Keys.resources set { null }
+        }
     }
 
     /** Primary archetype for projects that use pure Java. */
