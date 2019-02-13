@@ -38,30 +38,39 @@ fun Map<DependencyId, ResolvedDependency>.artifacts(): List<Path> {
  *
  * @return true if all [dependencies] resolve correctly without error
  */
-fun resolveDependencies(resolved: MutableMap<DependencyId, ResolvedDependency>, dependencies: Collection<Dependency>, repositories: Collection<Repository>, mapper: ((Dependency) -> Dependency) = { it }): Boolean {
-    val directoriesToLock = repositories.mapNotNull { it.cache?.directoryPath() }.distinct()
+fun resolveDependencies(resolved: MutableMap<DependencyId, ResolvedDependency>, dependencies: Collection<Dependency>,
+                        repositories: Collection<Repository>, mapper: ((Dependency) -> Dependency) = { it }): Boolean {
+    // Sort repositories
+    val sorted = ArrayList<Repository>(repositories)
+    sorted.sortWith(REPOSITORY_COMPARATOR)
 
-    fun <Result> locked(level:Int, action:()->Result):Result {
-        return if (level == directoriesToLock.size) {
+    // Lock repositories
+    val directoriesToLock = HashSet<Path>()
+    for (repository in repositories) {
+        directoriesToLock.add(repository.cache?.directoryPath() ?: continue)
+    }
+
+    fun <Result> locked(iterator:Iterator<Path>, action:()->Result):Result {
+        return if (!iterator.hasNext()) {
             action()
         } else {
-            val directory = directoriesToLock[level]
+            val directory = iterator.next()
             directorySynchronized(directory, {
                 // On wait
                 LOG.info("Waiting for lock on {}", directory)
             }) {
-                locked(level + 1, action)
+                locked(iterator, action)
             }
         }
     }
 
-    return locked(0) {
+    return locked(directoriesToLock.iterator()) {
         val dependencyStack = ArrayList<DependencyId>()
         val exclusionStack = ArrayList<DependencyExclusion>()
 
         var ok = true
         for (project in dependencies) {
-            if (!doResolveArtifacts(dependencyStack, exclusionStack, resolved, project, repositories.toList() /* TODO */, mapper)) {
+            if (!doResolveArtifacts(dependencyStack, exclusionStack, resolved, project, sorted, mapper)) {
                 ok = false
             }
             assert(dependencyStack.isEmpty())
@@ -74,6 +83,23 @@ fun resolveDependencies(resolved: MutableMap<DependencyId, ResolvedDependency>, 
 // -------------------------------- Internal ------------------------------
 
 private val LOG = LoggerFactory.getLogger("LibraryDependencyResolver")
+/** Repositories which are sorted for efficiency. Should be treated as opaque. */
+internal typealias SortedRepositories = List<Repository>
+
+/** Compares repositories so that local repositories are first. */
+private val REPOSITORY_COMPARATOR = Comparator<Repository> { o1, o2 ->
+    val cache1 = o1.cache
+    val cache2 = o2.cache
+    // Locals go first (cache == null <-> local)
+    if (cache1 == null && cache2 != null) {
+        -1
+    } else if (cache1 != null && cache2 == null) {
+         1
+    } else {
+        // Arbitrary sorting by name to get full ordering
+        o1.name.compareTo(o2.name)
+    }
+}
 
 /**
  * Resolve [dependency] using the [repositories] repository chain.
@@ -82,7 +108,7 @@ private val LOG = LoggerFactory.getLogger("LibraryDependencyResolver")
  * Does not resolve transitively.
  * When resolution fails, returns ResolvedDependency with [ResolvedDependency.hasError] = true.
  */
-internal fun resolveSingleDependency(dependencyId: DependencyId, repositories: List<Repository>): ResolvedDependency {
+internal fun resolveSingleDependency(dependencyId: DependencyId, repositories: SortedRepositories): ResolvedDependency {
     var log: StringBuilder? = null
     val startTime = System.nanoTime()
 
@@ -147,7 +173,7 @@ internal fun resolveSingleDependency(dependencyId: DependencyId, repositories: L
 private fun doResolveArtifacts(dependencyStack:ArrayList<DependencyId>,
                                exclusionStack:ArrayList<DependencyExclusion>,
                                resolved: MutableMap<DependencyId, ResolvedDependency>,
-                               dependency: Dependency, repositories: List<Repository>,
+                               dependency: Dependency, repositories: SortedRepositories,
                                mapper: (Dependency) -> Dependency): Boolean {
 
     val (dependencyId, exclusions) = mapper(dependency)

@@ -3,11 +3,11 @@
 ## For next release
 - Maven snapshots
 	- Publish snapshots as unique
-- Do not check the cache repeatedly, if previous repository used it as well and failed
-- When retrieving, try all repositories at the same time - if cache folder contains relevant maven-metadata-id, use that immediately
 
 ## For later
 - Rewrite directorySynchronized based on exclusive file creation and timestamp
+	- Make it possible to synchronize on multiple paths (which have to be sorted to prevent deadlock!)
+		- This is used in DependencyResolution
 
 - WEMI IS COMPILED MULTIPLE TIMES!!! cache compile!
 	- Warnings in EnclaveCL
