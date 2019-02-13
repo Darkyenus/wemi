@@ -90,7 +90,7 @@ class Repository(
     internal fun directoryPath(): Path? {
         try {
             if (local) {
-                return FileSystems.getDefault().getPath(url.path)
+                return url.toPath()
             }
         } catch (ignored:Exception) { }
         return null

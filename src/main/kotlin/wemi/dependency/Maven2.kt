@@ -544,14 +544,13 @@ internal fun publish(repository:Repository, metadata: InfoNode, artifacts: List<
 
     return if (lock != null) {
         directorySynchronized(lock) {
-            repository.publishLocked(metadata, artifacts)
+            publishLocked(repository, metadata, artifacts)
         }
     } else {
-        repository.publishLocked(metadata, artifacts)
+        publishLocked(repository, metadata, artifacts)
     }
 }
 
-// TODO(jp): This should be replaced with Files.exists and use unique snapshots
 private fun checkValidForPublish(path:Path, snapshot:Boolean) {
     if (Files.exists(path)) {
         if (snapshot) {
@@ -559,13 +558,14 @@ private fun checkValidForPublish(path:Path, snapshot:Boolean) {
         } else {
             throw UnsupportedOperationException("Can't overwrite published non-snapshot file $path")
         }
-    } else {
-        Files.createDirectories(path.parent)
     }
 }
 
-private fun Repository.publishLocked(metadata: InfoNode, artifacts: List<Pair<Path, Classifier>>): URI {
-    val path = directoryPath() ?: throw UnsupportedOperationException("Can't publish to non-local repository")
+private fun publishLocked(repository:Repository, metadata: InfoNode, artifacts: List<Pair<Path, Classifier>>): URI {
+    if (!repository.local) {
+        throw UnsupportedOperationException("Can't publish to non-local repository $repository")
+    }
+    val path = repository.url.toPath()!!
 
     val groupId = metadata.findChild("groupId")?.text ?: throw IllegalArgumentException("Metadata is missing a groupId:\n$metadata")
     val artifactId = metadata.findChild("artifactId")?.text ?: throw IllegalArgumentException("Metadata is missing a artifactId:\n$metadata")
@@ -576,6 +576,8 @@ private fun Repository.publishLocked(metadata: InfoNode, artifacts: List<Pair<Pa
     val pomPath = path / pomPath(groupId, artifactId, version, DEFAULT_SNAPSHOT_VERSION)
     LOG.debug("Publishing metadata to {}", pomPath)
     checkValidForPublish(pomPath, snapshot)
+    Files.createDirectories(pomPath.parent)
+
     val pomXML = metadata.toXML()
     Files.newBufferedWriter(pomPath, Charsets.UTF_8).use {
         it.append(pomXML)
