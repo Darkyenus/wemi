@@ -44,8 +44,8 @@ val core:Project by project {
     val JLineVersion = "3.3.0"
     libraryDependencies set { setOf(
             dependency("org.slf4j", "slf4j-api", "1.7.25"),
-            dependency("com.github.Darkyenus", "tproll", "v1.2.6"),
-            dependency("com.github.Darkyenus", "DaveWebb", "v1.2"),
+            dependency("com.darkyen", "tproll", "v1.3.0"),
+            dependency("com.darkyen", "DaveWebb", "v1.2"),
             dependency("com.github.EsotericSoftware", "jsonbeans", "0.9"),
             dependency("org.jline", "jline-terminal", JLineVersion),
             dependency("org.jline", "jline-terminal-jansi", JLineVersion),

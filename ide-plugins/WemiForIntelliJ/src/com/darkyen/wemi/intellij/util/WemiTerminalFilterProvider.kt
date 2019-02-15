@@ -12,7 +12,6 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import java.awt.Font
 import java.io.File
-import java.util.regex.Pattern
 
 /**
  * Provides clickable hyperlinks into IntelliJ's Terminal.
@@ -28,29 +27,73 @@ class WemiTerminalFilterProvider : ConsoleFilterProvider {
 
         private val hyperlinkInfoFactory = HyperlinkInfoFactory.getInstance()
 
-        override fun applyFilter(line: String, entireLength: Int): Filter.Result? {
-            if (!couldMatchPattern(line)) {
-                return null
+        // From PrettyPrintModules
+        private val PATH_TAG_BEGIN_DEFAULT = '\u200B'
+
+        private val PATH_TAGS_END = charArrayOf('\u200C', '\u00A0')
+
+        private fun parseColonNumbers(line:String, start:Int, consecutiveNumbers:Int): IntArray {
+            val result = IntArray(consecutiveNumbers + 1)
+            var resultI = -1
+            var endI = start
+
+            forChars@for (i in start until line.length) {
+                endI = i
+                val c = line[i]
+                when (c) {
+                    ':' -> {
+                        resultI++
+                        if (resultI >= consecutiveNumbers) {
+                            break@forChars
+                        }
+                    }
+                    in '0'..'9' -> {
+                        if (resultI < 0) {
+                            break@forChars
+                        }
+                        result[resultI] *= 10
+                        result[resultI] += c - '0'
+                    }
+                    else -> break@forChars
+                }
             }
-            val matcher = FilePattern.matcher(line)
-            while (matcher.find()) {
-                val path = line.substring(matcher.start(1), matcher.end(1))
-                val lineNumber = run {
-                    val start = matcher.start(2)
-                    if (start == -1) {
-                        0
-                    } else {
-                        line.substring(start, matcher.end(2)).toIntOrNull() ?: 0
-                    }
+
+            result[consecutiveNumbers] = endI
+            return result
+        }
+
+        private fun getColonNumberLength(line:String, colon:Int):Int {
+            if (colon in line.indices && line[colon] == ':') {
+                var numberEnd = colon + 1
+                while (numberEnd in line.indices && line[numberEnd].isDigit()) {
+                    numberEnd++
                 }
-                val columnNumber = run {
-                    val start = matcher.start(3)
-                    if (start == -1) {
-                        0
-                    } else {
-                        line.substring(start, matcher.end(3)).toIntOrNull() ?: 0
-                    }
+                return numberEnd - colon
+            }
+            return 0
+        }
+
+        override fun applyFilter(line: String, entireLength: Int): Filter.Result? {
+            val results = ArrayList<Filter.ResultItem>()
+
+            var start = 0
+            while (true) {
+                start = line.indexOf(PATH_TAG_BEGIN_DEFAULT, start)
+                if (start == -1) break
+
+                val pathStart = start + 1
+                val pathEnd = line.indexOfAny(PATH_TAGS_END, pathStart + 1)
+
+                if (pathEnd == -1) break
+                if (pathStart + 1 == pathEnd) {
+                    // 0-length path, skip
+                    start = pathEnd + 1
+                    continue
                 }
+
+                val path = line.substring(pathStart, pathEnd)
+                val (lineNum, columnNum, colonNumLength) = parseColonNumbers(line, pathEnd + 1, 2)
+                start = pathEnd + 1 + colonNumLength
 
                 val file: VirtualFile =
                         if (path.startsWith('/')) {
@@ -59,56 +102,33 @@ class WemiTerminalFilterProvider : ConsoleFilterProvider {
                             project.guessProjectDir()?.findFileByRelativePath(path)
                         } ?: continue
 
-                val openFileHyperlinkInfo = OpenFileHyperlinkInfo(project, file, lineNumber - 1, columnNumber - 1)
-                return Filter.Result(matcher.start(), matcher.end(), openFileHyperlinkInfo, UnderlineTextAttributes)
+                val openFileHyperlinkInfo = OpenFileHyperlinkInfo(project, file, lineNum - 1, columnNum - 1)
+                // Highlight only the last file part
+                var highlightStart = pathStart
+                var highlightEnd = pathEnd
+                while (highlightEnd - 1 > highlightStart && line[highlightEnd - 1] == '/') {
+                    // Exclude trailing / from the highlight
+                    highlightEnd -= 1
+                }
+                line.lastIndexOf('/', highlightEnd - 1).let {
+                    val newHighlightStart = it + 1
+                    if (newHighlightStart >= highlightStart && newHighlightStart < highlightEnd) {
+                        highlightStart = newHighlightStart
+                    }
+
+                }
+                results.add(Filter.ResultItem(highlightStart, highlightEnd, openFileHyperlinkInfo, UnderlineTextAttributes))
             }
 
-            return null
+            if (results.isEmpty()) {
+                return null
+            }
+
+            return Filter.Result(results)
         }
     }
 
     private companion object {
-        /** Fast heuristic, determining if given line could ever match [FilePattern] */
-        private fun couldMatchPattern(line:String):Boolean {
-            var hasSlash = false
-            for (c in line) {
-                when (c) {
-                    '/' -> hasSlash = true
-                    '.' -> if (hasSlash) return true
-                    ' ' -> hasSlash = false
-                }
-            }
-            return false
-        }
-
-        /** Path character */
-        private const val P = "[\\p{Alnum}\$()+,-.;=@_]"
-        /** Extension character */
-        private const val E = "[\\p{Alnum}]"
-        /** Optional ANSI control sequence */
-        private const val A = "(?:\u001B[0-9;]*m)?"
-
-        /** Matches file path:
-         * ```
-         * ([p]∗/)+[p]∗.[e]+(:[0-9]+)?
-         * ```
-         * Which matches paths like:
-         * ```
-         * foo/bar/Thing.txt
-         * /Users/Me/thing.java
-         * something//file.kt:12
-         * ```
-         * but for performance reasons, not:
-         * ```
-         * foo bar/baz.tar
-         * /Users/Me
-         * ```
-         * which is in context of Wemi acceptable. */
-        val FilePattern: Pattern = Pattern.compile(
-                "((?:$P*/)+$P*\\.$E+)(?!/)$A(?::$A(\\d+)$A(?::$A(\\d+))?)?")
-
         val UnderlineTextAttributes = TextAttributes(null, null, null, EffectType.LINE_UNDERSCORE, Font.PLAIN)
-
-
     }
 }

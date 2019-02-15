@@ -79,7 +79,7 @@ val checkResolution by key<Unit>("Check if resolved files contain what they shou
 fun EvalScope.assertClasspathContains(vararg items:String) {
     val got = externalClasspath.get().map { Files.readAllBytes(it.file).toString(Charsets.UTF_8) }.toSet()
     val expected = items.toSet()
-    assertThat(expected, equalTo(got))
+    assertThat(got, equalTo(expected))
 }
 
 val release_1 by configuration("") {

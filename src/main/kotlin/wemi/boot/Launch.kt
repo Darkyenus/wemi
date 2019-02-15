@@ -5,9 +5,12 @@ import com.darkyen.tproll.integration.JavaLoggingIntegration
 import com.darkyen.tproll.logfunctions.*
 import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TimeFormatter
+import com.darkyen.tproll.util.prettyprint.PrettyPrinterFileModule
+import com.darkyen.tproll.util.prettyprint.PrettyPrinterPathModule
 import org.jline.reader.EndOfFileException
 import org.jline.reader.UserInterruptException
 import org.jline.utils.OSUtils
+import org.joda.time.Duration
 import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.boot.Main.*
@@ -16,7 +19,6 @@ import wemi.dependency.DependencyExclusion
 import wemi.util.*
 import java.io.*
 import java.nio.file.Path
-import java.time.Duration
 import kotlin.system.exitProcess
 
 private val LOG = LoggerFactory.getLogger("Main")
@@ -29,7 +31,13 @@ internal var WemiReloadSupported = false
 
 @JvmField
 internal val WemiUnicodeOutputSupported:Boolean = System.getenv("WEMI_UNICODE").let {
-    if (it == null)!OSUtils.IS_WINDOWS else it == "true" }
+    it?.equals("true", true) ?: !OSUtils.IS_WINDOWS
+}
+
+@JvmField
+internal val WemiPathTags:Boolean = System.getenv("WEMI_PATH_TAGS").let {
+    it?.equals("true", true) ?: WemiUnicodeOutputSupported
+}
 
 @JvmField
 internal val WemiColorOutputSupported:Boolean = run {
@@ -123,8 +131,18 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
         machineOutput = PrintStream(FileOutputStream(FileDescriptor.out))
         System.setOut(System.err)
     } else {
-        machineOutput = null
+        // Inject pretty printing modules
+        PrettyPrinter.PRETTY_PRINT_MODULES.replaceAll { original ->
+            when (original) {
+                is PrettyPrinterPathModule -> WemiPrettyPrintPathModule()
+                is PrettyPrinterFileModule -> WemiPrettyPrintFileModule()
+                else -> original
+            }
+        }
+        PrettyPrinter.PRETTY_PRINT_MODULES.add(WemiPrettyPrintLocatedPathModule())
+        PrettyPrinter.PRETTY_PRINT_MODULES.add(WemiPrettyPrintFunctionModule())
 
+        machineOutput = null
         if (interactive == null && taskArguments.isEmpty()) {
             interactive = true
         }
@@ -134,7 +152,6 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
 
     WemiRunningInInteractiveMode = interactive
     LOG.trace("Starting Wemi from root: {}", WemiRootFolder)
-    PrettyPrinter.setApplicationRootDirectory(WemiRootFolder)
 
     // Setup logging
     TPLogger.setLogFunction(LogFunctionMultiplexer(
@@ -146,10 +163,10 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
                                     false,
                                     DateTimeFileCreationStrategy.DEFAULT_LOG_FILE_EXTENSION,
                                     1024L,
-                                    Duration.ofDays(60)),
+                                    Duration.standardDays(60)),
                             false),
                     true),
-            ConsoleLogFunction(null, null)
+            SimpleLogFunction.CONSOLE_LOG_FUNCTION
     ))
 
     val buildScriptInfo = prepareBuildScriptInfo(allowBrokenBuildScripts, interactive && !machineReadableOutput, cleanBuild)
@@ -227,7 +244,7 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
             while (true) {
                 val line = reader.readLine() ?: break
 
-                val parsed = TaskParser.PartitionedLine(listOf(line), true, true)
+                val parsed = TaskParser.PartitionedLine(listOf(line), allowQuotes = true, machineReadable = true)
                 parsed.machineReadableCheckErrors()
 
                 for (task in parsed.tasks) {

@@ -3,9 +3,7 @@ package wemi.compile.internal
 import org.slf4j.Logger
 import org.slf4j.Marker
 import wemi.boot.WemiRootFolder
-import wemi.util.Color
-import wemi.util.Format
-import wemi.util.format
+import wemi.util.*
 import java.nio.file.Paths
 
 /**
@@ -57,20 +55,23 @@ fun Logger.render(marker: Marker?,
     if (location != null) {
         val locationPath = Paths.get(location.path).toAbsolutePath()
         result.format(Color.Black)
+        result.appendPathTagBegin()
         if (locationPath.startsWith(WemiRootFolder)) {
             val relative = WemiRootFolder.relativize(locationPath)
             result.append(relative.toString())
         } else {
             result.append(locationPath.toString())
         }
-        result.append(':')
         if (location.line > 0) {
+            result.appendPathTagEnd(':')
             result.append(location.line)
             if (location.column > 0) {
                 result.format(Color.White).append(':').append(location.column).format()
             }
+            result.append(' ')
+        } else {
+            result.appendPathTagEnd(' ')
         }
-        result.append(' ')
     }
 
     result.format(foreground = color, format = if (important) Format.Bold else null)

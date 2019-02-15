@@ -6,8 +6,6 @@ import wemi.Key
 import wemi.boot.CLI
 import wemi.boot.WemiColorOutputSupported
 import wemi.dependency.*
-import java.nio.file.Files
-import java.nio.file.Path
 import java.util.*
 
 //region StringBuilder enhancements
@@ -170,19 +168,6 @@ internal fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
     } else {
         this.format(Color.Blue)
         PrettyPrinter.append(this, value)
-        if (value is Function<*>) {
-            val javaClass = value.javaClass
-            this.format(Color.White).append(" (").append(javaClass.name).append(')')
-        } else if (value is Path || value is LocatedPath) {
-            val path = value as? Path ?: (value as LocatedPath).file
-
-            if (Files.isRegularFile(path)) {
-                try {
-                    val size = Files.size(path)
-                    this.format(Color.White).append(" (").appendByteSize(size).append(')')
-                } catch (ignored:Exception) {}
-            }
-        }
         this.format()
     }
     return this
