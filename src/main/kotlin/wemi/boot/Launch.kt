@@ -36,7 +36,7 @@ internal val WemiUnicodeOutputSupported:Boolean = System.getenv("WEMI_UNICODE").
 
 @JvmField
 internal val WemiPathTags:Boolean = System.getenv("WEMI_PATH_TAGS").let {
-    it?.equals("true", true) ?: WemiUnicodeOutputSupported
+    it?.equals("true", true) ?: System.getenv("TERMINAL_EMULATOR")?.contains("JetBrains", ignoreCase = true) ?: false
 }
 
 @JvmField
