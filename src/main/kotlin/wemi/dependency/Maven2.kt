@@ -16,7 +16,6 @@ import wemi.util.*
 import java.io.ByteArrayInputStream
 import java.io.FileNotFoundException
 import java.io.IOException
-import java.net.URI
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
@@ -539,7 +538,7 @@ private fun mavenMetadataPath(dependencyId: DependencyId, repositoryIfCache:Repo
  *
  * @param artifacts list of artifacts and their classifiers if any
  */
-internal fun publish(repository:Repository, metadata: InfoNode, artifacts: List<Pair<Path, Classifier>>): URI {
+internal fun publish(repository:Repository, metadata: InfoNode, artifacts: List<Pair<Path, Classifier>>): Path {
     val lock = repository.directoryPath()
 
     return if (lock != null) {
@@ -561,7 +560,7 @@ private fun checkValidForPublish(path:Path, snapshot:Boolean) {
     }
 }
 
-private fun publishLocked(repository:Repository, metadata: InfoNode, artifacts: List<Pair<Path, Classifier>>): URI {
+private fun publishLocked(repository:Repository, metadata: InfoNode, artifacts: List<Pair<Path, Classifier>>): Path {
     if (!repository.local) {
         throw UnsupportedOperationException("Can't publish to non-local repository $repository")
     }
@@ -634,7 +633,7 @@ private fun publishLocked(repository:Repository, metadata: InfoNode, artifacts: 
         LOG.info("Published {} with {} checksum(s)", publishedArtifact, checksums.size)
     }
 
-    return pomPath.parent.toUri()
+    return pomPath.parent
 }
 
 /** Translated and resolved [RawPom], ready to be used. */

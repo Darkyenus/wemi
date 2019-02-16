@@ -40,22 +40,24 @@ internal val WemiPathTags:Boolean = System.getenv("WEMI_PATH_TAGS").let {
 }
 
 @JvmField
-internal val WemiColorOutputSupported:Boolean = run {
+internal val WemiColorOutputSupported: Boolean = run {
     // Try to determine if color output is enabled from TPROLL_COLOR and WEMI_COLOR variables and set them accordingly
-    val env = System.getenv("WEMI_COLOR") ?: System.getenv("TPROLL_COLOR") ?: ""
-
-    val value = BooleanValidator(env).value ?: run {
-        if (OSUtils.IS_WINDOWS) {
-            // Windows supports color only if terminal is sane
-            val term = System.getenv("TERM")
-            term?.contains("xterm") == true || term?.contains("color") == true
-        } else {
-            // Non-windows machines usually support color
-            true
-        }
-    }
-    System.setProperty("tproll.color", value.toString())
-    value
+    @Suppress("RedundantIf")// For readability
+    val enabled = BooleanValidator(System.getenv("WEMI_COLOR") ?: System.getenv("TPROLL_COLOR") ?: "").value
+            ?: // Not specified explicitly, guess
+            if (OSUtils.IS_WINDOWS) {
+                // Windows supports color only if terminal is sane
+                val term = System.getenv("TERM")
+                term?.contains("xterm") == true || term?.contains("color") == true
+            } else if (System.getenv("JITPACK")?.equals("true", ignoreCase = true) == true) {
+                // When running a JITPACK build, disable colors
+                false
+            } else {
+                // Non-windows machines usually support color
+                true
+            }
+    System.setProperty("tproll.color", enabled.toString())
+    enabled
 }
 
 /** Directory in which wemi executable is (./) */

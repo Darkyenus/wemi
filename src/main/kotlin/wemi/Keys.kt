@@ -16,7 +16,6 @@ import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.prettyPrint
 import wemi.util.*
-import java.net.URI
 import java.nio.file.Path
 import javax.tools.JavaCompiler
 
@@ -99,7 +98,7 @@ object Keys {
     val publishRepository by key<Repository>("Repository to which the archives are published")
     /** @see wemi.publish.artifacts preferred method for adding to this list. */
     val publishArtifacts by key<List<ArtifactEntry>>("Artifacts that should get published", defaultValue = emptyList())
-    val publish by key<URI>("Publish archives to 'publishRepository' and return the URI to where it was published")
+    val publish by key<Path>("Publish archives to 'publishRepository' and return the URI to where it was published")
 
     val assemblyMergeStrategy by key<MergeStrategyChooser>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
     val assemblyRenameFunction by key<RenameFunction>("Function for renaming assembled duplicate files for which merge strategy is Rename. Paths after rename must not conflict, rules are not recursive.")

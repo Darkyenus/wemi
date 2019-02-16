@@ -6,8 +6,6 @@
 	- Make it possible to synchronize on multiple paths (which have to be sorted to prevent deadlock!)
 		- This is used in DependencyResolution
 
-- include publishJitpack in bundled configurations 
-
 ## For later
 - Test everything, especially javadoc/dokka/tests/plugins
 

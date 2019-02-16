@@ -2,17 +2,16 @@
 
 package wemi
 
+import org.slf4j.LoggerFactory
 import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingClasspathModifier
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.KeyDefaults.inProjectDependencies
+import wemi.boot.WemiCacheFolder
 import wemi.collections.WMutableSet
 import wemi.collections.toMutable
 import wemi.compile.*
-import wemi.dependency.Dependency
-import wemi.dependency.JavadocClassifier
-import wemi.dependency.SourcesClassifier
-import wemi.dependency.Repository
+import wemi.dependency.*
 import wemi.test.JUnitPlatformLauncher
 import wemi.util.*
 
@@ -190,5 +189,44 @@ object Configurations {
             options.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005")
             options
         }
+    }
+
+    /** To be used when publishing on [jitpack.io](https://jitpack.io). For full build setup, create `jitpack.yml`
+     * in the project's root with following content:
+     * ```yml
+     * jdk:
+     * - oraclejdk8
+     * install:
+     * - java -jar wemi "<project>/jitpack:publish"
+     * ```
+     * For more information, see [Jitpack documentation](https://jitpack.io/docs/BUILDING/) */
+    val jitpack by configuration("Used when building for Jitpack.io") {
+        val LOG = LoggerFactory.getLogger("jitpack")
+
+        // For clarity, use the version Jitpack expects
+        Keys.projectVersion modify { System.getenv("VERSION") ?: it }
+
+        // Jitpack needs to publish to somewhere within project's repository and to copy it to local maven as well
+        val PublishRepositoryRoot = WemiCacheFolder / "-jitpack-out"
+        Keys.publishRepository set { Repository("local-jitpack", PublishRepositoryRoot) }
+
+        // Everything which is published inside PublishRepositoryRoot (and we expect to be the case always)
+        // should also get copied over to ~/.m2/repository, so that Jitpack can detect it
+        Keys.publish modify { publishedResult ->
+            if (!publishedResult.startsWith(PublishRepositoryRoot)) {
+                LOG.warn("Expected published artifacts to land inside {}, but this is not the case for {}", PublishRepositoryRoot, publishedResult)
+                return@modify publishedResult
+            }
+
+            val mavenRoot = LocalM2Repository.url.toPath() ?: throw AssertionError("Expected LocalM2Repository url to be local")
+            val relative = PublishRepositoryRoot.relativize(publishedResult)
+            val mavenResult = mavenRoot.resolve(relative)
+            Files.createDirectories(mavenResult)
+            publishedResult.copyRecursively(mavenResult)
+            LOG.info("{} copied to {}", publishedResult, mavenResult)
+
+            publishedResult
+        }
+
     }
 }

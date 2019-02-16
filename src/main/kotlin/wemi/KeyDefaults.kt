@@ -29,14 +29,16 @@ import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
-import wemi.util.CliStatusDisplay.Companion.withStatus
 import wemi.util.*
+import wemi.util.CliStatusDisplay.Companion.withStatus
 import java.io.BufferedReader
 import java.io.File
-import java.net.URI
 import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
-import java.nio.file.*
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.time.ZonedDateTime
 import java.util.*
 import javax.tools.*
@@ -1005,7 +1007,7 @@ object KeyDefaults {
                         continue
                     }
                     if (repository.local) {
-                        PUBLISH_MODEL_LOG.warn("Omitting repository {}, it is local")
+                        PUBLISH_MODEL_LOG.warn("Omitting repository {}, it is local", repository)
                         continue
                     }
 
@@ -1029,22 +1031,14 @@ object KeyDefaults {
         }
     }
 
-    val PublishM2: Value<URI> = {
+    val PublishM2: Value<Path> = {
         using(publishing) {
             val repository = Keys.publishRepository.get()
             val metadata = Keys.publishMetadata.get()
             val artifacts = Keys.publishArtifacts.get()
 
             val result = publish(repository, metadata, artifacts)
-
-            try {
-                expiresWith(Paths.get(result))
-            } catch (e:IllegalArgumentException) {
-                expiresNow()
-            } catch (e: FileSystemNotFoundException) {
-                expiresNow()
-            }
-
+            expiresWith(result)
             result
         }
     }
