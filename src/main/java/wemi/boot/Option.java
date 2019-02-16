@@ -85,7 +85,8 @@ final class Option {
 			final Option option = options[i];
 			final StringBuilder line = lines[i];
 
-			for (int j = 0; j < maxLineLength - line.length(); j++) {
+			final int spaces = maxLineLength - line.length();
+			for (int j = 0; j < spaces; j++) {
 				line.append(' ');
 			}
 			line.append(option.description);
