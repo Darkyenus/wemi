@@ -141,8 +141,8 @@ public class Main {
 					System.exit(EXIT_CODE_SUCCESS);
 				}),
 				new Option(Option.NO_SHORT_NAME, "version", "output version information and exit", false, null, arg -> {
-					System.err.println("wemi "+WEMI_VERSION);
-					System.err.println("Copyright (C) 2018 Jan Polák");
+					System.err.println("Wemi "+WEMI_VERSION);
+					System.err.println("Copyright 2017–2019 Jan Polák");
 					System.err.println("<https://github.com/Darkyenus/WEMI>");
 					System.exit(EXIT_CODE_SUCCESS);
 				})

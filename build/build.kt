@@ -1,5 +1,4 @@
 import wemi.Archetypes
-import wemi.Configurations
 import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.Keys
@@ -11,12 +10,15 @@ import wemi.boot.WemiCacheFolder
 import wemi.collections.toMutable
 import wemi.compile.KotlinCompilerFlags
 import wemi.createProject
+import wemi.dependency
 import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
+import wemi.dependency.ProjectDependency
 import wemi.publish.InfoNode
-import wemi.util.*
-import wemi.dependency.*
-import wemi.*
+import wemi.util.FileSet
+import wemi.util.executable
+import wemi.util.name
+import wemi.util.plus
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
@@ -225,20 +227,12 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
     extend(compiling) {
         libraryDependencies add {
             /* Used only in wemi.document.DokkaInterface */
-            wemi.dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", preferredRepository = JCenter)
+            dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", preferredRepository = JCenter)
         }
     }
 }
 
-val kotlinStdlib by project(wemi.Archetypes.BlankJVMProject) {
+val kotlinStdlib by project(Archetypes.BlankJVMProject) {
     libraryDependencies set { setOf(kotlinDependency("stdlib"), kotlinDependency("reflect")) }
-    assemblyOutputFile set { wemi.Keys.cacheDirectory.get() / "kotlin-stdlib-assembly.zip" } // TODO(jp): .jar, but now it gets flattened
-
-    // TODO Remove in next release, only here so that IDE does not create source root for this
-    Keys.sources set { null }
-    Keys.resources set { null }
-    extend (Configurations.testing) {
-        Keys.sources set { null }
-        Keys.resources set { null }
-    }
+    assemblyOutputFile set { Keys.cacheDirectory.get() / "kotlin-stdlib-assembly.zip" } // TODO(jp): .jar, but now it gets flattened
 }
