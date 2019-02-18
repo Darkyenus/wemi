@@ -28,11 +28,20 @@ val lwjgl3 by project(path("lwjgl3")) {
 
     projectDependencies add { ProjectDependency(core, true) }
 
-    runOptions add {"-XstartOnFirstThread"}
     mainClass set {"game.Main"}
 
+    val onMac = System.getProperty("os.name").toLowerCase().contains("mac")
+    if (onMac) {
+        runOptions add {"-XstartOnFirstThread"}
+    }
+
     assemblyPrependData set {
-        "#!/usr/bin/env sh\nexec java -XstartOnFirstThread -jar \"$0\" \"$@\"\n".toByteArray(Charsets.UTF_8)
+        // NOTE: This does mean that the jar built on Mac OS is not portable, but real application would deal with this differently anyway 
+        if (onMac) {
+            "#!/usr/bin/env sh\nexec java -XstartOnFirstThread -jar \"$0\" \"$@\"\n".toByteArray(Charsets.UTF_8)
+        } else {
+            "#!/usr/bin/env sh\nexec java -jar \"$0\" \"$@\"\n".toByteArray(Charsets.UTF_8)
+        }
     }
 
     assemblyOutputFile set {
