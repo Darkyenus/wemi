@@ -1,3 +1,5 @@
+import wemi.dependency.ProjectDependency
+
 /**
  * Plugin for hotswapping JVM code at runtime.
  */
@@ -7,7 +9,7 @@ val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
     projectVersion set { WemiVersion }
 
     extend(compiling) {
-        projectDependencies add { dependency(core, false) }
+        projectDependencies add { ProjectDependency(core, false) }
     }
 
     extend(testing) {

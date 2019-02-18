@@ -15,6 +15,7 @@ import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
 import wemi.publish.InfoNode
 import wemi.util.*
+import wemi.dependency.*
 import wemi.*
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -55,7 +56,7 @@ val core:Project by project {
 
     // Compile-only (provided) libraries
     extend(compiling) {
-        projectDependencies add { dependency(kotlinStdlib, true) }
+        projectDependencies add { ProjectDependency(kotlinStdlib, true) }
         libraryDependencies add {
             /* Used ONLY in wemi.test.forked.TestLauncher */
             dependency("org.junit.platform", "junit-platform-launcher", "1.0.2")
@@ -99,7 +100,7 @@ val core:Project by project {
                 asOp.assembly({ MergeStrategy.Deduplicate }, DefaultRenameFunction, DefaultAssemblyMapFilter, sourcePath, byteArrayOf(), false)
             }
 
-            oldResources + sourcePath.fileSet()
+            oldResources + FileSet(sourcePath)
         }
 
         // Add kotlin stdlib as a bundled jar
@@ -109,7 +110,7 @@ val core:Project by project {
             val libraryList = StringBuilder()
             for (stdlibJar in kotlinStdlib.evaluate{ externalClasspath.get() }) {
                 val jarEntry = stdlibJar.classpathEntry
-                resources += jarEntry.fileSet()
+                resources += FileSet(jarEntry)
                 libraryList.append(jarEntry.name).append('\n')
             }
 
@@ -119,7 +120,7 @@ val core:Project by project {
             Files.newBufferedWriter(librariesPath, StandardCharsets.UTF_8).use {
                 it.append(libraryList)
             }
-            resources += librariesPath.fileSet()
+            resources += FileSet(librariesPath)
 
             resources
         }
@@ -191,12 +192,12 @@ fun createKotlinCompilerProject(version:String):Project {
         }
 
         extend(compilingKotlin) {
-            sources set { (projectRoot.get() / "src").fileSet(include("**.kt")) }
+            sources set { FileSet(projectRoot.get() / "src") }
             compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
         }
 
         projectDependencies set {
-            setOf(dependency(core, false))
+            setOf(ProjectDependency(core, false))
         }
 
         libraryDependencies set { setOf(
@@ -213,12 +214,12 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
     }
 
     extend(compilingKotlin) {
-        sources set { (projectRoot.get() / "src").fileSet(include("**.kt")) }
+        sources set { FileSet(projectRoot.get() / "src") }
         compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
     }
 
     projectDependencies set {
-        setOf(dependency(core, false))
+        setOf(ProjectDependency(core, false))
     }
 
     extend(compiling) {
@@ -240,13 +241,4 @@ val kotlinStdlib by project(wemi.Archetypes.BlankJVMProject) {
         Keys.sources set { null }
         Keys.resources set { null }
     }
-}
-
-
-val jitpackBuild by configuration("Used when building for Jitpack") {
-    // See jitpack.yml
-    publishRepository set { repository("local", path("jitpack-out").toUri().toURL().toString()) }
-
-    // For clarity, use the version Jitpack expects
-    projectVersion modify { System.getenv("VERSION") ?: it }
 }
