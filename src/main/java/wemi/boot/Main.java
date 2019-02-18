@@ -21,7 +21,7 @@ import java.util.stream.Stream;
 public class Main {
 
 	/** Version of Wemi build system */
-	public static final String WEMI_VERSION = "0.8";
+	public static final String WEMI_VERSION = "0.9-SNAPSHOT";
 
 	// Standard exit codes
 	public static final int EXIT_CODE_SUCCESS = 0;

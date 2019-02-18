@@ -15,6 +15,7 @@ import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
 import wemi.publish.InfoNode
 import wemi.util.*
+import wemi.*
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
@@ -27,7 +28,7 @@ val CompilerProjects = listOf(
 )
 
 const val WemiGroup = "com.darkyen.wemi"
-const val ThisWemiVersion = "0.8" // as opposed to the generic WemiVersion, which is the version with which we build
+const val ThisWemiVersion = "0.9-SNAPSHOT" // as opposed to the generic WemiVersion, which is the version with which we build
 
 /**
  * Wemi Build System core

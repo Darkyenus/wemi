@@ -1,3 +1,5 @@
+# 0.9
+
 # 0.8 2019-02-18
 - Deprecate some utility methods in favor of using constructors directly (`FileSet`, `dependency` for project dependencies)
 	- `import wemi.*` is now assumed to be present in build scripts for more fluent api

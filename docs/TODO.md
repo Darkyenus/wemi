@@ -6,6 +6,9 @@
 	- Make it possible to synchronize on multiple paths (which have to be sorted to prevent deadlock!)
 		- This is used in DependencyResolution
 
+- Maven resolution
+	- When resolving snapshots, check both variants for cache first and also check all available repositories if they have cache, before downloading
+
 ## For later
 - Test everything, especially javadoc/dokka/tests/plugins
 
