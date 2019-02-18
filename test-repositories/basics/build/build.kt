@@ -8,6 +8,7 @@ import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.documentation.DokkaOptions.SourceLinkMapItem
+import wemi.dependency.*
 import wemi.*
 import com.esotericsoftware.jsonbeans.JsonValue
 
@@ -25,7 +26,7 @@ val basics by project {
         }
     }
 
-    repositories add { repository("jitpack", "https://jitpack.io") }
+    repositories add { Jitpack }
 
     libraryDependencies add { dependency("org.slf4j:slf4j-api:1.7.22") }
     libraryDependencies add { dependency("com.github.Darkyenus:tproll:v1.2.4") }
@@ -33,8 +34,8 @@ val basics by project {
     libraryDependencies add { kotlinDependency("reflect") }
 
     // -SNAPSHOT example
-    repositories add { repository("spigot-snapshots", "https://hub.spigotmc.org/nexus/content/repositories/snapshots", releases = false) }
-    repositories add { wemi.dependency.sonatypeOss("snapshots") }
+    repositories add { Repository("spigot-snapshots", "https://hub.spigotmc.org/nexus/content/repositories/snapshots", releases = false) }
+    repositories add { sonatypeOss("snapshots") }
     libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.13.2-R0.1-SNAPSHOT") }
 
     extend(compilingJava) {

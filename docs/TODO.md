@@ -53,3 +53,4 @@
 	- Investigate Parallel repository resolution
 	- Support publishing unique snapshots
 	- PGP signatures
+	- When generating maven publish metadata, add only those repositories, which were used. And don't add exclude when there are no excludes.
