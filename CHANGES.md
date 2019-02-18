@@ -1,4 +1,15 @@
-# 0.8
+# 0.8 2019-02-18
+- Deprecate some utility methods in favor of using constructors directly (`FileSet`, `dependency` for project dependencies)
+	- `import wemi.*` is now assumed to be present in build scripts for more fluent api
+- When running through `run` key, SIGINT is forwarded to the running program
+- Make `FileSet` more expressive
+- Refactored and partially rewritten Maven dependency resolution and related classes
+    - nicer API
+    - support `-SNAPSHOT` versions
+    - more control over checksum mismatches
+- `Key.add` and similar extension methods no longer incorrectly allow arbitrary types to be added
+- Fix `--log=<level>` startup parameter
+- Improve `Path` and `URL` `div` extension operators to handle `.` and `..` paths correctly and be more intuitive in general
 
 # 0.7 2019-02-05
 - Replaced `(re)sourceRoots`, `sourceExtensions` and `(re)sourceFiles` with single `(re)sources` key, powered by `FileSet` class (inspired by Ant's `<fileSet>`)
