@@ -4,6 +4,7 @@
 
 import wemi.Keys.runOptions
 import wemi.util.executable
+import wemi.compile.JavaCompilerFlags
 import wemi.dependency.*
 import wemi.*
 
@@ -66,4 +67,8 @@ val lwjgl2 by project(path("./lwjgl2/")) {
     projectDependencies add { ProjectDependency(core, true) }
 
     mainClass set {"game.Main"}
+    
+    extend(compilingJava) {
+        compilerOptions[JavaCompilerFlags.customFlags] += "-Xlint:unchecked"
+    }
 }

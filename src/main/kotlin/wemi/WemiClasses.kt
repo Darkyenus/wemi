@@ -104,9 +104,7 @@ class Configuration internal constructor(val name: String,
                                          val parent: Configuration?)
     : BindingHolder(), JsonWritable {
 
-    /**
-     * @return [name]
-     */
+    /** @return [name] */
     override fun toString(): String {
         return name
     }
@@ -180,10 +178,10 @@ class Project internal constructor(val name: String, internal val projectRoot: P
      * @see evaluate to use this
      */
     internal val projectScope: Scope = run {
-        val holders = ArrayList<BindingHolder>(1 + archetypes.size * 2)
+        val holders = ArrayList<BindingHolder>(1 + archetypes.size * 2) // approximation
         holders.add(this)
 
-        // Iterate through archetypes, most important first
+        // Iterate through archetypes, most important first, reversed afterwards
         var i = archetypes.lastIndex
         while (i >= 0) {
             var archetype = archetypes[i--]
@@ -299,12 +297,12 @@ class Archetype internal constructor(val name: String, val parent:Archetype?) : 
  * Scope allows to query the values of bound [Keys].
  * Each scope is internally formed by an ordered list of [BindingHolder]s.
  *
- * @param scopeBindingHolders list of holders contributing to the scope's holder stack. Most significant holders first.
+ * @param bindingHolders list of holders contributing to the scope's holder stack. Most significant holders first.
  * @param scopeParent of the scope, only [Project] may have null parent.
  */
 class Scope internal constructor(
         private val name: String,
-        val scopeBindingHolders: List<BindingHolder>,
+        val bindingHolders: List<BindingHolder>,
         val scopeParent: Scope?) {
 
     private val configurationScopeCache: MutableMap<Configuration, Scope> = HashMap()
@@ -313,54 +311,46 @@ class Scope internal constructor(
      * This cache contains only already at-least once evaluated bindings. */
     internal val keyBindingCache:MutableMap<Key<*>, Binding<*>> = HashMap()
 
-    private inline fun traverseHoldersBack(action: (BindingHolder) -> Unit) {
-        var scope = this
-        while (true) {
-            scope.scopeBindingHolders.forEach(action)
-            scope = scope.scopeParent ?: break
-        }
-    }
-
-    private fun addReverseExtensions(to:ArrayList<BindingHolder>, of:BindingHolder) {
-        traverseHoldersBack { holderToBeExtended ->
-            if (holderToBeExtended !is Configuration) {
-                return@traverseHoldersBack
-            }
-            val extension = of.configurationExtensions[holderToBeExtended] ?: return@traverseHoldersBack
-
-            addReverseExtensions(to, extension)
-            to.add(extension)
-        }
-    }
-
     @PublishedApi
     internal fun scopeFor(configuration: Configuration): Scope {
         val scopes = configurationScopeCache
         synchronized(scopes) {
             return scopes.getOrPut(configuration) {
-                // Most significant holder first
+                /*
+                Scope for configuration consists of flattened BindingHolders, and a given parent scope.
+                Then the configuration's parents are layered on top:
+                1. From oldest ancestor of [configuration] to [configuration]
+                    1. Take it (some configuration) and add it
+                    2. If any holder which already exists extends it, add it on top
+                 */
+
+                // Most significant are last, least significant are first
                 val newScopeHolders = ArrayList<BindingHolder>()
 
-                // Add extensions in [configuration], which should be applied based on the content of this scope
-                addReverseExtensions(newScopeHolders, configuration)
+                val holderStack:List<List<BindingHolder>> = ArrayList<List<BindingHolder>>().apply {
+                    var scope = this@Scope
+                    while (true) {
+                        add(scope.bindingHolders)
+                        scope = scope.scopeParent ?: break
+                    }
+                    reverse()
+                }
 
-                // Now add scope holders from parents, while resolving other extensions
-                var conf = configuration
-                while (true) {
-                    // Configuration may have been extended, add extensions
-                    traverseHoldersBack { holder ->
-                        val extension = holder.configurationExtensions[configuration] ?: return@traverseHoldersBack
-                        // Does this extension contain more extensions that are now applicable?
-                        addReverseExtensions(newScopeHolders, extension)
-                        newScopeHolders.add(extension)
+                fun addScopeHolderElementsFor(configuration:Configuration, addTo:MutableList<BindingHolder>, existingChain:List<List<BindingHolder>>) {
+                    if (configuration.parent != null) {
+                        addScopeHolderElementsFor(configuration.parent, addTo, existingChain)
                     }
 
-                    // Extensions added, now add the configuration itself
-                    newScopeHolders.add(conf)
-
-                    // Add configuration's parents, if any, with lesser priority than the configuration itself
-                    conf = conf.parent ?: break
+                    addTo.add(configuration)
+                    for (holders in existingChain) {
+                        for (holder in holders) {
+                            addTo.add(holder.configurationExtensions[configuration] ?: continue)
+                        }
+                    }
                 }
+
+                addScopeHolderElementsFor(configuration, newScopeHolders, holderStack)
+                newScopeHolders.reverse()
 
                 Scope(configuration.name, newScopeHolders, this)
             }
@@ -377,17 +367,19 @@ class Scope internal constructor(
 
         searchForBoundValue@while (true) {
             // Retrieve the holder
-            @Suppress("UNCHECKED_CAST")
-            for (holder in scope.scopeBindingHolders) {
-                val holderModifiers = holder.modifierBindings[key] as ArrayList<ValueModifier<T>>?
+
+            for (holder in scope.bindingHolders) {
+                val holderModifiers = holder.modifierBindings[key]
                 if (holderModifiers != null && holderModifiers.isNotEmpty()) {
                     listener?.keyEvaluationHasModifiers(scope, holder, holderModifiers.size)
-                    allModifiersReverse.addAllReversed(holderModifiers)
+                    @Suppress("UNCHECKED_CAST")
+                    allModifiersReverse.addAllReversed(holderModifiers as ArrayList<ValueModifier<T>>)
                 }
 
-                val boundValueCandidate = holder.binding[key] as Value<T>?
+                val boundValueCandidate = holder.binding[key]
                 if (boundValueCandidate != null) {
-                    boundValue = boundValueCandidate
+                    @Suppress("UNCHECKED_CAST")
+                    boundValue = boundValueCandidate as Value<T>
                     boundValueOriginHolder = holder
                     boundValueOriginScope = scope
                     break@searchForBoundValue
@@ -433,8 +425,8 @@ class Scope internal constructor(
         while (true) {
             scope = scope.scopeParent ?: break
         }
-        for (holder in scope.scopeBindingHolders) {
-            // Should be the first one
+        for (holder in scope.bindingHolders) {
+            // Should be the last one...
             if (holder is Project) {
                 return holder
             }
@@ -479,7 +471,7 @@ class Scope internal constructor(
         other as Scope
 
         if (name != other.name) return false
-        if (scopeBindingHolders != other.scopeBindingHolders) return false
+        if (bindingHolders != other.bindingHolders) return false
         if (scopeParent != other.scopeParent) return false
 
         return true
@@ -487,7 +479,7 @@ class Scope internal constructor(
 
     override fun hashCode(): Int {
         var result = name.hashCode()
-        result = 31 * result + scopeBindingHolders.hashCode()
+        result = 31 * result + bindingHolders.hashCode()
         result = 31 * result + (scopeParent?.hashCode() ?: 0)
         return result
     }

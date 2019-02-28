@@ -79,7 +79,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Wemi
                 h.append("default value")
             binding.valueOriginScope != null && binding.valueOriginHolder != null -> {
                 h.append(binding.valueOriginScope)
-                if (binding.valueOriginScope.scopeBindingHolders.last() !== binding.valueOriginHolder) {
+                if (binding.valueOriginScope.bindingHolders.last() !== binding.valueOriginHolder) {
                     // Specify which holder only if it isn't nominal
                     h.format(Color.White).append(" in ").format(format = Format.Underline).append(binding.valueOriginHolder).format()
                 }

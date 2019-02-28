@@ -59,3 +59,5 @@
 	- Support publishing unique snapshots
 	- PGP signatures
 	- When generating maven publish metadata, add only those repositories, which were used. And don't add exclude when there are no excludes.
+	- https://blog.autsoft.hu/a-confusing-dependency/
+	- libraryDependencies add { dependency("org.eclipse.jetty.websocket:websocket-client:9.4.15.v20190215") } check that it works, it uses some maven properties

@@ -481,7 +481,7 @@ object CLI {
                     }
 
                     for (project in AllProjects.values) {
-                        for (holder in project.projectScope.scopeBindingHolders) {
+                        for (holder in project.projectScope.bindingHolders) {
                             exploreForHolders(holder)
                         }
                     }
