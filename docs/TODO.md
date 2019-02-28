@@ -8,6 +8,7 @@
 
 - Maven resolution
 	- When resolving snapshots, check both variants for cache first and also check all available repositories if they have cache, before downloading
+	- Just implement whatever maven does, it is currently broken and does not handle scope:test filtering correctly for dependencyManagement
 
 - Allow to set default project in build script
 

@@ -11,6 +11,7 @@ import wemi.collections.toMutable
 import wemi.compile.KotlinCompilerFlags
 import wemi.createProject
 import wemi.dependency
+import wemi.dependency.DefaultExclusions
 import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
 import wemi.dependency.ProjectDependency
@@ -51,9 +52,10 @@ val core:Project by project {
             dependency("com.darkyen", "tproll", "v1.3.0"),
             dependency("com.darkyen", "DaveWebb", "v1.2"),
             dependency("com.github.EsotericSoftware", "jsonbeans", "0.9"),
-            dependency("org.jline", "jline-terminal", JLineVersion),
-            dependency("org.jline", "jline-terminal-jansi", JLineVersion),
-            dependency("org.jline", "jline-reader", JLineVersion)
+            // TODO Explicit excludes because Maven2 resolution is messed up again and it tried to include some testing libraries
+            Dependency(DependencyId("org.jline", "jline-terminal", JLineVersion), DefaultExclusions + DependencyExclusion("junit", "junit") + DependencyExclusion("org.easymock", "easymock")),
+            Dependency(DependencyId("org.jline", "jline-terminal-jansi", JLineVersion), DefaultExclusions + DependencyExclusion("junit", "junit") + DependencyExclusion("org.easymock", "easymock")),
+            Dependency(DependencyId("org.jline", "jline-reader", JLineVersion), DefaultExclusions + DependencyExclusion("junit", "junit") + DependencyExclusion("org.easymock", "easymock"))
         ) }
 
     // Compile-only (provided) libraries

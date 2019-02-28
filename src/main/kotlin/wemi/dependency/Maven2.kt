@@ -642,7 +642,7 @@ private class Pom(val groupId:String?, val artifactId:String?, val version:Strin
 
     /**
      * Resolves against [dependencyManagement].
-     * http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management
+     * [More info.](http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management)
      */
     private fun resolveDependencyManagement(dependency: Dependency, dependencyManagement:List<Dependency>): Dependency {
         for (templateDep in dependencyManagement) {
@@ -661,6 +661,8 @@ private class Pom(val groupId:String?, val artifactId:String?, val version:Strin
                 }
 
                 // Matches
+
+
                 LOG.trace("Dependency {} replaced with {} from dependencyManagement", dependency, templateDep)
                 return templateDep
             }
