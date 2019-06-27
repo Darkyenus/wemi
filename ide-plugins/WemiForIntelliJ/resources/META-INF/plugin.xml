@@ -2,7 +2,7 @@
     <id>com.darkyen.wemi.intellij</id>
     <name>Wemi</name>
     <version>0.9-SNAPSHOT</version>
-    <vendor email="darkyenus@gmail.com" url="http://darkyenus.github.io">Jan Polák</vendor>
+    <vendor email="darkyenus@gmail.com" url="https://github.com/Darkyenus">Jan Polák</vendor>
 
     <description><![CDATA[
       Allows to use WEMI build system from the IDE.
