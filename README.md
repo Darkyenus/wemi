@@ -79,6 +79,7 @@ val myProject by project {
 ```
 Things like `projectGroup` or `mainClass` above, are keys. Setting any of them is optional, most of them have
 sensible default values. There is more to them, check the [design documentation](docs/DESIGN.md).
+
 4. Now you have a build script that can compile and run Java and Kotlin projects. Add your sources to 
 `<your-project-root>/src/main/java` and/or `<your-project-root>/src/main/kotlin`.
 Dependency on Kotlin's standard library is added by default (if you do not want that, add line 
