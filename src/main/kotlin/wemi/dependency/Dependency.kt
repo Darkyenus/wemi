@@ -44,15 +44,12 @@ internal const val DEFAULT_SNAPSHOT_VERSION:String = ""
  * @param group of project (aka organisation)
  * @param name of project
  * @param version of project (aka revision)
- *
- * @param preferredRepository repository in which to search for this project first
- *          (its cache, if any, is searched even earlier)
  */
 @Json(DependencyId.Serializer::class)
+// TODO(jp): Make this into a regular class (without "data"), same with other classes
 data class DependencyId(val group: String,
                         val name: String,
                         val version: String,
-                        val preferredRepository: Repository? = null,
 
                         /**
                          * Various variants of the same dependency.
@@ -74,10 +71,13 @@ data class DependencyId(val group: String,
                          * Examples: compile, provided, test
                          * See https://maven.apache.org/pom.html#Dependencies
                          *
+                         * TODO: Not correct soon
                          * NOTE: In Wemi used only when filtering, does not actually modify when is the dependency used!
                          */
+                        @Deprecated("Moved to Dependency")
                         val scope:String = DEFAULT_SCOPE,
                         /** Optional transitive dependencies are skipped by default by Wemi. */
+                        @Deprecated("Moved to Dependency")
                         val optional:Boolean = DEFAULT_OPTIONAL,
                         /** When [isSnapshot] and repository uses unique snapshots, `SNAPSHOT` in the [version]
                          * is replaced by this string for the last resolution pass. Resolver (Wemi) will automatically
@@ -93,9 +93,6 @@ data class DependencyId(val group: String,
     override fun toString(): String {
         val result = StringBuilder()
         result.append(group).append(':').append(name).append(':').append(version)
-        if (preferredRepository != null) {
-            result.append('@').append(preferredRepository)
-        }
         if (classifier != NoClassifier) {
             result.append(" classifier:").append(classifier)
         }
@@ -148,8 +145,6 @@ data class DependencyId(val group: String,
                 field("name", value.name)
                 field("version", value.version)
 
-                field("preferredRepository", value.preferredRepository)
-
                 if (value.classifier != NoClassifier) {
                     field("classifier", value.classifier)
                 }
@@ -174,7 +169,6 @@ data class DependencyId(val group: String,
                     value.field("name"),
                     value.field("version"),
 
-                    value.field("preferredRepository"),
                     value.field("classifier", NoClassifier),
                     value.field("type", DEFAULT_TYPE),
                     value.field("scope", DEFAULT_SCOPE),
@@ -242,21 +236,32 @@ data class DependencyExclusion(val group: String? = null, val name: String? = nu
     }
 }
 
-/**
- * Exclusions used by default by [Dependency].
- *
- * Filters those that are what Maven considers optional.
- */
-val DefaultExclusions = listOf(DependencyExclusion(optional = true))
-
 /** Represents dependency on a [dependencyId], with transitive dependencies, which may be excluded by [exclusions].
  *
- * @param exclusions to filter transitive dependencies with. [DefaultExclusions] by default. */
+ * @param exclusions to filter transitive dependencies with */
 @Json(Dependency.Serializer::class)
-data class Dependency(val dependencyId: DependencyId, val exclusions: List<DependencyExclusion> = DefaultExclusions) : WithDescriptiveString {
+data class Dependency(val dependencyId: DependencyId,
+                      /**
+                       * Scope of the dependency.
+                       *
+                       * Examples: compile, provided, test
+                       * See https://maven.apache.org/pom.html#Dependencies
+                       */
+                      val scope:String = DEFAULT_SCOPE,
+                      /** Optional transitive dependencies are skipped by default by Wemi.
+                       * See https://maven.apache.org/guides/introduction/introduction-to-optional-and-excludes-dependencies.html */
+                      val optional:Boolean = DEFAULT_OPTIONAL,
+                      /** Filtering applied to transitive dependencies to exclude some. */
+                      val exclusions: List<DependencyExclusion> = emptyList(),
+                      /** When transitive dependencies match any of these through "{groupId, artifactId, type, classifier}",
+                       * they will be replaced with info in here.
+                       *
+                       * See https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management */
+                      val dependencyManagement: List<Dependency> = emptyList()// TODO(jp): Wire in
+) : WithDescriptiveString {
 
     override fun toDescriptiveAnsiString(): String {
-        return if (exclusions === DefaultExclusions) {
+        return if (exclusions.isEmpty()) {
             dependencyId.toString()
         } else {
             "$dependencyId, exclusions= $exclusions"
@@ -267,7 +272,7 @@ data class Dependency(val dependencyId: DependencyId, val exclusions: List<Depen
         override fun JsonWriter.write(value: Dependency) {
             writeObject {
                 field("id", value.dependencyId)
-                if (value.exclusions !== DefaultExclusions) {
+                if (value.exclusions.isNotEmpty()) {
                     fieldCollection("exclusions", value.exclusions)
                 }
             }
@@ -275,22 +280,23 @@ data class Dependency(val dependencyId: DependencyId, val exclusions: List<Depen
 
         override fun read(value: JsonValue): Dependency {
             val id = value.field<DependencyId>("id")
-            val exclusionsJson = value.get("exclusions")
-            return if (exclusionsJson == null) {
-                Dependency(id)
-            } else {
-                Dependency(id, exclusionsJson.toCollection(DependencyExclusion::class.java, ArrayList()))
-            }
+            val exclusions:List<DependencyExclusion> = value.fieldToCollection("exclusions", ArrayList())
+
+            return Dependency(id, exclusions =exclusions)
         }
     }
 }
 
 private val ARTIFACT_PATH_LOG = LoggerFactory.getLogger(ArtifactPath::class.java)
 
-/** Represents a [path] with lazily loaded [data].
- * @param originalUrl from which the file originated
- *          (typically points at file inside (non-cache) repository in which the artifact was resolved) */
-class ArtifactPath(val path:Path, val originalUrl:URL, data:ByteArray?) {
+/** Represents a [path] with lazily loaded [data]. */
+class ArtifactPath(val path:Path, data:ByteArray?,
+                   /** From which repository was the artifact retrieved */
+                   val repository:Repository,
+                   /** Inside the repository from which the artifact was possibly originally obtained */
+                   val url:URL,
+                   /** Whether or not was this artifact retrieved from cache */
+                   val fromCache:Boolean) {
 
     /** When null, but [path] exists, getter will attempt to load it and store the result for later queries. */
     var data: ByteArray? = data
@@ -331,6 +337,7 @@ class ArtifactPath(val path:Path, val originalUrl:URL, data:ByteArray?) {
  *
  * If successful, contains information about transitive [dependencies] and holds artifacts that were found.
  */
+// TODO(jp): Convert this to two types - successful and unsuccessful version (???)
 class ResolvedDependency private constructor(
         /** That was being resolved */
         val id: DependencyId,
@@ -338,21 +345,23 @@ class ResolvedDependency private constructor(
         val dependencies: List<Dependency>,
         /** In which (non-cache) repository was [id] ultimately found in */
         val resolvedFrom: Repository?,
-        /** `true` if this dependency failed to resolve (partially or completely), for any reason */
-        val hasError: Boolean,
         /** May contain a message explaining why did the dependency failed to resolve, if [hasError] */
-        val log: CharSequence,
+        val log: CharSequence?,
         /** If the artifact has been resolved to a file in a local filesystem, it is here. */
         val artifact:ArtifactPath?
 ) : JsonWritable {
 
+    /** `true` if this dependency failed to resolve (partially or completely), for any reason */
+    val hasError: Boolean
+        get() = log != null
+
     /** Error constructor */
     constructor(id:DependencyId, log:CharSequence, resolvedFrom:Repository? = null)
-            : this(id, emptyList(), resolvedFrom, true, log, null)
+            : this(id, emptyList(), resolvedFrom, log, null)
 
     /** Success constructor */
     constructor(id:DependencyId, dependencies:List<Dependency>, resolvedFrom:Repository, artifact:ArtifactPath)
-            :this(id, dependencies, resolvedFrom, false, "", artifact)
+            :this(id, dependencies, resolvedFrom, null, artifact)
 
     override fun JsonWriter.write() {
         writeObject {
@@ -360,7 +369,9 @@ class ResolvedDependency private constructor(
             fieldCollection("dependencies", dependencies)
             field("resolvedFrom", resolvedFrom)
             field("hasError", hasError)
-            field("log", log.toString())
+            if (!log.isNullOrBlank()) {
+                field("log", log.toString())
+            }
             if (artifact != null) {
                 field("artifact", artifact.path)
             }
@@ -373,7 +384,7 @@ class ResolvedDependency private constructor(
         result.append(", dependencies=").append(dependencies)
         result.append(", resolvedFrom=").append(resolvedFrom)
         result.append(", hasError=").append(hasError)
-        if (log.isNotEmpty()) {
+        if (!log.isNullOrBlank()) {
             result.append(", log=").append(log)
         }
         if (artifact != null) {
@@ -381,4 +392,13 @@ class ResolvedDependency private constructor(
         }
         return result.append(')').toString()
     }
+}
+
+// TODO(jp): Documentation
+class WithStatus<Thing, Status>(val thing:Thing, val status:Status)
+
+enum class TransitiveDependencyStatus {
+    OK,
+    BROKEN,
+    SKIPPED
 }

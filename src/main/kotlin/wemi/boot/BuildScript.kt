@@ -214,15 +214,15 @@ class BuildScriptInfo internal constructor(
             BuildDependency::class.java -> {
                 val (groupOrFull, name, version) = fields
                 if (name.isEmpty() && version.isEmpty()) {
-                    _dependencies.add(Dependency(wemi.dependencyId(groupOrFull, null), WemiBundledLibrariesExclude))
+                    _dependencies.add(Dependency(wemi.dependencyId(groupOrFull, null), exclusions = WemiBundledLibrariesExclude))
                 } else {
-                    _dependencies.add(Dependency(DependencyId(groupOrFull, name, version), WemiBundledLibrariesExclude))
+                    _dependencies.add(Dependency(DependencyId(groupOrFull, name, version), exclusions = WemiBundledLibrariesExclude))
                 }
             }
             BuildDependencyRepository::class.java -> {
                 val (name, url) = fields
 
-                _repositories.add(Repository(name, URL(url), LocalCacheM2Repository))
+                _repositories.add(Repository(name, URL(url), LocalCacheM2RepositoryPath))
             }
             BuildClasspathDependency::class.java -> {
                 val (file) = fields
@@ -273,8 +273,8 @@ class BuildScriptInfo internal constructor(
             }
         }
 
-        val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
-        if (!resolveDependencies(resolved, dependencies, repositories)) {
+        val (resolved, resolvedComplete) = resolveDependencies(dependencies, repositories)
+        if (!resolvedComplete) {
             // Dependencies failed to resolve
             // TODO Is this logged properly & nicely?
             return false

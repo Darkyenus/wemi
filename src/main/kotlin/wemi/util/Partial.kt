@@ -11,6 +11,9 @@ import com.esotericsoftware.jsonbeans.JsonWriter
  */
 class Partial<out T>(val value: T, val complete: Boolean) : JsonWritable {
 
+    operator fun component1() = value
+    operator fun component2() = complete
+
     override fun JsonWriter.write() {
         writeObject {
             field("complete", complete)

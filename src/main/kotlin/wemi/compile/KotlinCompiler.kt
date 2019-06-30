@@ -58,27 +58,27 @@ enum class KotlinCompilerVersion (
     Version1_1_61(
             "1.1.61",
             "wemi.compile.impl.KotlinCompilerImpl1_1_61",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.61", MavenCentral), WemiBundledLibrariesExclude))
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.61"), exclusions = WemiBundledLibrariesExclude))
     ),
     Version1_2_21(
             "1.2.21",
             "wemi.compile.impl.KotlinCompilerImpl1_2_21",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.21", MavenCentral), WemiBundledLibrariesExclude))
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.21"), exclusions = WemiBundledLibrariesExclude))
     ),
     Version1_2_41(
             "1.2.41",
             "wemi.compile.impl.KotlinCompilerImpl1_2_41",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.41", MavenCentral), WemiBundledLibrariesExclude))
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.41"), exclusions = WemiBundledLibrariesExclude))
     ),
     Version1_2_71(
             "1.2.71",
             "wemi.compile.impl.KotlinCompilerImpl1_2_71",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.71", MavenCentral), WemiBundledLibrariesExclude))
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.71"), exclusions = WemiBundledLibrariesExclude))
     ),
     Version1_3_20(
             "1.3.20",
             "wemi.compile.impl.KotlinCompilerImpl1_3_20",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.3.20", MavenCentral), WemiBundledLibrariesExclude))
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.3.20"), exclusions = WemiBundledLibrariesExclude))
     ),
     ;
 
@@ -93,7 +93,7 @@ enum class KotlinCompilerVersion (
         synchronized(this) {
             var kotlinCompiler = compilerCache
             if (kotlinCompiler == null) {
-                val artifacts = resolveDependencyArtifacts(compilerDependency, emptyList())
+                val artifacts = resolveDependencyArtifacts(compilerDependency, listOf(MavenCentral))
                         ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
                 LOG.trace("Classpath for {} compiler: {}", string, artifacts)

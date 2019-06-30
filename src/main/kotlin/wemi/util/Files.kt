@@ -285,6 +285,8 @@ fun URL.isLocal():Boolean {
 /** Append given path to the file. It is safe to use '/' slashes for directories
  * (this is preferred to chaining [div] calls). Do not use '\' backslash. */
 inline operator fun Path.div(path: CharSequence): Path = this.resolve(path.toString())
+/** Resolve this path to its sibling with given [appendix] appended. [appendix] should not contain directory separator. */
+infix fun Path.appendSuffix(appendix:CharSequence):Path = this.resolveSibling(this.name + appendix)
 
 /** @see [Files.isRegularFile] */
 inline fun Path.isRegularFile(): Boolean = Files.isRegularFile(this)

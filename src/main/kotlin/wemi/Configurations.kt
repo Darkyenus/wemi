@@ -136,7 +136,11 @@ object Configurations {
                     if (repository.local) {
                         add(repository)
                     } else if (repository.cache != null) {
-                        add(repository.cache)
+                        add(Repository(repository.name + "-cache", repository.cache,
+                                releases = repository.releases,
+                                snapshots = repository.snapshots,
+                                snapshotUpdateDelaySeconds = repository.snapshotUpdateDelaySeconds,
+                                tolerateChecksumMismatch = repository.tolerateChecksumMismatch))
                     }
                 }
             }

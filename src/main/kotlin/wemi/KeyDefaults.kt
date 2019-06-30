@@ -22,6 +22,7 @@ import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.internal.MessageLocation
 import wemi.compile.internal.render
 import wemi.dependency.*
+import wemi.dependency.internal.publish
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
@@ -102,10 +103,7 @@ object KeyDefaults {
         val repositories = Keys.repositories.get()
         val libraryDependencies = Keys.libraryDependencies.get()
         val libraryDependencyProjectMapper = Keys.libraryDependencyProjectMapper.get()
-
-        val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
-        val complete = resolveDependencies(resolved, libraryDependencies, repositories, libraryDependencyProjectMapper)
-        Partial(resolved, complete)
+        resolveDependencies(libraryDependencies, repositories, libraryDependencyProjectMapper)
     }
 
     private val ResolveProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
@@ -790,11 +788,11 @@ object KeyDefaults {
         options
     }
 
-    private val DokkaFatJar = listOf(Dependency(DependencyId("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", JCenter), WemiBundledLibrariesExclude))
+    private val DokkaFatJar = listOf(Dependency(DependencyId("org.jetbrains.dokka", "dokka-fatjar", "0.9.15"), exclusions = WemiBundledLibrariesExclude))
 
     val ArchiveDokkaInterface: Value<DokkaInterface> = {
         val javaHome = Keys.javaHome.get()
-        val artifacts = resolveDependencyArtifacts(DokkaFatJar, emptyList())?.toMutableList()
+        val artifacts = resolveDependencyArtifacts(DokkaFatJar, listOf(JCenter))?.toMutableList()
                 ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
         jdkToolsJar(javaHome)?.let { artifacts.add(it) }
@@ -974,9 +972,6 @@ object KeyDefaults {
                         }
                         newChild("exclusions") {
                             for (exclusion in dependency.exclusions) {
-                                if (exclusion in DefaultExclusions) {
-                                    continue
-                                }
                                 // Check if Maven compatible (only group and name is set)
                                 val mavenCompatible = exclusion.group != null
                                         && exclusion.name != null

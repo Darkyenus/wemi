@@ -7,18 +7,21 @@ import java.nio.file.Paths
 /** Default local Maven repository stored in `~/.m2/repository`. Used for local releases. */
 val LocalM2Repository = Repository("local", Paths.get(System.getProperty("user.home")) / ".m2/repository/", null)
 
-/** Default Wemi cache repository stored in `~/.m2/wemi-cache`. Used as a local cache. */
-val LocalCacheM2Repository = Repository("cache", Paths.get(System.getProperty("user.home")) / ".m2/wemi-cache/", null)
+/** Path to the default Wemi cache repository stored in `~/.m2/wemi-cache`. Used as a local cache.*/
+val LocalCacheM2RepositoryPath = Paths.get(System.getProperty("user.home")) / ".m2/wemi-cache/"
+
+/** Repository at [LocalCacheM2RepositoryPath]. Do not add explicitly, unless in offline mode. */
+val LocalCacheM2Repository = Repository("cache", LocalCacheM2RepositoryPath, null)
 
 /** Maven Central repository at [maven.org](https://maven.org). Cached by [LocalM2Repository]. */
-val MavenCentral = Repository("central", URL("https://repo1.maven.org/maven2/"), LocalCacheM2Repository, snapshots = false)
+val MavenCentral = Repository("central", URL("https://repo1.maven.org/maven2/"), LocalCacheM2RepositoryPath, snapshots = false)
 
 /** [Bintray JCenter repository](https://bintray.com/bintray/jcenter). Cached by [LocalM2Repository]. */
-val JCenter = Repository("jcenter", URL("https://jcenter.bintray.com/"), LocalCacheM2Repository, snapshots = false)
+val JCenter = Repository("jcenter", URL("https://jcenter.bintray.com/"), LocalCacheM2RepositoryPath, snapshots = false)
 
 /** [Jitpack repository](https://jitpack.io). Cached by [LocalM2Repository]. */
 @Suppress("unused")
-val Jitpack = Repository("jitpack", URL("https://jitpack.io/"), LocalCacheM2Repository)
+val Jitpack = Repository("jitpack", URL("https://jitpack.io/"), LocalCacheM2RepositoryPath)
 
 /** [Sonatype Oss](https://oss.sonatype.org/) repository. Cached by [LocalM2Repository].
  * Most used [repository]-ies are `"releases"` and `"snapshots"`. */
@@ -37,7 +40,7 @@ fun sonatypeOss(repository:String): Repository {
         snapshots = true
     }
 
-    return Repository("sonatype-oss-$repository", URL("https://oss.sonatype.org/content/repositories/$repository/"), LocalCacheM2Repository, releases = releases, snapshots = snapshots)
+    return Repository("sonatype-oss-$repository", URL("https://oss.sonatype.org/content/repositories/$repository/"), LocalCacheM2RepositoryPath, releases = releases, snapshots = snapshots)
 }
 
 /** Repositories to use by default ([MavenCentral], [LocalM2Repository]) */

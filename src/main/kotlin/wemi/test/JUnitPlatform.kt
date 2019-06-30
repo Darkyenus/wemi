@@ -36,41 +36,44 @@ const val JUnitEngineVersion = "5.0.2"
  * Dependency on JUnit 5 API
  *
  * To use JUnit 5 tests, add this as a testing dependency, together with [JUnitEngine].
+ * Dependency is located in [MavenCentral] repository.
  *
  * @see [JUnitEngineVersion] for used version (based on Wemi version)
  */
 @Suppress("unused")//Scope.
 val EvalScope.JUnitAPI: Dependency
-    get() = Dependency(DependencyId("org.junit.jupiter", "junit-jupiter-api", JUnitEngineVersion, MavenCentral))
+    get() = Dependency(DependencyId("org.junit.jupiter", "junit-jupiter-api", JUnitEngineVersion))
 
 /**
  * Dependency on JUnit 5 Engine
  *
  * To use JUnit 5 tests, add this as a testing dependency, together with [JUnitAPI].
+ * Dependency is located in [MavenCentral] repository.
  *
  * @see [JUnitEngineVersion] for used version (based on Wemi version)
  */
 @Suppress("unused")//Scope.
 val EvalScope.JUnitEngine: Dependency
-    get() = Dependency(DependencyId("org.junit.jupiter", "junit-jupiter-engine", JUnitEngineVersion, MavenCentral))
+    get() = Dependency(DependencyId("org.junit.jupiter", "junit-jupiter-engine", JUnitEngineVersion))
 
 /**
  * Dependency on JUnit 4 Engine
  *
  * To use JUnit 4 tests, add this as a testing dependency, together with JUnit 4.
+ * Dependency is located in [MavenCentral] repository.
  */
 @Suppress("unused")//Scope. and not auto-imported
 val EvalScope.JUnit4Engine: Dependency
-    get() = Dependency(DependencyId("org.junit.vintage", "junit-vintage-engine", "4.12.2", MavenCentral))
+    get() = Dependency(DependencyId("org.junit.vintage", "junit-vintage-engine", "4.12.2"))
 
 /**
  * DependencyId for the launcher needed to execute tests based on JUnit platform.
+ * Dependency is located in [MavenCentral] repository.
  */
 internal val JUnitPlatformLauncher = DependencyId(
         "org.junit.platform",
         "junit-platform-launcher",
-        JUnitPlatformVersion,
-        preferredRepository = MavenCentral)
+        JUnitPlatformVersion)
 
 /**
  * Handle running the process that does testing.

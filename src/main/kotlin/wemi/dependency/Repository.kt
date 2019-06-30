@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory
 import wemi.WemiException
 import wemi.util.*
 import java.net.URL
-import java.nio.file.FileSystems
 import java.nio.file.Path
 import java.security.MessageDigest
 
@@ -31,9 +30,9 @@ class Repository(
         val name: String,
         /** URL of this repository */
         val url: URL,
-        /** Repository acting as a cache for this repository, if [local]` == false`, otherwise not used.
-         * Must be [local]. Resolved dependencies will be stored here. */
-        cache: Repository? = null,
+        /** Path to local repository acting as a cache for this repository, if [local]` == false`, otherwise not used.
+         * Resolved dependencies will be stored here. */
+        cache: Path? = null,
         /** Whether this repository should be used to query for release versions (non-SNAPSHOT) */
         val releases:Boolean = true,
         /** Whether this repository should be used to query for snapshot versions (versions ending with -SNAPSHOT) */
@@ -51,28 +50,25 @@ class Repository(
         val local:Boolean = url.isLocal()) {
 
     /** Same as default constructor, but takes [path] instead of [url]. Useful for local repositories. */
-    constructor(name: String, path: Path, cache: Repository? = null, releases: Boolean = true, snapshots: Boolean = true,
+    constructor(name: String, path: Path, cache: Path? = null, releases: Boolean = true, snapshots: Boolean = true,
                 snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = true)
             : this(name, path.toUri().toURL(), cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch, local)
 
     /** Same as default constructor, but takes [url] as a [String] instead of [URL]. */
-    constructor(name: String, url: String, cache: Repository? = null, releases: Boolean = true, snapshots: Boolean = true,
+    constructor(name: String, url: String, cache: Path? = null, releases: Boolean = true, snapshots: Boolean = true,
                 snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = url.startsWith("file:", ignoreCase = true))
             : this(name, URL(url), cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch, local)
 
     /** Repository acting as a cache for this repository, if [local]` == false`, otherwise not used.
      * Must be [local]. Resolved dependencies will be stored here. */
-    val cache: Repository? =
+    val cache: Path? =
             // This logic is relied on by Maven2.retrieveFile
             if (!local && cache == null) {
-                LOG.warn("{} is not local and has no cache, default cache will be used", this)
-                LocalCacheM2Repository
+                LOG.debug("{} is not local and has no cache, default cache will be used", this)
+                LocalCacheM2RepositoryPath
             } else if (local && cache != null) {
-                LOG.warn("{} is local, but has cache, it will not be used", this)
+                LOG.warn("{} is local, but has cache specified. It will not be used", this)
                 null
-            } else if (cache != null && !cache.local) {
-                LOG.warn("{} is used as a cache for {}, but is not local, so default cache will be used instead", cache, this)
-                LocalCacheM2Repository
             } else {
                 cache
             }
@@ -87,14 +83,7 @@ class Repository(
     }
 
     /** Path to the directory root, if on this filesystem. Should be [directorySynchronized] to, if writing. */
-    internal fun directoryPath(): Path? {
-        try {
-            if (local) {
-                return url.toPath()
-            }
-        } catch (ignored:Exception) { }
-        return null
-    }
+    internal fun directoryPath(): Path? = cache ?: url.toPath()
 
     override fun toString(): String {
         val sb = StringBuilder()

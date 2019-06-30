@@ -3,6 +3,7 @@ package wemi
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
 import wemi.util.isLocal
+import wemi.util.toPath
 import java.net.URL
 import java.nio.file.Path
 import kotlin.reflect.KProperty0
@@ -162,7 +163,7 @@ fun dependencyId(groupNameVersion:String, preferredRepository: Repository? = nul
     val name = groupNameVersion.substring(first + 1, second)
     val version = groupNameVersion.substring(second + 1)
 
-    return DependencyId(group, name, version, preferredRepository, classifier, type, scope, optional, snapshotVersion)
+    return DependencyId(group, name, version, classifier, type, scope, optional, snapshotVersion)
 }
 
 /** Convenience Dependency creator.
@@ -170,7 +171,7 @@ fun dependencyId(groupNameVersion:String, preferredRepository: Repository? = nul
 fun dependency(group: String, name: String, version: String, preferredRepository: Repository? = null,
                classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE,
                optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION): Dependency {
-    return Dependency(DependencyId(group, name, version, preferredRepository, classifier, type, scope, optional, snapshotVersion))
+    return Dependency(DependencyId(group, name, version, classifier, type, scope, optional, snapshotVersion))
 }
 
 /** Convenience Dependency creator using [dependencyId]. */
@@ -193,7 +194,7 @@ fun repository(name: String, url: String,
     val usedUrl = URL(url)
     return Repository(name,
             usedUrl,
-            if (usedUrl.isLocal()) null else cache,
+            if (usedUrl.isLocal()) null else cache?.url?.toPath() ?: LocalCacheM2RepositoryPath,
             releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch)
 }
 
@@ -209,7 +210,7 @@ fun repository(name: String, url: String,
  * - And more, see http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.jetbrains.kotlin%22
  */
 fun EvalScope.kotlinDependency(name: String): Dependency {
-    return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-$name", Keys.kotlinVersion.get().string, MavenCentral))
+    return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-$name", Keys.kotlinVersion.get().string))
 }
 
 @DslMarker

@@ -14,7 +14,6 @@ import org.joda.time.Duration
 import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.boot.Main.*
-import wemi.dependency.DefaultExclusions
 import wemi.dependency.DependencyExclusion
 import wemi.util.*
 import java.io.*
@@ -86,7 +85,7 @@ internal val MainThread = Thread.currentThread()
  * Exclusions to be used when downloading libraries that will be loaded at runtime into Wemi process itself.
  * This is because Wemi bundles some libraries already and we don't need to duplicate them.
  */
-internal val WemiBundledLibrariesExclude = DefaultExclusions + listOf(
+internal val WemiBundledLibrariesExclude = listOf(
         DependencyExclusion("org.jetbrains.kotlin", "kotlin-stdlib"),
         DependencyExclusion("org.jetbrains.kotlin", "kotlin-reflect")
         //TODO Add Wemi itself here!
@@ -170,6 +169,9 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
                     true),
             SimpleLogFunction.CONSOLE_LOG_FUNCTION
     ))
+    // This logger must be here in a variable, because if it gets GC-ed, the setting will reset. Java logging is that good.
+    val jLineLogger = java.util.logging.Logger.getLogger("org.jline")
+    jLineLogger.level = java.util.logging.Level.OFF
 
     val buildScriptInfo = prepareBuildScriptInfo(allowBrokenBuildScripts, interactive && !machineReadableOutput, cleanBuild)
 

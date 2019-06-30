@@ -103,24 +103,31 @@ val compileErrors by project(path("errors")) {
 
 val CacheRepository = (wemi.boot.WemiCacheFolder / "-test-cache-repository").let {
     it.deleteRecursively()
-    Repository("test-cache", it)
+    it
 }
 
 val checkResolution by key<Unit>("Check if resolved files contain what they should")
 
+var classpathAssertions = 0
+var classpathAssertionsFailed = 0
+
 fun EvalScope.assertClasspathContains(vararg items:String) {
+    classpathAssertions++
     val got = externalClasspath.get().map { Files.readAllBytes(it.file).toString(Charsets.UTF_8) }.toSet()
     val expected = items.toSet()
     if (got != expected) {
+        classpathAssertionsFailed++
         System.err.println("\n\n\nERROR: Got $got, expected $expected")
         // assertThat(got, equalTo(expected)) disabled temporarily, because it should not hard quit right now
     }
 }
 
 fun EvalScope.assertClasspathContainsFiles(vararg items:String) {
+    classpathAssertions++
     val got = externalClasspath.get().map { it.file.name }.toSet()
     val expected = items.toSet()
     if (got != expected) {
+        classpathAssertionsFailed++
         System.err.println("\n\n\nERROR: Got $got, expected $expected")
         // assertThat(got, equalTo(expected)) disabled temporarily, because it should not hard quit right now
     }
@@ -250,4 +257,13 @@ val dependency_resolution by project(path("dependency-resolution")) {
 
     // Check if correct dependency artifacts are downloaded
     autoRun(checkResolution, mavenScopeFiltering)
+
+
+    checkResolution set {
+        println()
+        println("Assertions: $classpathAssertions")
+        println("Failed As.: $classpathAssertionsFailed")
+        println()
+    }
+    autoRun(checkResolution)
 }

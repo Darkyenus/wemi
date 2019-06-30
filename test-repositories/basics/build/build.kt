@@ -36,7 +36,7 @@ val basics by project {
     // -SNAPSHOT example
     repositories add { Repository("spigot-snapshots", "https://hub.spigotmc.org/nexus/content/repositories/snapshots", releases = false) }
     repositories add { sonatypeOss("snapshots") }
-    libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.13.2-R0.1-SNAPSHOT") }
+    libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.14.2-R0.1-SNAPSHOT") }
 
     extend(compilingJava) {
         compilerOptions[JavaCompilerFlags.customFlags] += "-Xlint:all"
