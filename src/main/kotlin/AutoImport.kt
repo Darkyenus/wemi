@@ -51,12 +51,6 @@ inline val EvalScope.JUnitAPI
 val EvalScope.JUnitEngine
     inline get() = _JUnitEngine
 
-@Deprecated("Use ProjectDependency constructor directly (REMOVE IN 0.9)", ReplaceWith("ProjectDependency(project, aggregate, configurations)"))
-inline fun dependency(project:Project, aggregate:Boolean, vararg configurations:Configuration) = wemi.dependency.dependency(project, aggregate, *configurations)
-
-@Deprecated("User version with explicit aggregate=true parameter. (REMOVE IN 0.9)", ReplaceWith("dependency(project, true, configurations)"))
-inline fun dependency(project:Project, vararg configurations:Configuration) = wemi.dependency.dependency(project, true, *configurations)
-
 // Path helpers
 /**
  * Construct a path, from given string, like with [Paths.get].

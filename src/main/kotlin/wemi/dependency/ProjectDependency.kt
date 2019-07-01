@@ -43,13 +43,3 @@ class ProjectDependency(val project: Project, val aggregate:Boolean, vararg val 
         return sb.toString()
     }
 }
-
-/**
- * Create a ProjectDependency for depending on this [Project], optionally with given configurations on top.
- *
- * @param aggregate see [ProjectDependency.aggregate]
- */
-@Deprecated("Use ProjectDependency constructor directly (REMOVE IN 0.9)", ReplaceWith("ProjectDependency(project, aggregate, configurations)", "wemi.dependency.ProjectDependency"))
-fun dependency(project:Project, aggregate:Boolean, vararg configurations: Configuration): ProjectDependency {
-    return ProjectDependency(project, aggregate, *configurations)
-}

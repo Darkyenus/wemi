@@ -221,23 +221,15 @@ private val DUPLICATE_FILE_SEPARATORS = Regex("(?:/\\.?)+/")
 /** Matches `***`, `****`, etc. */
 private val EXTRA_BLOBS = Regex("\\*{3,}")
 
-/** Create a [FileSet] with this path as its [FileSet.root]. */
-@Deprecated("Use FileSet constructor directly (REMOVE IN 0.9)", ReplaceWith("FileSet(this, patterns)", "wemi.util.FileSet"))
-fun Path.fileSet(vararg patterns: FileSet.Pattern,
-                 defaultExcludes:Boolean = true,
-                 caseSensitive:Boolean = true): FileSet {
-    return FileSet(this, *patterns, defaultExcludes = defaultExcludes, caseSensitive = caseSensitive, next = null)
-}
-
 /** Shortcut for [FileSet.Pattern] with [Pattern.Type.Include]. */
 @Suppress("UNCHECKED_CAST")
-fun include(vararg pattern:String): FileSet.Pattern = FileSet.Pattern(Pattern.Type.Include, pattern as Array<String>)
+fun include(vararg pattern:String): Pattern = Pattern(Pattern.Type.Include, pattern as Array<String>)
 /** Shortcut for [FileSet.Pattern] with [Pattern.Type.Exclude]. */
 @Suppress("UNCHECKED_CAST")
-fun exclude(vararg pattern:String): FileSet.Pattern = FileSet.Pattern(Pattern.Type.Exclude, pattern as Array<String>)
+fun exclude(vararg pattern:String): Pattern = Pattern(Pattern.Type.Exclude, pattern as Array<String>)
 /** Shortcut for [FileSet.Pattern] with [Pattern.Type.Filter]. */
 @Suppress("UNCHECKED_CAST")
-fun filter(vararg pattern:String): FileSet.Pattern = FileSet.Pattern(Pattern.Type.Filter, pattern as Array<String>)
+fun filter(vararg pattern:String): Pattern = Pattern(Pattern.Type.Filter, pattern as Array<String>)
 
 /** Combine two [FileSet]s. File will be in the resulting [FileSet], if it were in the first or the second one.
  * Note that if a file is matched by both, it **may** appear in [matchingFiles]. */
@@ -483,7 +475,7 @@ private const val DEFAULT_EXCLUDE_PATTERN = "**/.**"
 
 /** Tests if given [path] should be included based on [patterns] (and possibly [DEFAULT_EXCLUDE_PATTERN] if [defaultExcludes]).
  * @param caseSensitive passed through to [patternMatches] */
-internal fun matches(patterns: Array<out FileSet.Pattern>, defaultExcludes:Boolean, caseSensitive:Boolean, path:CharSequence):Boolean {
+internal fun matches(patterns: Array<out Pattern>, defaultExcludes:Boolean, caseSensitive:Boolean, path:CharSequence):Boolean {
     if (defaultExcludes && patternMatches(DEFAULT_EXCLUDE_PATTERN, path, false)) {
         return false
     }

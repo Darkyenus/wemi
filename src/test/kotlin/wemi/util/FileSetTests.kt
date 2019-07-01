@@ -164,10 +164,10 @@ class FileSetTests {
         Files.createFile(temp / "src/main/StrayFile.java")
         val expectedResult = setOf(src1, src2, src3)
 
-        val includeSet = temp.fileSet(include("src/main/kotlin/**.kt"), include("src/main/java/**.java"))
+        val includeSet = FileSet(temp, include("src/main/kotlin/**.kt"), include("src/main/java/**.java"))
         assertEquals(expectedResult, includeSet.matchingFiles().toSet())
 
-        val unionSet = kotlinDir.fileSet(include("**.kt")) + javaDir.fileSet(include("**.java"))
+        val unionSet = FileSet(kotlinDir, include("**.kt")) + FileSet(javaDir, include("**.java"))
         assertEquals(expectedResult, unionSet.matchingFiles().toSet())
     }
 
@@ -178,19 +178,19 @@ class FileSetTests {
 
         val expectedResult = setOf(singleFile)
 
-        val normalSet = singleFile.fileSet()
+        val normalSet = FileSet(singleFile)
         assertEquals(expectedResult, normalSet.matchingFiles().toSet())
 
-        val includeSet = singleFile.fileSet(include("*.jar"))
+        val includeSet = FileSet(singleFile, include("*.jar"))
         assertEquals(expectedResult, includeSet.matchingFiles().toSet())
 
-        val excludeSet = singleFile.fileSet(exclude("*.java"))
+        val excludeSet = FileSet(singleFile, exclude("*.java"))
         assertEquals(expectedResult, excludeSet.matchingFiles().toSet())
 
-        val emptyIncludeSet = singleFile.fileSet(include("a*.jar"), caseSensitive = true)
+        val emptyIncludeSet = FileSet(singleFile, include("a*.jar"))
         assertEquals(emptySet<Path>(), emptyIncludeSet.matchingFiles().toSet())
 
-        val emptyExcludeSet = singleFile.fileSet(exclude("*.ja?"))
+        val emptyExcludeSet = FileSet(singleFile, exclude("*.ja?"))
         assertEquals(emptySet<Path>(), emptyExcludeSet.matchingFiles().toSet())
     }
 
