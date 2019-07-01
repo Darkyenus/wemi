@@ -6,6 +6,7 @@ import wemi.util.isLocal
 import wemi.util.toPath
 import java.net.URL
 import java.nio.file.Path
+import java.util.regex.Pattern
 import kotlin.reflect.KProperty0
 import kotlin.reflect.jvm.isAccessible
 
@@ -142,43 +143,36 @@ fun KProperty0<Archetype>.inject(injectedInitializer:Archetype.() -> Unit) {
     delegate.inject(injectedInitializer)
 }
 
-/** Convenience DependencyId creator.
- * @param groupNameVersion Gradle-like semicolon separated group, name and version of the dependency.
- *          If the amount of ':'s isn't exactly 2, or one of the triplet is empty, runtime exception is thrown.
- */
-fun dependencyId(groupNameVersion:String, preferredRepository: Repository? = null,
-                 classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE,
-                 optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION):DependencyId {
-    val first = groupNameVersion.indexOf(':')
-    val second = groupNameVersion.indexOf(':', startIndex = maxOf(first + 1, 0))
-    val third = groupNameVersion.indexOf(':', startIndex = maxOf(second + 1, 0))
-    if (first < 0 || second < 0 || third >= 0) {
-        throw WemiException("groupNameVersion must contain exactly two semicolons: '$groupNameVersion'")
-    }
-    if (first == 0 || second <= first + 1 || second + 1 == groupNameVersion.length) {
-        throw WemiException("groupNameVersion must not have empty elements: '$groupNameVersion'")
-    }
-
-    val group = groupNameVersion.substring(0, first)
-    val name = groupNameVersion.substring(first + 1, second)
-    val version = groupNameVersion.substring(second + 1)
-
-    return DependencyId(group, name, version, classifier, type, scope, optional, snapshotVersion)
-}
-
-/** Convenience Dependency creator.
- * Creates [Dependency] with default exclusions. */
-fun dependency(group: String, name: String, version: String, preferredRepository: Repository? = null,
+/** Convenience Dependency creator. */
+fun dependency(group: String, name: String, version: String,
                classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE,
                optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION): Dependency {
-    return Dependency(DependencyId(group, name, version, classifier, type, scope, optional, snapshotVersion))
+    return Dependency(DependencyId(group, name, version, classifier, type, snapshotVersion), scope, optional)
 }
 
-/** Convenience Dependency creator using [dependencyId]. */
-fun dependency(groupNameVersion: String, preferredRepository: Repository? = null,
-               classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE,
-               optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION): Dependency {
-    return Dependency(dependencyId(groupNameVersion, preferredRepository, classifier, type, scope, optional, snapshotVersion))
+/** Used to parse Gradle-like dependency specifiers. The inner pattern is based on what Maven expects, with added ~
+ * due to https://github.com/jitpack/jitpack.io/issues/1145 */
+private val DependencyShorthandRegex = Pattern.compile("^([A-Za-z0-9.~_-]+):([A-Za-z0-9.~_-]+):([A-Za-z0-9.~_-]+)(?::([A-Za-z0-9.~_-]+))?(?:@([A-Za-z0-9.~_-]+))?$")
+
+/** Convenience Dependency creator using Gradle dependency notation.
+ * That is: "group:name:version:classifier@type", where classifier and extension (along with their preceding : and @)
+ * is optional. */
+fun dependency(groupNameVersionClassifierType: String,
+               scope:String = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL,
+               exclusions:List<DependencyExclusion> = emptyList(),
+               snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION,
+               dependencyManagement:List<Dependency> = emptyList()): Dependency {
+    val match = DependencyShorthandRegex.matcher(groupNameVersionClassifierType)
+    if (!match.matches())
+        throw WemiException("dependency($groupNameVersionClassifierType) needs to conform to 'group:name:version:classifier@type' pattern (last two parts being optional)")
+
+    val group = match.group(1)!!
+    val name = match.group(2)!!
+    val version = match.group(3)!!
+    val classifier = match.group(4) ?: NoClassifier
+    val type = match.group(5) ?: DEFAULT_TYPE
+
+    return Dependency(DependencyId(group, name, version, classifier, type, snapshotVersion), scope, optional, exclusions, dependencyManagement)
 }
 
 /**

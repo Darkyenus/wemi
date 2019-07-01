@@ -131,7 +131,7 @@ internal fun parseFileDirectives(source: BufferedReader, directives:Array<Class<
                 LOG.warn("{}:{} Unexpected characters between {} and {}", source, line, expectedParameterStart, parameter.range.first)
                 return false
             }
-            expectedParameterStart = parameter.range.endInclusive + 1
+            expectedParameterStart = parameter.range.last + 1
 
             val name = parameter.groupValues[1]
             val value = parameter.groupValues[2].let { value ->

@@ -424,23 +424,33 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
     val STATUS_NOT_RESOLVED: Byte = 1
     val STATUS_CYCLIC: Byte = 2
 
-    class NodeData(val dependencyId: DependencyId, var status: Byte)
+    class NodeData(val dependencyId: DependencyId, var status: Byte) {
+        val scope = ArrayList<String>()
+        var optional = false
+    }
 
     val nodes = HashMap<DependencyId, TreeNode<NodeData>>()
 
     // Build nodes
-    for (depId in keys) {
-        nodes[depId] = TreeNode(NodeData(depId, STATUS_NORMAL))
+    for ((depId, resolvedDep) in entries) {
+        nodes[depId] = TreeNode(NodeData(depId, STATUS_NORMAL).apply { scope.add(resolvedDep.scope) })
     }
 
     // Connect nodes (even with cycles)
     val notResolvedNodes = ArrayList<TreeNode<NodeData>>()// ConcurrentModification workaround
-    nodes.forEach { depId, node ->
+    nodes.forEach { (depId, node) ->
         this@prettyPrint[depId]?.dependencies?.forEach { dep ->
             var nodeToConnect = nodes[dep.dependencyId]
             if (nodeToConnect == null) {
-                nodeToConnect = TreeNode(NodeData(dep.dependencyId, STATUS_NOT_RESOLVED))
+                nodeToConnect = TreeNode(NodeData(dep.dependencyId, STATUS_NOT_RESOLVED).apply { scope.add(dep.scope) })
                 notResolvedNodes.add(nodeToConnect)
+            } else {
+                nodeToConnect.value.scope.let {
+                    if (dep.scope !in it) it.add(dep.scope)
+                }
+            }
+            if (dep.optional) {
+                nodeToConnect.value.optional = true
             }
             node.add(nodeToConnect)
         }
@@ -498,15 +508,23 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
                 .append(dependencyId.version).format()
 
         if (dependencyId.classifier != NoClassifier) {
-            result.append(" classifier=").append(dependencyId.classifier)
+            result.append(":").append(dependencyId.classifier)
         }
         if (dependencyId.type != DEFAULT_TYPE) {
-            result.append(" type=").append(dependencyId.type)
+            result.append(":").append(dependencyId.type)
         }
-        if (dependencyId.scope != DEFAULT_SCOPE) {
-            result.append(" scope=").append(dependencyId.scope)
+        if (scope.isNotEmpty()) {
+            result.append(' ').append(scope[0])
+            if (scope.size > 1) {
+                result.append(" (")
+                for (i in 1 until scope.size) {
+                    if (i > 1) result.append(", ")
+                    result.append(scope[i])
+                }
+                result.append(')')
+            }
         }
-        if (dependencyId.optional) {
+        if (optional) {
             result.append(" optional")
         }
         result.append(' ')

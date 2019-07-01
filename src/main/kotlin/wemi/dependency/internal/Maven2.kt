@@ -15,7 +15,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
-import java.util.concurrent.TimeUnit
 import kotlin.collections.HashMap
 
 private val LOG = LoggerFactory.getLogger("Maven2")
@@ -41,12 +40,6 @@ New maven resolution strategy:
     - Their scope may change: https://cwiki.apache.org/confluence/display/MAVENOLD/Dependency+Mediation+and+Conflict+Resolution (bottom) (Yes, but will it really?)
     - Optional dependencies are noted, but no artifacts are downloaded for them
 7. When all metadata is read, start downloading dependencies themselves
- */
-
-/*
-TODO Incorporate this back
-TODO: dependencyManagement of transitive dependencies is not handled to be Maven-like
-
  */
 
 private class DependencyManagementKey(val groupId:String, val name:String, val classifier:String, val type:String)
@@ -119,7 +112,7 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
                 continue
             }
 
-            val resolvedDep = resolveInM2Repository(depId, dep.scope, dep.dependencyManagement, repositories)
+            val resolvedDep = resolveInM2Repository(depId, dep.dependencyManagement, repositories, dep.scope)
             resolved[depId] = resolvedDep
             resolvedPartials[partialId] = resolvedDep
 
@@ -130,7 +123,10 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
 
             nextNextDependencies.ensureCapacity(resolvedDep.dependencies.size)
             for (transitiveDependency in resolvedDep.dependencies) {
-                // TODO(jp): Exclude optionals (here?)
+                if (dep.optional) {
+                    LOG.debug("Excluded optional {} (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                    continue
+                }
 
                 val exclusionRule = dep.exclusions.find { it.excludes(transitiveDependency.dependencyId) }
                 if (exclusionRule != null) {
@@ -138,9 +134,41 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
                     continue
                 }
 
-                val mapped = mapper(transitiveDependency)
-                if (mapped != transitiveDependency) {
-                    LOG.debug("{} mapped to {}", transitiveDependency, mapped)
+                // Resolve scope
+                // (See the table at https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope)
+                val resolvedToScope:String? = when (transitiveDependency.scope) {
+                    "compile" -> when (dep.scope) {
+                        "compile" -> "compile"
+                        "provided" -> "provided"
+                        "runtime" -> "runtime"
+                        "test" -> "test"
+                        else -> null
+                    }
+                    "runtime" -> when (dep.scope) {
+                        "compile" -> "runtime"
+                        "provided" -> "provided"
+                        "runtime" -> "runtime"
+                        "test" -> "test"
+                        else -> null
+                    }
+                    else -> null
+                }
+
+                if (resolvedToScope == null) {
+                    LOG.debug("Excluded {} due to transitive scope change (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                    continue
+                }
+
+                val withCorrectScope = if (transitiveDependency.scope == resolvedToScope) {
+                    transitiveDependency
+                } else {
+                    LOG.debug("Changing the scope of {} to {}", transitiveDependency, resolvedToScope)
+                    Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
+                }
+
+                val mapped = mapper(withCorrectScope)
+                if (mapped != withCorrectScope) {
+                    LOG.debug("{} mapped to {}", withCorrectScope, mapped)
                 }
 
                 nextNextDependencies.add(mapped)
@@ -153,32 +181,12 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
     return Partial(resolved, noError)
 }
 
-/**
- * Resolve [dependency] using the [repositories] repository chain.
- *
- * Does not resolve transitively.
- * When resolution fails, returns ResolvedDependency with [ResolvedDependency.hasError] = true.
- */
-@Deprecated("I'm not sure if I still want this method")
-private fun resolveSingleDependency(dependencyId: DependencyId, repositories: SortedRepositories): ResolvedDependency {
-    val startTime = System.nanoTime()
-
-    LOG.debug("Resolving {}", dependencyId)
-
-    val resolved = resolveInM2Repository(dependencyId, "" /* TODO */, emptyList() /* TODO */, repositories)
-    if (!resolved.hasError) {
-        LOG.debug("Resolution success {} ({} ms)", resolved, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime))
-        return resolved
-    }
-
-    // Fail
-    LOG.debug("Failed to resolve {} ({} ms)", dependencyId, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime))
-    val log = if (repositories.isEmpty()) "no repositories to search in" else repositories.joinToString(", ", "tried: ") { it.name }
-    return ResolvedDependency(dependencyId, log)
-}
-
 /** Attempt to resolve [dependencyId] in [repositories] */
-fun resolveInM2Repository(dependencyId: DependencyId, parentScope:String, transitiveDependencyManagement:List<Dependency>, repositories: SortedRepositories): ResolvedDependency {
+private fun resolveInM2Repository(
+        dependencyId: DependencyId,
+        transitiveDependencyManagement:List<Dependency>,
+        repositories: SortedRepositories,
+        resultScope:String): ResolvedDependency {
     val snapshot = dependencyId.isSnapshot
     val compatibleRepositories:CompatibleSortedRepositories = repositories.filter { repository ->
         if (if (snapshot) repository.snapshots else repository.releases) {
@@ -194,11 +202,11 @@ fun resolveInM2Repository(dependencyId: DependencyId, parentScope:String, transi
     val repository = retrievedPom.repository
 
     if (resolvedDependencyId.type.equals("pom", ignoreCase = true)) {
-        return ResolvedDependency(resolvedDependencyId, emptyList(), repository, retrievedPom)
+        return ResolvedDependency(resolvedDependencyId, resultScope, emptyList(), repository, retrievedPom)
     }
 
-    val resolvedPom = resolveRawPom(retrievedPom, compatibleRepositories).fold { rawPom ->
-        resolvePom(rawPom, parentScope, transitiveDependencyManagement, compatibleRepositories)
+    val resolvedPom = resolveRawPom(retrievedPom, transitiveDependencyManagement, compatibleRepositories).fold { rawPom ->
+        resolvePom(rawPom, transitiveDependencyManagement, compatibleRepositories)
     }
 
     val pom = resolvedPom.use( { it }, {  log ->
@@ -218,7 +226,7 @@ fun resolveInM2Repository(dependencyId: DependencyId, parentScope:String, transi
                 // Purge retrieved data, storing it would only create a memory leak, as the value is rarely used,
                 // can always be lazily loaded and the size of all dependencies can be quite big.
                 retrieved.data = null
-                return ResolvedDependency(resolvedDependencyId, pom.dependencies, repository, retrieved)
+                return ResolvedDependency(resolvedDependencyId, resultScope, pom.dependencies, repository, retrieved)
             }
         }
         else -> {
@@ -228,7 +236,7 @@ fun resolveInM2Repository(dependencyId: DependencyId, parentScope:String, transi
     }
 }
 
-private fun resolveRawPom(pomArtifact:ArtifactPath, repositories: SortedRepositories): Failable<RawPom, String> {
+private fun resolveRawPom(pomArtifact:ArtifactPath, transitiveDependencyManagement:List<Dependency>, repositories: SortedRepositories): Failable<RawPom, String> {
     val pomUrl:URL = pomArtifact.url
     val pomData:ByteArray = pomArtifact.data ?: return Failable.failure("Failed to retrieve pom data")
 
@@ -256,12 +264,12 @@ private fun resolveRawPom(pomArtifact:ArtifactPath, repositories: SortedReposito
         }
 
         LOG.trace("Retrieving parent pom of '{}' by coordinates '{}', in same repository", pomUrl, parentPomId)
-        val resolvedPom = resolveSingleDependency(parentPomId, repositories)
+        val resolvedPom = resolveInM2Repository(parentPomId, transitiveDependencyManagement, repositories, "")
         val artifact = resolvedPom.artifact
 
         var parent: RawPom? = null
         if (artifact != null) {
-            resolveRawPom(artifact, repositories)
+            resolveRawPom(artifact, transitiveDependencyManagement, repositories)
                     .success { pom ->
                         parent = pom
                     }
@@ -317,8 +325,8 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
     return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve pom xml"))
 }
 
-private fun resolvePom(rawPom: RawPom, parentScope:String, parentDependencyManagement:List<Dependency>, repositories: CompatibleSortedRepositories): Failable<Pom, String> {
-    val partialPom = rawPom.resolve(parentScope, parentDependencyManagement)
+private fun resolvePom(rawPom: RawPom, transitiveDependencyManagement:List<Dependency>, repositories: CompatibleSortedRepositories): Failable<Pom, String> {
+    val partialPom = rawPom.resolve(transitiveDependencyManagement)
     if (!partialPom.complete) {
         return Failable.failure("Pom is invalid")
     }
@@ -342,14 +350,14 @@ private fun resolvePom(rawPom: RawPom, parentScope:String, parentDependencyManag
 
         LOG.trace("Resolving dependencyManagement import {} in '{}'", dep, rawPom.url)
 
-        val resolvedPom = resolveSingleDependency(dep, repositories)
+        val resolvedPom = resolveInM2Repository(dep, dependency.dependencyManagement, repositories, "")
         if (resolvedPom.hasError) {
             LOG.warn("dependencyManagement import in {} of {} failed: failed to retrieve pom - {}", rawPom.url, dep, resolvedPom)
             return Failable.failure(resolvedPom.log?.toString() ?: "failed to retrieve")
         }
         val artifact = resolvedPom.artifact!!
-        resolveRawPom(artifact, repositories).fold { retrievedRawPom ->
-            resolvePom(retrievedRawPom, parentScope, parentDependencyManagement, repositories)
+        resolveRawPom(artifact, transitiveDependencyManagement, repositories).fold { retrievedRawPom ->
+            resolvePom(retrievedRawPom, transitiveDependencyManagement, repositories)
         }.use({ importedPom ->
             val imported = importedPom.dependencyManagement
             if (imported.isNotEmpty()) {
@@ -523,7 +531,11 @@ private class Pom constructor(
  * Resolves against [transitiveDependencyManagement] and [ownDependencyManagement].
  * [More info.](http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management)
  */
-private fun resolveDependencyManagement(dependency: RawPom.TranslatedRawPomDependency, parentScope: String, transitiveDependencyManagement: List<Dependency>, ownDependencyManagement: List<Dependency>, combinedDependencyManagement: List<Dependency>): WithStatus<Dependency, TransitiveDependencyStatus> {
+private fun resolveDependencyManagement(
+        dependency: RawPom.TranslatedRawPomDependency,
+        transitiveDependencyManagement: List<Dependency>,
+        ownDependencyManagement: List<Dependency>,
+        combinedDependencyManagement: List<Dependency>): Partial<Dependency> {
     /*
     (Discovered from docs and experimentally)
     1. Check dependency management of whoever is requesting this as a dependency
@@ -555,7 +567,7 @@ private fun resolveDependencyManagement(dependency: RawPom.TranslatedRawPomDepen
                 standIn.dependencyId.version,
                 dependency.classifier,
                 dependency.type,
-                if (standIn.dependencyId.scope.isBlank()) dependency.scope else standIn.dependencyId.scope,
+                if (standIn.scope.isBlank()) dependency.scope else standIn.scope,
                 dependency.optional,
                 dependency.exclusions + standIn.exclusions
         )
@@ -582,7 +594,7 @@ private fun resolveDependencyManagement(dependency: RawPom.TranslatedRawPomDepen
         )
     }) ?: dependency
 
-    return usedDependency.resolve(parentScope, combinedDependencyManagement)
+    return usedDependency.resolve(combinedDependencyManagement)
 }
 
 /**
@@ -603,7 +615,7 @@ private class RawPom(
     val dependencies = ArrayList<RawPomDependency>()
     val dependencyManagement = ArrayList<RawPomDependency>()
 
-    fun resolve(parentScope:String, transitiveDependencyManagement:List<Dependency>): Partial<Pom> {
+    fun resolve(transitiveDependencyManagement: List<Dependency>): Partial<Pom> {
         val resolvedGroupId = get { groupId }?.translate()
         val resolvedArtifactId = artifactId?.translate()
         val resolvedVersion = get { version }?.translate()
@@ -634,16 +646,10 @@ private class RawPom(
 
         var complete = true
         val newDependencies = ArrayList<Dependency>(dependencies.size)
-        translatedDependencies.mapNotNullTo(newDependencies) { dependency ->
-            val withStatus = resolveDependencyManagement(dependency, parentScope, transitiveDependencyManagement, ownDependencyManagement, combinedDependencyManagement)
-            when (withStatus.status) {
-                TransitiveDependencyStatus.OK -> withStatus.thing
-                TransitiveDependencyStatus.SKIPPED -> null
-                TransitiveDependencyStatus.BROKEN -> {
-                    complete = false
-                    null
-                }
-            }
+        translatedDependencies.mapTo(newDependencies) { dependency ->
+            val (dep, depComplete) = resolveDependencyManagement(dependency, transitiveDependencyManagement, ownDependencyManagement, combinedDependencyManagement)
+            complete = complete && depComplete
+            dep
         }
 
         return Partial(Pom(resolvedGroupId, resolvedArtifactId, resolvedVersion, resolvedPackaging, newDependencies, ownDependencyManagement), complete)
@@ -667,8 +673,6 @@ private class RawPom(
                             version ?: "",
                             classifier,
                             type,
-                            scope?.trim()?.toLowerCase() ?: DEFAULT_SCOPE,
-                            optional ?: DEFAULT_OPTIONAL,
                             DEFAULT_SNAPSHOT_VERSION
                     ),
                     scope?.trim()?.toLowerCase() ?: DEFAULT_SCOPE,
@@ -676,8 +680,8 @@ private class RawPom(
                     exclusions)
         }
 
-        fun resolve(parentScope:String?, dependencyManagement:List<Dependency>): WithStatus<Dependency, TransitiveDependencyStatus> {
-            var status = TransitiveDependencyStatus.OK
+        fun resolve(dependencyManagement:List<Dependency>): Partial<Dependency> {
+            var complete = true
 
             val group = group ?: ""
             val name = name ?: ""
@@ -685,62 +689,32 @@ private class RawPom(
 
             if (group.isEmpty()) {
                 LOG.warn("{} has no group specified", this)
-                status = TransitiveDependencyStatus.BROKEN
+                complete = false
             }
 
             if (name.isEmpty()) {
                 LOG.warn("{} has no name specified", this)
-                status = TransitiveDependencyStatus.BROKEN
+                complete = false
             }
 
             if (version.isEmpty()) {
                 LOG.warn("{} has no version specified", this)
-                status = TransitiveDependencyStatus.BROKEN
+                complete = false
             }
 
-            val scope = (scope ?: DEFAULT_SCOPE).trim().toLowerCase()
-
-            // Resolve scope
-            // (See the table at https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope)
-            val resolvedToScope:String? = if (status == TransitiveDependencyStatus.OK && parentScope != null) when (scope) {
-                "compile" -> when (parentScope.toLowerCase()) {
-                    "compile" -> "compile"
-                    "provided" -> "provided"
-                    "runtime" -> "runtime"
-                    "test" -> "test"
-                    else -> null
-                }
-                "runtime" -> when (parentScope.toLowerCase()) {
-                    "compile" -> "runtime"
-                    "provided" -> "provided"
-                    "runtime" -> "runtime"
-                    "test" -> "test"
-                    else -> null
-                }
-                else -> null
-            } else null
-
-            val optional = optional ?: DEFAULT_OPTIONAL
-
-            if (status == TransitiveDependencyStatus.OK && (optional || resolvedToScope == null)) {
-                status = TransitiveDependencyStatus.SKIPPED
-            }
-
-            return WithStatus(Dependency(
+            return Partial(Dependency(
                     DependencyId(
                             group,
                             name,
                             version,
                             classifier,
                             type,
-                            scope,
-                            optional,
                             DEFAULT_SNAPSHOT_VERSION
                     ),
-                    scope,
-                    optional,
+                    scope ?: DEFAULT_SCOPE,
+                    optional ?: DEFAULT_OPTIONAL,
                     exclusions,
-                    dependencyManagement), status)
+                    dependencyManagement), complete)
         }
 
         override fun toString(): String {
@@ -763,9 +737,7 @@ private class RawPom(
                             exclusion.name?.translate(),
                             exclusion.version?.translate(),
                             exclusion.classifier?.translate()?.toLowerCase(),
-                            exclusion.type?.translate()?.toLowerCase(),
-                            exclusion.scope?.translate()?.toLowerCase(),
-                            exclusion.optional /* Not set by POMs anyway. */)
+                            exclusion.type?.translate()?.toLowerCase())
                 })
     }
 

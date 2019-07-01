@@ -214,7 +214,7 @@ class BuildScriptInfo internal constructor(
             BuildDependency::class.java -> {
                 val (groupOrFull, name, version) = fields
                 if (name.isEmpty() && version.isEmpty()) {
-                    _dependencies.add(Dependency(wemi.dependencyId(groupOrFull, null), exclusions = WemiBundledLibrariesExclude))
+                    _dependencies.add(dependency(groupOrFull, exclusions = WemiBundledLibrariesExclude))
                 } else {
                     _dependencies.add(Dependency(DependencyId(groupOrFull, name, version), exclusions = WemiBundledLibrariesExclude))
                 }

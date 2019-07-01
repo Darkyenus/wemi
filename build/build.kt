@@ -1,3 +1,4 @@
+import wemi.*
 import wemi.Archetypes
 import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
@@ -9,8 +10,6 @@ import wemi.assembly.MergeStrategy
 import wemi.boot.WemiCacheFolder
 import wemi.collections.toMutable
 import wemi.compile.KotlinCompilerFlags
-import wemi.createProject
-import wemi.dependency
 import wemi.dependency.DefaultExclusions
 import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
@@ -131,11 +130,14 @@ val core:Project by project {
     }
 
     assemblyPrependData set {
-        Files.readAllBytes(buildDirectory.get() / "WemiPrepend.sh")
+        val prependFile = buildDirectory.get() / "WemiPrepend.sh"
+        expiresWith(prependFile)
+        Files.readAllBytes(prependFile)
     }
 
     assemblyOutputFile set {
         val assemblyDir = buildDirectory.get() / "assembly"
+        expiresWith(assemblyDir)
         Files.createDirectories(assemblyDir)
         assemblyDir / "wemi"
     }

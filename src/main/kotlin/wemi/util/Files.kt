@@ -529,7 +529,7 @@ fun Path.copyRecursively(to:Path, vararg options:CopyOption) {
         // Directory
         val root = this
         Files.createDirectories(to.parent)
-        val copyAttributes = options.contains(StandardCopyOption.COPY_ATTRIBUTES)
+        val copyAttributes = options.contains<CopyOption>(StandardCopyOption.COPY_ATTRIBUTES)
 
         Files.walkFileTree(root, object : FileVisitor<Path>{
 

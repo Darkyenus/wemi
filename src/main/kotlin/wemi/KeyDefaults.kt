@@ -54,12 +54,10 @@ import kotlin.collections.LinkedHashSet
 object KeyDefaults {
 
     /** Create value for [Keys.libraryDependencyProjectMapper] that appends given classifier to sources. */
-    fun classifierAppendingLibraryDependencyProjectMapper(appendClassifier:String):(Dependency) -> Dependency = {
-        (projectId, exclusions): Dependency ->
-            val classifier = joinClassifiers(projectId.classifier, appendClassifier)
-            val sourcesProjectId = projectId.copy(classifier = classifier)
-            Dependency(sourcesProjectId, exclusions)
-        }
+    fun classifierAppendingLibraryDependencyProjectMapper(appendClassifier: String): (Dependency) -> Dependency = { dep ->
+        val classifier = joinClassifiers(dep.dependencyId.classifier, appendClassifier)
+        dep.copy(dep.dependencyId.copy(classifier = classifier))
+    }
 
     /** Create BoundKeyValueModifier which takes a list of classpath entries (.jars or folders),
      * appends given classifier to each one and filters out only files that exist.
@@ -964,11 +962,11 @@ object KeyDefaults {
                         if (dependency.dependencyId.classifier != NoClassifier) {
                             newChild("classifier", dependency.dependencyId.classifier)
                         }
-                        if (dependency.dependencyId.scope != DEFAULT_SCOPE) {
-                            newChild("scope", dependency.dependencyId.scope)
+                        if (dependency.scope != DEFAULT_SCOPE) {
+                            newChild("scope", dependency.scope)
                         }
-                        if (dependency.dependencyId.optional != DEFAULT_OPTIONAL) {
-                            newChild("optional", dependency.dependencyId.optional.toString())
+                        if (dependency.optional != DEFAULT_OPTIONAL) {
+                            newChild("optional", dependency.optional.toString())
                         }
                         newChild("exclusions") {
                             for (exclusion in dependency.exclusions) {
@@ -978,8 +976,6 @@ object KeyDefaults {
                                         && exclusion.version == null
                                         && exclusion.classifier == null
                                         && exclusion.type == null
-                                        && exclusion.scope == null
-                                        && exclusion.optional == null
 
                                 if (mavenCompatible) {
                                     newChild("exclusion") {

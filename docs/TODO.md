@@ -1,7 +1,7 @@
 # Things to do next
 
 - need to reload before changes in WemiPrepend.sh take effect
--
+- respect scope of DependencyId
 
 ## For next release
 
@@ -13,7 +13,6 @@
 	- When resolving snapshots, check both variants for cache first and also check all available repositories if they have cache, before downloading
 	- Just implement whatever maven does, it is currently broken and does not handle scope:test filtering correctly for dependencyManagement
 	- Ensure that redirects are followed
-	- Do not log no such file exception when checking local repositories and artifact is not there
 	- Handle certificate problems from Webb: https://pastebin.com/raw/npZHjqft
 		- Investigate options to turn of checking on per-repo basis
 	- Dependency "type" must be used as an extension (when not in this list: https://maven.apache.org/ref/3.6.1/maven-core/artifact-handlers.html & allow extensions?)
