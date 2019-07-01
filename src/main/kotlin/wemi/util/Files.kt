@@ -458,7 +458,7 @@ fun Path.fileKey(): Any? = try {
  * Parent directory must exist.
  */
 fun Path.writeText(text: CharSequence) {
-    OutputStreamWriter(Files.newOutputStream(this)).use {
+    OutputStreamWriter(Files.newOutputStream(this), Charsets.UTF_8).use {
         it.append(text)
     }
 }
@@ -481,7 +481,7 @@ private val DELETING_FILE_VISITOR = object : FileVisitor<Path> {
         return FileVisitResult.CONTINUE
     }
 
-    override fun postVisitDirectory(dir: Path?, exc: IOException?): FileVisitResult {
+    override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
         if (exc != null) {
             LOG.warn("Premature postVisitDirectory in {}", dir, exc)
         }

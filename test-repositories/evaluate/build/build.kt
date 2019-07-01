@@ -3,6 +3,7 @@
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.*
 import wemi.util.*
+import wemi.dependency.*
 import wemi.*
 
 val someKey by key<String>("")
@@ -133,84 +134,284 @@ fun EvalScope.assertClasspathContainsFiles(vararg items:String) {
     }
 }
 
+val GROUP = "grp"
+val UNIQUE_CACHE_DATE = "20190101"
+
+class TestRepositoryData() {
+
+    class TestArtifact(val name:String, version:String, val buildNumber:Int) {
+        val dependsOn = ArrayList<TestArtifact>()
+        var cache:String? = null
+
+        data class UniqueCacheEntry(val buildNumber:Int, val inCache:Boolean, val text:String)
+        val uniqueCache = ArrayList<UniqueCacheEntry>()
+
+        val outsideVersion:String = if (buildNumber < 0) {
+            version
+        } else {
+            "$version-SNAPSHOT"
+        }
+
+        val snapshotTimestamp = "$UNIQUE_CACHE_DATE.${"%06d".format(buildNumber)}"
+
+        val insideVersion:String = if (buildNumber < 0) {
+            version
+        } else {
+            "$version-$snapshotTimestamp-$buildNumber"
+        }
+
+        val artifact:String = if (buildNumber < 0) {
+            "$name $version"
+        } else {
+            "$name $version $buildNumber"
+        }
+
+        fun dependsOn(other:TestArtifact):TestArtifact {
+            this.dependsOn.add(other)
+            return this
+        }
+
+        fun hasCache(text:String):TestArtifact {
+            cache = text
+            return this
+        }
+    }
+
+    private val artifacts = ArrayList<TestArtifact>()
+
+    fun artifact(name:String, version:String):TestArtifact {
+        val artifact = TestArtifact(name, version, -1)
+        artifacts.add(artifact)
+        return artifact
+    }
+
+    fun snapshotArtifact(name:String, version:String, buildNumber:Int):TestArtifact {
+        val artifact = TestArtifact(name, version, buildNumber)
+        artifacts.add(artifact)
+        return artifact
+    }
+
+    private fun Path.write(text:String) {
+        this.writeText(text)
+        for (checksum in Checksum.values()) {
+            this.appendSuffix(checksum.suffix).writeText(createHashSum(checksum.checksum(text.toByteArray()), null))
+        }
+    }
+
+    fun buildIn(repoFolder:Path, cacheRepoFolder:Path) {
+        for (artifact in artifacts) {
+            val pom = """<?xml version="1.0" encoding="UTF-8"?>
+<project
+    xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>$GROUP</groupId>
+  <artifactId>${artifact.name}</artifactId>
+  <version>${artifact.insideVersion}</version>
+  
+  <dependencies>${
+            artifact.dependsOn.map { dependency ->
+                """
+    <dependency>
+        <groupId>$GROUP</groupId>
+        <artifactId>${dependency.name}</artifactId>
+        <version>${dependency.outsideVersion}</version>
+    </dependency> 
+        """
+            }.joinToString("")
+  }</dependencies>
+</project>
+            """
+
+            // Create artifact and pom
+            val path = GROUP / artifact.name / artifact.outsideVersion
+
+            (repoFolder / path).let { folder ->
+                Files.createDirectories(folder)
+                (folder / "${artifact.name}-${artifact.insideVersion}.jar").write(artifact.artifact)
+                (folder / "${artifact.name}-${artifact.insideVersion}.pom").write(pom)
+            }
+
+            if (artifact.cache != null) {
+                (cacheRepoFolder / path).let { folder ->
+                    Files.createDirectories(folder)
+                    (folder / "${artifact.name}-${artifact.insideVersion}.jar").write(artifact.cache!!)
+                    (folder / "${artifact.name}-${artifact.insideVersion}.pom").write(pom)
+                }
+            }
+        }
+
+        fun writeMavenMetadata(path:Path, snapshots:List<TestArtifact>) {
+            if (snapshots.isEmpty()) {
+                return
+            }
+            
+            val metadata = """<?xml version="1.0" encoding="UTF-8"?>
+<metadata modelVersion="1.1.0">
+  <groupId>$GROUP</groupId>
+  <artifactId>${snapshots.first().name}</artifactId>
+  <version>${snapshots.first().outsideVersion}</version>
+  <versioning>
+    <snapshot>
+      <timestamp>${snapshots.last().snapshotTimestamp}</timestamp>
+      <buildNumber>${snapshots.last().buildNumber}</buildNumber>
+    </snapshot>
+    <lastUpdated>${snapshots.last().snapshotTimestamp.replace(".", "")}</lastUpdated>
+    <snapshotVersions>${
+            snapshots.map { snapshot ->
+                """
+        <snapshotVersion>
+            <extension>jar</extension>
+            <value>${snapshot.insideVersion}</value>
+            <updated>${snapshot.snapshotTimestamp.replace(".", "")}</updated>
+        </snapshotVersion>"""
+            }.joinToString("")
+    }</snapshotVersions>
+  </versioning>
+</metadata>
+            """
+            (path / "maven-metadata.xml").write(metadata)
+        }
+
+        for ((path, snapshots) in artifacts.filter { it.buildNumber >= 0 }.sortedBy { it.buildNumber }.groupBy { GROUP / it.name / it.outsideVersion }) {
+            writeMavenMetadata(repoFolder / path, snapshots)
+            writeMavenMetadata(cacheRepoFolder / path, snapshots.filter { it.cache != null })
+        }
+    }
+}
+
+val TEST_REPOSITORY_BASE = (wemi.boot.WemiCacheFolder / "-test-repository").apply {
+    ensureEmptyDirectory()
+}
+
+fun BindingHolder.setTestRepository(name:String, snapshotUpdateDelaySeconds:Long = SnapshotCheckDaily, create:TestRepositoryData.()->Unit) {
+    val repoFolder = TEST_REPOSITORY_BASE / name
+    val repoCacheFolder = TEST_REPOSITORY_BASE / "$name-cache"
+
+    val data = TestRepositoryData()
+    data.create()
+    data.buildIn(repoFolder, repoCacheFolder)
+
+    repositories set { setOf(Repository(name, repoFolder, repoCacheFolder, local = false, snapshotUpdateDelaySeconds = snapshotUpdateDelaySeconds)) }
+}
+
+// -------------------------------------------- Basic tests ------------------------------------------------------
+
 val release_1 by configuration("") {
-    repositories set { setOf(Repository("test-repo", projectRoot.get() / "release-1", CacheRepository, local = false)) }
-    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "1.0")) }
+    setTestRepository("release_1") {
+        artifact("king", "1")
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "king", "1")) }
 
     checkResolution set {
-        assertClasspathContains("v1.0")
+        assertClasspathContains("king 1")
     }
 }
 
 val release_2 by configuration("") {
-    repositories set { setOf(Repository("test-repo", projectRoot.get() / "release-2", CacheRepository, local = false)) }
-    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "1.1")) }
+    setTestRepository("release_2") {
+        artifact("king", "1").dependsOn(artifact("queen", "1"))
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "king", "1")) }
 
     checkResolution set {
-        assertClasspathContains("v1.0" /* through dependency in 1.1 */, "v1.1")
+        assertClasspathContains("queen 1" /* through dependency in king */, "king 1")
     }
 }
 
+// -------------------------------------- Non-unique snapshot tests ---------------------------------------------------
+
 val non_unique_1 by configuration("") {
-    repositories set { setOf(Repository("test-repo", projectRoot.get() / "non-unique-1", CacheRepository, local = false)) }
-    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "1.0-SNAPSHOT")) }
+    setTestRepository("non_unique_1") {
+        artifact("king", "1-SNAPSHOT")
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "king", "1-SNAPSHOT")) }
 
     checkResolution set {
-        assertClasspathContains("v1.0-SNAPSHOT-1")
+        assertClasspathContains("king 1-SNAPSHOT")
     }
 }
 
 val non_unique_2 by configuration("") {
-    repositories set { setOf(Repository("test-repo", projectRoot.get() / "non-unique-2", CacheRepository, local = false)) }
-    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "1.0-SNAPSHOT")) }
+    setTestRepository("non_unique_2") {
+        artifact("king", "1-SNAPSHOT").hasCache("cached king")
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "king", "1-SNAPSHOT")) }
 
     checkResolution set {
-        assertClasspathContains("v1.0-SNAPSHOT-1")
+        assertClasspathContains("cached king")
     }
 }
 
 val non_unique_3 by configuration("") {
-    repositories set { setOf(Repository("test-repo", projectRoot.get() / "non-unique-2", CacheRepository, snapshotUpdateDelaySeconds = wemi.dependency.SnapshotCheckAlways, local = false)) }
-    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "1.0-SNAPSHOT")) }
+    setTestRepository("non_unique_3", SnapshotCheckAlways) {
+        artifact("king", "1-SNAPSHOT").hasCache("cached king")
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "king", "1-SNAPSHOT")) }
 
     checkResolution set {
-        assertClasspathContains("v1.0-SNAPSHOT-2")
+        assertClasspathContains("king 1-SNAPSHOT")
     }
 }
 
+// -------------------------------------- Unique snapshot tests ---------------------------------------------------
+
 val unique_1 by configuration("") {
-    repositories set { setOf(Repository("test-repo", projectRoot.get() / "unique-1", CacheRepository, local = false)) }
-    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "2.0-SNAPSHOT")) }
+    setTestRepository("unique_1") {
+        snapshotArtifact("king", "2", 1)
+    }
+    
+    libraryDependencies set { setOf(dependency(GROUP, "king", "2-SNAPSHOT")) }
 
     checkResolution set {
-        assertClasspathContains("v2.0-SNAPSHOT-1")
+        assertClasspathContains("king 2 1")
     }
 }
 
 val unique_2 by configuration("") {
-    repositories set { setOf(Repository("test-repo", projectRoot.get() / "unique-2", CacheRepository, local = false)) }
-    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "2.0-SNAPSHOT")) }
+    setTestRepository("unique_2") {
+        snapshotArtifact("king", "2", 1).hasCache("cached king")
+        snapshotArtifact("king", "2", 2)
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "king", "2-SNAPSHOT")) }
 
     checkResolution set {
-        assertClasspathContains("v2.0-SNAPSHOT-1")
+        assertClasspathContains("cached king")
     }
 }
 
 val unique_3 by configuration("") {
-    repositories set { setOf(Repository("test-repo", projectRoot.get() / "unique-2", CacheRepository, snapshotUpdateDelaySeconds = wemi.dependency.SnapshotCheckAlways, local = false)) }
-    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "2.0-SNAPSHOT")) }
+    setTestRepository("unique_3", SnapshotCheckAlways) {
+        snapshotArtifact("king", "2", 1).hasCache("cached king")
+        snapshotArtifact("king", "2", 2)
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "king", "2-SNAPSHOT")) }
 
     checkResolution set {
-        assertClasspathContains("v2.0-SNAPSHOT-2")
+        assertClasspathContains("king 2 2")
     }
 }
 
 val unique_4 by configuration("") {
-    repositories set { setOf(Repository("test-repo", projectRoot.get() / "unique-2", CacheRepository, local = false)) }
-    libraryDependencies set { setOf(dependency("some-group", "some-artifact", "2.0-SNAPSHOT", snapshotVersion = "20190101.123456-1")) }
+    var snapshotVersion = ""
+    setTestRepository("unique_4", SnapshotCheckAlways) {
+        val older = snapshotArtifact("king", "2", 1)
+        snapshotVersion = "${older.snapshotTimestamp}-${older.buildNumber}"
+        snapshotArtifact("king", "2", 2)
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "king", "2-SNAPSHOT", snapshotVersion = snapshotVersion)) }
 
     checkResolution set {
-        assertClasspathContains("v2.0-SNAPSHOT-1")
+        assertClasspathContains("king 2 1")
     }
 }
 
@@ -219,11 +420,11 @@ val mavenScopeFiltering by configuration("") {
 
     checkResolution set {
         // Must not resolve to testing jars which jline uses
-        assertClasspathContainsFiles("jline-terminal-jansi-3.3.0.jar")
+        assertClasspathContainsFiles("jline-terminal-3.3.0.jar")
     }
 }
 
-val dependency_resolution by project(path("dependency-resolution")) {
+val dependency_resolution by project() {
     // Test dependency resolution by resolving against changing repository 3 different libraries
     /*
     1. Release
