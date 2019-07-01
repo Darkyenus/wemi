@@ -1,6 +1,5 @@
 # Things to do next
 
-- need to reload before changes in WemiPrepend.sh take effect
 - respect scope of DependencyId
 
 ## For next release

@@ -575,7 +575,7 @@ object KeyDefaults {
      * Binding for [Keys.archive] to use when archiving documentation and no documentation is available.
      */
     val ArchiveDummyDocumentation: Value<Path> = {
-        using(Configurations.archiving) {
+        using(archiving) {
             AssemblyOperation().use { assemblyOperation ->
 
                 /*
@@ -998,7 +998,7 @@ object KeyDefaults {
                         continue
                     }
                     if (repository.local) {
-                        PUBLISH_MODEL_LOG.warn("Omitting repository {}, it is local", repository)
+                        PUBLISH_MODEL_LOG.warn("Omitting repository {} from published pom, it is local", repository)
                         continue
                     }
 
