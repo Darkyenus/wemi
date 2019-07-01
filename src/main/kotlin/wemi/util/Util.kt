@@ -407,7 +407,7 @@ class TreeNode<T>(val value: T) : ArrayList<TreeNode<T>>() {
  * Returns a pretty-printed string in which the system is displayed as a tree of dependencies.
  * Uses full range of unicode characters for clarity.
  */
-fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<DependencyId>?): CharSequence {
+fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<DependencyId>?, includeSkipped:Boolean = false): CharSequence {
     /*
     ╤ org.foo:proj:1.0 ✅
     │ ╘ com.bar:pr:2.0 ❌⛔️
@@ -457,6 +457,19 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
     }
     for (notResolvedNode in notResolvedNodes) {
         nodes[notResolvedNode.value.dependencyId] = notResolvedNode
+    }
+
+    if (!includeSkipped) {
+        nodes.entries.removeIf { (id, node) ->
+            if (this@prettyPrint[id] == null) {
+                true // remove
+            } else {
+                // remove child nodes that were skipped
+                node.removeIf { this@prettyPrint[it.value.dependencyId] == null }
+
+                false // do not remove
+            }
+        }
     }
 
     val remainingNodes = HashMap(nodes)
