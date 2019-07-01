@@ -133,7 +133,12 @@ object KeyDefaults {
         if (!resolved.complete) {
             throw WemiException("Failed to resolve all artifacts\n${resolved.value.prettyPrint(Keys.libraryDependencies.get().map { it.dependencyId })}", showStacktrace = false)
         }
+
+        val scopes = Keys.resolvedLibraryScopes.get()
         for ((_, resolvedDependency) in resolved.value) {
+            if (scopes.isNotEmpty() && resolvedDependency.scope in scopes) {
+                continue
+            }
             result.add(LocatedPath(resolvedDependency.artifact?.path ?: continue))
         }
 

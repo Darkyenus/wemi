@@ -16,6 +16,10 @@ import java.util.*
  */
 typealias Classifier = String
 
+/** Artifacts scope.
+ * See https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope */
+typealias Scope = String
+
 /** Concatenate two classifiers. */
 fun joinClassifiers(first:Classifier, second:Classifier):Classifier {
     return when {
@@ -32,8 +36,18 @@ const val SourcesClassifier: Classifier = "sources"
 /** Classifier appended to artifacts with Javadoc */
 const val JavadocClassifier: Classifier = "javadoc"
 
+/** Available during compilation and runtime of both project itself and tests.
+ * Available transitively. */
+const val ScopeCompile: Scope = "compile"
+/** Available only on compilation and test classpath. */
+const val ScopeProvided: Scope = "provided"
+/** Available for running and for testing, not for compilation. */
+const val ScopeRuntime: Scope = "runtime"
+/** Available for testing only. */
+const val ScopeTest: Scope = "test"
+
 internal const val DEFAULT_TYPE:String = "jar"
-internal const val DEFAULT_SCOPE:String = "compile"
+internal const val DEFAULT_SCOPE:Scope = ScopeCompile
 internal const val DEFAULT_OPTIONAL:Boolean = false
 internal const val DEFAULT_SNAPSHOT_VERSION:String = ""
 

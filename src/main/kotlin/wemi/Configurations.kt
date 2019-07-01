@@ -21,6 +21,9 @@ object Configurations {
     //region Stage configurations
     /** @see Keys.compile */
     val compiling by configuration("Configuration used when compiling") {
+        Keys.resolvedLibraryScopes add { ScopeCompile }
+        Keys.resolvedLibraryScopes add { ScopeProvided }
+
         Keys.externalClasspath modify { classpath ->
             // Internal classpath of aggregate projects is not included in standard external classpath.
             // But it is needed for the compilation, so we add it explicitly.
@@ -34,10 +37,14 @@ object Configurations {
     }
 
     /** @see Keys.run */
-    val running by configuration("Configuration used when running, sources are resources") {}
+    val running by configuration("Configuration used when running, sources are resources") {
+        Keys.resolvedLibraryScopes add { ScopeRuntime }
+    }
 
     /** @see Keys.test */
     val testing by configuration("Used when testing") {
+        Keys.resolvedLibraryScopes add { ScopeTest }
+
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
         Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")

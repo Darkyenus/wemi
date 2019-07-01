@@ -422,10 +422,9 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
      */
     val STATUS_NORMAL: Byte = 0
     val STATUS_NOT_RESOLVED: Byte = 1
-    val STATUS_CYCLIC: Byte = 2
+    val STATUS_ALREADY_SEEN: Byte = 2
 
-    class NodeData(val dependencyId: DependencyId, var status: Byte) {
-        val scope = ArrayList<String>()
+    class NodeData(val dependencyId: DependencyId, var status: Byte, val scope:String?) {
         var optional = false
     }
 
@@ -433,7 +432,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
 
     // Build nodes
     for ((depId, resolvedDep) in entries) {
-        nodes[depId] = TreeNode(NodeData(depId, STATUS_NORMAL).apply { scope.add(resolvedDep.scope) })
+        nodes[depId] = TreeNode(NodeData(depId, STATUS_NORMAL, resolvedDep.scope))
     }
 
     // Connect nodes (even with cycles)
@@ -442,12 +441,8 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
         this@prettyPrint[depId]?.dependencies?.forEach { dep ->
             var nodeToConnect = nodes[dep.dependencyId]
             if (nodeToConnect == null) {
-                nodeToConnect = TreeNode(NodeData(dep.dependencyId, STATUS_NOT_RESOLVED).apply { scope.add(dep.scope) })
+                nodeToConnect = TreeNode(NodeData(dep.dependencyId, STATUS_NOT_RESOLVED, null))
                 notResolvedNodes.add(nodeToConnect)
-            } else {
-                nodeToConnect.value.scope.let {
-                    if (dep.scope !in it) it.add(dep.scope)
-                }
             }
             if (dep.optional) {
                 nodeToConnect.value.optional = true
@@ -476,7 +471,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
 
     fun liftNode(dependencyId: DependencyId): TreeNode<NodeData> {
         // Lift what was asked
-        val liftedNode = remainingNodes.remove(dependencyId) ?: return TreeNode(NodeData(dependencyId, STATUS_CYCLIC))
+        val liftedNode = remainingNodes.remove(dependencyId) ?: return TreeNode(NodeData(dependencyId, STATUS_ALREADY_SEEN, null))
         val resultNode = TreeNode(liftedNode.value)
         // Lift all dependencies too and return them in the result node
         for (dependencyNode in liftedNode) {
@@ -491,7 +486,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
     explicitRoots?.forEach { root ->
         val liftedNode = liftNode(root)
         // Check for nodes that are in explicitRoots but were never resolved to begin with
-        if (liftedNode.value.status == STATUS_CYCLIC && !this.containsKey(liftedNode.value.dependencyId)) {
+        if (liftedNode.value.status == STATUS_ALREADY_SEEN && !this.containsKey(liftedNode.value.dependencyId)) {
             liftedNode.value.status = STATUS_NOT_RESOLVED
         }
         roots.add(liftedNode)
@@ -526,42 +521,36 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
         if (dependencyId.type != DEFAULT_TYPE) {
             result.append(":").append(dependencyId.type)
         }
-        if (scope.isNotEmpty()) {
-            result.append(' ').append(scope[0])
-            if (scope.size > 1) {
-                result.append(" (")
-                for (i in 1 until scope.size) {
-                    if (i > 1) result.append(", ")
-                    result.append(scope[i])
-                }
-                result.append(')')
-            }
-        }
-        if (optional) {
-            result.append(" optional")
-        }
-        result.append(' ')
 
-        val resolved = this@prettyPrint[dependencyId]
-
-        when {
-            resolved == null -> result.append(CLI.ICON_UNKNOWN)
-            resolved.hasError -> result.append(CLI.ICON_FAILURE)
-            else -> result.append(CLI.ICON_SUCCESS)
-        }
-
-        if (status == STATUS_CYCLIC) {
-            result.append(CLI.ICON_SEE_ABOVE)
+        if (status == STATUS_ALREADY_SEEN) {
+            result.append(' ').append(CLI.ICON_SEE_ABOVE)
         } else {
+            if (scope != null) {
+                result.append(' ').format(Color.Blue).append(scope).format()
+            }
+
+            if (optional) {
+                result.append(" optional")
+            }
+            result.append(' ')
+
+            val resolved = this@prettyPrint[dependencyId]
+
+            when {
+                resolved == null -> result.append(CLI.ICON_UNKNOWN)
+                resolved.hasError -> result.append(CLI.ICON_FAILURE)
+                else -> result.append(CLI.ICON_SUCCESS)
+            }
+
             val resolvedFrom = resolved?.resolvedFrom
             if (resolvedFrom != null) {
                 result.format(Color.White).append(" from ").format().append(resolvedFrom)
             }
-        }
 
-        val log = resolved?.log
-        if (log != null && log.isNotBlank()) {
-            result.append(' ').format(Color.Red).append(log).format()
+            val log = resolved?.log
+            if (log != null && log.isNotBlank()) {
+                result.append(' ').format(Color.Red).append(log).format()
+            }
         }
     }
 }

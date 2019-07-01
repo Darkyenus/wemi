@@ -63,11 +63,9 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
         return Partial(emptyMap(), false)
     }
 
-    val resolvedPartials = HashMap<DependencyManagementKey, ResolvedDependency>()
     val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
-
+    val resolvedPartials = HashMap<DependencyManagementKey, ResolvedDependency>()
     var nextDependencies = dependencies
-
     var noError = true
 
     // TODO(jp): Cycle detection

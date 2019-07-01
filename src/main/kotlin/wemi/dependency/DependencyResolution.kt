@@ -41,7 +41,7 @@ fun resolveDependencies(dependencies: Collection<Dependency>,
                         repositories: Collection<Repository>,
                         mapper: ((Dependency) -> Dependency) = { it }): Partial<Map<DependencyId, ResolvedDependency>> {
     // Sort repositories
-    val sorted = ArrayList<Repository>(repositories)
+    val sorted = ArrayList(repositories)
     sorted.sortWith(REPOSITORY_COMPARATOR)
 
     // Lock repositories
