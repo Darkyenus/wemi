@@ -7,13 +7,14 @@
 		- This is used in DependencyResolution
 
 - Maven resolution
-	- Dependency "type" must be used as an extension (when not in this list: https://maven.apache.org/ref/3.6.1/maven-core/artifact-handlers.html & allow extensions?)
 	- TEST: When resolving snapshots, check both variants for cache first and also check all available repositories if they have cache, before downloading
 	- TEST: if dependencyManagement is handled correctly
 	- Ensure that redirects are reasonably followed
 	- Ensure that when there is a dependency in the graph twice, with different scope, it is resolved correctly: https://cwiki.apache.org/confluence/display/MAVENOLD/Dependency+Mediation+and+Conflict+Resolution (down)
 	- Handle certificate problems from Webb: https://pastebin.com/raw/npZHjqft
 		- Investigate options to turn off checking on per-repo basis
+	- TEST: that cycles are resolved correctly
+	- Cycle detection
 
 - Allow to set default project in build script
 

@@ -179,6 +179,18 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
     return Partial(resolved, noError)
 }
 
+/** Maven type to extension mapping for types that are not equal to their extensions.
+ * See https://maven.apache.org/ref/3.6.1/maven-core/artifact-handlers.html */
+private val TYPE_TO_EXTENSION_MAPPING:Map<String, String> = mapOf(
+        "bundle" to "jar",
+        "ejb" to "jar",
+        "ejb-client" to "jar",
+        "test-jar" to "jar",
+        "maven-plugin" to "jar",
+        "java-source" to "jar",
+        "javadoc" to "jar"
+)
+
 /** Attempt to resolve [dependencyId] in [repositories] */
 private fun resolveInM2Repository(
         dependencyId: DependencyId,
@@ -212,25 +224,19 @@ private fun resolveInM2Repository(
         return ResolvedDependency(resolvedDependencyId, log, repository)
     })
 
-    when (resolvedDependencyId.type) {
-        "jar", "bundle" -> { // TODO Should osgi bundles have different handling?
-            val jarPath = artifactPath(resolvedDependencyId.group, resolvedDependencyId.name, resolvedDependencyId.version, resolvedDependencyId.classifier, "jar", resolvedDependencyId.snapshotVersion)
-            val retrieved = retrieveFile(jarPath, snapshot, listOf(repository))
+    val extension = TYPE_TO_EXTENSION_MAPPING.getOrDefault(resolvedDependencyId.type, resolvedDependencyId.type)
 
-            if (retrieved == null) {
-                LOG.warn("Failed to retrieve jar at '{}' in {}", jarPath, repository)
-                return ResolvedDependency(resolvedDependencyId, "Failed to retrieve jar", repository)
-            } else {
-                // Purge retrieved data, storing it would only create a memory leak, as the value is rarely used,
-                // can always be lazily loaded and the size of all dependencies can be quite big.
-                retrieved.data = null
-                return ResolvedDependency(resolvedDependencyId, resultScope, pom.dependencies, repository, retrieved)
-            }
-        }
-        else -> {
-            LOG.warn("Unsupported packaging {} of {}", resolvedDependencyId.type, resolvedDependencyId)
-            return ResolvedDependency(resolvedDependencyId, "Unsupported dependency type \"${resolvedDependencyId.type}\"", repository)
-        }
+    val filePath = artifactPath(resolvedDependencyId.group, resolvedDependencyId.name, resolvedDependencyId.version, resolvedDependencyId.classifier, extension, resolvedDependencyId.snapshotVersion)
+    val retrieved = retrieveFile(filePath, snapshot, listOf(repository))
+
+    if (retrieved == null) {
+        LOG.warn("Failed to retrieve file at '{}' in {}", filePath, repository)
+        return ResolvedDependency(resolvedDependencyId, "Failed to retrieve file", repository)
+    } else {
+        // Purge retrieved data, storing it would only create a memory leak, as the value is rarely used,
+        // can always be lazily loaded and the size of all dependencies can be quite big.
+        retrieved.data = null
+        return ResolvedDependency(resolvedDependencyId, resultScope, pom.dependencies, repository, retrieved)
     }
 }
 
