@@ -1,7 +1,5 @@
 # Things to do next
 
-- respect scope of DependencyId
-
 ## For next release
 
 - Rewrite directorySynchronized based on exclusive file creation and timestamp
@@ -9,12 +7,13 @@
 		- This is used in DependencyResolution
 
 - Maven resolution
-	- When resolving snapshots, check both variants for cache first and also check all available repositories if they have cache, before downloading
-	- Just implement whatever maven does, it is currently broken and does not handle scope:test filtering correctly for dependencyManagement
-	- Ensure that redirects are followed
-	- Handle certificate problems from Webb: https://pastebin.com/raw/npZHjqft
-		- Investigate options to turn of checking on per-repo basis
 	- Dependency "type" must be used as an extension (when not in this list: https://maven.apache.org/ref/3.6.1/maven-core/artifact-handlers.html & allow extensions?)
+	- TEST: When resolving snapshots, check both variants for cache first and also check all available repositories if they have cache, before downloading
+	- TEST: if dependencyManagement is handled correctly
+	- Ensure that redirects are reasonably followed
+	- Ensure that when there is a dependency in the graph twice, with different scope, it is resolved correctly: https://cwiki.apache.org/confluence/display/MAVENOLD/Dependency+Mediation+and+Conflict+Resolution (down)
+	- Handle certificate problems from Webb: https://pastebin.com/raw/npZHjqft
+		- Investigate options to turn off checking on per-repo basis
 
 - Allow to set default project in build script
 
@@ -41,9 +40,7 @@
 	- <profiles> support
 		- https://dzone.com/articles/maven-profile-best-practices
 		- https://blog.gradle.org/maven-pom-profiles
-	- Transitive dependencies are not yet affected by dependencyManagement
-		- https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management
-		- https://www.davidjhay.com/maven-dependency-management/
+	
 
 - In assembling, handle LIST files and signatures
 
@@ -71,5 +68,3 @@
 	- Support publishing unique snapshots
 	- PGP signatures
 	- When generating maven publish metadata, add only those repositories, which were used. And don't add exclude when there are no excludes.
-	- https://blog.autsoft.hu/a-confusing-dependency/
-	- libraryDependencies add { dependency("org.eclipse.jetty.websocket:websocket-client:9.4.15.v20190215") } check that it works, it uses some maven properties

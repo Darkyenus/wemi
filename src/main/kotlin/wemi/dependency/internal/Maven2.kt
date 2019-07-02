@@ -527,7 +527,8 @@ private class Pom constructor(
 
 /**
  * Resolves against [transitiveDependencyManagement] and [ownDependencyManagement].
- * [More info.](http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management)
+ * See http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management
+ * and https://www.davidjhay.com/maven-dependency-management/
  */
 private fun resolveDependencyManagement(
         dependency: RawPom.TranslatedRawPomDependency,

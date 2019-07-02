@@ -123,6 +123,17 @@ fun EvalScope.assertClasspathContains(vararg items:String) {
     }
 }
 
+fun EvalScope.assertClasspathContainsFiles(vararg items:String) {
+    classpathAssertions++
+    val got = externalClasspath.get().map { it.file.name }.toSet()
+    val expected = items.toSet()
+    if (got != expected) {
+        classpathAssertionsFailed++
+        //System.err.println("\n\n\nERROR: Got $got, expected $expected")
+        assertThat(got, equalTo(expected))
+    }
+}
+
 val GROUP = "grp"
 val UNIQUE_CACHE_DATE = "20190101"
 
@@ -292,6 +303,12 @@ fun BindingHolder.setTestRepository(name:String, snapshotUpdateDelaySeconds:Long
     repositories set { setOf(Repository(name, repoFolder, repoCacheFolder, local = false, snapshotUpdateDelaySeconds = snapshotUpdateDelaySeconds)) }
 }
 
+fun BindingHolder.setTestCacheRepository(name:String) {
+    val repoCacheFolder = TEST_REPOSITORY_BASE / "$name-cache"
+    
+    repositories modify { it.map { repo -> if (repo.cache == null) repo else repo.copy(cache = repoCacheFolder) }.toSet() }
+}
+
 // -------------------------------------------- Basic tests ------------------------------------------------------
 
 val release_1 by configuration("") {
@@ -421,7 +438,7 @@ val mavenScopeFiltering by configuration("") {
             .dependsOn(testingLib, scope = "test") // Not present, because test is not transitive
             .dependsOn(someApi, scope = "provided") // Also not present, because provided is not transitive
             .dependsOn(someImplementation, scope = "runtime")
-        
+
         artifact("frothy-chocolate", "1")
         artifact("run-like-hell", "2")
         artifact("testing-attention-please", "1")
@@ -437,7 +454,7 @@ val mavenScopeFiltering by configuration("") {
     checkResolution set {
         // Must not resolve to testing jars which jline uses
         assertClasspathContains("magnum-opus 1", "some-implementation 1", "frothy-chocolate 1", "run-like-hell 2", "testing-attention-please 1")
-        
+
         using(compiling) {
             // When compiling, runtime dependencies should be ommited
             assertClasspathContains("magnum-opus 1", "frothy-chocolate 1")
@@ -447,10 +464,21 @@ val mavenScopeFiltering by configuration("") {
             // When running, provided dependencies should be ommited
             assertClasspathContains("magnum-opus 1", "some-implementation 1", "run-like-hell 2")
         }
-        
+
         using(testing) {
             assertClasspathContains("magnum-opus 1", "some-implementation 1", "frothy-chocolate 1", "run-like-hell 2", "testing-attention-please 1")
         }
+    }
+}
+
+val problematic_1 by configuration("") {
+    setTestCacheRepository("problematic_1")
+
+    // Uses some properties
+    libraryDependencies set { setOf(dependency("org.eclipse.jetty.websocket:websocket-client:9.4.15.v20190215")) }
+
+    checkResolution set {
+        assertClasspathContainsFiles("websocket-client.jar")
     }
 }
 
@@ -488,7 +516,9 @@ val dependency_resolution by project() {
 
     // Check if correct dependency artifacts are downloaded
     autoRun(checkResolution, mavenScopeFiltering)
-
+    
+    // Problematic dependencies that broke something previously
+    autoRun(checkResolution, problematic_1)
 
     checkResolution set {
         println()

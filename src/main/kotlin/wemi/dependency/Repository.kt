@@ -59,6 +59,14 @@ class Repository(
                 snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = url.startsWith("file:", ignoreCase = true))
             : this(name, URL(url), cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch, local)
 
+    fun copy(name:String = this.name, url:URL = this.url, cache:Path? = this.cache,
+             releases:Boolean = this.releases, snapshots:Boolean = this.snapshots,
+             snapshotUpdateDelaySeconds:Long = this.snapshotUpdateDelaySeconds,
+             tolerateChecksumMismatch: Boolean = this.tolerateChecksumMismatch,
+             local:Boolean = this.local):Repository {
+        return Repository(name, url, cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch, local)
+    }
+
     /** Repository acting as a cache for this repository, if [local]` == false`, otherwise not used.
      * Must be [local]. Resolved dependencies will be stored here. */
     val cache: Path? =
