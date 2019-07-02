@@ -123,24 +123,15 @@ fun EvalScope.assertClasspathContains(vararg items:String) {
     }
 }
 
-fun EvalScope.assertClasspathContainsFiles(vararg items:String) {
-    classpathAssertions++
-    val got = externalClasspath.get().map { it.file.name }.toSet()
-    val expected = items.toSet()
-    if (got != expected) {
-        classpathAssertionsFailed++
-        System.err.println("\n\n\nERROR: Got $got, expected $expected")
-        // assertThat(got, equalTo(expected)) disabled temporarily, because it should not hard quit right now
-    }
-}
-
 val GROUP = "grp"
 val UNIQUE_CACHE_DATE = "20190101"
 
 class TestRepositoryData() {
 
+    data class TestArtifactDependency(val artifact:TestArtifact, val scope:String)
+
     class TestArtifact(val name:String, version:String, val buildNumber:Int) {
-        val dependsOn = ArrayList<TestArtifact>()
+        val dependsOn = ArrayList<TestArtifactDependency>()
         var cache:String? = null
 
         data class UniqueCacheEntry(val buildNumber:Int, val inCache:Boolean, val text:String)
@@ -166,8 +157,8 @@ class TestRepositoryData() {
             "$name $version $buildNumber"
         }
 
-        fun dependsOn(other:TestArtifact):TestArtifact {
-            this.dependsOn.add(other)
+        fun dependsOn(other:TestArtifact, scope:String = "compile"):TestArtifact {
+            this.dependsOn.add(TestArtifactDependency(other, scope))
             return this
         }
 
@@ -211,12 +202,13 @@ class TestRepositoryData() {
   <version>${artifact.insideVersion}</version>
   
   <dependencies>${
-            artifact.dependsOn.map { dependency ->
+            artifact.dependsOn.map { (dependency, scope) ->
                 """
     <dependency>
         <groupId>$GROUP</groupId>
         <artifactId>${dependency.name}</artifactId>
         <version>${dependency.outsideVersion}</version>
+        <scope>${scope}</scope>
     </dependency> 
         """
             }.joinToString("")
@@ -246,7 +238,7 @@ class TestRepositoryData() {
             if (snapshots.isEmpty()) {
                 return
             }
-            
+
             val metadata = """<?xml version="1.0" encoding="UTF-8"?>
 <metadata modelVersion="1.1.0">
   <groupId>$GROUP</groupId>
@@ -366,7 +358,7 @@ val unique_1 by configuration("") {
     setTestRepository("unique_1") {
         snapshotArtifact("king", "2", 1)
     }
-    
+
     libraryDependencies set { setOf(dependency(GROUP, "king", "2-SNAPSHOT")) }
 
     checkResolution set {
@@ -416,11 +408,22 @@ val unique_4 by configuration("") {
 }
 
 val mavenScopeFiltering by configuration("") {
-    libraryDependencies set { setOf(dependency("org.jline", "jline-terminal", "3.3.0")) }
+    setTestRepository("mavenScopeFiltering") {
+        val testingLib = artifact("testing-lib", "1")
+        val someApi = artifact("some-api", "1")
+        val someImplementation = artifact("some-implementation", "1")
+
+        artifact("magnum-opus", "1")
+            .dependsOn(testingLib, scope = "test") // Not present, because test is not transitive
+            .dependsOn(someApi, scope = "provided") // Also not present, because provided is not transitive
+            .dependsOn(someImplementation, scope = "runtime")
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "magnum-opus", "1")) }
 
     checkResolution set {
         // Must not resolve to testing jars which jline uses
-        assertClasspathContainsFiles("jline-terminal-3.3.0.jar")
+        assertClasspathContains("magnum-opus 1", "some-implementation 1")
     }
 }
 
