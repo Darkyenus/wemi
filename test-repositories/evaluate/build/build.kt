@@ -421,13 +421,36 @@ val mavenScopeFiltering by configuration("") {
             .dependsOn(testingLib, scope = "test") // Not present, because test is not transitive
             .dependsOn(someApi, scope = "provided") // Also not present, because provided is not transitive
             .dependsOn(someImplementation, scope = "runtime")
+        
+        artifact("frothy-chocolate", "1")
+        artifact("run-like-hell", "2")
+        artifact("testing-attention-please", "1")
     }
 
-    libraryDependencies set { setOf(dependency(GROUP, "magnum-opus", "1")) }
+    libraryDependencies set { setOf(
+            dependency(GROUP, "magnum-opus", "1"),
+            dependency(GROUP, "frothy-chocolate", "1", scope = "provided"),
+            dependency(GROUP, "run-like-hell", "2", scope = "runtime"),
+            dependency(GROUP, "testing-attention-please", "1", scope = "test")
+    ) }
 
     checkResolution set {
         // Must not resolve to testing jars which jline uses
-        assertClasspathContains("magnum-opus 1", "some-implementation 1")
+        assertClasspathContains("magnum-opus 1", "some-implementation 1", "frothy-chocolate 1", "run-like-hell 2", "testing-attention-please 1")
+        
+        using(compiling) {
+            // When compiling, runtime dependencies should be ommited
+            assertClasspathContains("magnum-opus 1", "frothy-chocolate 1")
+        }
+
+        using(running) {
+            // When running, provided dependencies should be ommited
+            assertClasspathContains("magnum-opus 1", "some-implementation 1", "run-like-hell 2")
+        }
+        
+        using(testing) {
+            assertClasspathContains("magnum-opus 1", "some-implementation 1", "frothy-chocolate 1", "run-like-hell 2", "testing-attention-please 1")
+        }
     }
 }
 

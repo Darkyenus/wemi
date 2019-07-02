@@ -21,8 +21,7 @@ object Configurations {
     //region Stage configurations
     /** @see Keys.compile */
     val compiling by configuration("Configuration used when compiling") {
-        Keys.resolvedLibraryScopes add { ScopeCompile }
-        Keys.resolvedLibraryScopes add { ScopeProvided }
+        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeProvided) }
 
         Keys.externalClasspath modify { classpath ->
             // Internal classpath of aggregate projects is not included in standard external classpath.
@@ -38,17 +37,19 @@ object Configurations {
 
     /** @see Keys.run */
     val running by configuration("Configuration used when running, sources are resources") {
-        Keys.resolvedLibraryScopes add { ScopeRuntime }
+        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
     }
 
     /** @see Keys.test */
     val testing by configuration("Used when testing") {
-        Keys.resolvedLibraryScopes add { ScopeTest }
+        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime, ScopeProvided, ScopeTest) }
 
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
         Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
+    }
 
+    internal val testingLaunch by configuration("Used internally when launching tests", testing) {
         Keys.libraryDependencies add { Dependency(JUnitPlatformLauncher) }
     }
 

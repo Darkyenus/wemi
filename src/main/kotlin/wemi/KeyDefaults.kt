@@ -136,7 +136,7 @@ object KeyDefaults {
 
         val scopes = Keys.resolvedLibraryScopes.get()
         for ((_, resolvedDependency) in resolved.value) {
-            if (scopes.isNotEmpty() && resolvedDependency.scope in scopes) {
+            if (scopes.isNotEmpty() && resolvedDependency.scope !in scopes) {
                 continue
             }
             result.add(LocatedPath(resolvedDependency.artifact?.path ?: continue))
@@ -477,7 +477,7 @@ object KeyDefaults {
     }
 
     val Test: Value<TestReport> = {
-        using(Configurations.testing) {
+        using(Configurations.testingLaunch) {
             val javaExecutable = Keys.javaExecutable.get()
             val directory = Keys.runDirectory.get()
             val options = Keys.runOptions.get()
