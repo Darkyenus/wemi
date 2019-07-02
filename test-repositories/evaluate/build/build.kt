@@ -118,15 +118,15 @@ fun EvalScope.assertClasspathContains(vararg items:String) {
     val expected = items.toSet()
     if (got != expected) {
         classpathAssertionsFailed++
-        System.err.println("\n\n\nERROR: Got $got, expected $expected")
-        // assertThat(got, equalTo(expected)) disabled temporarily, because it should not hard quit right now
+        //System.err.println("\n\n\nERROR: Got $got, expected $expected")
+        assertThat(got, equalTo(expected))
     }
 }
 
 val GROUP = "grp"
 val UNIQUE_CACHE_DATE = "20190101"
 
-class TestRepositoryData() {
+class TestRepositoryData(val repositoryName:String) {
 
     data class TestArtifactDependency(val artifact:TestArtifact, val scope:String)
 
@@ -165,6 +165,10 @@ class TestRepositoryData() {
         fun hasCache(text:String):TestArtifact {
             cache = text
             return this
+        }
+
+        override fun toString(): String {
+            return "$name:$outsideVersion/$insideVersion"
         }
     }
 
@@ -234,7 +238,7 @@ class TestRepositoryData() {
             }
         }
 
-        fun writeMavenMetadata(path:Path, snapshots:List<TestArtifact>) {
+        fun writeMavenMetadata(path:Path, snapshots:List<TestArtifact>, fileSuffix:String = "") {
             if (snapshots.isEmpty()) {
                 return
             }
@@ -263,12 +267,12 @@ class TestRepositoryData() {
   </versioning>
 </metadata>
             """
-            (path / "maven-metadata.xml").write(metadata)
+            (path / "maven-metadata$fileSuffix.xml").write(metadata)
         }
 
-        for ((path, snapshots) in artifacts.filter { it.buildNumber >= 0 }.sortedBy { it.buildNumber }.groupBy { GROUP / it.name / it.outsideVersion }) {
+        for ((path, snapshots) in artifacts.filter { it.buildNumber >= 0 }.sortedBy { it.buildNumber }.groupBy { (GROUP / it.name / it.outsideVersion).toString() }) {
             writeMavenMetadata(repoFolder / path, snapshots)
-            writeMavenMetadata(cacheRepoFolder / path, snapshots.filter { it.cache != null })
+            writeMavenMetadata(cacheRepoFolder / path, snapshots.filter { it.cache != null }, "-$repositoryName")
         }
     }
 }
@@ -281,7 +285,7 @@ fun BindingHolder.setTestRepository(name:String, snapshotUpdateDelaySeconds:Long
     val repoFolder = TEST_REPOSITORY_BASE / name
     val repoCacheFolder = TEST_REPOSITORY_BASE / "$name-cache"
 
-    val data = TestRepositoryData()
+    val data = TestRepositoryData(name)
     data.create()
     data.buildIn(repoFolder, repoCacheFolder)
 
