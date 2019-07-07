@@ -267,10 +267,10 @@ class Dependency(val dependencyId: DependencyId,
             result.append(" optional")
         }
         if (exclusions.isNotEmpty()) {
-            result.append(" exclusions:").append(exclusions)
+            result.append(' ').append(exclusions.size).append(" exclusion(s)")
         }
         if (dependencyManagement.isNotEmpty()) {
-            result.append(" dependencyManagement:").append(dependencyManagement)
+            result.append(' ').append(dependencyManagement.size).append(" dependencyManagement(s)")
         }
 
         return result.toString()

@@ -548,15 +548,7 @@ private fun resolveDependencyManagement(
        - Version, if not empty, must match
      */
 
-    /*
-    When applying dependency management templates:
-    1. group, name, classifier, type & optional is kept
-    2. version & scope is replaced if own is empty or when template is from requester
-    3. exclusions are merged
-     */
-
-    val usedDependency =
-    (transitiveDependencyManagement.find { template ->
+    val usedTransitiveDependencyStandIn = transitiveDependencyManagement.find { template ->
         val templateDepId = template.dependencyId
         // Parent dependency management has to match only in group, name, type and classifier
         // https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management
@@ -564,20 +556,9 @@ private fun resolveDependencyManagement(
                 && dependency.name == templateDepId.name
                 && dependency.type == templateDepId.type
                 && dependency.classifier == templateDepId.classifier
-    }?.let { standIn ->
-        LOG.trace("Dependency {} replaced with {} from requester dependencyManagement", dependency, standIn)
-        RawPom.TranslatedRawPomDependency(
-                dependency.group,
-                dependency.name,
-                standIn.dependencyId.version,
-                dependency.classifier,
-                dependency.type,
-                if (standIn.scope.isBlank()) dependency.scope else standIn.scope,
-                dependency.optional,
-                dependency.exclusions + standIn.exclusions
-        )
-    }) ?:
-    (ownDependencyManagement.find { template ->
+    }
+
+    val standIn = usedTransitiveDependencyStandIn ?: ownDependencyManagement.find { template ->
         val templateDepId = template.dependencyId
         // Own dependency management may also use the template if it is missing its own version
         dependency.group == templateDepId.group
@@ -585,19 +566,41 @@ private fun resolveDependencyManagement(
                 && dependency.type == templateDepId.type
                 && dependency.classifier == templateDepId.classifier
                 && (dependency.version.isNullOrBlank() || dependency.version == templateDepId.version)
-    }?.let { standIn ->
-        LOG.trace("Dependency {} replaced with {} from own dependencyManagement", dependency, standIn)
+    }
+
+    /*
+    When applying dependency management templates:
+    1. group, name, classifier, type & optional is kept
+    2. version & scope is replaced if own is empty or when template's origin is transitive
+    3. exclusions are merged
+     */
+
+    val usedDependency = if (standIn == null) {
+        dependency
+    } else {
+        val transitive = usedTransitiveDependencyStandIn != null
+        LOG.trace("Dependency {} replaced with {} from {} dependencyManagement", dependency, standIn, if (transitive) "transitive" else "own")
+
         RawPom.TranslatedRawPomDependency(
                 dependency.group,
                 dependency.name,
                 standIn.dependencyId.version,
                 dependency.classifier,
                 dependency.type,
-                if (dependency.scope.isNullOrBlank()) standIn.scope else dependency.scope,
+                // NOTE(jp): I am not entirely sure how is this supposed to work, so this is my best guess.
+                //  http://maven.40175.n5.nabble.com/DependencyManagement-to-force-scope-td112273.html suggests,
+                //  that "provided" scope should get some special treatment, but I couldn't find any other source for that claim.
+                if (dependency.scope.isNullOrBlank()) {
+                    if (standIn.scope.isBlank()) {
+                        DEFAULT_SCOPE
+                    } else {
+                        standIn.scope
+                    }
+                } else dependency.scope,
                 dependency.optional,
                 dependency.exclusions + standIn.exclusions
         )
-    }) ?: dependency
+    }
 
     return usedDependency.resolve(combinedDependencyManagement)
 }
@@ -640,7 +643,7 @@ private class RawPom(
             pom.dependencies.mapTo(translatedDependencies) { it.translate() }
             // Child dependencyManagement takes precedence over parent. No deduplication is done, but child is added (and thus) checked first.
             pom.dependencyManagement.mapTo(ownDependencyManagement) {
-                it.translate().resolveSimple()
+                it.translate().resolveAsDependencyManagement()
             }
             pom = pom.parent ?: break
             pomIsParent = true
@@ -670,7 +673,7 @@ private class RawPom(
 
 
 
-        fun resolveSimple():Dependency {
+        fun resolveAsDependencyManagement():Dependency {
             return Dependency(
                     DependencyId(
                             group ?: "",
@@ -680,7 +683,7 @@ private class RawPom(
                             type,
                             DEFAULT_SNAPSHOT_VERSION
                     ),
-                    scope?.trim()?.toLowerCase() ?: DEFAULT_SCOPE,
+                    scope?.trim()?.toLowerCase() ?: "",
                     optional ?: DEFAULT_OPTIONAL,
                     exclusions)
         }

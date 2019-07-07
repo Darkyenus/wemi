@@ -28,6 +28,8 @@ private val WEBB = Webb(null).apply {
     // Just for consistency
     setDefaultHeader("Accept", "*/*")
     setDefaultHeader("Accept-Language", "*")
+    // Should be default, but just in case
+    setFollowRedirects(true)
 }
 
 private fun httpGet(url: URL, ifModifiedSince:Long = -1): Request {

@@ -478,7 +478,7 @@ val problematic_1 by configuration("") {
     libraryDependencies set { setOf(dependency("org.eclipse.jetty.websocket:websocket-client:9.4.15.v20190215")) }
 
     checkResolution set {
-        assertClasspathContainsFiles("websocket-client.jar")
+        assertClasspathContainsFiles("websocket-client-9.4.15.v20190215.jar", "jetty-client-9.4.15.v20190215.jar", "jetty-xml-9.4.15.v20190215.jar", "jetty-util-9.4.15.v20190215.jar", "jetty-io-9.4.15.v20190215.jar", "websocket-common-9.4.15.v20190215.jar", "jetty-http-9.4.15.v20190215.jar", "jetty-jmx-9.4.15.v20190215.jar", "websocket-api-9.4.15.v20190215.jar")
     }
 }
 
