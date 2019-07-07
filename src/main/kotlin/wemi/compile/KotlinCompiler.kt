@@ -4,6 +4,7 @@ import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.Marker
+import wemi.ActivityListener
 import wemi.boot.WemiBundledLibrariesExclude
 import wemi.dependency.*
 import wemi.util.*
@@ -89,11 +90,11 @@ enum class KotlinCompilerVersion (
      *
      * First invocation will need to resolve some dependencies, which may take a while.
      */
-    fun compilerInstance():KotlinCompiler {
+    fun compilerInstance(progressTracker:ActivityListener?):KotlinCompiler {
         synchronized(this) {
             var kotlinCompiler = compilerCache
             if (kotlinCompiler == null) {
-                val artifacts = resolveDependencyArtifacts(compilerDependency, listOf(MavenCentral))
+                val artifacts = resolveDependencyArtifacts(compilerDependency, listOf(MavenCentral), progressTracker)
                         ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
                 LOG.trace("Classpath for {} compiler: {}", string, artifacts)

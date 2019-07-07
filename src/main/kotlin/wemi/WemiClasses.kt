@@ -214,10 +214,10 @@ class Project internal constructor(val name: String, internal val projectRoot: P
      * @param configurations that should be applied to this [Project]'s [Scope] before [action] is run in it.
      *          It is equivalent to calling [Scope.using] directly in the [action], but more convenient.
      */
-    inline fun <Result> evaluate(vararg configurations:Configuration, action:EvalScope.()->Result):Result {
+    inline fun <Result> evaluate(listener:EvaluationListener?, vararg configurations:Configuration, action:EvalScope.()->Result):Result {
         try {
             evaluateLock()
-            return EvalScope(this.scopeFor(*configurations), NO_CONFIGURATIONS, ArrayList(), ArrayList(), NO_INPUT).run(action)
+            return EvalScope(this.scopeFor(*configurations), NO_CONFIGURATIONS, ArrayList(), ArrayList(), NO_INPUT, listener).run(action)
         } finally {
             evaluateUnlock()
         }
@@ -357,7 +357,7 @@ class Scope internal constructor(
         }
     }
 
-    private fun <T> createElementaryKeyBinding(key:Key<T>, listener:WemiKeyEvaluationListener?):Binding<T>? {
+    private fun <T> createElementaryKeyBinding(key:Key<T>, listener:EvaluationListener?):Binding<T>? {
         val boundValue: Value<T>?
         val boundValueOriginScope: Scope?
         val boundValueOriginHolder: BindingHolder?
@@ -406,7 +406,7 @@ class Scope internal constructor(
         return Binding(key, boundValue, modifiers, boundValueOriginScope, boundValueOriginHolder)
     }
 
-    internal fun <T> getKeyBinding(key:Key<T>, listener:WemiKeyEvaluationListener?):Binding<T>? {
+    internal fun <T> getKeyBinding(key:Key<T>, listener:EvaluationListener?):Binding<T>? {
         // Put into the cache after successful evaluation
         keyBindingCache[key]?.let {
             @Suppress("UNCHECKED_CAST")
@@ -726,7 +726,7 @@ sealed class BindingHolder : WithDescriptiveString {
  */
 class Static<V>(private val value:V) : (EvalScope) -> V {
     override fun invoke(ignored: EvalScope): V {
-        activeKeyEvaluationListener?.keyEvaluationFeature("static")
+        ignored.progressListener?.keyEvaluationFeature("static")
         return value
     }
 }
@@ -752,9 +752,9 @@ class LazyStatic<V>(generator:()->V) : (EvalScope) -> V {
             value = generator.invoke()
             this.cachedValue = value
             this.generator = null
-            activeKeyEvaluationListener?.keyEvaluationFeature("first lazy static")
+            scope.progressListener?.keyEvaluationFeature("first lazy static")
         } else {
-            activeKeyEvaluationListener?.keyEvaluationFeature("lazy static")
+            scope.progressListener?.keyEvaluationFeature("lazy static")
             value = this.cachedValue as V
         }
         return value

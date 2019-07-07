@@ -7,10 +7,10 @@ import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
 
 /**
- * [WemiKeyEvaluationListener] that stores relevant information about key evaluation and then
+ * [EvaluationListener] that stores relevant information about key evaluation and then
  * produces a human readable tree report about it.
  */
-class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : WemiKeyEvaluationListener {
+class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : EvaluationListener {
 
     private val roots = ArrayList<TreeNode<KeyData>>()
     private val stack = ArrayDeque<TreeNode<KeyData>>()

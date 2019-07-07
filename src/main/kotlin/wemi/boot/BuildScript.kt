@@ -326,7 +326,7 @@ internal fun compileBuildScript(buildScriptInfo:BuildScriptInfo) {
     val externalClasspath = buildScriptInfo.unmanagedDependencies + buildScriptInfo.managedDependencies
     LOG.debug("Compiling sources: {} classpath: {} resultJar: {}", sources, externalClasspath, resultJar)
 
-    val status = WemiKotlinVersion.compilerInstance().compileJVM(sources.map { LocatedPath(it) }, externalClasspath, resultJar,
+    val status = WemiKotlinVersion.compilerInstance(null).compileJVM(sources.map { LocatedPath(it) }, externalClasspath, resultJar,
             null, BuildScriptInfo.compilerOptions, LoggerFactory.getLogger("BuildScriptCompilation"), null)
     if (status != KotlinCompiler.CompileExitStatus.OK) {
         LOG.warn("Compilation failed for {}: {}", sources, status)

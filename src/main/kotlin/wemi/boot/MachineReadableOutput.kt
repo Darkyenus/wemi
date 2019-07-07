@@ -70,7 +70,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
     }
 
     try {
-        val (_, data, status) = task.evaluateKey(null)
+        val (_, data, status) = task.evaluateKey(null, null)
         when (status) {
             TaskEvaluationStatus.Success -> {
                 machineReadablePrint(out, data)

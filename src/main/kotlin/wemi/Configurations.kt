@@ -73,7 +73,7 @@ object Configurations {
             it.appendPatterns(filter(*Array(KotlinSourceFileExtensions.size) { i ->"**.${KotlinSourceFileExtensions[i]}"}))
         }
 
-        Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance() }
+        Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance(progressListener) }
         Keys.compilerOptions modify {
             it.apply {
                 set(KotlinCompilerFlags.moduleName, Keys.projectName.get())

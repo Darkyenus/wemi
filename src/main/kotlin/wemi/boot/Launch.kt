@@ -204,7 +204,7 @@ internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.funct
     // Auto-run
     for (task in autoRunTasks!!) {
         LOG.info("Auto-run: {}", task)
-        val result = task.evaluateKey(null)
+        val result = task.evaluateKey(null, null)
         when (result.status) {
             TaskEvaluationStatus.Success -> {
                 LOG.info("Success")

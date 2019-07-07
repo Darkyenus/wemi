@@ -60,11 +60,55 @@ fun StringBuilder.appendTimeDuration(ms: Long): StringBuilder {
     return result
 }
 
+/** Like [appendTimeDuration], but only shows most significant unit. */
+fun StringBuilder.appendShortTimeDuration(ms: Long): StringBuilder {
+    val SECOND = 1000
+    val MINUTE = SECOND * 60
+    val HOUR = MINUTE * 60
+    val DAY = HOUR * 24
+
+    var remaining = ms
+
+    val days = remaining / DAY
+    if (days == 1L) {
+        return append("1 day")
+    } else if (days > 1L) {
+        return append(days).append(" days")
+    }
+
+    remaining %= DAY
+    val hours = remaining / HOUR
+    if (hours == 1L) {
+        return append("1 hour ")
+    } else if (hours > 1L) {
+        return append(hours).append(" hours ")
+    }
+
+    remaining %= HOUR
+    val minutes = remaining / MINUTE
+    if (minutes == 1L) {
+        return append("1 minute ")
+    } else if (minutes > 1L) {
+        return append(minutes).append(" minutes ")
+    }
+
+    remaining %= MINUTE
+    val seconds = remaining / SECOND
+    if (seconds == 1L) {
+        return append("1 second ")
+    } else if (seconds > 1L) {
+        return append(seconds).append(" seconds ")
+    }
+
+    remaining %= SECOND
+    return append(remaining).append(" ms")
+}
+
 /**
  * Format given [bytes] amount as a human readable duration string.
  * Uses SI units. Only two most significant units are used, rest is truncated.
  *
- * Example output: "1 day 5 minutes 33 seconds 0 ms"
+ * Example output: "1 TB 5 GB"
  */
 fun StringBuilder.appendByteSize(bytes: Long): StringBuilder {
     val KILO = 1000L
@@ -113,6 +157,42 @@ fun StringBuilder.appendByteSize(bytes: Long): StringBuilder {
     setLength(length-1)//Truncate trailing space
 
     return this
+}
+
+/** Like [appendByteSize], but only most significant unit and no spaces. */
+fun StringBuilder.appendShortByteSize(bytes: Long): StringBuilder {
+    val KILO = 1000L
+    val MEGA = 1000_000L
+    val GIGA = 1000_000_000L
+    val TERA = 1000_000_000_000L
+
+    var remaining = bytes
+
+    val tera = remaining / TERA
+    if (tera > 0L) {
+        return append(tera).append("TB")
+    }
+
+    remaining %= TERA
+    val giga = remaining / GIGA
+    if (giga > 0L) {
+        return append(giga).append("GB")
+    }
+
+    remaining %= GIGA
+    val mega = remaining / MEGA
+    if (mega > 0L) {
+        return append(mega).append("MB")
+    }
+
+    remaining %= MEGA
+    val kilo = remaining / KILO
+    if (kilo > 0L) {
+        return append(kilo).append("kB")
+    }
+
+    remaining %= KILO
+    return append(remaining).append('B')
 }
 
 /**

@@ -98,16 +98,19 @@ class DependencyId constructor(
 
 
     override fun toString(): String {
+        // group:name:version:classifier@type
         val result = StringBuilder()
         result.append(group).append(':').append(name).append(':').append(version)
+
+        if (isSnapshot && snapshotVersion != DEFAULT_SNAPSHOT_VERSION) {
+            result.setLength(maxOf(result.length - "SNAPSHOT".length, 0))
+            result.append('(').append(snapshotVersion).append(')')
+        }
         if (classifier != NoClassifier) {
-            result.append(" classifier:").append(classifier)
+            result.append(":").append(classifier)
         }
         if (type != DEFAULT_TYPE) {
-            result.append(" type:").append(type)
-        }
-        if (snapshotVersion != DEFAULT_SNAPSHOT_VERSION) {
-            result.append(" snapshotVersion:").append(snapshotVersion)
+            result.append("@").append(type)
         }
         return result.toString()
     }

@@ -104,7 +104,8 @@ class EvalScope @PublishedApi internal constructor(
         @PublishedApi internal val configurationPrefix:Array<Configuration>,
         @PublishedApi internal val usedBindings: ArrayList<Binding<*>>,
         @PublishedApi internal val expirationTriggers: ArrayList<() -> Boolean>,
-        val input:Array<out Pair<String, String>>) : Closeable {
+        val input:Array<out Pair<String, String>>,
+        val progressListener:EvaluationListener?) : Closeable {
 
     /** Used by the input subsystem. See Input.kt. */
     internal var nextFreeInput = 0
@@ -131,7 +132,7 @@ class EvalScope @PublishedApi internal constructor(
         for (configuration in configurations) {
             scope = scope.scopeFor(configuration)
         }
-        return EvalScope(scope, configurationPrefix + configurations, usedBindings, expirationTriggers, input).use { it.action() }
+        return EvalScope(scope, configurationPrefix + configurations, usedBindings, expirationTriggers, input, progressListener).use { it.action() }
     }
 
     /** Run the [action] in a scope, which is created by layering [configurations] over this [Scope]. */
@@ -141,24 +142,24 @@ class EvalScope @PublishedApi internal constructor(
         for (configuration in configurations) {
             scope = scope.scopeFor(configuration)
         }
-        return EvalScope(scope, configurationPrefix + configurations, usedBindings, expirationTriggers, input).use { it.action() }
+        return EvalScope(scope, configurationPrefix + configurations, usedBindings, expirationTriggers, input, progressListener).use { it.action() }
     }
 
     /** Run the [action] in a scope, which is created by layering [configuration] over this [Scope]. */
     inline fun <Result> using(configuration: Configuration, action: EvalScope.() -> Result): Result {
         ensureNotClosed()
-        return EvalScope(scope.scopeFor(configuration), configurationPrefix + configuration, usedBindings, expirationTriggers, input).use { it.action() }
+        return EvalScope(scope.scopeFor(configuration), configurationPrefix + configuration, usedBindings, expirationTriggers, input, progressListener).use { it.action() }
     }
 
     inline fun <Result> using(project:Project, vararg configurations:Configuration, action: EvalScope.() -> Result): Result {
         ensureNotClosed()
         val scope = project.scopeFor(*configurations)
-        return EvalScope(scope, NO_CONFIGURATIONS, usedBindings, expirationTriggers, input).use { it.action() }
+        return EvalScope(scope, NO_CONFIGURATIONS, usedBindings, expirationTriggers, input, progressListener).use { it.action() }
     }
 
     private fun <V : Output, Output> getKeyValue(key: Key<V>, otherwise: Output, useOtherwise: Boolean, input:Array<out Pair<String, String>>): Output {
         ensureNotClosed()
-        val listener = activeKeyEvaluationListener
+        val listener = progressListener
         listener?.keyEvaluationStarted(this.scope, key)
 
         val binding = scope.getKeyBinding(key, listener)
@@ -184,7 +185,7 @@ class EvalScope @PublishedApi internal constructor(
             binding.lastEvaluationExpirationTriggers.clear()
 
             val result:V =
-            EvalScope(scope, NO_CONFIGURATIONS, newDependsOn, binding.lastEvaluationExpirationTriggers, input).use { evalScope ->
+            EvalScope(scope, NO_CONFIGURATIONS, newDependsOn, binding.lastEvaluationExpirationTriggers, input, listener).use { evalScope ->
                 val boundValue = binding.value
                 var result =
                 if (boundValue == null) {
@@ -217,7 +218,7 @@ class EvalScope @PublishedApi internal constructor(
             }
 
             if (binding.lastEvaluationExpirationTriggers.isNotEmpty()) {
-                listener?.keyEvaluationFeature(WemiKeyEvaluationListener.FEATURE_EXPIRATION_TRIGGERS)
+                listener?.keyEvaluationFeature(EvaluationListener.FEATURE_EXPIRATION_TRIGGERS)
             }
 
             binding.lastEvaluated = globalTickTime
@@ -362,23 +363,22 @@ fun EvalScope.expiresWith(file: Path) {
     expiresWhen { file.lastModifiedMillis() != time }
 }
 
+/** Listener watching the progress of some nested activities. */
+interface ActivityListener {
+    /** Begin some internal [activity]. Must be balanced with [endActivity]. */
+    fun beginActivity(activity: String) {}
 
-/** @see useKeyEvaluationListener */
-internal var activeKeyEvaluationListener:WemiKeyEvaluationListener? = null
-    private set
+    /** This activity concerns some data and the progress is measured in processed bytes,
+     * for example file downloading. Notify user about the progress of this processing.
+     * Implicitly completed by end of [beginActivity]-[endActivity] block.
+     *
+     * @param bytes processed so far
+     * @param totalBytes to be processed in total. 0 if unknown.
+     * @param durationNs how long in nanoseconds did it took to process this far*/
+    fun activityProgressBytes(bytes:Long, totalBytes:Long, durationNs:Long) {}
 
-/** Execute [action] with [listener] set to listen to any key evaluations that are done during this time. */
-fun <Result>useKeyEvaluationListener(listener: WemiKeyEvaluationListener, action:()->Result):Result {
-    val oldListener = activeKeyEvaluationListener
-    val usedListener =
-            if (oldListener == null) listener else WemiKeyEvaluationListenerSplitter(oldListener, listener)
-    try {
-        activeKeyEvaluationListener = usedListener
-        return action()
-    } finally {
-        assert(activeKeyEvaluationListener === usedListener) { "Someone has applied different listener during action()!" }
-        activeKeyEvaluationListener = oldListener
-    }
+    /** End activity started by [beginActivity]. */
+    fun endActivity() {}
 }
 
 /**
@@ -388,7 +388,7 @@ fun <Result>useKeyEvaluationListener(listener: WemiKeyEvaluationListener, action
  * Keys are evaluated in a tree, the currently evaluated key is on a stack.
  * @see keyEvaluationStarted for more information
  */
-interface WemiKeyEvaluationListener {
+interface EvaluationListener : ActivityListener {
     /**
      * Evaluation of a key has started.
      *
@@ -452,40 +452,61 @@ interface WemiKeyEvaluationListener {
     companion object {
         /** [keyEvaluationFeature] to signify that when this value has been cached, it specified explicit expiration triggers */
         const val FEATURE_EXPIRATION_TRIGGERS = "has expiration triggers"
-    }
-}
 
-private class WemiKeyEvaluationListenerSplitter(
-        private val first:WemiKeyEvaluationListener,
-        private val second:WemiKeyEvaluationListener) : WemiKeyEvaluationListener {
+        operator fun EvaluationListener?.plus(second:EvaluationListener?):EvaluationListener? {
+            if (this == null || second == null) {
+                return this ?: second
+            }
 
-    override fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {
-        first.keyEvaluationStarted(fromScope, key)
-        second.keyEvaluationStarted(fromScope, key)
-    }
+            val first = this
 
-    override fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder: BindingHolder, amount: Int) {
-        first.keyEvaluationHasModifiers(modifierFromScope, modifierFromHolder, amount)
-        second.keyEvaluationHasModifiers(modifierFromScope, modifierFromHolder, amount)
-    }
+            return object : EvaluationListener {
 
-    override fun keyEvaluationFeature(feature: String) {
-        first.keyEvaluationFeature(feature)
-        second.keyEvaluationFeature(feature)
-    }
+                override fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {
+                    first.keyEvaluationStarted(fromScope, key)
+                    second.keyEvaluationStarted(fromScope, key)
+                }
 
-    override fun <V> keyEvaluationSucceeded(binding: Binding<V>, result: V) {
-        first.keyEvaluationSucceeded(binding, result)
-        second.keyEvaluationSucceeded(binding, result)
-    }
+                override fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder: BindingHolder, amount: Int) {
+                    first.keyEvaluationHasModifiers(modifierFromScope, modifierFromHolder, amount)
+                    second.keyEvaluationHasModifiers(modifierFromScope, modifierFromHolder, amount)
+                }
 
-    override fun keyEvaluationFailedByNoBinding(withAlternative: Boolean, alternativeResult: Any?) {
-        first.keyEvaluationFailedByNoBinding(withAlternative, alternativeResult)
-        second.keyEvaluationFailedByNoBinding(withAlternative, alternativeResult)
-    }
+                override fun keyEvaluationFeature(feature: String) {
+                    first.keyEvaluationFeature(feature)
+                    second.keyEvaluationFeature(feature)
+                }
 
-    override fun keyEvaluationFailedByError(exception: Throwable, fromKey: Boolean) {
-        first.keyEvaluationFailedByError(exception, fromKey)
-        second.keyEvaluationFailedByError(exception, fromKey)
+                override fun <V> keyEvaluationSucceeded(binding: Binding<V>, result: V) {
+                    first.keyEvaluationSucceeded(binding, result)
+                    second.keyEvaluationSucceeded(binding, result)
+                }
+
+                override fun keyEvaluationFailedByNoBinding(withAlternative: Boolean, alternativeResult: Any?) {
+                    first.keyEvaluationFailedByNoBinding(withAlternative, alternativeResult)
+                    second.keyEvaluationFailedByNoBinding(withAlternative, alternativeResult)
+                }
+
+                override fun keyEvaluationFailedByError(exception: Throwable, fromKey: Boolean) {
+                    first.keyEvaluationFailedByError(exception, fromKey)
+                    second.keyEvaluationFailedByError(exception, fromKey)
+                }
+
+                override fun beginActivity(activity: String) {
+                    first.beginActivity(activity)
+                    second.beginActivity(activity)
+                }
+
+                override fun activityProgressBytes(bytes: Long, totalBytes: Long, durationNs:Long) {
+                    first.activityProgressBytes(bytes, totalBytes, durationNs)
+                    second.activityProgressBytes(bytes, totalBytes, durationNs)
+                }
+
+                override fun endActivity() {
+                    first.endActivity()
+                    second.endActivity()
+                }
+            }
+        }
     }
 }

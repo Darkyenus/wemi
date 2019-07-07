@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory
 import org.xml.sax.*
 import org.xml.sax.helpers.DefaultHandler
 import org.xml.sax.helpers.XMLReaderFactory
+import wemi.ActivityListener
 import wemi.dependency.*
 import wemi.dependency.internal.PomBuildingXMLHandler.Companion.SupportedModelVersion
 import wemi.publish.InfoNode
@@ -55,7 +56,8 @@ private class DependencyManagementKey(val groupId:String, val name:String, val c
  */
 internal fun resolveArtifacts(dependencies: Collection<Dependency>,
                               repositories: SortedRepositories,
-                              mapper: (Dependency) -> Dependency):Partial<Map<DependencyId, ResolvedDependency>> {
+                              mapper: (Dependency) -> Dependency,
+                              progressTracker: ActivityListener?):Partial<Map<DependencyId, ResolvedDependency>> {
     if (dependencies.isEmpty()) {
         return Partial(emptyMap(), true)
     } else if (repositories.isEmpty()) {
@@ -86,68 +88,73 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
                 continue
             }
 
-            val resolvedDep = resolveInM2Repository(depId, dep.dependencyManagement, repositories, dep.scope)
-            resolved[depId] = resolvedDep
-            resolvedPartials[partialId] = resolvedDep
+            progressTracker?.beginActivity(dep.dependencyId.toString())
+            try {
+                val resolvedDep = resolveInM2Repository(depId, dep.dependencyManagement, repositories, dep.scope, progressTracker)
+                resolved[depId] = resolvedDep
+                resolvedPartials[partialId] = resolvedDep
 
-            if (resolvedDep.hasError) {
-                noError = false
-                continue
-            }
-
-            nextNextDependencies.ensureCapacity(resolvedDep.dependencies.size)
-            for (transitiveDependency in resolvedDep.dependencies) {
-                if (transitiveDependency.optional) {
-                    LOG.debug("Excluded optional {} (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                if (resolvedDep.hasError) {
+                    noError = false
                     continue
                 }
 
-                val exclusionRule = dep.exclusions.find { it.excludes(transitiveDependency.dependencyId) }
-                if (exclusionRule != null) {
-                    LOG.debug("Excluded {} with rule {} (dependency of {})", transitiveDependency.dependencyId, exclusionRule, dep.dependencyId)
-                    continue
-                }
+                nextNextDependencies.ensureCapacity(resolvedDep.dependencies.size)
+                for (transitiveDependency in resolvedDep.dependencies) {
+                    if (transitiveDependency.optional) {
+                        LOG.debug("Excluded optional {} (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                        continue
+                    }
 
-                // Resolve scope
-                // (See the table at https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope)
-                val resolvedToScope:String? = when (transitiveDependency.scope) {
-                    "compile" -> when (dep.scope) {
-                        "compile" -> "compile"
-                        "provided" -> "provided"
-                        "runtime" -> "runtime"
-                        "test" -> "test"
+                    val exclusionRule = dep.exclusions.find { it.excludes(transitiveDependency.dependencyId) }
+                    if (exclusionRule != null) {
+                        LOG.debug("Excluded {} with rule {} (dependency of {})", transitiveDependency.dependencyId, exclusionRule, dep.dependencyId)
+                        continue
+                    }
+
+                    // Resolve scope
+                    // (See the table at https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope)
+                    val resolvedToScope:String? = when (transitiveDependency.scope) {
+                        "compile" -> when (dep.scope) {
+                            "compile" -> "compile"
+                            "provided" -> "provided"
+                            "runtime" -> "runtime"
+                            "test" -> "test"
+                            else -> null
+                        }
+                        "runtime" -> when (dep.scope) {
+                            "compile" -> "runtime"
+                            "provided" -> "provided"
+                            "runtime" -> "runtime"
+                            "test" -> "test"
+                            else -> null
+                        }
                         else -> null
                     }
-                    "runtime" -> when (dep.scope) {
-                        "compile" -> "runtime"
-                        "provided" -> "provided"
-                        "runtime" -> "runtime"
-                        "test" -> "test"
-                        else -> null
+
+                    if (resolvedToScope == null) {
+                        LOG.debug("Excluded {} due to transitive scope change (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                        continue
                     }
-                    else -> null
-                }
 
-                if (resolvedToScope == null) {
-                    LOG.debug("Excluded {} due to transitive scope change (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
-                    continue
-                }
-
-                val transitivelyAdjusted = if (transitiveDependency.scope == resolvedToScope && dep.exclusions.isEmpty()) {
-                    transitiveDependency
-                } else {
-                    if (transitiveDependency.scope != resolvedToScope) {
-                        LOG.debug("Changing the scope of {} to {}", transitiveDependency, resolvedToScope)
+                    val transitivelyAdjusted = if (transitiveDependency.scope == resolvedToScope && dep.exclusions.isEmpty()) {
+                        transitiveDependency
+                    } else {
+                        if (transitiveDependency.scope != resolvedToScope) {
+                            LOG.debug("Changing the scope of {} to {}", transitiveDependency, resolvedToScope)
+                        }
+                        Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, dep.exclusions + transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
                     }
-                    Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, dep.exclusions + transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
-                }
 
-                val mapped = mapper(transitivelyAdjusted)
-                if (mapped != transitivelyAdjusted) {
-                    LOG.debug("{} mapped to {}", transitivelyAdjusted, mapped)
-                }
+                    val mapped = mapper(transitivelyAdjusted)
+                    if (mapped != transitivelyAdjusted) {
+                        LOG.debug("{} mapped to {}", transitivelyAdjusted, mapped)
+                    }
 
-                nextNextDependencies.add(mapped)
+                    nextNextDependencies.add(mapped)
+                }
+            } finally {
+                progressTracker?.endActivity()
             }
         }
 
@@ -214,7 +221,8 @@ private fun resolveInM2Repository(
         dependencyId: DependencyId,
         transitiveDependencyManagement:List<Dependency>,
         repositories: SortedRepositories,
-        resultScope:String): ResolvedDependency {
+        resultScope:String,
+        progressTracker: ActivityListener?): ResolvedDependency {
     val snapshot = dependencyId.isSnapshot
     val compatibleRepositories:CompatibleSortedRepositories = repositories.filter { repository ->
         if (if (snapshot) repository.snapshots else repository.releases) {
@@ -226,15 +234,15 @@ private fun resolveInM2Repository(
     }
 
     // Retrieve basic POM data
-    val (retrievedPom, resolvedDependencyId) = retrievePom(dependencyId, compatibleRepositories, snapshot).use({ it }, { return it })
+    val (retrievedPom, resolvedDependencyId) = retrievePom(dependencyId, compatibleRepositories, snapshot, progressTracker).use({ it }, { return it })
     val repository = retrievedPom.repository
 
     if (resolvedDependencyId.type.equals("pom", ignoreCase = true)) {
         return ResolvedDependency(resolvedDependencyId, resultScope, emptyList(), repository, retrievedPom)
     }
 
-    val resolvedPom = resolveRawPom(retrievedPom, transitiveDependencyManagement, compatibleRepositories).fold { rawPom ->
-        resolvePom(rawPom, transitiveDependencyManagement, compatibleRepositories)
+    val resolvedPom = resolveRawPom(retrievedPom, transitiveDependencyManagement, compatibleRepositories, progressTracker).fold { rawPom ->
+        resolvePom(rawPom, transitiveDependencyManagement, compatibleRepositories, progressTracker)
     }
 
     val pom = resolvedPom.use( { it }, {  log ->
@@ -245,7 +253,7 @@ private fun resolveInM2Repository(
     val extension = TYPE_TO_EXTENSION_MAPPING.getOrDefault(resolvedDependencyId.type, resolvedDependencyId.type)
 
     val filePath = artifactPath(resolvedDependencyId.group, resolvedDependencyId.name, resolvedDependencyId.version, resolvedDependencyId.classifier, extension, resolvedDependencyId.snapshotVersion)
-    val retrieved = retrieveFile(filePath, snapshot, listOf(repository))
+    val retrieved = retrieveFile(filePath, snapshot, listOf(repository), progressTracker = progressTracker)
 
     if (retrieved == null) {
         LOG.warn("Failed to retrieve file at '{}' in {}", filePath, repository)
@@ -258,7 +266,7 @@ private fun resolveInM2Repository(
     }
 }
 
-private fun resolveRawPom(pomArtifact:ArtifactPath, transitiveDependencyManagement:List<Dependency>, repositories: SortedRepositories): Failable<RawPom, String> {
+private fun resolveRawPom(pomArtifact:ArtifactPath, transitiveDependencyManagement:List<Dependency>, repositories: SortedRepositories, progressTracker: ActivityListener?): Failable<RawPom, String> {
     val pomUrl:URL = pomArtifact.url
     val pomData:ByteArray = pomArtifact.data ?: return Failable.failure("Failed to retrieve pom data")
 
@@ -286,12 +294,12 @@ private fun resolveRawPom(pomArtifact:ArtifactPath, transitiveDependencyManageme
         }
 
         LOG.trace("Retrieving parent pom of '{}' by coordinates '{}', in same repository", pomUrl, parentPomId)
-        val resolvedPom = resolveInM2Repository(parentPomId, transitiveDependencyManagement, repositories, "")
+        val resolvedPom = resolveInM2Repository(parentPomId, transitiveDependencyManagement, repositories, "", progressTracker)
         val artifact = resolvedPom.artifact
 
         var parent: RawPom? = null
         if (artifact != null) {
-            resolveRawPom(artifact, transitiveDependencyManagement, repositories)
+            resolveRawPom(artifact, transitiveDependencyManagement, repositories, progressTracker)
                     .success { pom ->
                         parent = pom
                     }
@@ -309,10 +317,10 @@ private fun resolveRawPom(pomArtifact:ArtifactPath, transitiveDependencyManageme
 
 /** Retrieve raw pom file for given [dependencyId] in [repositories].
  * If [snapshot] and it is unique snapshot, it resolves maven-metadata.xml and returns the pom for the newest version. */
-private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSortedRepositories, snapshot:Boolean):Failable<Pair<ArtifactPath, DependencyId>, ResolvedDependency> {
+private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSortedRepositories, snapshot:Boolean, progressTracker: ActivityListener?):Failable<Pair<ArtifactPath, DependencyId>, ResolvedDependency> {
     LOG.trace("Retrieving pom for {} at '{}'", dependencyId, repositories)
     // Handles normal poms and old non-unique snapshot poms
-    val retrievedPom = retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion), snapshot, repositories)
+    val retrievedPom = retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion), snapshot, repositories, progressTracker)
     if (retrievedPom != null) {
         return Failable.success(retrievedPom to dependencyId)
     }
@@ -321,7 +329,7 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
     if (snapshot && dependencyId.snapshotVersion.isEmpty()) {
         // Query for maven-metadata.xml (https://github.com/strongbox/strongbox/wiki/Maven-Metadata)
         val mavenMetadataPath = mavenMetadataPath(dependencyId, null)
-        val metadataFileArtifact = retrieveFile(mavenMetadataPath, true, repositories) { repo -> mavenMetadataPath(dependencyId, repo) }
+        val metadataFileArtifact = retrieveFile(mavenMetadataPath, true, repositories, progressTracker) { repo -> mavenMetadataPath(dependencyId, repo) }
                 ?: return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve snapshot metadata"))
         val metadataBuilder = MavenMetadataBuildingXMLHandler.buildFrom(metadataFileArtifact)
         val snapshotVersion = metadataBuilder.use({ metadata ->
@@ -335,7 +343,7 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
 
         LOG.debug("Resolving {} in {} with snapshot version {}", dependencyId, metadataFileArtifact.repository, snapshotVersion)
 
-        val newRetrievedPom = retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, snapshotVersion), snapshot, listOf(metadataFileArtifact.repository))
+        val newRetrievedPom = retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, snapshotVersion), snapshot, listOf(metadataFileArtifact.repository), progressTracker)
 
         if (newRetrievedPom != null) {
             return Failable.success(newRetrievedPom to dependencyId.copy(snapshotVersion = snapshotVersion))
@@ -347,7 +355,7 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
     return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve pom xml"))
 }
 
-private fun resolvePom(rawPom: RawPom, transitiveDependencyManagement:List<Dependency>, repositories: CompatibleSortedRepositories): Failable<Pom, String> {
+private fun resolvePom(rawPom: RawPom, transitiveDependencyManagement:List<Dependency>, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?): Failable<Pom, String> {
     val partialPom = rawPom.resolve(transitiveDependencyManagement)
     if (!partialPom.complete) {
         return Failable.failure("Pom is invalid")
@@ -372,14 +380,14 @@ private fun resolvePom(rawPom: RawPom, transitiveDependencyManagement:List<Depen
 
         LOG.trace("Resolving dependencyManagement import {} in '{}'", dep, rawPom.url)
 
-        val resolvedPom = resolveInM2Repository(dep, dependency.dependencyManagement, repositories, "")
+        val resolvedPom = resolveInM2Repository(dep, dependency.dependencyManagement, repositories, "", progressTracker)
         if (resolvedPom.hasError) {
             LOG.warn("dependencyManagement import in {} of {} failed: failed to retrieve pom - {}", rawPom.url, dep, resolvedPom)
             return Failable.failure(resolvedPom.log?.toString() ?: "failed to retrieve")
         }
         val artifact = resolvedPom.artifact!!
-        resolveRawPom(artifact, transitiveDependencyManagement, repositories).fold { retrievedRawPom ->
-            resolvePom(retrievedRawPom, transitiveDependencyManagement, repositories)
+        resolveRawPom(artifact, transitiveDependencyManagement, repositories, progressTracker).fold { retrievedRawPom ->
+            resolvePom(retrievedRawPom, transitiveDependencyManagement, repositories, progressTracker)
         }.use({ importedPom ->
             val imported = importedPom.dependencyManagement
             if (imported.isNotEmpty()) {

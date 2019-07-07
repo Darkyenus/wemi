@@ -76,7 +76,7 @@ class Task(
      *
      * @param defaultProject to be used if no project is supplied
      */
-    fun evaluateKey(defaultProject:Project?): TaskEvaluationResult {
+    fun evaluateKey(defaultProject:Project?, listener:EvaluationListener?): TaskEvaluationResult {
         var project: Project? = defaultProject
 
         // Parse Project
@@ -101,7 +101,7 @@ class Task(
                 ?: return TaskEvaluationResult(null, this.key, TaskEvaluationStatus.NoKey)
 
         return try {
-            val result = project.evaluate(*configurations) {
+            val result = project.evaluate(listener, *configurations) {
                 key.get(*this@Task.input)
             }
 

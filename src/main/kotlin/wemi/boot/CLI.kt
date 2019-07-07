@@ -13,11 +13,13 @@ import wemi.*
 import wemi.Binding
 import wemi.util.*
 import wemi.util.CliStatusDisplay.Companion.withStatus
+import wemi.EvaluationListener.Companion.plus
 import java.io.IOException
 import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 /**
  * Handles user interaction in standard (possibly interactive) mode
@@ -219,12 +221,16 @@ object CLI {
         }
     }
 
-    private val KeyEvaluationStatusListener = object : WemiKeyEvaluationListener {
+    private val KeyEvaluationStatusListener = object : EvaluationListener {
 
         private val STATUS_PREFIX = if (WemiUnicodeOutputSupported) "• " else "# "
         private val STATUS_INFIX = if (WemiUnicodeOutputSupported) " ‣ " else " > "
+        private val STATUS_ELLIPSIS = if (WemiUnicodeOutputSupported) "…" else "..."
         private val STATUS_META_STYLE = AttributedStyle.BOLD.foreground(AttributedStyle.GREEN)
         private val STATUS_CONTENT_STYLE = AttributedStyle.DEFAULT.underline()
+        private val STATUS_CONTENT_ACTIVITY_STYLE = AttributedStyle.DEFAULT.underline().foreground(AttributedStyle.WHITE)
+        private val STATUS_SIZE_STYLE = AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE)
+        private val STATUS_TIME_STYLE = AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN)
 
         private val messageBuilder = AttributedStringBuilder()
         private val stack = ArrayList<Int>()
@@ -269,12 +275,79 @@ object CLI {
         override fun keyEvaluationFailedByError(exception: Throwable, fromKey: Boolean) {
             pop()
         }
+
+        override fun beginActivity(activity: String) {
+            stack.add(messageBuilder.length)
+            if (stack.size > 1) {
+                messageBuilder.style(STATUS_META_STYLE)
+                messageBuilder.append(STATUS_INFIX)
+            }
+            messageBuilder.style(STATUS_CONTENT_ACTIVITY_STYLE)
+            val maxLength = 32
+            if (activity.length > maxLength) {
+                messageBuilder.append(STATUS_ELLIPSIS).append(activity, maxOf(activity.length - maxLength - STATUS_ELLIPSIS.length, 0), activity.length)
+            } else {
+                messageBuilder.append(activity)
+            }
+            update()
+            nextActivityProgress = 0L
+        }
+
+        private val activityProgressBytes_sb = StringBuilder()
+
+        private var nextActivityProgress = 0L
+
+        override fun activityProgressBytes(bytes: Long, totalBytes: Long, durationNs:Long) {
+            val now = System.currentTimeMillis()
+            if (nextActivityProgress > now) {
+                // Do not update too often
+                return
+            }
+            nextActivityProgress = now + 1000 //ms
+
+            val originalMessageLength = messageBuilder.length
+            try {
+                val message = activityProgressBytes_sb
+                message.setLength(0)
+                message.append(' ').appendShortByteSize(bytes)
+                if (totalBytes > 0 && bytes <= totalBytes) {
+                    message.append('/').appendShortByteSize(totalBytes)
+                }
+                messageBuilder.style(STATUS_SIZE_STYLE).append(message)
+
+                val durationSec = durationNs / 1000000000.0
+                if (bytes > 0 && durationSec >= 1) {
+                    val bytesPerSec = bytes.toDouble() / durationSec
+                    message.setLength(0)
+                    message.append(" at ").appendShortByteSize(bytesPerSec.toLong()).append("/s")
+                    messageBuilder.append(message)
+
+                    if (bytes < totalBytes && bytesPerSec > 0) {
+                        val remainingSeconds = totalBytes / bytesPerSec
+                        if (remainingSeconds > 1.0 && remainingSeconds <= TimeUnit.DAYS.toSeconds(1)) {
+                            message.setLength(0)
+                            message.append(" (ETA ").appendShortTimeDuration((remainingSeconds * 1000.0).toLong()).append(')')
+                            messageBuilder.style(STATUS_TIME_STYLE).append(message)
+                        }
+                    }
+                }
+
+                update()
+            } finally {
+                messageBuilder.setLength(originalMessageLength)
+            }
+        }
+
+        override fun endActivity() {
+            pop()
+            nextActivityProgress = 0L
+        }
     }
 
     /**
      * Evaluates the key or command and prints human readable, formatted output.
      */
-    fun evaluateAndPrint(task: Task): TaskEvaluationResult {
+    fun evaluateAndPrint(task: Task, listener:EvaluationListener? = null): TaskEvaluationResult {
         if (task.couldBeCommand) {
             val commandFunction = commands[task.key]
             if (commandFunction != null) {
@@ -284,10 +357,8 @@ object CLI {
         }
 
         val beginTime = System.currentTimeMillis()
-        val keyEvaluationResult = useKeyEvaluationListener(KeyEvaluationStatusListener) {
-            MessageDisplay.withStatus(true) {
-                task.evaluateKey(defaultProject)
-            }
+        val keyEvaluationResult = MessageDisplay.withStatus(true) {
+            task.evaluateKey(defaultProject, KeyEvaluationStatusListener + listener)
         }
         val (key, data, status) = keyEvaluationResult
         val duration = System.currentTimeMillis() - beginTime
@@ -555,15 +626,13 @@ object CLI {
 
                 for (cycle in 1 until repeatCount) {
                     for (taskText in tasks) {
-                        evaluateLine(taskText)
+                        evaluateLine(taskText, null)
                     }
                     println("${if(WemiUnicodeOutputSupported) "🐾" else "#"} ${format("Repeat cycle $cycle done", format = Format.Bold)}")
                 }
 
                 for (taskText in tasks) {
-                    useKeyEvaluationListener(treePrintingListener) {
-                        result = evaluateLine(taskText)
-                    }
+                    result = evaluateLine(taskText, treePrintingListener)
                     treePrintingListener.appendResultTo(sb)
 
                     println("${if(WemiUnicodeOutputSupported) "🐾" else "#"} ${format("Trace", format = Format.Bold)}")
@@ -659,7 +728,7 @@ object CLI {
      *
      * @return result of last task evaluation, if any
      */
-    private fun evaluateLine(command: String):TaskEvaluationResult? {
+    private fun evaluateLine(command: String, listener:EvaluationListener?):TaskEvaluationResult? {
         if (command.isBlank()) {
             return null
         }
@@ -677,7 +746,7 @@ object CLI {
 
         var lastResult:TaskEvaluationResult? = null
         for (task in tasks) {
-            lastResult = evaluateAndPrint(task)
+            lastResult = evaluateAndPrint(task, listener)
         }
         return lastResult
     }
@@ -711,7 +780,7 @@ object CLI {
                 }
 
                 try {
-                    evaluateLine(line)
+                    evaluateLine(line, null)
                 } catch (e: ExitWemi) {
                     throw e
                 } catch (e: Exception) {

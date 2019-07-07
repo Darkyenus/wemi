@@ -1,15 +1,14 @@
 package wemi.dependency.internal
 
 import WemiVersion
-import com.darkyen.dave.Request
-import com.darkyen.dave.Response
-import com.darkyen.dave.Webb
-import com.darkyen.dave.WebbException
+import com.darkyen.dave.*
 import org.slf4j.LoggerFactory
+import wemi.ActivityListener
 import wemi.dependency.*
 import wemi.util.*
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.InputStream
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
@@ -148,12 +147,12 @@ private sealed class DownloadResult {
     class Success(val remoteLastModifiedTime:Long, val remoteArtifactData:ByteArray, val checksums:Array<String?>, val checksumMismatches:Int):DownloadResult()
 }
 
-private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheControlMs: Long, snapshot: Boolean):DownloadResult {
+private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheControlMs: Long, snapshot: Boolean, progressTracker: ActivityListener?):DownloadResult {
     val response: Response<ByteArray>
     // Falls back to current time if headers are invalid/missing, as we don't have any better metric
     var remoteLastModifiedTime = System.currentTimeMillis()
     try {
-        response = httpGet(repositoryArtifactUrl, cacheControlMs).executeBytes()
+        response = httpGet(repositoryArtifactUrl, cacheControlMs).execute(progressTracker, ResponseTranslator.BYTES_TRANSLATOR)
 
         val lastModified = response.lastModified
         val date = response.date
@@ -185,7 +184,7 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
     for (checksum in CHECKSUMS) {
         val checksumUrl = repositoryArtifactUrl.appendToPath(checksum.suffix)
         val checksumFileBody: String? = try {
-            val checksumResponse = httpGet(checksumUrl).executeString()
+            val checksumResponse = httpGet(checksumUrl).execute(progressTracker, ResponseTranslator.STRING_TRANSLATOR)
             if (!checksumResponse.isSuccess) {
                 LOG.debug("Failed to retrieve checksum '{}' (code: {})", checksumUrl, checksumResponse.statusCode)
                 continue
@@ -224,7 +223,7 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
 }
 
 /** Continuation of [retrieveFileLocally]. */
-private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:Boolean, cache:CacheArtifactPath, storeArtifact:Boolean): ArtifactPath? {
+private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:Boolean, cache:CacheArtifactPath, storeArtifact:Boolean, progressTracker: ActivityListener?): ArtifactPath? {
     val repositoryArtifactUrl = repository.url / path
     val cacheFile = cache.cacheFile
 
@@ -235,7 +234,7 @@ private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:
     var downloadFileSuccess:DownloadResult.Success? = null
     val retries = 3
     for (downloadTry in 1 .. retries) {
-        val downloadFileResult = retrieveFileDownloadAndVerify(repositoryArtifactUrl, cache.cacheControlMs, snapshot)
+        val downloadFileResult = retrieveFileDownloadAndVerify(repositoryArtifactUrl, cache.cacheControlMs, snapshot, progressTracker)
         when (downloadFileResult) {
             DownloadResult.Failure -> return null
             DownloadResult.UseCache -> {
@@ -310,7 +309,7 @@ private fun Repository.canResolve(snapshot:Boolean):Boolean {
     return if (snapshot) this.snapshots else this.releases
 }
 
-internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, cachePath:(Repository) -> String = {path}):ArtifactPath? {
+internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?, cachePath:(Repository) -> String = {path}):ArtifactPath? {
     val localFailures = arrayOfNulls<CacheArtifactPath>(repositories.size)
     for ((i, repository) in repositories.withIndex()) {
         retrieveFileLocally(repository, path, snapshot, cachePath(repository)).use<Unit>({
@@ -328,7 +327,7 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
             continue
 
         val repository = repositories[i]
-        val success = retrieveFileRemotely(repository, path, snapshot, cacheArtifactPath, result == null) ?: continue
+        val success = retrieveFileRemotely(repository, path, snapshot, cacheArtifactPath, result == null, progressTracker) ?: continue
         if (result == null) {
             result = success
             resultRepository = repository
@@ -345,4 +344,97 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
     }
 
     return result
+}
+
+private fun <T> Request.execute(listener:ActivityListener?, responseTranslator:ResponseTranslator<T>):Response<T> {
+    if (listener == null) {
+        return execute(responseTranslator)
+    } else {
+        listener.beginActivity(uri)
+        try {
+            return execute(object : ResponseTranslator<T> {
+                private val startNs = System.nanoTime()
+
+                override fun decode(response: Response<*>, originalIn: InputStream): T {
+                    val totalLength = response.headers.entries.find { it.key.equals("Content-Length", ignoreCase = true) }?.value?.first()?.toLongOrNull() ?: 0L
+
+                    listener.activityProgressBytes(0L, totalLength, System.nanoTime() - startNs)
+
+                    return responseTranslator.decode(response, object : InputStream() {
+
+                        private var totalRead = 0L
+                            set(value) {
+                                field = value
+                                if (value > totalReadHighMark) {
+                                    totalReadHighMark = value
+                                    listener.activityProgressBytes(value, totalLength, System.nanoTime() - startNs)
+                                }
+                            }
+                        private var totalReadMark = 0L
+
+                        private var totalReadHighMark = 0L
+
+                        override fun read(): Int {
+                            val read = originalIn.read()
+                            if (read != -1) {
+                                totalRead++
+                            }
+                            return read
+                        }
+
+                        override fun read(b: ByteArray): Int {
+                            val read = super.read(b)
+                            if (read > 0) {
+                                totalRead += read
+                            }
+                            return read
+                        }
+
+                        override fun read(b: ByteArray, off: Int, len: Int): Int {
+                            val read = super.read(b, off, len)
+                            if (read > 0) {
+                                totalRead += read
+                            }
+                            return read
+                        }
+
+                        override fun skip(n: Long): Long {
+                            val skipped = originalIn.skip(n)
+                            totalRead = maxOf(0, totalRead + skipped)
+                            return skipped
+                        }
+
+                        override fun available(): Int {
+                            return originalIn.available()
+                        }
+
+                        override fun close() {
+                            originalIn.close()
+                            listener.activityProgressBytes(totalRead, totalLength, System.nanoTime() - startNs)
+                        }
+
+                        override fun reset() {
+                            originalIn.reset()
+                            totalRead = totalReadMark
+                        }
+
+                        override fun mark(readlimit: Int) {
+                            originalIn.mark(readlimit)
+                            totalReadMark = totalRead
+                        }
+
+                        override fun markSupported(): Boolean {
+                            return originalIn.markSupported()
+                        }
+                    })
+                }
+
+                override fun decodeEmptyBody(response: Response<*>): T {
+                    return responseTranslator.decodeEmptyBody(response)
+                }
+            })
+        } finally {
+            listener.endActivity()
+        }
+    }
 }

@@ -1,6 +1,7 @@
 package wemi.dependency
 
 import org.slf4j.LoggerFactory
+import wemi.ActivityListener
 import wemi.util.Partial
 import wemi.util.directorySynchronized
 import java.nio.file.Path
@@ -10,8 +11,8 @@ import java.nio.file.Path
  *
  * If any dependency fails to resolve, returns null.
  */
-fun resolveDependencyArtifacts(dependencies: Collection<Dependency>, repositories: Collection<Repository>): List<Path>? {
-    val (resolved, ok ) = resolveDependencies(dependencies, repositories)
+fun resolveDependencyArtifacts(dependencies: Collection<Dependency>, repositories: Collection<Repository>, progressListener:ActivityListener?): List<Path>? {
+    val (resolved, ok ) = resolveDependencies(dependencies, repositories, progressListener = progressListener)
 
     if (!ok) {
         return null
@@ -39,7 +40,8 @@ fun Map<DependencyId, ResolvedDependency>.artifacts(): List<Path> {
  */
 fun resolveDependencies(dependencies: Collection<Dependency>,
                         repositories: Collection<Repository>,
-                        mapper: ((Dependency) -> Dependency) = { it }): Partial<Map<DependencyId, ResolvedDependency>> {
+                        mapper: ((Dependency) -> Dependency) = { it },
+                        progressListener: ActivityListener? = null): Partial<Map<DependencyId, ResolvedDependency>> {
     // Sort repositories
     val sorted = ArrayList(repositories)
     sorted.sortWith(REPOSITORY_COMPARATOR)
@@ -65,7 +67,7 @@ fun resolveDependencies(dependencies: Collection<Dependency>,
     }
 
     return locked(directoriesToLock.iterator()) {
-        wemi.dependency.internal.resolveArtifacts(dependencies, sorted, mapper)
+        wemi.dependency.internal.resolveArtifacts(dependencies, sorted, mapper, progressListener)
     }
 }
 

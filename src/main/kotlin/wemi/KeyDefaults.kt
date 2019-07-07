@@ -101,7 +101,7 @@ object KeyDefaults {
         val repositories = Keys.repositories.get()
         val libraryDependencies = Keys.libraryDependencies.get()
         val libraryDependencyProjectMapper = Keys.libraryDependencyProjectMapper.get()
-        resolveDependencies(libraryDependencies, repositories, libraryDependencyProjectMapper)
+        resolveDependencies(libraryDependencies, repositories, libraryDependencyProjectMapper, progressListener)
     }
 
     private val ResolveProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
@@ -795,7 +795,7 @@ object KeyDefaults {
 
     val ArchiveDokkaInterface: Value<DokkaInterface> = {
         val javaHome = Keys.javaHome.get()
-        val artifacts = resolveDependencyArtifacts(DokkaFatJar, listOf(JCenter))?.toMutableList()
+        val artifacts = resolveDependencyArtifacts(DokkaFatJar, listOf(JCenter), progressListener)?.toMutableList()
                 ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
         jdkToolsJar(javaHome)?.let { artifacts.add(it) }
