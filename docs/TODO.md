@@ -8,13 +8,9 @@
 
 - Maven resolution
 	- TEST: When resolving snapshots, check both variants for cache first and also check all available repositories if they have cache, before downloading
-	- TEST: if dependencyManagement is handled correctly
-	- Ensure that redirects are reasonably followed
 	- Ensure that when there is a dependency in the graph twice, with different scope, it is resolved correctly: https://cwiki.apache.org/confluence/display/MAVENOLD/Dependency+Mediation+and+Conflict+Resolution (down)
 	- Handle certificate problems from Webb: https://pastebin.com/raw/npZHjqft
 		- Investigate options to turn off checking on per-repo basis
-
-- Allow to set default project in build script
 
 - Kotlin compiler MUST be the same as wemi kotlin stdlib version! (Or maybe just older or same). 1.30 now fails to compile!
 

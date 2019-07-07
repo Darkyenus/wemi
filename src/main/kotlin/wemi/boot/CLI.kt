@@ -134,14 +134,14 @@ object CLI {
      * Needed before any IO operations are done through [CLI].
      */
     internal fun init(root: Path) {
-        val shouldBeDefault = findDefaultProject(root)
+        val shouldBeDefault = defaultProject ?: findDefaultProject(root)
         if (shouldBeDefault == null) {
             printWarning("No project found")
         } else {
             defaultProject = shouldBeDefault
         }
 
-        System.setOut(PrintStream(MessageDisplay, true))
+        MessageDisplay?.let { System.setOut(PrintStream(it, true)) }
     }
 
     /**
@@ -149,12 +149,19 @@ object CLI {
      */
     private var defaultProject: Project? = null
         set(value) {
-            if (value != null) {
-                print(formatLabel("Project: "))
-                println(formatValue(value.name))
+            if (field != value) {
+                if (value != null) {
+                    print(formatLabel("Project: "))
+                    println(formatValue(value.name))
+                }
+                field = value
             }
-            field = value
         }
+
+    /** Make this [Project] a default [wemi.boot.CLI] project. */
+    fun Project.makeDefault() {
+        defaultProject = this
+    }
 
     /**
      * Format given text like it is a label.

@@ -7,6 +7,7 @@ import wemi.util.executable
 import wemi.compile.JavaCompilerFlags
 import wemi.dependency.*
 import wemi.*
+import wemi.boot.CLI.makeDefault
 
 val gdxVersion = "1.9.7"
 
@@ -19,6 +20,8 @@ val core by project(path("core")) {
 }
 
 val lwjgl3 by project(path("lwjgl3")) {
+    
+    makeDefault()
 
     projectName set {"LibGDX Demo"}
     projectGroup set {"wemi"}
