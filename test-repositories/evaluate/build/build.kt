@@ -490,7 +490,7 @@ val problematic_2 by configuration("") {
     libraryDependencies set { setOf(dependency("org.apache.xmlgraphics", "batik-gvt", "1.6.1", exclusions = listOf(DependencyExclusion("xml-apis", "xml-apis")))) }
 
     checkResolution set {
-        assertClasspathContainsFiles("batik-transcoder-1.9.1.jar", "batik-anim-1.9.1.jar", "batik-awt-util-1.9.1.jar", "batik-bridge-1.9.1.jar", "batik-dom-1.9.1.jar", "batik-gvt-1.9.1.jar", "batik-svggen-1.9.1.jar", "batik-util-1.9.1.jar", "batik-xml-1.9.1.jar", "xml-apis-ext-1.3.04.jar", "batik-css-1.9.1.jar", "batik-ext-1.9.1.jar", "batik-parser-1.9.1.jar", "batik-svg-dom-1.9.1.jar", "xmlgraphics-commons-2.2.jar", "batik-script-1.9.1.jar", "xalan-2.7.2.jar", "xml-apis-1.3.04.jar", "batik-constants-1.9.1.jar", "batik-i18n-1.9.1.jar", "commons-io-1.3.1.jar", "commons-logging-1.0.4.jar", "rhino-1.7.7.jar", "jython-2.7.0.jar", "serializer-2.7.2.jar")
+        assertClasspathContainsFiles("batik-gvt-1.6.1.jar", "batik-awt-util-1.6.1.jar", "batik-bridge-1.6.1.jar", "batik-util-1.6.1.jar", "batik-gui-util-1.6.1.jar", "batik-css-1.6.1.jar", "batik-dom-1.6.1.jar", "batik-ext-1.6.1.jar", "batik-parser-1.6.1.jar", "batik-script-1.6.1.jar", "batik-svg-dom-1.6.1.jar", "batik-xml-1.6.1.jar")
     }
 }
 

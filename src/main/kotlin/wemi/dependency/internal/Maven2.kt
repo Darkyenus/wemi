@@ -133,16 +133,18 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
                     continue
                 }
 
-                val withCorrectScope = if (transitiveDependency.scope == resolvedToScope) {
+                val transitivelyAdjusted = if (transitiveDependency.scope == resolvedToScope && dep.exclusions.isEmpty()) {
                     transitiveDependency
                 } else {
-                    LOG.debug("Changing the scope of {} to {}", transitiveDependency, resolvedToScope)
-                    Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
+                    if (transitiveDependency.scope != resolvedToScope) {
+                        LOG.debug("Changing the scope of {} to {}", transitiveDependency, resolvedToScope)
+                    }
+                    Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, dep.exclusions + transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
                 }
 
-                val mapped = mapper(withCorrectScope)
-                if (mapped != withCorrectScope) {
-                    LOG.debug("{} mapped to {}", withCorrectScope, mapped)
+                val mapped = mapper(transitivelyAdjusted)
+                if (mapped != transitivelyAdjusted) {
+                    LOG.debug("{} mapped to {}", transitivelyAdjusted, mapped)
                 }
 
                 nextNextDependencies.add(mapped)
@@ -152,51 +154,47 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
         nextDependencies = nextNextDependencies
     } while (nextDependencies.isNotEmpty())
 
-    if (!noError && LOG.isInfoEnabled) {
-        reportCyclicDependencies(resolved, dependencies)
+    if (LOG.isInfoEnabled) {
+        val stack = ArrayList<DependencyId>()
+        for (root in dependencies) {
+            reportCyclicDependencies(resolved, stack, root.dependencyId)
+            assert(stack.isEmpty())
+        }
     }
 
     return Partial(resolved, noError)
 }
 
-private fun reportCyclicDependencies(resolved:Map<DependencyId, ResolvedDependency>, roots:Collection<Dependency>) {
+/** Recursive depth-first-search of resolved dependencies to find and report circular dependencies. */
+private fun reportCyclicDependencies(resolved:Map<DependencyId, ResolvedDependency>, stack:ArrayList<DependencyId>, root:DependencyId) {
+    val loopIndex = stack.indexOf(root)
+    if (loopIndex != -1) {
+        // Cyclic dependency detected
+        val arrow = " → "
 
-    fun walk(resolved:Map<DependencyId, ResolvedDependency>, stack:ArrayList<DependencyId>, root:DependencyId) {
-        val loopIndex = stack.indexOf(root)
-        if (loopIndex != -1) {
-            // Cyclic dependency detected
-            val arrow = " → "
-
-            val sb = StringBuilder()
-            sb.format(Color.White)
-            for (i in 0 until loopIndex) {
-                sb.append(stack[i]).append(arrow)
-            }
-            sb.format(Color.Black)
-            sb.append('↪').format().append(' ')
-            for (i in loopIndex until stack.size) {
-                sb.append(stack[i].toString()).append(arrow)
-            }
-            sb.setLength(maxOf(sb.length - arrow.length, 0))
-            sb.append(' ').format(Color.Black).append('↩').format()
-
-            LOG.info("Circular dependency: {}", sb)
-            return
+        val sb = StringBuilder()
+        sb.format(Color.White)
+        for (i in 0 until loopIndex) {
+            sb.append(stack[i]).append(arrow)
         }
-
-        val resolvedRoot = resolved[root] ?: return
-        stack.add(root)
-        for (dependency in resolvedRoot.dependencies) {
-            walk(resolved, stack, dependency.dependencyId)
+        sb.format(Color.Black)
+        sb.append('↪').format().append(' ')
+        for (i in loopIndex until stack.size) {
+            sb.append(stack[i].toString()).append(arrow)
         }
-        stack.removeAt(stack.lastIndex)
+        sb.setLength(maxOf(sb.length - arrow.length, 0))
+        sb.append(' ').format(Color.Black).append('↩').format()
+
+        LOG.info("Circular dependency: {}", sb)
+        return
     }
 
-    val stack = ArrayList<DependencyId>()
-    for (root in roots) {
-        walk(resolved, stack, root.dependencyId)
-        assert(stack.isEmpty())
+    val resolvedRoot = resolved[root] ?: return
+    stack.add(root)
+    for (dependency in resolvedRoot.dependencies) {
+        reportCyclicDependencies(resolved, stack, dependency.dependencyId)
     }
+    stack.removeAt(stack.lastIndex)
 }
 
 /** Maven type to extension mapping for types that are not equal to their extensions.
