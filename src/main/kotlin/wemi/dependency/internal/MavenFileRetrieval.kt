@@ -90,17 +90,17 @@ private fun retrieveFileLocally(repository: Repository, path: String, snapshot:B
     // Step 1: check if local repository
     if (repository.local) {
         val localFile = repositoryArtifactUrl.toPath() ?: throw AssertionError("local repository URL is not valid Path")
-        LOG.debug("Retrieving local artifact: {}", localFile)
+        LOG.trace("Retrieving local artifact: {}", localFile)
         try {
-            val attributes = Files.readAttributes(localFile, BasicFileAttributes::class.java)
+            val attributes = Files.readAttributes<BasicFileAttributes>(localFile, BasicFileAttributes::class.java)
             if (attributes.isDirectory) {
                 LOG.warn("Local artifact is a directory: {}", localFile)
                 return Failable.failure(null)
             }
-            LOG.trace("Using local artifact: {}", localFile)
+            LOG.debug("Using local artifact: {}", localFile)
             return Failable.success(ArtifactPath(localFile, null, repository, repositoryArtifactUrl,false))
         } catch (fileDoesNotExist: java.nio.file.NoSuchFileException) {
-            LOG.debug("Local artifact does not exist: {}", localFile)
+            LOG.trace("Local artifact does not exist: {}", localFile)
             return Failable.failure(null)
         } catch (ioProblem: IOException) {
             LOG.debug("Failed to retrieve local artifact: {}", localFile, ioProblem)
@@ -117,19 +117,19 @@ private fun retrieveFileLocally(repository: Repository, path: String, snapshot:B
     // Step 2: check local cache
     var cacheControlMs:Long = -1
     try {
-        LOG.debug("Checking local artifact cache: {}", cacheFile)
+        LOG.trace("Checking local artifact cache: {}", cacheFile)
         val attributes = Files.readAttributes<BasicFileAttributes>(cacheFile, BasicFileAttributes::class.java)
         if (attributes.isDirectory) {
             LOG.warn("Local artifact cache is a directory: {}", cacheFile)
             return Failable.failure(null)
         }
         if (!snapshot) {
-            LOG.trace("Using local artifact cache (not snapshot): {}", cacheFile)
+            LOG.debug("Using local artifact cache (not snapshot): {}", cacheFile)
             return Failable.success(ArtifactPath(cacheFile, null, repository, repositoryArtifactUrl, true))
         }
         val modified = attributes.lastModifiedTime().toMillis()
         if (modified + TimeUnit.SECONDS.toMillis(repository.snapshotUpdateDelaySeconds) > System.currentTimeMillis()) {
-            LOG.trace("Using local artifact cache (snapshot still fresh): {}", cacheFile)
+            LOG.debug("Using local artifact cache (snapshot still fresh): {}", cacheFile)
             return Failable.success(ArtifactPath(cacheFile, null, repository, repositoryArtifactUrl, true))
         }
 
@@ -150,7 +150,7 @@ private sealed class DownloadResult {
 
 private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheControlMs: Long, snapshot: Boolean):DownloadResult {
     val response: Response<ByteArray>
-    // Fallbacks to current time if headers are invalid/missing, we don't have any better metric
+    // Falls back to current time if headers are invalid/missing, as we don't have any better metric
     var remoteLastModifiedTime = System.currentTimeMillis()
     try {
         response = httpGet(repositoryArtifactUrl, cacheControlMs).executeBytes()
@@ -164,7 +164,7 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
         }
     } catch (e: WebbException) {
         if (e.cause is FileNotFoundException) {
-            LOG.debug("Failed to retrieve '{}', file not found", repositoryArtifactUrl)
+            LOG.trace("Failed to retrieve '{}', file not found", repositoryArtifactUrl)
         } else {
             LOG.debug("Failed to retrieve '{}'", repositoryArtifactUrl, e)
         }
@@ -229,7 +229,7 @@ private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:
     val cacheFile = cache.cacheFile
 
     // Step 3 & 4: download from remote to memory and verify checksums
-    LOG.info("Retrieving file '{}' from {}", path, repository)
+    LOG.debug("Retrieving file '{}' from {}", path, repository)
 
     // Download may fail, or checksums may fail, so try multiple times
     var downloadFileSuccess:DownloadResult.Success? = null

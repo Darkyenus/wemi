@@ -121,7 +121,7 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
 
             nextNextDependencies.ensureCapacity(resolvedDep.dependencies.size)
             for (transitiveDependency in resolvedDep.dependencies) {
-                if (dep.optional) {
+                if (transitiveDependency.optional) {
                     LOG.debug("Excluded optional {} (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
                     continue
                 }
@@ -315,7 +315,7 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
             return Failable.failure(ResolvedDependency(dependencyId, "Failed to parse metadata xml: $log", metadataFileArtifact.repository))
         })
 
-        LOG.info("Resolving {} in {} with snapshot version {}", dependencyId, metadataFileArtifact.repository, snapshotVersion)
+        LOG.debug("Resolving {} in {} with snapshot version {}", dependencyId, metadataFileArtifact.repository, snapshotVersion)
 
         val newRetrievedPom = retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, snapshotVersion), snapshot, listOf(metadataFileArtifact.repository))
 

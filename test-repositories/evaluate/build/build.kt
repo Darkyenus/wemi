@@ -478,7 +478,19 @@ val problematic_1 by configuration("") {
     libraryDependencies set { setOf(dependency("org.eclipse.jetty.websocket:websocket-client:9.4.15.v20190215")) }
 
     checkResolution set {
-        assertClasspathContainsFiles("websocket-client-9.4.15.v20190215.jar", "jetty-client-9.4.15.v20190215.jar", "jetty-xml-9.4.15.v20190215.jar", "jetty-util-9.4.15.v20190215.jar", "jetty-io-9.4.15.v20190215.jar", "websocket-common-9.4.15.v20190215.jar", "jetty-http-9.4.15.v20190215.jar", "jetty-jmx-9.4.15.v20190215.jar", "websocket-api-9.4.15.v20190215.jar")
+        assertClasspathContainsFiles("websocket-client-9.4.15.v20190215.jar", "jetty-client-9.4.15.v20190215.jar", "jetty-xml-9.4.15.v20190215.jar", "jetty-util-9.4.15.v20190215.jar", "jetty-io-9.4.15.v20190215.jar", "websocket-common-9.4.15.v20190215.jar", "jetty-http-9.4.15.v20190215.jar", "websocket-api-9.4.15.v20190215.jar")
+    }
+}
+
+val problematic_2 by configuration("") {
+    setTestCacheRepository("problematic_2")
+    
+    // Has cyclic dependency
+    libraryDependencies set { setOf(dependency("org.apache.xmlgraphics", "batik-transcoder", "1.9.1")) }
+    // "org.apache.xmlgraphics", "batik-codec", "1.9.1"
+
+    checkResolution set {
+        assertClasspathContainsFiles("batik-transcoder-1.9.1.jar", "batik-anim-1.9.1.jar", "batik-awt-util-1.9.1.jar", "batik-bridge-1.9.1.jar", "batik-dom-1.9.1.jar", "batik-gvt-1.9.1.jar", "batik-svggen-1.9.1.jar", "batik-util-1.9.1.jar", "batik-xml-1.9.1.jar", "xml-apis-ext-1.3.04.jar", "batik-css-1.9.1.jar", "batik-ext-1.9.1.jar", "batik-parser-1.9.1.jar", "batik-svg-dom-1.9.1.jar", "xmlgraphics-commons-2.2.jar", "batik-script-1.9.1.jar", "xalan-2.7.2.jar", "xml-apis-1.3.04.jar", "batik-constants-1.9.1.jar", "batik-i18n-1.9.1.jar", "commons-io-1.3.1.jar", "commons-logging-1.0.4.jar", "rhino-1.7.7.jar", "jython-2.7.0.jar", "serializer-2.7.2.jar")
     }
 }
 
@@ -517,8 +529,9 @@ val dependency_resolution by project() {
     // Check if correct dependency artifacts are downloaded
     autoRun(checkResolution, mavenScopeFiltering)
     
-    // Problematic dependencies that broke something previously
+    // Problematic dependencies that broke something previously or are weird
     autoRun(checkResolution, problematic_1)
+    autoRun(checkResolution, problematic_2)
 
     checkResolution set {
         println()
