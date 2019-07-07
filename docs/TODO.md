@@ -13,8 +13,6 @@
 	- Ensure that when there is a dependency in the graph twice, with different scope, it is resolved correctly: https://cwiki.apache.org/confluence/display/MAVENOLD/Dependency+Mediation+and+Conflict+Resolution (down)
 	- Handle certificate problems from Webb: https://pastebin.com/raw/npZHjqft
 		- Investigate options to turn off checking on per-repo basis
-	- TEST: that cycles are resolved correctly
-	- Cycle detection
 
 - Allow to set default project in build script
 

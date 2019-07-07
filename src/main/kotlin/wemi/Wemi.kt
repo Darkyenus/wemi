@@ -146,8 +146,10 @@ fun KProperty0<Archetype>.inject(injectedInitializer:Archetype.() -> Unit) {
 /** Convenience Dependency creator. */
 fun dependency(group: String, name: String, version: String,
                classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:String = DEFAULT_SCOPE,
-               optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION): Dependency {
-    return Dependency(DependencyId(group, name, version, classifier, type, snapshotVersion), scope, optional)
+               optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION,
+               exclusions:List<DependencyExclusion> = emptyList(),
+               dependencyManagement:List<Dependency> = emptyList()): Dependency {
+    return Dependency(DependencyId(group, name, version, classifier, type, snapshotVersion), scope, optional, exclusions, dependencyManagement)
 }
 
 /** Used to parse Gradle-like dependency specifiers. The inner pattern is based on what Maven expects, with added ~

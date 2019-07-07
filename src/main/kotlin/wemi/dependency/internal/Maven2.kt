@@ -68,30 +68,6 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
     var nextDependencies = dependencies
     var noError = true
 
-    // TODO(jp): Cycle detection
-    /*
-    val loopIndex = dependencyStack.indexOf(dependencyId)
-    if (loopIndex != -1) {
-        if (LOG.isInfoEnabled) {
-            val arrow = " → "
-
-            val sb = StringBuilder()
-            for (i in 0 until loopIndex) {
-                sb.append(dependencyStack[i]).append(arrow)
-            }
-            sb.append('↪').append(' ')
-            for (i in loopIndex until dependencyStack.size) {
-                sb.append(dependencyStack[i].toString()).append(arrow)
-            }
-            sb.setLength(maxOf(sb.length - arrow.length, 0))
-            sb.append(' ').append('↩')
-
-            LOG.info("Circular dependency: {}", sb)
-        }
-        return true
-    }
-     */
-
     do {
         val nextNextDependencies = ArrayList<Dependency>()
 
@@ -176,7 +152,51 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
         nextDependencies = nextNextDependencies
     } while (nextDependencies.isNotEmpty())
 
+    if (!noError && LOG.isInfoEnabled) {
+        reportCyclicDependencies(resolved, dependencies)
+    }
+
     return Partial(resolved, noError)
+}
+
+private fun reportCyclicDependencies(resolved:Map<DependencyId, ResolvedDependency>, roots:Collection<Dependency>) {
+
+    fun walk(resolved:Map<DependencyId, ResolvedDependency>, stack:ArrayList<DependencyId>, root:DependencyId) {
+        val loopIndex = stack.indexOf(root)
+        if (loopIndex != -1) {
+            // Cyclic dependency detected
+            val arrow = " → "
+
+            val sb = StringBuilder()
+            sb.format(Color.White)
+            for (i in 0 until loopIndex) {
+                sb.append(stack[i]).append(arrow)
+            }
+            sb.format(Color.Black)
+            sb.append('↪').format().append(' ')
+            for (i in loopIndex until stack.size) {
+                sb.append(stack[i].toString()).append(arrow)
+            }
+            sb.setLength(maxOf(sb.length - arrow.length, 0))
+            sb.append(' ').format(Color.Black).append('↩').format()
+
+            LOG.info("Circular dependency: {}", sb)
+            return
+        }
+
+        val resolvedRoot = resolved[root] ?: return
+        stack.add(root)
+        for (dependency in resolvedRoot.dependencies) {
+            walk(resolved, stack, dependency.dependencyId)
+        }
+        stack.removeAt(stack.lastIndex)
+    }
+
+    val stack = ArrayList<DependencyId>()
+    for (root in roots) {
+        walk(resolved, stack, root.dependencyId)
+        assert(stack.isEmpty())
+    }
 }
 
 /** Maven type to extension mapping for types that are not equal to their extensions.
