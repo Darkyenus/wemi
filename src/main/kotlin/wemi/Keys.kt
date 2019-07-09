@@ -73,7 +73,7 @@ object Keys {
     val runDirectory by key<Path>("Initial working directory of the project launched by 'run'")
     val runOptions by key<List<String>>("Options given to 'java' when running the project", defaultValue = emptyList())
     val runArguments by key<List<String>>("Options given to the application when running the project", defaultValue = emptyList())
-    val run by key<Int>("Compile and run the project, return exit code")
+    val run by key<Int>("Compile and run the project, return exit code", inputKeys = arrayOf("dry" to "Only print the command to run the program, instead of running it (bool)"))
     val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code", inputKeys = arrayOf("main" to "Main class to run"))
 
     val testParameters by key<TestParameters>("Parameters for the test key. By default discovers all tests in the test sources.", inputKeys = arrayOf("class" to "Include classes, whose fully classified name match this regex"))

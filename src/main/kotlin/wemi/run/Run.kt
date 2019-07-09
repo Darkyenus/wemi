@@ -47,6 +47,19 @@ fun javaExecutable(javaHome: Path): Path {
     }
 }
 
+fun prepareJavaProcessCommand(javaExecutable: Path, classpath: Collection<Path>,
+                              mainClass: String, javaOptions: Collection<String>, args: Collection<String>): List<String> {
+    val command = ArrayList<String>()
+    command.add(javaExecutable.absolutePath)
+    command.add("-cp")
+    command.add(classpath.joinToString(System.getProperty("path.separator", ":")))
+    command.addAll(javaOptions)
+    command.add(mainClass)
+    command.addAll(args)
+
+    return command
+}
+
 /**
  * Prepare [ProcessBuilder] for java JVM launch.
  *
@@ -59,14 +72,7 @@ fun javaExecutable(javaHome: Path): Path {
  */
 fun prepareJavaProcess(javaExecutable: Path, workingDirectory: Path, classpath: Collection<Path>,
                        mainClass: String, javaOptions: Collection<String>, args: Collection<String>): ProcessBuilder {
-    val command = mutableListOf<String>()
-    command.add(javaExecutable.absolutePath)
-    command.add("-cp")
-    command.add(classpath.joinToString(System.getProperty("path.separator", ":")))
-    command.addAll(javaOptions)
-    command.add(mainClass)
-    command.addAll(args)
-
+    val command = prepareJavaProcessCommand(javaExecutable, classpath, mainClass, javaOptions, args)
     LOG.debug("Prepared command {} in {}", command, workingDirectory)
     return ProcessBuilder(command)
             .directory(workingDirectory.toFile())

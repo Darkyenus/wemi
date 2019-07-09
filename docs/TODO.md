@@ -9,9 +9,6 @@
 
 - Kotlin compiler MUST be the same as wemi kotlin stdlib version! (Or maybe just older or same). 1.30 now fails to compile!
 
-- Allow to generate run script for external tools (profilers, etc.), possibly by printing the executing command line
-	- "run dry" ?
-
 ## For later
 - Test everything, especially javadoc/dokka/tests/plugins
 

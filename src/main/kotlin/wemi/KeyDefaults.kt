@@ -436,6 +436,13 @@ object KeyDefaults {
         val options = Keys.runOptions.get()
         val arguments = Keys.runArguments.get()
 
+        val dry = read("dry", "Only print the command to run the program, instead of running it", BooleanValidator, doNotAsk = true) ?: false
+        if (dry) {
+            val command = wemi.run.prepareJavaProcessCommand(javaExecutable, classpathEntries, mainClass, options, arguments)
+            println(command.joinToString(" "))
+            return 0
+        }
+
         val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, classpathEntries,
                 mainClass, options, arguments)
 
