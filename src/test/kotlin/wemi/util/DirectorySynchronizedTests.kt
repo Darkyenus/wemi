@@ -1,12 +1,12 @@
 package wemi.util
 
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import wemi.util.DirectorySynchronizedTests.StressTestParameters.CLOSE_PREFIX
 import wemi.util.DirectorySynchronizedTests.StressTestParameters.LOG_FILE_NAME
 import wemi.util.DirectorySynchronizedTests.StressTestParameters.OPEN_PREFIX
 import wemi.util.DirectorySynchronizedTests.StressTestParameters.PROCESSES
+import wemi.util.DirectorySynchronizedTests.StressTestParameters.REPEATS
 import wemi.util.DirectorySynchronizedTests.StressTestParameters.SLEEP_TIME
 import wemi.util.DirectorySynchronizedTests.StressTestParameters.THREADS
 import java.nio.file.Files
@@ -60,25 +60,33 @@ class DirectorySynchronizedTests {
 
         val seenNumbers = ArrayList<Int>()
 
+        var failures = 0
         var lastOpen = -1
         log.forEachLine { line ->
             if (lastOpen == -1) {
-                assertTrue(line.startsWith(OPEN_PREFIX))
+                if (!line.startsWith(OPEN_PREFIX)) {
+                    failures++
+                }
                 lastOpen = line.substring(OPEN_PREFIX.length).toInt()
             } else {
-                assertTrue(line.startsWith(CLOSE_PREFIX))
+                if (!line.startsWith(CLOSE_PREFIX)) {
+                    failures++
+                }
                 val close = line.substring(CLOSE_PREFIX.length).toInt()
-                assertEquals(lastOpen, close)
+                if (lastOpen != close) {
+                    failures++
+                }
                 lastOpen = -1
 
                 seenNumbers.add(close)
             }
         }
+        assertEquals(0, failures, "Failure count")
         assertEquals(-1, lastOpen)
 
-        if(VERBOSE) println(seenNumbers)
+        //if(VERBOSE) println(seenNumbers)
         seenNumbers.sort()
-        assertEquals(PROCESSES * THREADS, seenNumbers.size)
+        assertEquals(PROCESSES * THREADS * REPEATS, seenNumbers.size)
 
         seenNumbers.forEachIndexed { index, i ->
             assertEquals(index, i)
@@ -87,11 +95,11 @@ class DirectorySynchronizedTests {
         if(VERBOSE) println("Directory synchronized test ended successfully")
     }
 
-    @Suppress("unused") // IntelliJ is drunk
     private object StressTestParameters {
         const val PROCESSES = 10
         const val THREADS = 10
-        const val SLEEP_TIME = 100L
+        const val REPEATS = 10
+        const val SLEEP_TIME = 1L
 
         const val LOG_FILE_NAME = "log.txt"
         const val OPEN_PREFIX = "OPEN:  "
@@ -105,13 +113,13 @@ class DirectorySynchronizedTests {
 
         private fun doSynchronizedDancing(id:Int) {
             directorySynchronized(Paths.get(".")) {
-                Files.newOutputStream(logFile, StandardOpenOption.APPEND).use {
+                Files.newOutputStream(logFile, StandardOpenOption.APPEND, StandardOpenOption.WRITE).use {
                     it.write("$OPEN_PREFIX$id\n".toByteArray())
                 }
 
                 Thread.sleep(SLEEP_TIME)
 
-                Files.newOutputStream(logFile, StandardOpenOption.APPEND).use {
+                Files.newOutputStream(logFile, StandardOpenOption.APPEND, StandardOpenOption.WRITE).use {
                     it.write("$CLOSE_PREFIX$id\n".toByteArray())
                 }
             }
@@ -119,11 +127,13 @@ class DirectorySynchronizedTests {
 
         @JvmStatic
         fun main(args: Array<String>) {
-            val baseId = args[0].toInt() * THREADS
+            val baseId = args[0].toInt() * THREADS * REPEATS
 
             val threads = Array(THREADS) { i ->
                 Thread({
-                    doSynchronizedDancing(baseId+i)
+                    for (repeat in 0 until REPEATS) {
+                        doSynchronizedDancing(baseId + i * REPEATS + repeat)
+                    }
                 }, "Synchronized thread $i").apply {
                     start()
                 }

@@ -9,10 +9,11 @@ import java.io.OutputStreamWriter
 import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.nio.channels.FileLock
+import java.nio.channels.OverlappingFileLockException
 import java.nio.file.*
 import java.nio.file.attribute.*
 import java.util.*
-import java.util.concurrent.Semaphore
 
 private val LOG = LoggerFactory.getLogger("Files")
 
@@ -638,150 +639,277 @@ val PATH_COMPARATOR_WITH_TOTAL_ORDERING = object : Comparator<Path> {
 }
 
 /** Like [PATH_COMPARATOR_WITH_TOTAL_ORDERING], but for [LocatedPath] */
-val LOCATED_PATH_COMPARATOR_WITH_TOTAL_ORDERING = object : Comparator<LocatedPath> {
-    override fun compare(o1: LocatedPath, o2: LocatedPath): Int {
-        return PATH_COMPARATOR_WITH_TOTAL_ORDERING.compare(o1.file, o2.file)
+val LOCATED_PATH_COMPARATOR_WITH_TOTAL_ORDERING = Comparator<LocatedPath> { o1, o2 ->
+    PATH_COMPARATOR_WITH_TOTAL_ORDERING.compare(o1.file, o2.file)
+}
+
+private val LOCK_FILE_OPEN_OPTIONS = setOf<OpenOption>(StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW, StandardOpenOption.SPARSE)
+private val LOCK_FILE_STALE_CHECK_OPEN_OPTIONS = setOf<OpenOption>(StandardOpenOption.READ, StandardOpenOption.WRITE)
+private val NO_FOLLOW_LINKS = arrayOf(LinkOption.NOFOLLOW_LINKS)
+private val RANDOM = Random()
+
+/*
+Locking scheme:
+
+1. Locking process exclusively creates a lock file. Existence of this file signifies, that the directory is locked.
+2. After lock is no longer needed, the lock file is removed
+
+Problem: Stale lock detection and removal (process that has created the lock crashes before it can remove the lock file)
+1. After lock file is created, it is exclusively locked
+2. If a process which did not create the file manages to lock the file, it is considered stale and ready to be deleted
+3. Process that wishes to remove stale lock file, has to lock the file. Then it has to test if it holds correct file.
+    Then it can delete it and attempt to create a new lock.
+ */
+
+/** Create a lock file path from [directory] path. If the directory does not yet exist, it will be created.
+ * If the lock file exists and is not an ordinary file, error is logged and null is returned. */
+private fun lockFileFromDirectory(directory:Path):Path? {
+    try {
+        Files.createDirectories(directory)
+    } catch (fileExists:FileAlreadyExistsException) {
+        LOG.warn("[lockFileFromDirectory] Can't create a lock on {}, because it is not a directory", directory)
+        return null
+    } catch (io:IOException) {
+        LOG.warn("[lockFileFromDirectory] Can't create a lock on {}", directory, io)
+        return null
+    }
+
+    val lockPath = directory.toAbsolutePath().resolve(".wemi-lock")
+
+    val attributes:BasicFileAttributes = try {
+        Files.readAttributes(lockPath, BasicFileAttributes::class.java, *NO_FOLLOW_LINKS)
+    } catch (notExists:NoSuchFileException) {
+        // This is fine
+        return lockPath
+    } catch (io:IOException) {
+        // This is bad
+        LOG.warn("[lockFileFromDirectory] Failed to read attributes of lock file {}", lockPath, io)
+        return null
+    }
+
+    if (!attributes.isRegularFile || attributes.isSymbolicLink || attributes.isOther) {
+        LOG.warn("[lockFileFromDirectory] Can't use {} as a lock file, it already exists and is not a regular file", lockPath)
+        return null
+    }
+
+    return lockPath
+}
+
+@Throws(IOException::class)
+private fun doesChannelMatchFile(channel:FileChannel, file:Path, proofOfLock:FileLock):Boolean {
+    if (!proofOfLock.isValid) {
+        LOG.warn("[doesChannelMatchFile] Proof of lock is not valid")
+        return false
+    }
+
+    for (i in 0 until 3) {
+        val size = 1L + RANDOM.nextInt(8192)
+        channel.truncate(0L).position(size - 1L)
+        val zeroBuffer = ByteBuffer.allocate(1)
+        channel.write(zeroBuffer)
+        val foundSize = try {
+            Files.size(file)
+        } catch (noFile: NoSuchFileException) {
+            -1
+        }
+
+        if (foundSize != size) {
+            return false
+        }
+    }
+
+    return true
+}
+
+@Throws(IOException::class)
+private fun createNurseryLockFile(lockFile:Path):Pair<Path, FileLock>? {
+    val lockFileNursery = lockFile.resolveSibling("%s.%08x".format(lockFile.name, RANDOM.nextInt()))
+
+    val channel = try {
+        FileChannel.open(lockFileNursery, LOCK_FILE_OPEN_OPTIONS)
+    } catch (alreadyExists:FileAlreadyExistsException) {
+        LOG.warn("[createNurseryLockFile] Nursery lock file already exists") // Could happen during large contention
+        return null
+    } catch (io:IOException) {
+        throw IOException("Could not create a nursery lock file $lockFileNursery", io)
+    }
+
+    var success = false
+    try {
+        val lock = try {
+            channel.tryLock()
+        } catch (overlap: OverlappingFileLockException) {
+            // Lock is already held by this process
+            LOG.error("[createNurseryLockFile] This process stole my nursery lock file {}", lockFile)
+            null
+        } catch (io: IOException) {
+            throw IOException("Nursery lock file channel lock failed", io)
+        } ?: run {
+            LOG.error("[createNurseryLockFile] Someone stole my nursery lock file {}", lockFile)
+            return null
+        }
+        // When returned lock is null, someone was faster, probably checking for lock staleness. It will be deleted soon.
+
+        success = true
+        return lockFileNursery to lock
+    } finally {
+        if (!success) {
+            try {
+                Files.delete(lockFileNursery)
+            } catch (e:Exception) {
+                LOG.warn("[createLockFile] Exception while deleting leftover lock file nursery", lockFileNursery, e)
+            }
+
+            try {
+                channel.close()
+            } catch (e: Exception) {
+                LOG.warn("[createLockFile] Exception while closing file channel of my {}", lockFile, e)
+            }
+        }
     }
 }
 
-private val FILE_SYNCHRONIZED_OPEN_OPTIONS = setOf<OpenOption>(
-        StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
-private val LOCKED_PATHS = WeakHashMap<Path, Semaphore>()
+/** Called when under suspicion that the [lockFile] is stale and should be deleted.
+ * Checks if the file is stale and if it is, it deletes it.
+ * @return true if the lock file is no more, false if it is still locked */
+private fun deleteLockFileIfStale(lockFile:Path):Boolean {
+    val staleChannel = try {
+        FileChannel.open(lockFile, LOCK_FILE_STALE_CHECK_OPEN_OPTIONS)
+    } catch (notExists:NoSuchFileException) {
+        // Looks like the file was just unlocked!
+        return true
+    } catch (io:IOException) {
+        // This is really strange, bail!
+        LOG.warn("[deleteLockFileIfStale] Failed to open lock file {} for staleness check", io)
+        return false
+    }
+
+    try {
+        val lock = try {
+            staleChannel.tryLock()
+        } catch (overlap: OverlappingFileLockException) {
+            // Lock is already held by this process
+            return false
+        } catch (io: IOException) {
+            LOG.warn("[deleteLockFileIfStale] Failed to lock the lock file {} for staleness check", lockFile, io)
+            return false
+        } ?: return false // When null, someone has already locked it, no need to worry about it further
+
+        // File has been locked by a process which has not created it.
+        // This means that the file is stale (or that we have managed to steal it from the creating process).
+        // In either case, we have to delete it.
+
+        try {
+            if (!doesChannelMatchFile(staleChannel, lockFile, lock)) {
+                LOG.debug("[deleteLockFileIfStale] Acquired lock file is not current, it has been stolen")
+                return true
+            }
+        } catch (io:IOException) {
+            LOG.warn("[deleteLockFileIfStale] Failed to verify that acquired lock file is correct", io)
+            return false
+        }
+
+        try {
+            Files.delete(lockFile)
+        } catch (noFile: NoSuchFileException) {
+            LOG.error("[deleteLockFileIfStale] Someone deleted lock file {}, when it was my job", lockFile, lock.isValid, lock.isShared)
+            return true
+        } catch (dirNotEmpty: DirectoryNotEmptyException) {
+            LOG.warn("[deleteLockFileIfStale] Lock file {} has turned into a directory, this is most unusual", lockFile, dirNotEmpty)
+            return false
+        } catch (io: IOException) {
+            LOG.warn("[deleteLockFileIfStale] Failed to delete stale lock file {}", lockFile, io)
+            return false
+        }
+
+        LOG.warn("[deleteLockFileIfStale] Deleted stale lock file {}", lockFile)
+        return true
+    } finally {
+        try {
+            staleChannel.close()
+        } catch (e:Exception) {
+            LOG.warn("[deleteLockFileIfStale] Exception while closing lock file channel of {}", lockFile, e)
+        }
+    }
+}
 
 /**
  * Works like [synchronized], but the synchronization is done on a [directory] and is coordinated with other processes
  * as well.
  *
- * @param onWait optional callback that will be called once it is determined that waiting for the
+ * @param onWait optional callback that will be called once it is determined that waiting for the lock will take some time
  */
-fun <Result> directorySynchronized(directory: Path, onWait:(()->Unit)? = null, action:() -> Result):Result {
-    // Implementation of this is not trivial as all OSes have own quirks and differences
+fun <Result> directorySynchronized(directory:Path, onWait:(()->Unit)? = null, action:() -> Result):Result {
+    val lockFile = lockFileFromDirectory(directory) ?: throw IllegalArgumentException("$directory can't be locked")
 
-    if (!Files.exists(directory)) {
-        // Otherwise toRealPath will crash
-        Files.createDirectories(directory)
-    }
+    val startTime = System.currentTimeMillis()
 
-    val lockedPath = directory.toRealPath()
-
-    if (!Files.isDirectory(lockedPath)) {
-        throw IllegalArgumentException("$lockedPath is not a directory")
-    }
-
-    // Semaphore for path locking for this process
-    val semaphore =
-            synchronized(LOCKED_PATHS) {
-                LOCKED_PATHS.getOrPut(lockedPath) { Semaphore(1) }
-            }
-
-    val lockPath = lockedPath.resolve(".wemi-lock")
-
-    var onWaitCalled = false
-
-    // Coordinate with other threads
-    if (!semaphore.tryAcquire()) {
-        if (!onWaitCalled) {
-            onWait?.invoke()
-            onWaitCalled = true
-        }
-        semaphore.acquire()
-    }
-
+    var nursery:Pair<Path, FileLock>? = null
+    var ownsLock = false
     try {
-        // Coordinate with other processes
+        for (attempt in 0 until 10000) {
+            if (nursery == null) {
+                nursery = createNurseryLockFile(lockFile)
+            }
 
-        // Create FileChannel and lock it
-        var channel:FileChannel
-        while (true) {
-
-            // Construct FileChannel
-            var creationAttempt = 0
-            while (true) {// Thanks Lucy for helping with this
+            if (nursery != null) {
                 try {
-                    // Windows sometimes crashes here, but it usually fixes itself in <10 attempts
-                    channel = FileChannel.open(lockPath, FILE_SYNCHRONIZED_OPEN_OPTIONS)
-                    break
-                } catch (e:IOException) {
-                    when {
-                        creationAttempt < 10 -> Thread.yield()
-                        creationAttempt < 1000 -> Thread.sleep(1)
-                        else -> throw e
-                    }
-                    creationAttempt++
+                    Files.createLink(lockFile, nursery.first)
+                } catch (alreadyExists: FileAlreadyExistsException) {
+                    // Already locked, bail
+                    continue
+                } catch (io: IOException) {
+                    throw IOException("Failed to hardlink nursery lock file", io)
                 }
+                ownsLock = true
+                break
             }
 
-            // Remember the fileKey before the lock is acquired
-            val preLockKey = lockPath.fileKey()
-            // Lock, this may take some time
-            if (channel.tryLock() == null) {
-                if (!onWaitCalled) {
-                    onWait?.invoke()
-                    onWaitCalled = true
-                }
-                channel.lock()
+            if (attempt == 0 && onWait != null) {
+                onWait()
+            } else if (attempt >= 100 && deleteLockFileIfStale(lockFile)) {
+                // Lock file deleted successfully, try to lock it
+                continue
+            } else {
+                // Randomized linear backoff (About a day of waiting)
+                Thread.sleep(System.nanoTime() and 7L + attempt * 2L)
             }
-
-            // Check, that channel points to the actual file in the filesystem, visible to other processes
-            // It may happen, that it points to removed inode
-            if (Files.exists(lockPath) && preLockKey == lockPath.fileKey()) {
-                if (preLockKey != null) {
-                    // If file keys are supported on this filesystem, we can be pretty sure that the file is correct.
-                    break
-                    // On Windows (for example) we have to continue
-                }
-
-                // Again check that we already have this file locked by resizing it to random size and observing if
-                // the file in the filesystem behaves accordingly
-                val expectedSize = 1L + Random().nextInt(1_000)
-                channel.position(expectedSize-1L)
-                channel.write(ByteBuffer.allocate(1))
-                channel.force(false) // Flush changes
-                val filesystemSize = Files.size(lockPath)
-                channel.truncate(0) // Reset the size
-
-                if (filesystemSize == expectedSize) {
-                    // File passed the check, we have the file locked!
-                    // Break the loop and use this channel
-                    break
-                }
-            }
-
-            // Close the channel and try again
-            try {
-                channel.close()
-            } catch (ignored:IOException) {}
         }
 
-        // Do the action
+        if (nursery == null || !ownsLock) {
+            throw RuntimeException("Could not synchronize on $directory, timed out after ${"%.3f".format((System.currentTimeMillis() - startTime) / (1000.0 * 60.0 * 60.0))} hours")
+        }
+
         try {
             return action()
         } finally {
-            // Cleanup the lock
-            // OS may allow us to delete the file while it is still open, which would be great
-            var deleted = false
-            try {
-                Files.delete(lockPath)
-                deleted = true
-            } catch (ignored:IOException) {}
-
-            // Close the channel, releasing the lock
-            try {
-                channel.close()
-            } catch (ignored:IOException) {}
-
-            if (!deleted) {
-                // We now need to delete the lock file. Different process may have already locked on it,
-                // so it may fail, which we don't care about, if it is still visible to others
+            if (!nursery.second.isValid) {
+                LOG.error("[directorySynchronized] Lock on {} is no longer valid, not deleting the lock file", lockFile)
+            } else {
                 try {
-                    Files.delete(lockPath)
-                } catch (ignored:IOException) { }
+                    Files.delete(lockFile)
+                } catch (noFile: NoSuchFileException) {
+                    LOG.error("[directorySynchronized] Someone deleted my lock file {}", lockFile)
+                } catch (dirNotEmpty: DirectoryNotEmptyException) {
+                    LOG.error("[directorySynchronized] My lock file {} has turned into a directory, this is most unusual", lockFile, dirNotEmpty)
+                } catch (io: IOException) {
+                    LOG.warn("[directorySynchronized] Failed to delete my lock file {}", lockFile, io)
+                }
             }
         }
     } finally {
-        // Allow other threads to work with this directory
-        semaphore.release()
+        if (nursery != null) {
+            try {
+                Files.delete(nursery.first)
+            } catch (e:Exception) {
+                LOG.warn("[directorySynchronized] Exception while deleting leftover lock file nursery", e)
+            }
 
-        //TODO LOCKED_PATHS may leak memory here
+            try {
+                nursery.second.acquiredBy().close()
+            } catch (e: Exception) {
+                LOG.warn("[directorySynchronized] Exception while closing nursery lock channel", e)
+            }
+        }
     }
 }
