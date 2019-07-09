@@ -66,7 +66,7 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
     }
 
     val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
-    val resolvedPartials = HashMap<DependencyManagementKey, ResolvedDependency>()
+    val resolvedPartials = HashMap<DependencyManagementKey, DependencyId>()
     var nextDependencies = dependencies
     var noError = true
 
@@ -75,16 +75,23 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
 
         for (dep in nextDependencies) {
             val depId = dep.dependencyId
-            if (resolved.contains(depId)) {
-                LOG.debug("{} already resolved, skipping", dep)
-                continue
-            }
-
             val partialId = DependencyManagementKey(depId.group, depId.name, depId.classifier, depId.type)
-            val resolvedPartial = resolvedPartials[partialId]
-            if (resolvedPartial != null) {
-                resolved[depId] = resolvedPartial
-                LOG.debug("{}'s partial already resolved, skipping", dep)
+
+            // Check if we haven't resolved this dependency (or its different version) previously
+            val resolvedPreviouslyPartialId = resolvedPartials[partialId]
+            val resolvedPreviously = resolved[resolvedPreviouslyPartialId ?: depId]
+            if (resolvedPreviously != null) {
+                if (resolvedPreviouslyPartialId == null) {
+                    LOG.debug("{} already resolved, skipping", dep)
+                } else {
+                    LOG.debug("{} already resolved by {}, skipping", dep, resolvedPreviouslyPartialId)
+                }
+
+                // We did already resolve it, its scope may need adjusting.
+                val newScope = resolveScopes(resolvedPreviously.scope, dep.scope)
+                if (newScope != resolvedPreviously.scope) {
+                    resolved[resolvedPreviouslyPartialId ?: depId] = resolvedPreviously.copy(scope = newScope)
+                }
                 continue
             }
 
@@ -92,7 +99,7 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
             try {
                 val resolvedDep = resolveInM2Repository(depId, dep.dependencyManagement, repositories, dep.scope, progressTracker)
                 resolved[depId] = resolvedDep
-                resolvedPartials[partialId] = resolvedDep
+                resolvedPartials[partialId] = depId
 
                 if (resolvedDep.hasError) {
                     noError = false
@@ -170,6 +177,28 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
     }
 
     return Partial(resolved, noError)
+}
+
+/** Returns the scope of an artifact, which is required by two different scopes. */
+private fun resolveScopes(nearest:String, furthest:String):String {
+    // Based on https://cwiki.apache.org/confluence/display/MAVENOLD/Dependency+Mediation+and+Conflict+Resolution
+    return when (nearest) {
+        "compile" -> "compile"
+        "provided" -> when (furthest) {
+            "compile" -> "compile"
+            "runtime" -> "runtime"
+            else -> nearest
+        }
+        "test" -> when (furthest) {
+            "compile" -> "compile"
+            "runtime" -> "runtime"
+            else -> nearest
+        }
+        else -> when (furthest) {
+            "compile" -> "compile"
+            else -> nearest
+        }
+    }
 }
 
 /** Recursive depth-first-search of resolved dependencies to find and report circular dependencies. */

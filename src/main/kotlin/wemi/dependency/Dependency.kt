@@ -386,6 +386,11 @@ class ResolvedDependency private constructor(
     constructor(id:DependencyId, scope:String, dependencies:List<Dependency>, resolvedFrom:Repository, artifact:ArtifactPath)
             :this(id, scope, dependencies, resolvedFrom, null, artifact)
 
+    fun copy(id:DependencyId = this.id, scope:String = this.scope, dependencies:List<Dependency> = this.dependencies,
+             resolvedFrom:Repository? = this.resolvedFrom, log:CharSequence? = this.log, artifact:ArtifactPath? = this.artifact):ResolvedDependency {
+        return ResolvedDependency(id, scope, dependencies, resolvedFrom, log, artifact)
+    }
+
     override fun JsonWriter.write() {
         writeObject {
             field("id", id)

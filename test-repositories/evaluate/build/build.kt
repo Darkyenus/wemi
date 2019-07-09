@@ -471,6 +471,36 @@ val mavenScopeFiltering by configuration("") {
     }
 }
 
+val mavenScopeResolution_1 by configuration("") {
+    setTestRepository("mavenScopeResolution_1") {
+        val first = artifact("first", "1")
+        val second = artifact("second", "1")
+        
+        val end = artifact("end", "1")
+
+        first.dependsOn(end, scope = "compile")
+        second.dependsOn(end, scope = "compile")
+    }
+
+    libraryDependencies set { setOf(
+            dependency(GROUP, "first", "1", scope = "test"),
+            dependency(GROUP, "second", "1", scope = "compile")
+            ) }
+
+    checkResolution set {
+        assertClasspathContains("first 1", "second 1", "end 1")
+        
+        using(compiling) {
+            assertClasspathContains("second 1", "end 1")
+        }
+        
+        using(testing) {
+            assertClasspathContains("first 1", "second 1", "end 1")
+        }
+    }
+    
+}
+
 val problematic_1 by configuration("") {
     setTestCacheRepository("problematic_1")
 
@@ -528,6 +558,7 @@ val dependency_resolution by project() {
 
     // Check if correct dependency artifacts are downloaded
     autoRun(checkResolution, mavenScopeFiltering)
+    autoRun(checkResolution, mavenScopeResolution_1)
     
     // Problematic dependencies that broke something previously or are weird
     autoRun(checkResolution, problematic_1)

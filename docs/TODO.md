@@ -4,7 +4,6 @@
 
 - Maven resolution
 	- TEST: When resolving snapshots, check both variants for cache first and also check all available repositories if they have cache, before downloading
-	- Ensure that when there is a dependency in the graph twice, with different scope, it is resolved correctly: https://cwiki.apache.org/confluence/display/MAVENOLD/Dependency+Mediation+and+Conflict+Resolution (down)
 	- Handle certificate problems from Webb: https://pastebin.com/raw/npZHjqft
 		- Investigate options to turn off checking on per-repo basis
 
