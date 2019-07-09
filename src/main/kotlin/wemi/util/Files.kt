@@ -913,3 +913,32 @@ fun <Result> directorySynchronized(directory:Path, onWait:(()->Unit)? = null, ac
         }
     }
 }
+
+/** Like [directorySynchronized], but for multiple [directories]. */
+fun <Result> directorySynchronized(directories:Set<Path>, onWait:((Path)->Unit)? = null, action:() -> Result):Result {
+    val list = ArrayList(directories)
+    for (dir in list) {
+        try {
+            Files.createDirectories(dir)
+        } catch (fileExists:FileAlreadyExistsException) {
+            throw IOException("Can't create a lock on $dir, because it exists and is not a directory", fileExists)
+        } catch (io:IOException) {
+            throw IOException("Can't create a lock on $dir", io)
+        }
+    }
+
+    list.sortBy { it.fileKey()?.toString() }
+
+    return directorySynchronized_sync(list.iterator(), onWait, action)
+}
+
+private fun <Result> directorySynchronized_sync(iterator:Iterator<Path>, onWait:((Path)->Unit)?, action:() -> Result):Result {
+    if (iterator.hasNext()) {
+        val path = iterator.next()
+        return directorySynchronized(path, onWait?.let{ { it(path) } }) {
+            directorySynchronized_sync(iterator, onWait, action)
+        }
+    } else {
+        return action()
+    }
+}

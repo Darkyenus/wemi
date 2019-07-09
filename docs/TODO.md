@@ -2,10 +2,6 @@
 
 ## For next release
 
-- Rewrite directorySynchronized based on exclusive file creation and timestamp
-	- Make it possible to synchronize on multiple paths (which have to be sorted to prevent deadlock!)
-		- This is used in DependencyResolution
-
 - Maven resolution
 	- TEST: When resolving snapshots, check both variants for cache first and also check all available repositories if they have cache, before downloading
 	- Ensure that when there is a dependency in the graph twice, with different scope, it is resolved correctly: https://cwiki.apache.org/confluence/display/MAVENOLD/Dependency+Mediation+and+Conflict+Resolution (down)

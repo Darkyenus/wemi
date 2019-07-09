@@ -48,25 +48,14 @@ fun resolveDependencies(dependencies: Collection<Dependency>,
 
     // Lock repositories
     val directoriesToLock = HashSet<Path>()
-    for (repository in repositories) {// TODO(jp): Only lock caches, this process does not touch local repositories
-        directoriesToLock.add(repository.directoryPath() ?: continue)
+    for (repository in repositories) {
+        directoriesToLock.add(repository.cache ?: continue)
     }
 
-    fun <Result> locked(iterator:Iterator<Path>, action:()->Result):Result {
-        return if (!iterator.hasNext()) {
-            action()
-        } else {
-            val directory = iterator.next()
-            directorySynchronized(directory, {
-                // On wait
-                LOG.info("Waiting for lock on {}", directory)
-            }) {
-                locked(iterator, action)
-            }
-        }
-    }
-
-    return locked(directoriesToLock.iterator()) {
+    return directorySynchronized(directoriesToLock, { dir ->
+        // On wait
+        LOG.info("Waiting for lock on {}", dir)
+    }) {
         wemi.dependency.internal.resolveArtifacts(dependencies, sorted, mapper, progressListener)
     }
 }

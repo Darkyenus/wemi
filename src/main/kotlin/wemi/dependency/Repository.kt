@@ -68,7 +68,7 @@ class Repository(
     }
 
     /** Repository acting as a cache for this repository, if [local]` == false`, otherwise not used.
-     * Must be [local]. Resolved dependencies will be stored here. */
+     * Resolved dependencies will be stored here. */
     val cache: Path? =
             // This logic is relied on by Maven2.retrieveFile
             if (!local && cache == null) {
