@@ -780,7 +780,7 @@ private fun deleteLockFileIfStale(lockFile:Path):Boolean {
         return true
     } catch (io:IOException) {
         // This is really strange, bail!
-        LOG.warn("[deleteLockFileIfStale] Failed to open lock file {} for staleness check", io)
+        LOG.warn("Failed to open lock file {} for staleness check", io)
         return false
     }
 
@@ -791,7 +791,7 @@ private fun deleteLockFileIfStale(lockFile:Path):Boolean {
             // Lock is already held by this process
             return false
         } catch (io: IOException) {
-            LOG.warn("[deleteLockFileIfStale] Failed to lock the lock file {} for staleness check", lockFile, io)
+            LOG.warn("Failed to lock the lock file {} for staleness check", lockFile, io)
             return false
         } ?: return false // When null, someone has already locked it, no need to worry about it further
 
@@ -822,7 +822,7 @@ private fun deleteLockFileIfStale(lockFile:Path):Boolean {
             return false
         }
 
-        LOG.warn("[deleteLockFileIfStale] Deleted stale lock file {}", lockFile)
+        LOG.warn("Deleted stale lock file {}", lockFile)
         return true
     } finally {
         try {
@@ -855,14 +855,13 @@ fun <Result> directorySynchronized(directory:Path, onWait:(()->Unit)? = null, ac
             if (nursery != null) {
                 try {
                     Files.createLink(lockFile, nursery.first)
+                    ownsLock = true
+                    break
                 } catch (alreadyExists: FileAlreadyExistsException) {
                     // Already locked, bail
-                    continue
                 } catch (io: IOException) {
                     throw IOException("Failed to hardlink nursery lock file", io)
                 }
-                ownsLock = true
-                break
             }
 
             if (attempt == 0 && onWait != null) {
