@@ -524,6 +524,19 @@ val problematic_2 by configuration("") {
     }
 }
 
+val unsafeRepositoryDownload by configuration("") {
+    repositories set { setOf(MavenCentral, Repository("jitpack", java.net.URL("https://jitpack.io/"), LocalCacheM2RepositoryPath, useUnsafeTransport = true)) }
+    
+    setTestCacheRepository("unsafeRepositoryDownload")
+
+    // Something random
+    libraryDependencies set { setOf(dependency("com.darkyen", "tproll", "v1.3.1")) }
+
+    checkResolution set {
+        assertClasspathContainsFiles("tproll-v1.3.1.jar", "joda-time-2.10.1.jar")
+    }
+}
+
 val dependency_resolution by project() {
     // Test dependency resolution by resolving against changing repository 3 different libraries
     /*
@@ -563,6 +576,8 @@ val dependency_resolution by project() {
     // Problematic dependencies that broke something previously or are weird
     autoRun(checkResolution, problematic_1)
     autoRun(checkResolution, problematic_2)
+    
+    autoRun(checkResolution, unsafeRepositoryDownload)
 
     checkResolution set {
         println()

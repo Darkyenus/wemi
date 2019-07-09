@@ -47,24 +47,27 @@ class Repository(
          * WARNING: Making non-local repository local will throw [WemiException].
          * Marking local repository as non-local can be useful, if, for example, the repository is actually on
          * a slow network drive, external drive which may not be present, etc. */
-        val local:Boolean = url.isLocal()) {
+        val local:Boolean = url.isLocal(),
+        /** When downloading non-local artifacts, ignore transport safety problems, such as expired https certificates. */
+        val useUnsafeTransport:Boolean = false) {
 
     /** Same as default constructor, but takes [path] instead of [url]. Useful for local repositories. */
     constructor(name: String, path: Path, cache: Path? = null, releases: Boolean = true, snapshots: Boolean = true,
                 snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = true)
-            : this(name, path.toUri().toURL(), cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch, local)
+            : this(name=name, url=path.toUri().toURL(), cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local)
 
     /** Same as default constructor, but takes [url] as a [String] instead of [URL]. */
     constructor(name: String, url: String, cache: Path? = null, releases: Boolean = true, snapshots: Boolean = true,
                 snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = url.startsWith("file:", ignoreCase = true))
-            : this(name, URL(url), cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch, local)
+            : this(name=name, url=URL(url), cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local)
 
     fun copy(name:String = this.name, url:URL = this.url, cache:Path? = this.cache,
              releases:Boolean = this.releases, snapshots:Boolean = this.snapshots,
              snapshotUpdateDelaySeconds:Long = this.snapshotUpdateDelaySeconds,
              tolerateChecksumMismatch: Boolean = this.tolerateChecksumMismatch,
-             local:Boolean = this.local):Repository {
-        return Repository(name, url, cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch, local)
+             local:Boolean = this.local,
+             useUnsafeTransport: Boolean = this.useUnsafeTransport):Repository {
+        return Repository(name=name, url=url, cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local, useUnsafeTransport=useUnsafeTransport)
     }
 
     /** Repository acting as a cache for this repository, if [local]` == false`, otherwise not used.

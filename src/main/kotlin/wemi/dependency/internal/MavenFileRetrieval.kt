@@ -15,24 +15,48 @@ import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.*
+
 
 private val LOG = LoggerFactory.getLogger("MavenFileRetrieval")
 
-private val WEBB = Webb(null).apply {
-    // NOTE: When User-Agent is not set, it defaults to "Java/<version>" and some servers (Sonatype Nexus)
-    // then return gutted version of some resources (at least maven-metadata.xml) for which the checksums don't match
-    // This seems to be due to: https://issues.sonatype.org/browse/NEXUS-6171 (not a bug, but a feature!)
-    setDefaultHeader("User-Agent", "Wemi/$WemiVersion")
-    // Just for consistency
-    setDefaultHeader("Accept", "*/*")
-    setDefaultHeader("Accept-Language", "*")
-    // Should be default, but just in case
-    setFollowRedirects(true)
+private fun createWebb():Webb {
+    return Webb(null).apply {
+        // NOTE: When User-Agent is not set, it defaults to "Java/<version>" and some servers (Sonatype Nexus)
+        // then return gutted version of some resources (at least maven-metadata.xml) for which the checksums don't match
+        // This seems to be due to: https://issues.sonatype.org/browse/NEXUS-6171 (not a bug, but a feature!)
+        setDefaultHeader("User-Agent", "Wemi/$WemiVersion")
+        // Just for consistency
+        setDefaultHeader("Accept", "*/*")
+        setDefaultHeader("Accept-Language", "*")
+        // Should be default, but just in case
+        setFollowRedirects(true)
+    }
 }
 
-private fun httpGet(url: URL, ifModifiedSince:Long = -1): Request {
-    val request = WEBB.get(url.toExternalForm())
+private val WEBB = createWebb()
+
+private val UNSAFE_WEBB = createWebb().apply {
+    val sslContext = SSLContext.getInstance("TLS")
+    sslContext.init(null, arrayOf(object : X509TrustManager {
+        override fun checkClientTrusted(p0: Array<out X509Certificate>?, p1: String?) {}
+        override fun checkServerTrusted(p0: Array<out X509Certificate>?, p1: String?) {}
+        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+    }), null)
+
+    setSSLSocketFactory(sslContext.socketFactory)
+    setHostnameVerifier { _, _ -> true }
+}
+
+private fun httpGet(url: URL, ifModifiedSince:Long = -1, useUnsafeTransport:Boolean = false): Request {
+    val webb = if (useUnsafeTransport) {
+        LOG.warn("Forgoing all cryptography verifications on GET of {}", url)
+        UNSAFE_WEBB
+    } else WEBB
+
+    val request = webb.get(url.toExternalForm())
     request.useCaches(false) // Do not use local caches, we do the caching ourselves
     request.retry(2, true)
     if (ifModifiedSince > 0) {
@@ -147,12 +171,12 @@ private sealed class DownloadResult {
     class Success(val remoteLastModifiedTime:Long, val remoteArtifactData:ByteArray, val checksums:Array<String?>, val checksumMismatches:Int):DownloadResult()
 }
 
-private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheControlMs: Long, snapshot: Boolean, progressTracker: ActivityListener?):DownloadResult {
+private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheControlMs: Long, snapshot: Boolean, useUnsafeTransport:Boolean, progressTracker: ActivityListener?):DownloadResult {
     val response: Response<ByteArray>
     // Falls back to current time if headers are invalid/missing, as we don't have any better metric
     var remoteLastModifiedTime = System.currentTimeMillis()
     try {
-        response = httpGet(repositoryArtifactUrl, cacheControlMs).execute(progressTracker, ResponseTranslator.BYTES_TRANSLATOR)
+        response = httpGet(repositoryArtifactUrl, cacheControlMs, useUnsafeTransport = useUnsafeTransport).execute(progressTracker, ResponseTranslator.BYTES_TRANSLATOR)
 
         val lastModified = response.lastModified
         val date = response.date
@@ -184,7 +208,7 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
     for (checksum in CHECKSUMS) {
         val checksumUrl = repositoryArtifactUrl.appendToPath(checksum.suffix)
         val checksumFileBody: String? = try {
-            val checksumResponse = httpGet(checksumUrl).execute(progressTracker, ResponseTranslator.STRING_TRANSLATOR)
+            val checksumResponse = httpGet(checksumUrl, useUnsafeTransport = useUnsafeTransport).execute(progressTracker, ResponseTranslator.STRING_TRANSLATOR)
             if (!checksumResponse.isSuccess) {
                 LOG.debug("Failed to retrieve checksum '{}' (code: {})", checksumUrl, checksumResponse.statusCode)
                 continue
@@ -234,7 +258,7 @@ private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:
     var downloadFileSuccess:DownloadResult.Success? = null
     val retries = 3
     for (downloadTry in 1 .. retries) {
-        val downloadFileResult = retrieveFileDownloadAndVerify(repositoryArtifactUrl, cache.cacheControlMs, snapshot, progressTracker)
+        val downloadFileResult = retrieveFileDownloadAndVerify(repositoryArtifactUrl, cache.cacheControlMs, snapshot, repository.useUnsafeTransport, progressTracker)
         when (downloadFileResult) {
             DownloadResult.Failure -> return null
             DownloadResult.UseCache -> {
