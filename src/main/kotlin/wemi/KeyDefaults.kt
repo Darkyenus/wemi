@@ -178,7 +178,8 @@ object KeyDefaults {
         Keys.cacheDirectory.get() / "-$tag-${scope.scopeProject().name.toSafeFileName('_')}"
     }
 
-    private val CompileLOG = LoggerFactory.getLogger("Compile")
+    private val KotlincLOG = LoggerFactory.getLogger("Kotlinc")
+    private val JavacLOG = LoggerFactory.getLogger("Javac")
 
     private val JavaDiagnosticListener : DiagnosticListener<JavaFileObject> = DiagnosticListener { diagnostic ->
         val source = diagnostic.source
@@ -223,10 +224,10 @@ object KeyDefaults {
                     lint = lintCategory.javaClass.getField("option").get(lintCategory) as String?
                 }
             } else {
-                CompileLOG.debug("Failed to extract lint information from {}", diagnostic.javaClass)
+                JavacLOG.debug("Failed to extract lint information from {}", diagnostic.javaClass)
             }
         } catch (ex:Exception) {
-            CompileLOG.debug("Failed to extract lint information from {}", diagnostic, ex)
+            JavacLOG.debug("Failed to extract lint information from {}", diagnostic, ex)
         }
 
         var message = diagnostic.getMessage(Locale.getDefault())
@@ -235,7 +236,7 @@ object KeyDefaults {
             message = "[$lint] $message"
         }
 
-        CompileLOG.render(null, diagnostic.kind.name, message, location)
+        JavacLOG.render(null, diagnostic.kind.name, message, location)
     }
 
     val CompileJava: Value<Path> = {
@@ -297,9 +298,9 @@ object KeyDefaults {
                 if (!writerSb.isBlank()) {
                     val format = if (writerSb.contains('\n')) "\n{}" else "{}"
                     if (success) {
-                        CompileLOG.info(format, writerSb)
+                        JavacLOG.info(format, writerSb)
                     } else {
-                        CompileLOG.warn(format, writerSb)
+                        JavacLOG.warn(format, writerSb)
                     }
                 }
 
@@ -333,7 +334,7 @@ object KeyDefaults {
                 val cacheFolder = output.resolveSibling(output.name + "-kotlin-cache")
                 Files.createDirectories(cacheFolder)
 
-                val compileResult = compiler.compileJVM(javaSources + kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, CompileLOG, null)
+                val compileResult = compiler.compileJVM(javaSources + kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, KotlincLOG, null)
                 if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
                     throw WemiException.CompilationException("Kotlin compilation failed: $compileResult")
                 }
@@ -389,15 +390,17 @@ object KeyDefaults {
                         JavaDiagnosticListener,
                         compilerOptions,
                         null,
-                        javaFiles
+                        javaFiles.filter {
+                            it.kind == JavaFileObject.Kind.SOURCE
+                        }
                 ).call()
 
                 if (!writerSb.isBlank()) {
                     val format = if (writerSb.contains('\n')) "\n{}" else "{}"
                     if (success) {
-                        CompileLOG.info(format, writerSb)
+                        JavacLOG.info(format, writerSb)
                     } else {
-                        CompileLOG.warn(format, writerSb)
+                        JavacLOG.warn(format, writerSb)
                     }
                 }
 
