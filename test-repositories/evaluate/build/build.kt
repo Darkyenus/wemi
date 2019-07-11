@@ -568,7 +568,7 @@ val artifactInMultipleRepositories_2 by configuration("") {
 }
 
 val dependency_resolution by project() {
-    val longRunning = false
+    val longRunning = true
 
     // Test dependency resolution by resolving against changing repository 3 different libraries
     /*
@@ -577,7 +577,7 @@ val dependency_resolution by project() {
         2. Exists, with a new version which depends on the old one
         3. Does not exist (offline) but should still resolve, as it is in the cache
      */
-    /*autoRun(checkResolution, release_1)
+    autoRun(checkResolution, release_1)
     autoRun(checkResolution, release_2)
     autoRun(checkResolution, Configurations.offline, release_2)
 
@@ -603,7 +603,7 @@ val dependency_resolution by project() {
 
     // Check if correct dependency artifacts are downloaded
     autoRun(checkResolution, mavenScopeFiltering)
-    autoRun(checkResolution, mavenScopeResolution_1)*/
+    autoRun(checkResolution, mavenScopeResolution_1)
     
     // Problematic dependencies that broke something previously or are weird
     if (longRunning) {
