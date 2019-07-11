@@ -141,7 +141,7 @@ class TestRepositoryData(val repositoryName:String) {
 
     data class TestArtifactDependency(val artifact:TestArtifact, val scope:String)
 
-    class TestArtifact(val name:String, version:String, val buildNumber:Int) {
+    class TestArtifact(val name:String, version:String, val buildNumber:Int, val artifact:String) {
         val dependsOn = ArrayList<TestArtifactDependency>()
         var cache:String? = null
 
@@ -162,12 +162,6 @@ class TestRepositoryData(val repositoryName:String) {
             "$version-$snapshotTimestamp-$buildNumber"
         }
 
-        val artifact:String = if (buildNumber < 0) {
-            "$name $version"
-        } else {
-            "$name $version $buildNumber"
-        }
-
         fun dependsOn(other:TestArtifact, scope:String = "compile"):TestArtifact {
             this.dependsOn.add(TestArtifactDependency(other, scope))
             return this
@@ -185,14 +179,14 @@ class TestRepositoryData(val repositoryName:String) {
 
     private val artifacts = ArrayList<TestArtifact>()
 
-    fun artifact(name:String, version:String):TestArtifact {
-        val artifact = TestArtifact(name, version, -1)
+    fun artifact(name:String, version:String, content:String = "$name $version"):TestArtifact {
+        val artifact = TestArtifact(name, version, -1, artifact = content)
         artifacts.add(artifact)
         return artifact
     }
 
-    fun snapshotArtifact(name:String, version:String, buildNumber:Int):TestArtifact {
-        val artifact = TestArtifact(name, version, buildNumber)
+    fun snapshotArtifact(name:String, version:String, buildNumber:Int, content:String = "$name $version $buildNumber"):TestArtifact {
+        val artifact = TestArtifact(name, version, buildNumber, artifact = content)
         artifacts.add(artifact)
         return artifact
     }
@@ -292,7 +286,7 @@ val TEST_REPOSITORY_BASE = (wemi.boot.WemiCacheFolder / "-test-repository").appl
     ensureEmptyDirectory()
 }
 
-fun BindingHolder.setTestRepository(name:String, snapshotUpdateDelaySeconds:Long = SnapshotCheckDaily, create:TestRepositoryData.()->Unit) {
+fun BindingHolder.setTestRepository(name:String, snapshotUpdateDelaySeconds:Long = SnapshotCheckDaily, replace:Boolean = true, create:TestRepositoryData.()->Unit) {
     val repoFolder = TEST_REPOSITORY_BASE / name
     val repoCacheFolder = TEST_REPOSITORY_BASE / "$name-cache"
 
@@ -300,7 +294,13 @@ fun BindingHolder.setTestRepository(name:String, snapshotUpdateDelaySeconds:Long
     data.create()
     data.buildIn(repoFolder, repoCacheFolder)
 
-    repositories set { setOf(Repository(name, repoFolder, repoCacheFolder, local = false, snapshotUpdateDelaySeconds = snapshotUpdateDelaySeconds)) }
+    val repo = Repository(name, repoFolder, repoCacheFolder, local = false, snapshotUpdateDelaySeconds = snapshotUpdateDelaySeconds)
+
+    if (replace) {
+        repositories set { setOf(repo) }
+    } else {
+        repositories add { repo }
+    }
 }
 
 fun BindingHolder.setTestCacheRepository(name:String) {
@@ -475,7 +475,7 @@ val mavenScopeResolution_1 by configuration("") {
     setTestRepository("mavenScopeResolution_1") {
         val first = artifact("first", "1")
         val second = artifact("second", "1")
-        
+
         val end = artifact("end", "1")
 
         first.dependsOn(end, scope = "compile")
@@ -489,16 +489,16 @@ val mavenScopeResolution_1 by configuration("") {
 
     checkResolution set {
         assertClasspathContains("first 1", "second 1", "end 1")
-        
+
         using(compiling) {
             assertClasspathContains("second 1", "end 1")
         }
-        
+
         using(testing) {
             assertClasspathContains("first 1", "second 1", "end 1")
         }
     }
-    
+
 }
 
 val problematic_1 by configuration("") {
@@ -526,7 +526,7 @@ val problematic_2 by configuration("") {
 
 val unsafeRepositoryDownload by configuration("") {
     repositories set { setOf(MavenCentral, Repository("jitpack", java.net.URL("https://jitpack.io/"), LocalCacheM2RepositoryPath, useUnsafeTransport = true)) }
-    
+
     setTestCacheRepository("unsafeRepositoryDownload")
 
     // Something random
@@ -537,7 +537,39 @@ val unsafeRepositoryDownload by configuration("") {
     }
 }
 
+val artifactInMultipleRepositories_1 by configuration("") {
+    setTestRepository("artifactInMultipleRepositories_1_a") {
+        artifact("foo", "1")
+    }
+    setTestRepository("artifactInMultipleRepositories_1_b", replace = false) {
+        artifact("foo", "1")
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "foo", "1")) }
+
+    checkResolution set {
+        assertClasspathContains("foo 1")
+    }
+}
+
+val artifactInMultipleRepositories_2 by configuration("") {
+    setTestRepository("artifactInMultipleRepositories_2_a") {
+        artifact("foo", "1", content="foo 1 a")
+    }
+    setTestRepository("artifactInMultipleRepositories_2_b", replace = false) {
+        artifact("foo", "1", content="foo 1 b")
+    }
+
+    libraryDependencies set { setOf(dependency(GROUP, "foo", "1")) }
+
+    checkResolution set {
+        assertClasspathContains("foo 1 a")
+    }
+}
+
 val dependency_resolution by project() {
+    val longRunning = false
+
     // Test dependency resolution by resolving against changing repository 3 different libraries
     /*
     1. Release
@@ -545,7 +577,7 @@ val dependency_resolution by project() {
         2. Exists, with a new version which depends on the old one
         3. Does not exist (offline) but should still resolve, as it is in the cache
      */
-    autoRun(checkResolution, release_1)
+    /*autoRun(checkResolution, release_1)
     autoRun(checkResolution, release_2)
     autoRun(checkResolution, Configurations.offline, release_2)
 
@@ -571,13 +603,19 @@ val dependency_resolution by project() {
 
     // Check if correct dependency artifacts are downloaded
     autoRun(checkResolution, mavenScopeFiltering)
-    autoRun(checkResolution, mavenScopeResolution_1)
+    autoRun(checkResolution, mavenScopeResolution_1)*/
     
     // Problematic dependencies that broke something previously or are weird
-    autoRun(checkResolution, problematic_1)
-    autoRun(checkResolution, problematic_2)
-    
-    autoRun(checkResolution, unsafeRepositoryDownload)
+    if (longRunning) {
+        autoRun(checkResolution, problematic_1)
+        autoRun(checkResolution, problematic_2)
+    }
+
+    if (longRunning) {
+        autoRun(checkResolution, unsafeRepositoryDownload)
+    }
+    autoRun(checkResolution, artifactInMultipleRepositories_1)
+    autoRun(checkResolution, artifactInMultipleRepositories_2)
 
     checkResolution set {
         println()

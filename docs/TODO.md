@@ -2,9 +2,6 @@
 
 ## For next release
 
-- Maven resolution
-	- TEST: When resolving snapshots, check both variants for cache first and also check all available repositories if they have cache, before downloading
-
 - Kotlin compiler MUST be the same as wemi kotlin stdlib version! (Or maybe just older or same). 1.30 now fails to compile!
 
 ## For later

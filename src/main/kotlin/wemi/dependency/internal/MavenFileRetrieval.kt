@@ -69,6 +69,8 @@ private fun httpGet(url: URL, ifModifiedSince:Long = -1, useUnsafeTransport:Bool
     return request
 }
 
+private val NO_ALTERNATE_REPOSITORIES = emptyArray<Repository>()
+
 private class CacheArtifactPath(val cacheFile: Path, val cacheFileExists: Boolean, val cacheControlMs: Long)
 
 /**
@@ -158,8 +160,10 @@ private fun retrieveFileLocally(repository: Repository, path: String, snapshot:B
 
         cacheFileExists = true
         cacheControlMs = modified
-    } catch (fileDoesNotExist: IOException) {
-        LOG.trace("Local artifact cache does not exist: {}", cacheFile, fileDoesNotExist)
+    } catch (fileDoesNotExist: java.nio.file.NoSuchFileException) {
+        LOG.trace("Local artifact cache does not exist: {}", cacheFile)
+    } catch (io: IOException) {
+        LOG.warn("Failed to check local artifact cache: {}", cacheFile, io)
     }
 
     return Failable.failure(CacheArtifactPath(cacheFile, cacheFileExists, cacheControlMs))
@@ -333,11 +337,11 @@ private fun Repository.canResolve(snapshot:Boolean):Boolean {
     return if (snapshot) this.snapshots else this.releases
 }
 
-internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?, cachePath:(Repository) -> String = {path}):ArtifactPath? {
+internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?, cachePath:(Repository) -> String = {path}):Pair<ArtifactPath, Array<Repository>>? {
     val localFailures = arrayOfNulls<CacheArtifactPath>(repositories.size)
     for ((i, repository) in repositories.withIndex()) {
         retrieveFileLocally(repository, path, snapshot, cachePath(repository)).use<Unit>({
-            return it
+            return it to NO_ALTERNATE_REPOSITORIES
         }, {
             localFailures[i] = it
         })
@@ -345,13 +349,15 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
 
     var result:ArtifactPath? = null
     var resultRepository:Repository? = null
+    var alternateRepositories:Array<Repository> = NO_ALTERNATE_REPOSITORIES
 
     for ((i, cacheArtifactPath) in localFailures.withIndex()) {
         if (cacheArtifactPath == null)
             continue
 
         val repository = repositories[i]
-        val success = retrieveFileRemotely(repository, path, snapshot, cacheArtifactPath, result == null, progressTracker) ?: continue
+        val success = retrieveFileRemotely(repository, path, snapshot,
+                cacheArtifactPath, result == null, progressTracker) ?: continue
         if (result == null) {
             result = success
             resultRepository = repository
@@ -359,7 +365,8 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
             val resultData = result.data
             val successData = success.data
             if (resultData != null && successData != null && resultData.contentEquals(successData)) {
-                // At two different locations, but same content, this is fine
+                // At two different locations, but same content, this could be fine
+                alternateRepositories += repository
             } else {
                 // This is a problem! (https://blog.autsoft.hu/a-confusing-dependency/)
                 LOG.warn("File {} has been found at both {} (used) and {} (ignored), with different content! Please verify the dependency, as it may have been compromised.", path, resultRepository, repository)
@@ -367,7 +374,7 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
         }
     }
 
-    return result
+    return result?.let { it to alternateRepositories }
 }
 
 private fun <T> Request.execute(listener:ActivityListener?, responseTranslator:ResponseTranslator<T>):Response<T> {

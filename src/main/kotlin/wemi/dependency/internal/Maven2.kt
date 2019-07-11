@@ -263,14 +263,16 @@ private fun resolveInM2Repository(
     }
 
     // Retrieve basic POM data
-    val (retrievedPom, resolvedDependencyId) = retrievePom(dependencyId, compatibleRepositories, snapshot, progressTracker).use({ it }, { return it })
-    val repository = retrievedPom.repository
+    val retrievedPom = retrievePom(dependencyId, compatibleRepositories, snapshot, progressTracker).use({ it }, { return it })
+    val resolvedDependencyId = retrievedPom.id
+    val retrievedPomPath = retrievedPom.path
+    val repository = retrievedPomPath.repository
 
     if (resolvedDependencyId.type.equals("pom", ignoreCase = true)) {
-        return ResolvedDependency(resolvedDependencyId, resultScope, emptyList(), repository, retrievedPom)
+        return ResolvedDependency(resolvedDependencyId, resultScope, emptyList(), repository, retrievedPomPath)
     }
 
-    val resolvedPom = resolveRawPom(retrievedPom, transitiveDependencyManagement, compatibleRepositories, progressTracker).fold { rawPom ->
+    val resolvedPom = resolveRawPom(retrievedPomPath, transitiveDependencyManagement, compatibleRepositories, progressTracker).fold { rawPom ->
         resolvePom(rawPom, transitiveDependencyManagement, compatibleRepositories, progressTracker)
     }
 
@@ -282,16 +284,24 @@ private fun resolveInM2Repository(
     val extension = TYPE_TO_EXTENSION_MAPPING.getOrDefault(resolvedDependencyId.type, resolvedDependencyId.type)
 
     val filePath = artifactPath(resolvedDependencyId.group, resolvedDependencyId.name, resolvedDependencyId.version, resolvedDependencyId.classifier, extension, resolvedDependencyId.snapshotVersion)
-    val retrieved = retrieveFile(filePath, snapshot, listOf(repository), progressTracker = progressTracker)
+    val artifactRepositories = ArrayList<Repository>(1 + retrievedPom.alternateRepositories.size)
+    artifactRepositories.add(repository)
+    retrievedPom.alternateRepositories.forEach { artifactRepositories.add(it) }
+    val retrieved = retrieveFile(filePath, snapshot, artifactRepositories, progressTracker = progressTracker)
 
     if (retrieved == null) {
         LOG.warn("Failed to retrieve file at '{}' in {}", filePath, repository)
         return ResolvedDependency(resolvedDependencyId, "Failed to retrieve file", repository)
     } else {
+        if (retrieved.second.isNotEmpty()) {
+            LOG.info("{} has been also found in these repositories: {}", dependencyId, retrieved.second)
+        }
+
         // Purge retrieved data, storing it would only create a memory leak, as the value is rarely used,
         // can always be lazily loaded and the size of all dependencies can be quite big.
-        retrieved.data = null
-        return ResolvedDependency(resolvedDependencyId, resultScope, pom.dependencies, repository, retrieved)
+        val retrievedArtifact = retrieved.first
+        retrievedArtifact.data = null
+        return ResolvedDependency(resolvedDependencyId, resultScope, pom.dependencies, repository, retrievedArtifact)
     }
 }
 
@@ -344,22 +354,37 @@ private fun resolveRawPom(pomArtifact:ArtifactPath, transitiveDependencyManageme
     return Failable.success(rawPom)
 }
 
+private class RetrievedPom(
+        /** ID of the actually retrieved pom. May be different than requested pom in case of unique snapshots,
+         *  in which case the snapshot version will be filled out. */
+        val id:DependencyId,
+        val path:ArtifactPath,
+        /** Repositories in which the artifact was also found. This may be a simple duplication if the artifacts are
+         * equal in all of them or an error if they are different. It may even be a sign of a deliberate attack. */
+        val alternateRepositories:Array<Repository>)
+
 /** Retrieve raw pom file for given [dependencyId] in [repositories].
  * If [snapshot] and it is unique snapshot, it resolves maven-metadata.xml and returns the pom for the newest version. */
-private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSortedRepositories, snapshot:Boolean, progressTracker: ActivityListener?):Failable<Pair<ArtifactPath, DependencyId>, ResolvedDependency> {
+private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSortedRepositories, snapshot:Boolean, progressTracker: ActivityListener?):Failable<RetrievedPom, ResolvedDependency> {
     LOG.trace("Retrieving pom for {} at '{}'", dependencyId, repositories)
     // Handles normal poms and old non-unique snapshot poms
     val retrievedPom = retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion), snapshot, repositories, progressTracker)
     if (retrievedPom != null) {
-        return Failable.success(retrievedPom to dependencyId)
+        return Failable.success(RetrievedPom(dependencyId, retrievedPom.first, retrievedPom.second))
     }
 
     // Handle unique snapshots with maven-metadata.xml file
     if (snapshot && dependencyId.snapshotVersion.isEmpty()) {
         // Query for maven-metadata.xml (https://github.com/strongbox/strongbox/wiki/Maven-Metadata)
         val mavenMetadataPath = mavenMetadataPath(dependencyId, null)
-        val metadataFileArtifact = retrieveFile(mavenMetadataPath, true, repositories, progressTracker) { repo -> mavenMetadataPath(dependencyId, repo) }
+        val (metadataFileArtifact, metadataFileAlternateRepos) = retrieveFile(mavenMetadataPath, true, repositories, progressTracker) { repo -> mavenMetadataPath(dependencyId, repo) }
                 ?: return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve snapshot metadata"))
+
+        if (metadataFileAlternateRepos.isNotEmpty()) {
+            // This is just too hard to handle right now, could be resolved correctly later
+            LOG.warn("There are multiple repositories with snapshots of {} using first, ignoring the rest ({})", dependencyId, metadataFileAlternateRepos)
+        }
+
         val metadataBuilder = MavenMetadataBuildingXMLHandler.buildFrom(metadataFileArtifact)
         val snapshotVersion = metadataBuilder.use({ metadata ->
             val timestamp = metadata.versioningSnapshotTimestamp
@@ -375,7 +400,8 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
         val newRetrievedPom = retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, snapshotVersion), snapshot, listOf(metadataFileArtifact.repository), progressTracker)
 
         if (newRetrievedPom != null) {
-            return Failable.success(newRetrievedPom to dependencyId.copy(snapshotVersion = snapshotVersion))
+            assert(newRetrievedPom.second.isEmpty()) // Should be impossible to fail, since were passing only one repository
+            return Failable.success(RetrievedPom(dependencyId.copy(snapshotVersion = snapshotVersion), newRetrievedPom.first, newRetrievedPom.second))
         }
 
         return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve pom xml for deduced snapshot version \"$snapshotVersion\"", metadataFileArtifact.repository))
