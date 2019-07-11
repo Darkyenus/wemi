@@ -5,7 +5,7 @@
     <vendor email="darkyenus@gmail.com" url="https://github.com/Darkyenus">Jan Polák</vendor>
 
     <description><![CDATA[
-      Allows to use WEMI build system from the IDE.
+      Allows to use <a href="https://github.com/Darkyenus/wemi">WEMI build system</a> from the IDE.
 
       <h3>Features:</h3>
       <ul>
@@ -77,7 +77,7 @@
     </change-notes>
 
     <!-- http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html -->
-    <idea-version since-build="171"/>
+    <idea-version since-build="181"/>
 
     <!--  http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
