@@ -24,8 +24,6 @@ import java.nio.file.Files
 
 val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.61"),
-        createKotlinCompilerProject("1.2.21"),
-        createKotlinCompilerProject("1.2.41"),
         createKotlinCompilerProject("1.2.71"),
         createKotlinCompilerProject("1.3.20")
 )
