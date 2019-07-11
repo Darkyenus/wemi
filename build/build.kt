@@ -10,7 +10,7 @@ import wemi.assembly.MergeStrategy
 import wemi.boot.WemiCacheFolder
 import wemi.collections.toMutable
 import wemi.compile.KotlinCompilerFlags
-import wemi.dependency.DefaultExclusions
+import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
 import wemi.dependency.ProjectDependency
@@ -30,7 +30,7 @@ val CompilerProjects = listOf(
 )
 
 const val WemiGroup = "com.darkyen.wemi"
-const val ThisWemiVersion = "0.9-SNAPSHOT" // as opposed to the generic WemiVersion, which is the version with which we build
+const val ThisWemiVersion = "0.9" // as opposed to the generic WemiVersion, which is the version with which we build
 
 val SLF4J_API = dependency("org.slf4j", "slf4j-api", "1.7.25")
 
@@ -52,10 +52,9 @@ val core:Project by project {
             dependency("com.darkyen", "tproll", "v1.3.0"),
             dependency("com.darkyen", "DaveWebb", "v1.2"),
             dependency("com.github.EsotericSoftware", "jsonbeans", "0.9"),
-            // TODO Explicit excludes because Maven2 resolution is messed up again and it tried to include some testing libraries
-            Dependency(DependencyId("org.jline", "jline-terminal", JLineVersion), DefaultExclusions + DependencyExclusion("junit", "junit") + DependencyExclusion("org.easymock", "easymock")),
-            Dependency(DependencyId("org.jline", "jline-terminal-jansi", JLineVersion), DefaultExclusions + DependencyExclusion("junit", "junit") + DependencyExclusion("org.easymock", "easymock")),
-            Dependency(DependencyId("org.jline", "jline-reader", JLineVersion), DefaultExclusions + DependencyExclusion("junit", "junit") + DependencyExclusion("org.easymock", "easymock"))
+            dependency("org.jline", "jline-terminal", JLineVersion),
+            dependency("org.jline", "jline-terminal-jansi", JLineVersion),
+            dependency("org.jline", "jline-reader", JLineVersion)
         ) }
 
     // Compile-only (provided) libraries
@@ -83,12 +82,12 @@ val core:Project by project {
             val cpWithCompilers = cp.toMutable()
 
             for (p in CompilerProjects) {
-                p.evaluate {
+                p.evaluate(null) {
                     cpWithCompilers.addAll(internalClasspath.get())
                 }
             }
 
-            cpWithCompilers.addAll(dokkaInterfaceImplementation.evaluate { internalClasspath.get() })
+            cpWithCompilers.addAll(dokkaInterfaceImplementation.evaluate(null) { internalClasspath.get() })
             
             cpWithCompilers
         }
@@ -112,7 +111,7 @@ val core:Project by project {
             var resources = oldResources
 
             val libraryList = StringBuilder()
-            for (stdlibJar in kotlinStdlib.evaluate{ externalClasspath.get() }) {
+            for (stdlibJar in kotlinStdlib.evaluate(null) { externalClasspath.get() }) {
                 val jarEntry = stdlibJar.classpathEntry
                 resources += FileSet(jarEntry)
                 libraryList.append(jarEntry.name).append('\n')
@@ -193,7 +192,6 @@ fun createKotlinCompilerProject(version:String):Project {
     }
 
     return createProject(projectName.toString(), path("src/main-kotlinc/$version"), Archetypes.JavaKotlinProject) {
-
         sources set { FileSet(projectRoot.get() / "src") }
 
         extend(compilingKotlin) {
@@ -226,15 +224,20 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
         setOf(ProjectDependency(core, false))
     }
 
-    extend(compiling) {
-        libraryDependencies add {
-            /* Used only in wemi.document.DokkaInterface */
-            dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", preferredRepository = JCenter)
-        }
+    repositories set { setOf(JCenter) }
+
+    libraryDependencies add {
+        /* Used only in wemi.document.DokkaInterface */
+        dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", scope="provided")
     }
 }
 
 val kotlinStdlib by project(Archetypes.BlankJVMProject) {
-    libraryDependencies set { setOf(kotlinDependency("stdlib"), kotlinDependency("reflect")) }
+    fun latestKotlinDependency(name:String):Dependency {
+        val latestKotlinVersion = KotlinCompilerVersion.values().last().string
+        return dependency("org.jetbrains.kotlin", "kotlin-$name", latestKotlinVersion)
+    }
+    
+    libraryDependencies set { setOf(latestKotlinDependency("stdlib"), latestKotlinDependency("reflect")) }
     assemblyOutputFile set { Keys.cacheDirectory.get() / "kotlin-stdlib-assembly.zip" } // TODO(jp): .jar, but now it gets flattened
 }

@@ -1,4 +1,16 @@
-# 0.9
+# 0.9 2019-07-11
+- Improve Maven dependency resolution system
+    - Handles transitive dependencies, dependencyManagement, exclusions and scopes in the same way as Maven itself does
+    - Attempts to properly detect multiple repositories which host same artifact and warns if their content differs
+    - `DependencyId.scope` now works as expected, it is no longer just a dummy value
+        - Previous approach of setting "scope" indirectly through `using(compiling/running/testing)` is still supported
+- Default project can now be set directly in the build script, through `Project.makeDefault()`
+- Progress for long running dependency downloads is now shown, along with download speed and ETA
+- `run` key now supports `dry=true` input to just print the command used to run the program
+- HTTPS security can now be relaxed on a per-repo basis. This is inherently unsafe, so it is accompanied by a healthy dose of warnings.
+- Remove old Kotlin versions (1.2.21 and 1.2.41) and add latest one instead (1.3.41)
+- *CLI:* `X/` where `X` is a project name is now an alias for `project X`, for switching session's default project
+- *Internal:* Directory locking is now more reliable
 
 # 0.8 2019-02-18
 - Deprecate some utility methods in favor of using constructors directly (`FileSet`, `dependency` for project dependencies)

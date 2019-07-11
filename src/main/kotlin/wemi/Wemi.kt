@@ -11,7 +11,7 @@ import kotlin.reflect.KProperty0
 import kotlin.reflect.jvm.isAccessible
 
 /** Version of Kotlin used for build scripts */
-val WemiKotlinVersion = KotlinCompilerVersion.Version1_2_71
+val WemiKotlinVersion = KotlinCompilerVersion.values().last()
 
 /** Immutable view into the list of loaded [Project]s. */
 val AllProjects: Map<String, Project>

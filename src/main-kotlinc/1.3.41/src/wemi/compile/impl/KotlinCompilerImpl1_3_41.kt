@@ -164,38 +164,17 @@ internal class KotlinCompilerImpl1_3_41 : KotlinCompiler {
             val cachedOutput = cacheFolder!!.resolve("output")
             Files.createDirectories(cachedOutput)
             args.destination = cachedOutput.absolutePath
+            args.javaSourceRoots = run {
+                val rootSet = HashSet<String>()
+                sources.mapNotNullTo(rootSet) { it.root?.toString() }
+                rootSet.toTypedArray()
+            }
 
             val kotlincCache = cacheFolder.resolve("kotlinc-cache")
             Files.createDirectories(kotlincCache)
             val kotlincCachesDir = kotlincCache.toFile()
 
             val buildHistoryFile = File(kotlincCachesDir, "build-history.bin")
-
-            /*
-            val kotlinExtensions = DEFAULT_KOTLIN_SOURCE_FILES_EXTENSIONS
-    val allExtensions = kotlinExtensions + "java"
-    val rootsWalk = sourceRoots.asSequence().flatMap { it.walk() }
-    val files = rootsWalk.filter(File::isFile)
-    val sourceFiles = files.filter { it.extension.toLowerCase() in allExtensions }.toList()
-    val buildHistoryFile = File(cachesDir, "build-history.bin")
-    args.javaSourceRoots = sourceRoots.map { it.absolutePath }.toTypedArray()
-
-    withIC {
-        val compiler = IncrementalJvmCompilerRunner(
-            cachesDir,
-            reporter,
-            // Use precise setting in case of non-Gradle build
-            usePreciseJavaTracking = true,
-            outputFiles = emptyList(),
-            buildHistoryFile = buildHistoryFile,
-            modulesApiHistory = EmptyModulesApiHistory,
-            kotlinSourceFilesExtensions = kotlinExtensions
-        )
-        compiler.compile(sourceFiles, args, messageCollector, providedChangedFiles = null)
-    }
-             */
-
-
 
             exitCode = withIC {
                 val compiler = IncrementalJvmCompilerRunner(
