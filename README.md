@@ -96,6 +96,9 @@ Also check out examples in [test repositories](test%20repositories) and
 the [design document](docs/DESIGN.md) with detailed documentation of Wemi's inner workings.
 
 ## Contributing & License
-The code is not yet under any license, but you can still read it.
-Likewise, contributions are not accepted yet, but if you want to
-join the effort or send feedback, send me a mail!
+Wemi and its plugins included in this repository are licensed under Mozilla Public License Version 2.0.
+IDE plugins are licensed under a more permissive MIT license.
+
+Bug reports and pull requests are welcome, along with any [feedback, questions](https://gitter.im/wemi-build/community), etc.
+Feature requests are collected, but without any guarantees on their fulfillment. However, I will be happy to assist anyone
+who would wish to contribute or just to understand the code.
