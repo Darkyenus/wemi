@@ -25,11 +25,14 @@ import java.nio.file.Files
 val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.61"),
         createKotlinCompilerProject("1.2.71"),
-        createKotlinCompilerProject("1.3.20")
+        createKotlinCompilerProject("1.3.20"),
+        createKotlinCompilerProject("1.3.41")
 )
 
 const val WemiGroup = "com.darkyen.wemi"
 const val ThisWemiVersion = "0.9-SNAPSHOT" // as opposed to the generic WemiVersion, which is the version with which we build
+
+val SLF4J_API = dependency("org.slf4j", "slf4j-api", "1.7.25")
 
 /**
  * Wemi Build System core
@@ -45,7 +48,7 @@ val core:Project by project {
 
     val JLineVersion = "3.3.0"
     libraryDependencies set { setOf(
-            dependency("org.slf4j", "slf4j-api", "1.7.25"),
+            SLF4J_API,
             dependency("com.darkyen", "tproll", "v1.3.0"),
             dependency("com.darkyen", "DaveWebb", "v1.2"),
             dependency("com.github.EsotericSoftware", "jsonbeans", "0.9"),
@@ -191,12 +194,9 @@ fun createKotlinCompilerProject(version:String):Project {
 
     return createProject(projectName.toString(), path("src/main-kotlinc/$version"), Archetypes.JavaKotlinProject) {
 
-        extend(compilingJava) {
-            sources set { null }
-        }
+        sources set { FileSet(projectRoot.get() / "src") }
 
         extend(compilingKotlin) {
-            sources set { FileSet(projectRoot.get() / "src") }
             compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
         }
 
@@ -206,7 +206,7 @@ fun createKotlinCompilerProject(version:String):Project {
 
         libraryDependencies set { setOf(
                 dependency("org.jetbrains.kotlin", "kotlin-compiler", version),
-                dependency("org.slf4j", "slf4j-api", "1.7.25")
+                SLF4J_API
         ) }
 
     }

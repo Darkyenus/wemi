@@ -61,16 +61,6 @@ enum class KotlinCompilerVersion (
             "wemi.compile.impl.KotlinCompilerImpl1_1_61",
             listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.1.61"), exclusions = WemiBundledLibrariesExclude))
     ),
-    Version1_2_21(
-            "1.2.21",
-            "wemi.compile.impl.KotlinCompilerImpl1_2_21",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.21"), exclusions = WemiBundledLibrariesExclude))
-    ),
-    Version1_2_41(
-            "1.2.41",
-            "wemi.compile.impl.KotlinCompilerImpl1_2_41",
-            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.2.41"), exclusions = WemiBundledLibrariesExclude))
-    ),
     Version1_2_71(
             "1.2.71",
             "wemi.compile.impl.KotlinCompilerImpl1_2_71",
@@ -80,6 +70,11 @@ enum class KotlinCompilerVersion (
             "1.3.20",
             "wemi.compile.impl.KotlinCompilerImpl1_3_20",
             listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.3.20"), exclusions = WemiBundledLibrariesExclude))
+    ),
+    Version1_3_41(
+            "1.3.41",
+            "wemi.compile.impl.KotlinCompilerImpl1_3_41",
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.3.41"), exclusions = WemiBundledLibrariesExclude))
     ),
     ;
 
