@@ -2,7 +2,7 @@
 
 ## For next release
 
-- Kotlin compiler MUST be the same as wemi kotlin stdlib version! (Or maybe just older or same). 1.30 now fails to compile!
+- Better error message when compilation fails because JAVA_HOME is just JRE
 
 ## For later
 - Test everything, especially javadoc/dokka/tests/plugins

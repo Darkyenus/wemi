@@ -190,10 +190,14 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
             remoteLastModifiedTime = date
         }
     } catch (e: WebbException) {
-        if (e.cause is FileNotFoundException) {
-            LOG.trace("Failed to retrieve '{}', file not found", repositoryArtifactUrl)
-        } else {
-            LOG.debug("Failed to retrieve '{}'", repositoryArtifactUrl, e)
+        when (e.cause) {
+            is FileNotFoundException ->
+                LOG.trace("Failed to retrieve '{}', file not found", repositoryArtifactUrl)
+            is SSLException -> {
+                LOG.warn("Failed to retrieve '{}', problem with SSL", repositoryArtifactUrl, e.cause)
+            }
+            else ->
+                LOG.debug("Failed to retrieve '{}'", repositoryArtifactUrl, e)
         }
         return DownloadResult.Failure
     }
@@ -219,10 +223,14 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
             }
             checksumResponse.body
         } catch (e: WebbException) {
-            if (e.cause is FileNotFoundException) {
-                LOG.debug("Failed to retrieve checksum '{}', file not found", checksumUrl)
-            } else {
-                LOG.debug("Failed to retrieve checksum '{}'", checksumUrl, e)
+            when (e.cause) {
+                is FileNotFoundException ->
+                    LOG.trace("Failed to retrieve checksum '{}', file not found", repositoryArtifactUrl)
+                is SSLException -> {
+                    LOG.warn("Failed to retrieve checksum '{}', problem with SSL", repositoryArtifactUrl, e.cause)
+                }
+                else ->
+                    LOG.debug("Failed to retrieve checksum '{}'", repositoryArtifactUrl, e)
             }
             continue
         }

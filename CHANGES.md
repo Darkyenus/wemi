@@ -1,3 +1,5 @@
+# 0.10
+
 # 0.9 2019-07-11
 - Improve Maven dependency resolution system
     - Handles transitive dependencies, dependencyManagement, exclusions and scopes in the same way as Maven itself does
