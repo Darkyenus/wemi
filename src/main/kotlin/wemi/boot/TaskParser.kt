@@ -466,6 +466,11 @@ object TaskParser : Parser {
             val keyRawText = takeUpToSeparator(TokenType.Key, null)
 
             if (keyRawText == null) {
+                // Special case: "X/" should evaluate to "project projectName", to allow for easy project change
+                // This is admittedly not a very nice solution though.
+                if (project != null && configurations.isEmpty()) {
+                    return Task(null, emptyList(), "project", arrayOf("" to project))
+                }
                 error("Key name expected")
                 return null
             }

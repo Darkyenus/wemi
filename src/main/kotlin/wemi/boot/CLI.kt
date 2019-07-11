@@ -433,6 +433,15 @@ object CLI {
         return keyEvaluationResult
     }
 
+    private fun commandChangeProject(projectName:String) {
+        val project = AllProjects.findCaseInsensitive(projectName)
+        if (project == null) {
+            printWarning("No project named '$projectName' found", projectName, AllProjects.keys)
+        } else {
+            defaultProject = project
+        }
+    }
+
     /** Known CLI commands. */
     internal val commands: Map<String, (Task) -> TaskEvaluationResult?> = HashMap<String, (Task) -> TaskEvaluationResult?>().apply {
         put("exit") {
@@ -447,16 +456,11 @@ object CLI {
             }
         }
         put("project") { task ->
-            val projectName = task.firstInput("project", true)
+            val projectName = task.firstInput("project", true)?.removeSuffix("/")
             if (projectName == null) {
                 printWarning("project <project> - switch default project")
             } else {
-                val project = AllProjects.findCaseInsensitive(projectName)
-                if (project == null) {
-                    printWarning("No project named '$projectName' found", projectName, AllProjects.keys)
-                } else {
-                    defaultProject = project
-                }
+                commandChangeProject(projectName)
             }
             null
         }
