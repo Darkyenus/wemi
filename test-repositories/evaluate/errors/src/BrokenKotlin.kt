@@ -1,6 +1,6 @@
 
 class BrokenJava {
     fun thing() {
-        //missingReference()
+        //missingReference() // Blocks java compilation from proceeding, comment in/out to see it
     }
 }

@@ -92,13 +92,10 @@ val evaluationTest by project(archetypes = *arrayOf(keyExtensionArchetype)) {
 }
 
 val compileErrors by project(path("errors")) {
-    extend(compilingJava) {
-        sources set { FileSet(projectRoot.get() / "src") }
-        compilerOptions[wemi.compile.JavaCompilerFlags.customFlags] += "-Xlint:all"
-    }
+    sources set { FileSet(projectRoot.get() / "src") }
 
-    extend(compilingKotlin) {
-        sources set { FileSet(projectRoot.get() / "src") }
+    extend(compilingJava) {
+        compilerOptions[wemi.compile.JavaCompilerFlags.customFlags] += "-Xlint:all"
     }
 }
 
@@ -568,7 +565,7 @@ val artifactInMultipleRepositories_2 by configuration("") {
 }
 
 val dependency_resolution by project() {
-    val longRunning = true
+    val longRunning = false
 
     // Test dependency resolution by resolving against changing repository 3 different libraries
     /*

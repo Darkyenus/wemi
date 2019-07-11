@@ -335,8 +335,11 @@ object KeyDefaults {
                 Files.createDirectories(cacheFolder)
 
                 val compileResult = compiler.compileJVM(javaSources + kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, KotlincLOG, null)
-                if (compileResult != KotlinCompiler.CompileExitStatus.OK) {
-                    throw WemiException.CompilationException("Kotlin compilation failed: $compileResult")
+                when (compileResult) {
+                    KotlinCompiler.CompileExitStatus.OK -> {}
+                    KotlinCompiler.CompileExitStatus.CANCELLED -> throw WemiException.CompilationException("Kotlin compilation has been cancelled")
+                    KotlinCompiler.CompileExitStatus.COMPILATION_ERROR -> throw WemiException.CompilationException("Kotlin compilation failed")
+                    else -> throw WemiException.CompilationException("Kotlin compilation failed: $compileResult")
                 }
 
                 compilerFlags.warnAboutUnusedFlags("Kotlin compiler")
@@ -390,9 +393,7 @@ object KeyDefaults {
                         JavaDiagnosticListener,
                         compilerOptions,
                         null,
-                        javaFiles.filter {
-                            it.kind == JavaFileObject.Kind.SOURCE
-                        }
+                        javaFiles
                 ).call()
 
                 if (!writerSb.isBlank()) {
