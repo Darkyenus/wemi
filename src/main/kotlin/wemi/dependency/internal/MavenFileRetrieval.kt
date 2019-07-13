@@ -4,6 +4,7 @@ import WemiVersion
 import com.darkyen.dave.*
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
+import wemi.boot.WemiUnicodeOutputSupported
 import wemi.dependency.*
 import wemi.util.*
 import java.io.FileNotFoundException
@@ -396,11 +397,43 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
     return result?.let { ArtifactPathWithAlternateRepositories(it, alternateRepositories, NO_ALTERNATE_REPOSITORIES) }
 }
 
+private fun uriToActivityName(uri:String):String {
+    val maxCharacters = 64
+    if (uri.length < maxCharacters) {
+        return uri
+    }
+
+    val protocolEnd = uri.indexOf("//")
+    if (protocolEnd == -1 || (!uri.startsWith("https://", ignoreCase = true) && !uri.startsWith("http://"))) {
+        return uri
+    }
+
+    // Shorten to domain/...file
+    val domainStart = protocolEnd + 2
+    var domainEnd = uri.indexOf('/', startIndex = domainStart)
+    if (domainEnd == -1)
+        domainEnd = uri.length
+
+    val remainingCharacters = uri.length - domainEnd
+    val availableCharacters = maxCharacters - (domainEnd - domainStart)
+
+    if (remainingCharacters <= availableCharacters) {
+        return uri.substring(domainStart)
+    } else {
+        val result = StringBuilder(70)
+        result.append(uri, domainStart, domainEnd)
+        result.append('/').append(if (WemiUnicodeOutputSupported) "[…]" else "[...]")
+        val remaining = maxCharacters - result.length
+        result.append(uri, uri.length - remaining, uri.length)
+        return result.toString()
+    }
+}
+
 private fun <T> Request.execute(listener:ActivityListener?, responseTranslator:ResponseTranslator<T>):Response<T> {
     if (listener == null) {
         return execute(responseTranslator)
     } else {
-        listener.beginActivity(uri)
+        listener.beginActivity(uriToActivityName(uri))
         try {
             return execute(object : ResponseTranslator<T> {
                 private val startNs = System.nanoTime()

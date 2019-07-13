@@ -283,7 +283,7 @@ object CLI {
                 messageBuilder.append(STATUS_INFIX)
             }
             messageBuilder.style(STATUS_CONTENT_ACTIVITY_STYLE)
-            val maxLength = 32
+            val maxLength = 64
             if (activity.length > maxLength) {
                 messageBuilder.append(STATUS_ELLIPSIS).append(activity, maxOf(activity.length - maxLength - STATUS_ELLIPSIS.length, 0), activity.length)
             } else {
