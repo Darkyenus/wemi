@@ -121,14 +121,14 @@ object Configurations {
     val retrievingSources by configuration("Used to retrieve sources") {
         val mapper = classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier)
         Keys.libraryDependencies modify { it.map(mapper).toSet() }
-        Keys.libraryDependencyProjectMapper set Static(mapper)
+        Keys.libraryDependencyMapper set Static(mapper)
         Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(SourcesClassifier)
     }
 
     val retrievingDocs by configuration("Used to retrieve documentation") {
         val mapper = classifierAppendingLibraryDependencyProjectMapper(JavadocClassifier)
         Keys.libraryDependencies modify { it.map(mapper).toSet() }
-        Keys.libraryDependencyProjectMapper set Static(mapper)
+        Keys.libraryDependencyMapper set Static(mapper)
         Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(JavadocClassifier)
     }
     //endregion

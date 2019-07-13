@@ -47,7 +47,7 @@ object Keys {
 
     val repositories by key<Set<Repository>>("Repositories to be used when resolving dependencies", defaultValue = emptySet())
     val libraryDependencies by key<Set<Dependency>>("Libraries that the project depends on", defaultValue = emptySet())
-    val libraryDependencyProjectMapper by key<(Dependency) -> Dependency>("Function applied to transitive Dependency-ies encountered while resolving. Used for example when retrieving sources.", defaultValue = { it })
+    val libraryDependencyMapper by key<(Dependency) -> Dependency>("Function applied to transitive Dependency-ies encountered while resolving. Used for example when retrieving sources.", defaultValue = { it })
     val resolvedLibraryScopes by key<Set<String>>("Allowed scopes of libraries returned by resolvedLibraryDependencies. Empty = all.", defaultValue = emptySet())
     val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved ->
         resolved.value.prettyPrint(null)

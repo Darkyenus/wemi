@@ -123,8 +123,11 @@ val repositories
     inline get() = wemi.Keys.repositories
 val libraryDependencies
     inline get() = wemi.Keys.libraryDependencies
+@Deprecated("Renamed to libraryDependencyMapper, removed in 0.11", replaceWith = ReplaceWith("libraryDependencyMapper"))
 val libraryDependencyProjectMapper
-    inline get() = wemi.Keys.libraryDependencyProjectMapper
+    inline get() = wemi.Keys.libraryDependencyMapper
+val libraryDependencyMapper
+    inline get() = wemi.Keys.libraryDependencyMapper
 val resolvedLibraryDependencies
     inline get() = wemi.Keys.resolvedLibraryDependencies
 val unmanagedDependencies

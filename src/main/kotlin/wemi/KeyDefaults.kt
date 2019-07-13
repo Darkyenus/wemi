@@ -53,7 +53,7 @@ import kotlin.collections.LinkedHashSet
  */
 object KeyDefaults {
 
-    /** Create value for [Keys.libraryDependencyProjectMapper] that appends given classifier to sources. */
+    /** Create value for [Keys.libraryDependencyMapper] that appends given classifier to sources. */
     fun classifierAppendingLibraryDependencyProjectMapper(appendClassifier: String): (Dependency) -> Dependency = { dep ->
         val classifier = joinClassifiers(dep.dependencyId.classifier, appendClassifier)
         dep.copy(dep.dependencyId.copy(classifier = classifier))
@@ -100,7 +100,7 @@ object KeyDefaults {
     val ResolvedLibraryDependencies: Value<Partial<Map<DependencyId, ResolvedDependency>>> =  {
         val repositories = Keys.repositories.get()
         val libraryDependencies = Keys.libraryDependencies.get()
-        val libraryDependencyProjectMapper = Keys.libraryDependencyProjectMapper.get()
+        val libraryDependencyProjectMapper = Keys.libraryDependencyMapper.get()
         resolveDependencies(libraryDependencies, repositories, libraryDependencyProjectMapper, progressListener)
     }
 
