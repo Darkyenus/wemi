@@ -3,8 +3,13 @@ package wemi.dependency
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
 import wemi.util.Partial
+import wemi.util.appendShortByteSize
 import wemi.util.directorySynchronized
 import java.nio.file.Path
+import java.util.*
+import kotlin.Comparator
+import kotlin.collections.ArrayList
+import kotlin.collections.HashSet
 
 /**
  * Utility method to [resolveDependencies] dependencies and retrieve their [artifacts].
@@ -27,6 +32,40 @@ fun resolveDependencyArtifacts(dependencies: Collection<Dependency>, repositorie
  */
 fun Map<DependencyId, ResolvedDependency>.artifacts(): List<Path> {
     return mapNotNull { it.value.artifact?.path }
+}
+
+private object LoggingDownloadTracker : ActivityListener {
+
+    private val activityStack = Stack<String>()
+    private val activityLoggedStack = Stack<Boolean>()
+
+    override fun beginActivity(activity: String) {
+        activityStack.push(activity)
+        activityLoggedStack.push(false)
+    }
+
+    override fun activityProgressBytes(bytes: Long, totalBytes: Long, durationNs: Long) {
+        if (activityLoggedStack.isNotEmpty() && durationNs > 1000_000_000 /* 1s */ && !activityLoggedStack.peek()) {
+            activityLoggedStack.pop()
+            activityLoggedStack.push(true)
+
+            if (LOG.isInfoEnabled) {
+                val sb = StringBuilder()
+                sb.appendShortByteSize(bytes).append('/')
+                if (totalBytes > 0 && bytes < totalBytes) {
+                    sb.appendShortByteSize(totalBytes)
+                } else {
+                    sb.append("???")
+                }
+                LOG.info("Downloading {} ({})", activityStack.peek(), sb)
+            }
+        }
+    }
+
+    override fun endActivity() {
+        activityStack.pop()
+        activityLoggedStack.pop()
+    }
 }
 
 /**
@@ -56,7 +95,7 @@ fun resolveDependencies(dependencies: Collection<Dependency>,
         // On wait
         LOG.info("Waiting for lock on {}", dir)
     }) {
-        wemi.dependency.internal.resolveArtifacts(dependencies, sorted, mapper, progressListener)
+        wemi.dependency.internal.resolveArtifacts(dependencies, sorted, mapper, progressListener ?: LoggingDownloadTracker)
     }
 }
 

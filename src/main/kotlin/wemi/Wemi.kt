@@ -178,23 +178,6 @@ fun dependency(groupNameVersionClassifierType: String,
 }
 
 /**
- * Convenience [Repository] creator.
- *
- * If the [url] is local, no cache is used. If it is not local (that is, not `file:`),
- * [LocalM2Repository] is used as cache.
- */
-@Deprecated("Use Repository constructor directly (REMOVE IN 0.10)", ReplaceWith("Repository(name, url, cache, releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch)"))
-fun repository(name: String, url: String,
-               cache:Repository? = LocalCacheM2Repository, releases:Boolean = true, snapshots:Boolean = true,
-               snapshotUpdateDelaySeconds:Long = SnapshotCheckDaily, tolerateChecksumMismatch:Boolean = false): Repository {
-    val usedUrl = URL(url)
-    return Repository(name,
-            usedUrl,
-            if (usedUrl.isLocal()) null else cache?.url?.toPath() ?: LocalCacheM2RepositoryPath,
-            releases, snapshots, snapshotUpdateDelaySeconds, tolerateChecksumMismatch)
-}
-
-/**
  * Convenience creator of dependencies on kotlin libraries.
  *
  * Returns dependency on `org.jetbrains.kotlin:kotlin-$name:$Keys.kotlinVersion}`.

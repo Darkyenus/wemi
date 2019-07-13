@@ -522,7 +522,7 @@ val problematic_2 by configuration("") {
 }
 
 val unsafeRepositoryDownload by configuration("") {
-    repositories set { setOf(MavenCentral, Repository("jitpack", java.net.URL("https://jitpack.io/"), LocalCacheM2RepositoryPath, useUnsafeTransport = true)) }
+    repositories set { setOf(MavenCentral, Repository("jitpack", java.net.URL("https://jitpack.io/"), useUnsafeTransport = true)) }
 
     setTestCacheRepository("unsafeRepositoryDownload")
 
@@ -565,7 +565,7 @@ val artifactInMultipleRepositories_2 by configuration("") {
 }
 
 val dependency_resolution by project() {
-    val longRunning = false
+    val longRunning = true
 
     // Test dependency resolution by resolving against changing repository 3 different libraries
     /*

@@ -222,7 +222,7 @@ class BuildScriptInfo internal constructor(
             BuildDependencyRepository::class.java -> {
                 val (name, url) = fields
 
-                _repositories.add(Repository(name, URL(url), LocalCacheM2RepositoryPath))
+                _repositories.add(Repository(name, URL(url)))
             }
             BuildClasspathDependency::class.java -> {
                 val (file) = fields

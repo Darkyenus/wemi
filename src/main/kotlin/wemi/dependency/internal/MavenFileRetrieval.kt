@@ -345,11 +345,22 @@ private fun Repository.canResolve(snapshot:Boolean):Boolean {
     return if (snapshot) this.snapshots else this.releases
 }
 
-internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?, cachePath:(Repository) -> String = {path}):Pair<ArtifactPath, Array<Repository>>? {
+internal class ArtifactPathWithAlternateRepositories(
+        /** The artifact retrieved. */
+        val artifactPath:ArtifactPath,
+        /** Repositories in which the artifact was also found. */
+        val alternateRepositories:Array<Repository>,
+        /** Repositories in which the artifact could also be found, but weren't checked yet. */
+        val possibleAlternateRepositories:Array<Repository>
+)
+
+internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?, cachePath:(Repository) -> String = {path}):ArtifactPathWithAlternateRepositories? {
     val localFailures = arrayOfNulls<CacheArtifactPath>(repositories.size)
     for ((i, repository) in repositories.withIndex()) {
         retrieveFileLocally(repository, path, snapshot, cachePath(repository)).use<Unit>({
-            return it to NO_ALTERNATE_REPOSITORIES
+            val alternateRepositories =
+                    if (i + 1 == repositories.size) NO_ALTERNATE_REPOSITORIES else Array(repositories.size - i - 1) { copyIndex -> repositories[i + 1 + copyIndex] }
+            return ArtifactPathWithAlternateRepositories(it, NO_ALTERNATE_REPOSITORIES, alternateRepositories)
         }, {
             localFailures[i] = it
         })
@@ -382,7 +393,7 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
         }
     }
 
-    return result?.let { it to alternateRepositories }
+    return result?.let { ArtifactPathWithAlternateRepositories(it, alternateRepositories, NO_ALTERNATE_REPOSITORIES) }
 }
 
 private fun <T> Request.execute(listener:ActivityListener?, responseTranslator:ResponseTranslator<T>):Response<T> {

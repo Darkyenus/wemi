@@ -76,7 +76,7 @@ class Repository(
             // This logic is relied on by Maven2.retrieveFile
             if (!local && cache == null) {
                 LOG.debug("{} is not local and has no cache, default cache will be used", this)
-                LocalCacheM2RepositoryPath
+                repositoryCachePath(name)
             } else if (local && cache != null) {
                 LOG.warn("{} is local, but has cache specified. It will not be used", this)
                 null
