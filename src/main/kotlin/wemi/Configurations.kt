@@ -54,7 +54,9 @@ object Configurations {
     }
 
     /** @see Keys.assembly */
-    val assembling by configuration("Configuration used when assembling Jar with dependencies") {}
+    val assembling by configuration("Configuration used when assembling Jar with dependencies") {
+        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
+    }
     //endregion
 
     //region Compiling
