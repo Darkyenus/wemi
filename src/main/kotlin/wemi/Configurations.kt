@@ -119,12 +119,16 @@ object Configurations {
 
     //region IDE configurations
     val retrievingSources by configuration("Used to retrieve sources") {
-        Keys.libraryDependencyProjectMapper set Static(classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier))
+        val mapper = classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier)
+        Keys.libraryDependencies modify { it.map(mapper).toSet() }
+        Keys.libraryDependencyProjectMapper set Static(mapper)
         Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(SourcesClassifier)
     }
 
     val retrievingDocs by configuration("Used to retrieve documentation") {
-        Keys.libraryDependencyProjectMapper set Static(classifierAppendingLibraryDependencyProjectMapper(JavadocClassifier))
+        val mapper = classifierAppendingLibraryDependencyProjectMapper(JavadocClassifier)
+        Keys.libraryDependencies modify { it.map(mapper).toSet() }
+        Keys.libraryDependencyProjectMapper set Static(mapper)
         Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(JavadocClassifier)
     }
     //endregion
