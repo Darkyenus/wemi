@@ -7,7 +7,6 @@ import com.intellij.openapi.components.Storage
 import com.intellij.openapi.externalSystem.settings.AbstractExternalSystemSettings
 import com.intellij.openapi.externalSystem.settings.ExternalSystemSettingsListener
 import com.intellij.openapi.project.Project
-import com.intellij.util.containers.ContainerUtilRt
 import com.intellij.util.xmlb.annotations.XCollection
 
 /**
@@ -39,7 +38,7 @@ class WemiSystemSettings(project: Project) :
         wemiLauncherJre = settings.wemiLauncherJre
     }
 
-    override fun getState(): WemiSystemSettings.WemiSystemSettingsState {
+    override fun getState(): WemiSystemSettingsState {
         //This is what GradleSettings does
         val state = WemiSystemSettingsState()
         fillState(state)
@@ -60,10 +59,10 @@ class WemiSystemSettings(project: Project) :
         }
     }
 
-    class WemiSystemSettingsState : AbstractExternalSystemSettings.State<WemiProjectSettings> {
+    class WemiSystemSettingsState : State<WemiProjectSettings> {
 
         var wemiLauncherJre:String = ""
-        private val projectSettings = ContainerUtilRt.newTreeSet<WemiProjectSettings>()
+        private val projectSettings:java.util.TreeSet<WemiProjectSettings> = java.util.TreeSet()
 
         @Suppress("DEPRECATION") // @AbstractCollection is deprecated, but don't remove it for backwards compatibility
         @com.intellij.util.xmlb.annotations.AbstractCollection(surroundWithTag = false, elementTypes = [(WemiProjectSettings::class)])
