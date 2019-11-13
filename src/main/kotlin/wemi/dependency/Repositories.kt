@@ -28,7 +28,7 @@ fun repositoryCachePath(repositoryName:String): Path {
 val LocalCacheM2RepositoryPath = Paths.get(System.getProperty("user.home")) / ".m2/wemi-cache/"
 
 /** Maven Central repository at [maven.org](https://maven.org). Cached by [LocalM2Repository]. */
-val MavenCentral = Repository("central", URL("https://repo1.maven.org/maven2/"), snapshots = false)
+val MavenCentral = Repository("central", URL("https://repo.maven.apache.org/maven2/"), snapshots = false)
 
 /** [Bintray JCenter repository](https://bintray.com/bintray/jcenter). Cached by [LocalM2Repository]. */
 val JCenter = Repository("jcenter", URL("https://jcenter.bintray.com/"), snapshots = false)
