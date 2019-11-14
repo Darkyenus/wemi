@@ -172,6 +172,20 @@ object KeyDefaults {
         classpath
     }
 
+    val InternalClasspathOfBlankProject: Value<List<LocatedPath>> = {
+        val resources = Keys.resources.getLocatedPaths()
+
+        val classpath = WMutableList<LocatedPath>(resources.size + 128)
+        classpath.addAll(resources)
+
+        inProjectDependencies(true) {
+            ClasspathResolution_LOG.debug("Resolving internal project dependency on {}", this)
+            classpath.addAll(Keys.internalClasspath.get())
+        }
+
+        classpath
+    }
+
     fun outputClassesDirectory(tag: String): Value<Path> = {
         // Using scopeProject() instead of Keys.projectName, because it has to be unique
         // Prefix - signifies that it should be deleted on clean command
@@ -538,38 +552,18 @@ object KeyDefaults {
         }
     }
 
-    /**
-     * Special version of [Archive] that includes classpath contributions from [Keys.projectDependencies].
-     */
-    val ArchivePublishing: Value<Path> = {
-        using(archiving) {
-            AssemblyOperation().use { assemblyOperation ->
-                // Load data
-                for (file in Keys.internalClasspath.get()) {
-                    assemblyOperation.addSource(file, true)
-                }
-
-                val outputFile = Keys.archiveOutputFile.get()
-                assemblyOperation.assembly(
-                        NoConflictStrategyChooser,
-                        DefaultRenameFunction,
-                        DefaultAssemblyMapFilter,
-                        outputFile,
-                        NoPrependData,
-                        compress = true)
-
-                expiresWith(outputFile)
-                outputFile
-            }
-        }
-    }
-
     val ArchiveSources: Value<Path> = {
         using(archiving) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
                 for (file in Keys.sources.getLocatedPaths()) {
-                    assemblyOperation.addSource(file, true)
+                    assemblyOperation.addSource(file, true, extractJarEntries = false)
+                }
+
+                inProjectDependencies(true) {
+                    for (file in Keys.sources.getLocatedPaths()) {
+                        assemblyOperation.addSource(file, true, extractJarEntries = false)
+                    }
                 }
 
                 val outputFile = Keys.archiveOutputFile.get()

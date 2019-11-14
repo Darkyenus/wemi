@@ -1,25 +1,26 @@
-import wemi.*
 import wemi.Archetypes
-import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
-import wemi.Keys
+import wemi.KeyDefaults.inProjectDependencies
+import wemi.Keys.cacheDirectory
 import wemi.assembly.AssemblyOperation
 import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.DefaultRenameFunction
-import wemi.assembly.MergeStrategy
-import wemi.boot.WemiCacheFolder
-import wemi.collections.toMutable
+import wemi.assembly.NoConflictStrategyChooser
+import wemi.assembly.NoPrependData
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinCompilerVersion
+import wemi.createProject
+import wemi.dependency
 import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
 import wemi.dependency.ProjectDependency
+import wemi.expiresWith
+import wemi.key
 import wemi.publish.InfoNode
 import wemi.util.FileSet
-import wemi.util.executable
+import wemi.util.LocatedPath
+import wemi.util.ensureEmptyDirectory
 import wemi.util.name
-import wemi.util.plus
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
 val CompilerProjects = listOf(
@@ -32,23 +33,101 @@ val CompilerProjects = listOf(
 const val WemiGroup = "com.darkyen.wemi"
 const val ThisWemiVersion = "0.10-SNAPSHOT" // as opposed to the generic WemiVersion, which is the version with which we build
 
-val SLF4J_API = dependency("org.slf4j", "slf4j-api", "1.7.25")
+val distributionArchive by key<Path>("Create a distribution archive for Wemi")
 
-/**
- * Wemi Build System core
- */
-val core:Project by project {
+val wemi:Project by project(Archetypes.BlankJVMProject) {
+
     projectGroup set { WemiGroup }
     projectName set { "wemi-core" }
     projectVersion set { ThisWemiVersion }
 
-    mainClass set { "wemi.boot.PreMain" }
+    projectDependencies add { ProjectDependency(core, true) }
+    projectDependencies addAll { CompilerProjects.map { ProjectDependency(it, true) } }
+    projectDependencies add { ProjectDependency(dokkaInterfaceImplementation, true) }
+
+    distributionArchive set {
+        val distFolder = Files.createDirectories(cacheDirectory.get() / "-distribution-archive")
+        distFolder.ensureEmptyDirectory()
+        expiresWith(distFolder)
+        val distSourceFolder = Files.createDirectories(distFolder / "sources")
+
+        Files.copy(archive.get()!!, distFolder / "wemi.jar")
+        Files.copy(using(archivingSources) { archive.get()!! }, distSourceFolder / "wemi.jar")
+        for (path in externalClasspath.get()) {
+            Files.copy(path.file, distFolder / path.file.name)
+        }
+
+        ProcessBuilder("")
+
+        distFolder
+    }
+
+    publishMetadata modify { metadata ->
+        setupSharedPublishMetadata(
+                metadata,
+                "Wemi",
+                "Wonders Expeditiously, Mundane Instantly - Simple yet powerful build system - core jar",
+                "2017"
+        )
+    }
+
+    // TODO(jp): Remove after upgrading to version 0.10
+    internalClasspath set {
+        val resources = Keys.resources.getLocatedPaths()
+
+        val classpath = ArrayList<LocatedPath>(resources.size + 128)
+        classpath.addAll(resources)
+
+        inProjectDependencies(true) {
+            classpath.addAll(Keys.internalClasspath.get())
+        }
+
+        classpath
+    }
+
+    extend(archivingSources) {
+        archive set {
+            using(Configurations.archiving) {
+                AssemblyOperation().use { assemblyOperation ->
+                    // Load data
+                    for (file in sources.getLocatedPaths()) {
+                        assemblyOperation.addSource(file, true, extractJarEntries = false)
+                    }
+
+                    inProjectDependencies(true) {
+                        for (file in sources.getLocatedPaths()) {
+                            assemblyOperation.addSource(file, true, extractJarEntries = false)
+                        }
+                    }
+
+                    val outputFile = archiveOutputFile.get()
+                    assemblyOperation.assembly(
+                            NoConflictStrategyChooser,
+                            DefaultRenameFunction,
+                            DefaultAssemblyMapFilter,
+                            outputFile,
+                            NoPrependData,
+                            compress = true)
+
+                    expiresWith(outputFile)
+                    outputFile
+                }
+            }
+        }
+    }
+    // end remove
+}
+
+/** Core functionality */
+val core:Project by project {
 
     repositories add { Jitpack }
 
     val JLineVersion = "3.3.0"
     libraryDependencies set { setOf(
-            SLF4J_API,
+            latestKotlinDependency("stdlib"),
+            latestKotlinDependency("reflect"),
+            dependency("org.slf4j", "slf4j-api", "1.7.25"),
             dependency("com.darkyen", "tproll", "v1.3.0"),
             dependency("com.darkyen", "DaveWebb", "v1.2"),
             dependency("com.github.EsotericSoftware", "jsonbeans", "0.9"),
@@ -59,7 +138,6 @@ val core:Project by project {
 
     // Compile-only (provided) libraries
     extend(compiling) {
-        projectDependencies add { ProjectDependency(kotlinStdlib, true) }
         libraryDependencies add {
             /* Used ONLY in wemi.test.forked.TestLauncher */
             dependency("org.junit.platform", "junit-platform-launcher", "1.0.2")
@@ -75,88 +153,11 @@ val core:Project by project {
         libraryDependencies add { JUnitAPI }
         libraryDependencies add { JUnitEngine }
     }
+}
 
-    extend(assembling) {
-        // Add all compiler frontends to the internal classpath
-        internalClasspath modify { cp ->
-            val cpWithCompilers = cp.toMutable()
-
-            for (p in CompilerProjects) {
-                p.evaluate(null) {
-                    cpWithCompilers.addAll(internalClasspath.get())
-                }
-            }
-
-            cpWithCompilers.addAll(dokkaInterfaceImplementation.evaluate(null) { internalClasspath.get() })
-            
-            cpWithCompilers
-        }
-
-        // Add .jar with sources to resource files
-        resources modify { oldResources ->
-            val sourcePath = WemiCacheFolder / "source.zip"
-            AssemblyOperation().use { asOp ->
-                for (file in Keys.sources.getLocatedPaths()) {
-                    asOp.addSource(file, true, extractJarEntries = false)
-                }
-
-                asOp.assembly({ MergeStrategy.Deduplicate }, DefaultRenameFunction, DefaultAssemblyMapFilter, sourcePath, byteArrayOf(), false)
-            }
-
-            oldResources + FileSet(sourcePath)
-        }
-
-        // Add kotlin stdlib as a bundled jar
-        resources modify { oldResources ->
-            var resources = oldResources
-
-            val libraryList = StringBuilder()
-            for (stdlibJar in kotlinStdlib.evaluate(null) { externalClasspath.get() }) {
-                val jarEntry = stdlibJar.classpathEntry
-                resources += FileSet(jarEntry)
-                libraryList.append(jarEntry.name).append('\n')
-            }
-
-            val assemblyFolder = WemiCacheFolder / "-assembly-libraries"
-            Files.createDirectories(assemblyFolder)
-            val librariesPath = assemblyFolder / "libraries"
-            Files.newBufferedWriter(librariesPath, StandardCharsets.UTF_8).use {
-                it.append(libraryList)
-            }
-            resources += FileSet(librariesPath)
-
-            resources
-        }
-    }
-
-    assemblyPrependData set {
-        val prependFile = buildDirectory.get() / "WemiPrepend.sh"
-        expiresWith(prependFile)
-        Files.readAllBytes(prependFile)
-    }
-
-    assemblyOutputFile set {
-        val assemblyDir = buildDirectory.get() / "assembly"
-        expiresWith(assemblyDir)
-        Files.createDirectories(assemblyDir)
-        assemblyDir / "wemi"
-    }
-
-    assembly modify { assembled ->
-        assembled.executable = true
-        assembled
-    }
-
-    publishMetadata modify { metadata ->
-        setupSharedPublishMetadata(
-                metadata,
-                "Wemi",
-                "Wonders Expeditiously, Mundane Instantly - Simple yet powerful build system - core jar",
-                "2017"
-                )
-    }
-
-    run set { println("This is not a good idea"); -1 }
+fun latestKotlinDependency(name:String):Dependency {
+    val latestKotlinVersion = KotlinCompilerVersion.values().last().string
+    return dependency("org.jetbrains.kotlin", "kotlin-$name", latestKotlinVersion)
 }
 
 fun setupSharedPublishMetadata(metadata:InfoNode, name:String, description:String, inceptionYear:String): InfoNode {
@@ -198,46 +199,35 @@ fun createKotlinCompilerProject(version:String):Project {
             compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
         }
 
-        projectDependencies set {
-            setOf(ProjectDependency(core, false))
+        libraryDependencies set { emptySet() } // Disable default kotlin stdlib
+
+        extend(compiling) {
+            projectDependencies add { ProjectDependency(core, false) }
+
+            libraryDependencies set { setOf(
+                    dependency("org.jetbrains.kotlin", "kotlin-compiler", version)
+            ) }
         }
-
-        libraryDependencies set { setOf(
-                dependency("org.jetbrains.kotlin", "kotlin-compiler", version),
-                SLF4J_API
-        ) }
-
     }
 }
 
 val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
-    extend(compilingJava) {
-        sources set { null }
-    }
+    sources set { FileSet(projectRoot.get() / "src") }
 
     extend(compilingKotlin) {
-        sources set { FileSet(projectRoot.get() / "src") }
         compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
     }
 
-    projectDependencies set {
-        setOf(ProjectDependency(core, false))
+    libraryDependencies set { emptySet() } // Disable default kotlin stdlib
+
+    extend(compiling) {
+        projectDependencies add { ProjectDependency(core, false) }
+
+        libraryDependencies add {
+            /* Used only in wemi.document.DokkaInterface */
+            dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", scope="provided")
+        }
     }
 
     repositories set { setOf(JCenter) }
-
-    libraryDependencies add {
-        /* Used only in wemi.document.DokkaInterface */
-        dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", scope="provided")
-    }
-}
-
-val kotlinStdlib by project(Archetypes.BlankJVMProject) {
-    fun latestKotlinDependency(name:String):Dependency {
-        val latestKotlinVersion = KotlinCompilerVersion.values().last().string
-        return dependency("org.jetbrains.kotlin", "kotlin-$name", latestKotlinVersion)
-    }
-    
-    libraryDependencies set { setOf(latestKotlinDependency("stdlib"), latestKotlinDependency("reflect")) }
-    assemblyOutputFile set { Keys.cacheDirectory.get() / "kotlin-stdlib-assembly.zip" } // TODO(jp): .jar, but now it gets flattened
 }

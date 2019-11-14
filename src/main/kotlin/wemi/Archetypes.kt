@@ -117,7 +117,7 @@ object Archetypes {
      * Those can serve as an aggregation of dependencies or as a Maven-like parent projects.
      */
     val BlankJVMProject by archetype(::JVMBase) {
-        Keys.internalClasspath set Static(emptyList())
+        Keys.internalClasspath set KeyDefaults.InternalClasspathOfBlankProject
 
         Keys.sources set { null }
         Keys.resources set { null }

@@ -1,8 +1,9 @@
-#!/bin/sh -x
-# Target platform: POSIX Compliant systems
+#!/bin/sh
+# Target platform: Reasonably POSIX compliant systems
 # https://pubs.opengroup.org/onlinepubs/009695399/
 
-# Wemi Launcher
+# Wemi Launcher - This file is distributed under MIT License
+
 # Copyright 2019 Jan Polák
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
@@ -27,8 +28,7 @@ fail_unsatisfied() { log "Unsatisfied software dependency - install this softwar
 # Wemi settings
 ###################################
 # Wemi version to use
-readonly WEMI_VERSION=0.9
-readonly WEMI_CACHE_DIR="${HOME}/.wemi"
+readonly WEMI_VERSION=0.10-SNAPSHOT
 
 ###################################
 # Java settings
@@ -93,29 +93,27 @@ readonly JDK_RELEASE=latest
 }
 ###################################
 
+readonly WEMI_CACHE_DIR=${WEMI_HOME:-"${HOME}/.wemi"}
+if [ ! -e "$WEMI_CACHE_DIR" ]; then
+	log "Creating '$WEMI_CACHE_DIR' as a cache for Wemi related files"
+	mkdir -p "$WEMI_CACHE_DIR" || fail "Wemi cache directory creation failed (mkdir returned $?)"
+	cat <<EOF >"$WEMI_CACHE_DIR/readme.txt"
+This directory is used by Wemi to store downloaded Wemi versions and JDKs.
+Feel free do delete this directory to completely remove Wemi from your system.
+
+To change the location of this directory, specify the new path in WEMI_HOME environment variable.
+Then you can delete this directory or move it to the new location.
+
+jdk/ contains downloaded OpenJDK Java distributions.
+wemi/ contains downloaded Wemi distributions.
+You can delete anything from these folders to reclaim disk space, as long as it is currently not used.
+EOF
+fi
+
 # Contains all versions of this type of JDK
 readonly WEMI_JDK_TYPE_FOLDER="${WEMI_CACHE_DIR}/jdk/${JDK_VERSION}-${JDK_IMPLEMENTATION}-${JDK_HEAP_SIZE}"
-# File with the Wemi launcher for this version
-readonly WEMI_LAUNCHER="${WEMI_CACHE_DIR}/wemi/${WEMI_VERSION}.jar"
-
-# If we want latest version (default), latest version exists and is not too old, just use it. This is the fast path.
-# If we want specific version, just check whether it exists.
-
-# Creates and prints a path of an empty temporary directory.
-# Directory should be deleted after use.
-create_temporary_directory() {
-	temp_base="${TMPDIR:-"${WEMI_CACHE_DIR}/temp"}"
-	mkdir -p "$temp_base" || fail "Failed to create a temporary directory base at: $temp_base"
-	temp_dir_index=1
-	until { temp_dir="${temp_base}/wemi-tmp-${temp_dir_index}"; mkdir "$temp_dir" 2>/dev/null; } do
-		temp_dir_index=$((temp_dir_index + 1))
-		if [ "$temp_dir_index" -gt 100 ]; then
-			fail "Failed to create a temporary directory at: $temp_base"
-		fi
-	done
-
-	echo "$temp_dir"
-}
+# Contains the Wemi classpath jars
+readonly WEMI_LAUNCHER_FOLDER="${WEMI_CACHE_DIR}/wemi/${WEMI_VERSION}"
 
 # $1: Command name
 # $?: Whether or not the command exists
@@ -165,6 +163,48 @@ url_encode() {
 	echo "$output"
 }
 
+# @1 .zip archive
+# @2 directory with entries extracted
+extract_zip() {
+	if command_exists unzip; then
+		unzip "$1" -d "$2" 1>/dev/null || fail "Failed to unzip '$1' (unzip returned $?)"
+	else
+		fail_unsatisfied "unzip"
+	fi
+}
+
+# @1 .tar.gz archive
+# @2 directory with entries extracted
+extract_targz() {
+	# If we have gzip, use it, if we don't then hope that tar/pax supports the -z switch
+	# (gzip, tar and pax's -z switch are not POSIX compliant, so this tries things that are most likely to work first)
+	if command_exists gzip; then
+		if command_exists tar; then
+			# shellcheck disable=SC2015
+			mkdir "$2" 1>&2 &&
+			gzip -d -c < "$1" | tar -x -C "$2" 1>/dev/null || fail "Failed to extract '$1' (gzip|tar returned $?)"
+		elif command_exists pax; then
+			# pax has two pecularities:
+			# 1. It always extracts (relative) to the current working directory
+			# 2. It permits absolute paths in archives and WILL extract to an absolute path
+			# Both can be fixed by prefixing the paths by the target directory manually.
+			gzip -d -c < "$1" | pax -r -s "#^#${2}/#" 1>/dev/null || fail "Failed to extract '$1' (gzip|pax returned $?)"
+		else
+			fail_unsatisfied "tar or pax"
+		fi
+	else
+		if command_exists tar; then
+			# shellcheck disable=SC2015
+			mkdir "$2" &&
+			tar -x -z -C "$2" -f "$1" 1>/dev/null || fail "Failed to extract '$1' (tar returned $?)"
+		elif command_exists pax; then
+			pax -r -z -s "#^#${2}/#" -f "$1" 1>/dev/null || fail "Failed to extract '$1' (pax returned $?)"
+		else
+			fail_unsatisfied "tar or pax"
+		fi
+	fi
+}
+
 # Download, extract and test a JDK distribution according to JDK_* constants and the JDK release argument.
 # Returns immediately if already downloaded.
 # $1: JDK release (not 'latest')
@@ -191,39 +231,9 @@ fetch_jdk() {
 	decompressed_folder="${jdk_version_folder}.decompressed"
 
 	if [ ${JDK_OS} = 'windows' ]; then
-		if command_exists unzip; then
-			unzip "$download_file" -d "$decompressed_folder" 1>/dev/null || fail "Failed to unzip downloaded JDK (unzip returned $?)"
-		else
-			fail_unsatisfied "unzip"
-		fi
+		extract_zip "$download_file" "$decompressed_folder"
 	else
-		# If we have gzip, use it, if we don't then hope that tar/pax supports the -z switch
-		# (gzip, tar and pax's -z switch are not POSIX compliant, so this tries things that are most likely to work first)
-		if command_exists gzip; then
-			if command_exists tar; then
-				# shellcheck disable=SC2015
-				mkdir "$decompressed_folder" 1>&2 &&
-				gzip -d -c < "$download_file" | tar -x -C "$decompressed_folder" 1>/dev/null || fail "Failed to extract downloaded JDK (gzip|tar returned $?)"
-			elif command_exists pax; then
-				# pax has two pecularities:
-				# 1. It always extracts (relative) to the current working directory
-				# 2. It permits absolute paths in archives and WILL extract to an absolute path
-				# Both can be fixed by prefixing the paths by the target directory manually.
-				gzip -d -c < "$download_file" | pax -r -s "#^#${decompressed_folder}/#" 1>/dev/null || fail "Failed to extract downloaded JDK (gzip|pax returned $?)"
-			else
-				fail_unsatisfied "tar or pax"
-			fi
-		else
-			if command_exists tar; then
-				# shellcheck disable=SC2015
-				mkdir "$decompressed_folder" &&
-				tar -x -z -C "$decompressed_folder" -f "$download_file" 1>/dev/null || fail "Failed to extract downloaded JDK (tar returned $?)"
-			elif command_exists pax; then
-				pax -r -z -s "#^#${decompressed_folder}/#" -f "$download_file" 1>/dev/null || fail "Failed to extract downloaded JDK (pax returned $?)"
-			else
-				fail_unsatisfied "tar or pax"
-			fi
-		fi
+		extract_targz "$download_file" "$decompressed_folder"
 	fi
 
 	# Unpack the folder (it is bundled in a different directory structure according to the platform)
@@ -380,13 +390,12 @@ launch_wemi() {
 	readonly JAVA_EXE="$(get_runtime_java_exe)"
 
 	# Fetch Wemi if this version does not exist
-	if [ ! -e "$WEMI_LAUNCHER" ]; then
-		wemi_launcher_download_file="${WEMI_LAUNCHER}.downloading"
-		log "Downloading Wemi launcher (version ${WEMI_LAUNCHER})"
-		download_to_file "https://github.com/Darkyenus/wemi/releases/download/v${WEMI_VERSION}/wemi" "$wemi_launcher_download_file"
-
-		chmod +x "$wemi_launcher_download_file" || fail "Failed to mark Wemi launcher as executable (chmod returned $?)"
-		mv "$wemi_launcher_download_file" "$WEMI_LAUNCHER" || fail "Failed to finish downloading of Wemi launcher (mv returned $?)"
+	if [ ! -e "$WEMI_LAUNCHER_FOLDER" ]; then
+		wemi_launcher_download_file="${WEMI_LAUNCHER_FOLDER}.downloading"
+		log "Downloading Wemi launcher (version ${WEMI_VERSION})"
+		download_to_file "https://github.com/Darkyenus/wemi/releases/download/v${WEMI_VERSION}/wemi.tar.gz" "$wemi_launcher_download_file"
+		extract_targz "$wemi_launcher_download_file" "${WEMI_LAUNCHER_FOLDER}/"
+		rm "$wemi_launcher_download_file" || log "Failed to remove downloaded Wemi archive (mv returned $?)"
 	fi
 
 	# Parse --debug, --debug-suspend, --debug=<port> and --debug-suspend=<port> flags, which are mutually exclusive and
@@ -401,9 +410,9 @@ launch_wemi() {
 	readonly WEMI_RELOAD_CODE=6
 	while true; do
 		# shellcheck disable=SC2086
-		"$JAVA_EXE" $WEMI_JAVA_OPTS -jar "$WEMI_LAUNCHER" --root="$(dirname "$0")" --reload-supported "$@"
+		"$JAVA_EXE" $WEMI_JAVA_OPTS -classpath "${WEMI_LAUNCHER_FOLDER}/*" 'wemi.boot.Main' --root="$(dirname "$0")" --reload-supported "$@"
 		wemi_exit_code="$?"
-		if [ "$?" != "$WEMI_RELOAD_CODE" ]; then
+		if [ "$?" -ne "$WEMI_RELOAD_CODE" ]; then
 			exit "$wemi_exit_code"
 		fi
 	done

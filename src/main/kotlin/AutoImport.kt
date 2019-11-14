@@ -113,6 +113,8 @@ val projectRoot
     inline get() = wemi.Keys.projectRoot
 val buildDirectory
     inline get() = wemi.Keys.buildDirectory
+val cacheDirectory
+    inline get() = wemi.Keys.cacheDirectory
 
 val sources
     inline get() = wemi.Keys.sources
@@ -128,6 +130,8 @@ val libraryDependencyProjectMapper
     inline get() = wemi.Keys.libraryDependencyMapper
 val libraryDependencyMapper
     inline get() = wemi.Keys.libraryDependencyMapper
+val resolvedLibraryScopes
+    inline get() = wemi.Keys.resolvedLibraryScopes
 val resolvedLibraryDependencies
     inline get() = wemi.Keys.resolvedLibraryDependencies
 val unmanagedDependencies
