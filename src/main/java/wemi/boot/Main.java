@@ -2,19 +2,14 @@ package wemi.boot;
 
 import com.darkyen.tproll.TPLogger;
 
-import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.nio.charset.StandardCharsets;
+import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 /** Parse command line options, loads self-packed libraries and start real Main. */
 @SuppressWarnings("WeakerAccess")
@@ -67,8 +62,7 @@ public class Main {
 	static final int OPTION_LOG_LEVEL = 10;
 	static final int OPTIONS_SIZE = 11;
 
-	@SuppressWarnings("unchecked")
-	public static void main(String[] args) throws Throwable {
+	public static void main(String[] args) {
 		final boolean[] cleanBuild = {false};
 		final Boolean[] interactive = {null};
 		final boolean[] machineReadableOutput = {false};
@@ -170,21 +164,18 @@ public class Main {
 		final Path buildDirectory = rootDirectory[0].resolve("build");
 		final Path cacheDirectory = buildDirectory.resolve("cache");
 
-		final ClassLoader classLoader = Main.class.getClassLoader();
-		final List<Path> paths = prepareUnpackedClasspath(classLoader, cacheDirectory.resolve("wemi-libs"));
-		if (paths == null) {
-			System.exit(1);
-		}
+		final ArrayList<Path> paths = new ArrayList<>();
+		final String fullClassPath = System.getProperty("java.class.path");
+		{
+			int start = 0;
+			while (start < fullClassPath.length()) {
+				int end = fullClassPath.indexOf(File.pathSeparatorChar, start);
+				if (end == -1) {
+					end = fullClassPath.length();
+				}
 
-		// Create URLs of just created (or discovered) libraries to load in classloader
-		final URL[] classpath = new URL[paths.size()];
-		for (int i = 0; i < paths.size(); i++) {
-			try {
-				classpath[i] = paths.get(i).toUri().toURL();
-			} catch (MalformedURLException e) {
-				System.err.println("Failed to convert to URL \""+paths.get(i)+'\"');
-				e.printStackTrace(System.err);
-				System.exit(1);
+				paths.add(Paths.get(fullClassPath.substring(start, end)));
+				start = end + 1;
 			}
 		}
 
@@ -201,107 +192,6 @@ public class Main {
 		launchOptions[OPTION_LIST_OF_PATH_RUNTIME_CLASSPATH] = paths;
 		launchOptions[OPTION_LOG_LEVEL] = logLevel[0];
 
-		final Consumer<Object[]> launch;
-
-		try {
-			// Using parent class loader, not system one, because we want everything, including normal wemi classes
-			// to be loaded through this class loader.
-			// Otherwise wemi classes are loaded through default system class loader, which does not know about this one,
-			// and externally loaded libraries never load.
-			final ClassLoader runtimeClassLoader = new URLClassLoader(classpath, classLoader.getParent());
-
-			final Class<?> mainClass = Class.forName("wemi.boot.LaunchKt", true, runtimeClassLoader);
-			// Options are passed through Consumer and not through reflective method call, to ensure that the stacktrace is clean.
-			launch = (Consumer<Object[]>) mainClass.getDeclaredField("launch").get(null);
-		} catch (ClassNotFoundException | IllegalAccessException e) {
-			System.err.println("Failed to launch");
-			e.printStackTrace(System.err);
-			System.exit(1);
-			return;
-		}
-
-		launch.accept(launchOptions);
-	}
-
-	private static List<Path> prepareUnpackedClasspath(ClassLoader classLoader, final Path libDirectory) {
-		try {
-			Files.createDirectories(libDirectory);
-		} catch (IOException ignored) {}
-
-		final InputStream librariesStream = classLoader.getResourceAsStream("libraries");
-		if (librariesStream == null) {
-			System.err.println("Failed to find \"libraries\"");
-			return null;
-		}
-
-		final ArrayList<Path> paths = new ArrayList<>();
-
-		// Read which libraries we need and copy them
-		try (BufferedReader reader = new BufferedReader(new InputStreamReader(librariesStream, StandardCharsets.UTF_8))) {
-			String name;
-			while ((name = reader.readLine()) != null) {
-				final URL resource = classLoader.getResource(name);
-				if (resource == null) {
-					System.err.println("Failed to find library \""+name+"\"");
-					return null;
-				}
-
-				final Path path = libDirectory.resolve(name);
-				if (!Files.isRegularFile(path)) {
-					if (Files.exists(path)) {
-						System.err.println("Failed to unpack libraries, \""+path+"\" already exists and is not a file");
-						return null;
-					}
-					// Copy it
-					try (InputStream resourceIn = resource.openStream()) {
-						Files.copy(resourceIn, path);
-					} catch (IOException e) {
-						System.err.println("Failed to unpack library to \""+path+"\"");
-						e.printStackTrace(System.err);
-					}
-				}
-
-				paths.add(path);
-			}
-		} catch (IOException e) {
-			System.err.println("Failed to read \"libraries\"");
-			e.printStackTrace(System.err);
-			return null;
-		}
-
-		// Delete old files in the directory
-		try (Stream<Path> libPaths = Files.list(libDirectory)) {
-			libPaths.forEach(item -> {
-				if (!paths.contains(item)) {
-					try {
-						Files.delete(item);
-					} catch (IOException e) {
-						System.err.println("Failed to delete \""+item+'\"');
-						e.printStackTrace(System.err);
-					}
-				}
-			});
-		} catch (IOException e) {
-			System.err.println("Failed to cleanup \""+libDirectory+'\"');
-			e.printStackTrace(System.err);
-			// But continue, this isn't a problem
-		}
-
-		// Add ./wemi jar (and other custom classpath entries, if necessary) to paths
-		final String fullClassPath = System.getProperty("java.class.path");
-		{
-			int start = 0;
-			while (start < fullClassPath.length()) {
-				int end = fullClassPath.indexOf(File.pathSeparatorChar, start);
-				if (end == -1) {
-					end = fullClassPath.length();
-				}
-
-				paths.add(Paths.get(fullClassPath.substring(start, end)));
-				start = end + 1;
-			}
-		}
-
-		return paths;
+		wemi.boot.LaunchKt.launch(launchOptions);
 	}
 }

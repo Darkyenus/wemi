@@ -96,12 +96,8 @@ internal val WemiBundledLibrariesExclude = listOf(
  * After that, it is not allowed to add new tasks. */
 internal var autoRunTasks:ArrayList<Task>? = ArrayList()
 
-/** Called reflectively from Main. See there for more info.
- * Entry point for the WEMI build tool. */
-@PublishedApi // So that it is easily reflectively visible
-@JvmSynthetic // So that people don't see it
-@JvmField // So that it actually is a field
-internal val launch : java.util.function.Consumer<Array<Any?>> = java.util.function.Consumer { rawOptions ->
+/** Entry point for the WEMI build tool. */
+fun launch(rawOptions:Array<Any?>) {
     WemiRootFolder = rawOptions[OPTION_PATH_ROOT_FOLDER] as Path
     WemiBuildFolder = rawOptions[OPTION_PATH_BUILD_FOLDER] as Path
     WemiCacheFolder = rawOptions[OPTION_PATH_CACHE_FOLDER] as Path

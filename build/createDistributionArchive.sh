@@ -26,6 +26,7 @@ chmod +x "${wemi_home}/build/dist/wemi"
 # Package the files
 cd "${wemi_home}/build/cache/-distribution-archive" || fail "cd to distribution archive"
 tar -c -v -z -f "${wemi_home}/build/dist/wemi.tar.gz" ./* || fail "tar ($?)"
+cd "$wemi_home" || fail "cd back home"
 
 log "Done"
 echo "${wemi_home}/build/dist"

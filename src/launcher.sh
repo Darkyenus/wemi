@@ -384,19 +384,45 @@ get_runtime_java_exe() {
 	echo "${jdk_home}/bin/java"
 }
 
+fetch_wemi() {
+	redownload='false'
+	if [ "${WEMI_VERSION%-SNAPSHOT}" != "${WEMI_VERSION}" ]; then
+		# Snapshot version
+		wemi_download_url="https://darkyen.com/wemi/${WEMI_VERSION}/wemi.tar.gz"
+		# If the snapshot folder exists and is less than 3 days old, we should download a new snapshot
+		if [ -z "$(find "$WEMI_LAUNCHER_FOLDER" -type d -name "$(basename "$WEMI_LAUNCHER_FOLDER")" -mtime -60 -print 2>/dev/null)" ]; then
+			log "Checking for a newer Wemi snapshot"
+			redownload='true'
+		fi
+	else
+		# Normal version
+		wemi_download_url="https://github.com/Darkyenus/wemi/releases/download/v${WEMI_VERSION}/wemi.tar.gz"
+	fi
+
+	if [ ! -e "$WEMI_LAUNCHER_FOLDER" ] || [ "$redownload" = 'true' ]; then
+		wemi_launcher_download_file="${WEMI_LAUNCHER_FOLDER}.downloading"
+		log "Downloading Wemi launcher (version ${WEMI_VERSION})"
+		if ( download_to_file "$wemi_download_url" "$wemi_launcher_download_file" ); then
+			# Success
+			rm -rf "${WEMI_LAUNCHER_FOLDER}"
+			extract_targz "$wemi_launcher_download_file" "${WEMI_LAUNCHER_FOLDER}"
+			rm "$wemi_launcher_download_file" || log "Failed to remove downloaded Wemi archive (rm returned $?)"
+		elif [ -e "$WEMI_LAUNCHER_FOLDER" ]; then
+			# Failure, but we can use old version
+			log "Failed to download newer Wemi snapshot, continuing with the old one"
+		else
+			# Failure unfixable
+			fail "Failed to download Wemi. Make sure that your internet connection works and then try again."
+		fi
+	fi
+}
+
 # Launch as a Wemi launcher
 launch_wemi() {
 	# Retrieve it here, so that if it fails, it is now
-	readonly JAVA_EXE="$(get_runtime_java_exe)"
+	java_exe="$(get_runtime_java_exe)"
 
-	# Fetch Wemi if this version does not exist
-	if [ ! -e "$WEMI_LAUNCHER_FOLDER" ]; then
-		wemi_launcher_download_file="${WEMI_LAUNCHER_FOLDER}.downloading"
-		log "Downloading Wemi launcher (version ${WEMI_VERSION})"
-		download_to_file "https://github.com/Darkyenus/wemi/releases/download/v${WEMI_VERSION}/wemi.tar.gz" "$wemi_launcher_download_file"
-		extract_targz "$wemi_launcher_download_file" "${WEMI_LAUNCHER_FOLDER}/"
-		rm "$wemi_launcher_download_file" || log "Failed to remove downloaded Wemi archive (mv returned $?)"
-	fi
+	fetch_wemi
 
 	# Parse --debug, --debug-suspend, --debug=<port> and --debug-suspend=<port> flags, which are mutually exclusive and
 	# must be the first flag to appear.
@@ -410,7 +436,7 @@ launch_wemi() {
 	readonly WEMI_RELOAD_CODE=6
 	while true; do
 		# shellcheck disable=SC2086
-		"$JAVA_EXE" $WEMI_JAVA_OPTS -classpath "${WEMI_LAUNCHER_FOLDER}/*" 'wemi.boot.Main' --root="$(dirname "$0")" --reload-supported "$@"
+		"$java_exe" $WEMI_JAVA_OPTS -classpath "${WEMI_LAUNCHER_FOLDER}/*" 'wemi.boot.Main' --root="$(dirname "$0")" --reload-supported "$@"
 		wemi_exit_code="$?"
 		if [ "$?" -ne "$WEMI_RELOAD_CODE" ]; then
 			exit "$wemi_exit_code"
