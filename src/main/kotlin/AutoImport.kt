@@ -38,7 +38,7 @@ typealias Paths = java.nio.file.Paths
 typealias Files = java.nio.file.Files
 
 val WemiVersion
-    get() = wemi.boot.Main.WEMI_VERSION
+    get() = wemi.boot.WemiVersion
 
 // Core Functions
 inline fun project(vararg archetypes: Archetype = arrayOf(Archetypes.DefaultArchetype), noinline initializer: Project.() -> Unit) = wemi.project(path("."), archetypes = *archetypes, initializer = initializer)

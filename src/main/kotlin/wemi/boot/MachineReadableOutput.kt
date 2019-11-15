@@ -3,13 +3,19 @@ package wemi.boot
 import com.esotericsoftware.jsonbeans.JsonWriter
 import com.esotericsoftware.jsonbeans.OutputType
 import org.slf4j.LoggerFactory
-import wemi.*
-import wemi.util.*
+import wemi.AllConfigurations
+import wemi.AllKeys
+import wemi.AllProjects
+import wemi.WemiException
+import wemi.util.JsonWritable
+import wemi.util.field
+import wemi.util.writeArray
+import wemi.util.writeObject
+import wemi.util.writeValue
 import java.io.OutputStreamWriter
 import java.io.PrintStream
 import java.nio.file.Paths
 import kotlin.system.exitProcess
-import wemi.boot.Main.*
 
 private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
 
@@ -24,7 +30,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
     if (task.isMachineReadableCommand) {
         when (task.key) {
             "version" -> {
-                machineReadablePrint(out, Main.WEMI_VERSION)
+                machineReadablePrint(out, WemiVersion)
                 return
             }
             "projects" -> {

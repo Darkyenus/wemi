@@ -146,7 +146,7 @@ internal fun parseFileDirectives(source: BufferedReader, directives:Array<Class<
                 } else {
                     val wemiVersionName = ::WemiVersion.name
                     if (value == wemiVersionName) {
-                        Main.WEMI_VERSION
+                        wemi.boot.WemiVersion
                     } else {
                         LOG.warn("{}:{} Invalid directive annotation - unrecognized parameter '{}', only strings and '{}' allowed", source, line, value, wemiVersionName)
                         return false

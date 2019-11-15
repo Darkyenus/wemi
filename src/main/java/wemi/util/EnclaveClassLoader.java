@@ -8,7 +8,6 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.*;
 
-
 /**
  * ClassLoader that first checks own URLs before asking parent.
  *
@@ -20,7 +19,6 @@ import java.util.*;
  *
  * This is useful for injecting dynamically loaded libraries which are compiled in as "provided".
  */
-@SuppressWarnings("unchecked")
 public class EnclaveClassLoader extends URLClassLoader {
 
 	private final ClassLoader parent;
@@ -40,6 +38,10 @@ public class EnclaveClassLoader extends URLClassLoader {
 	private Class<?> forceLoadClass(String name) throws ClassNotFoundException {
 		final String resourceName = name.replace('.', '/') + ".class";
 		try (final InputStream stream = getResourceAsStream(resourceName)) {
+			if (stream == null) {
+				throw new ClassNotFoundException(name);
+			}
+
 			byte[] buffer = new byte[2048];
 
 			int offset = 0;
@@ -53,8 +55,8 @@ public class EnclaveClassLoader extends URLClassLoader {
 			}
 
 			return defineClass(name, buffer, 0, offset);
-		} catch (Exception ex) {
-			throw new ClassNotFoundException("Could not force-load class " + name, ex);
+		} catch (IOException e) {
+			throw new ClassNotFoundException("Could not force-load class " + name, e);
 		}
 	}
 

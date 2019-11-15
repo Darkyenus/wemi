@@ -710,7 +710,7 @@ object CLI {
             null
         }
         put("help") {
-            println(formatLabel("Wemi ${Main.WEMI_VERSION} (Kotlin $WemiKotlinVersion, Java ${System.getProperty("java.version")} - ${System.getProperty("java.vendor")})"))
+            println(formatLabel("Wemi $WemiVersion (Kotlin $WemiKotlinVersion, Java ${System.getProperty("java.version")} - ${System.getProperty("java.vendor")})"))
             print(formatLabel("Commands: "))
             println(" exit, reload, help, log <level>")
             println(" projects [filter], configurations [filter], keys [filter] - list available")
@@ -737,7 +737,7 @@ object CLI {
             return null
         }
 
-        val parsed = TaskParser.PartitionedLine(listOf(command), allowQuotes = true, machineReadable = false)
+        val parsed = TaskParser.PartitionedLine(arrayOf(command), allowQuotes = true, machineReadable = false)
         val tasks = parsed.tasks
 
         val errors = parsed.formattedErrors(true)

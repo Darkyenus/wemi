@@ -436,7 +436,7 @@ launch_wemi() {
 	readonly WEMI_RELOAD_CODE=6
 	while true; do
 		# shellcheck disable=SC2086
-		"$java_exe" $WEMI_JAVA_OPTS -classpath "${WEMI_LAUNCHER_FOLDER}/*" 'wemi.boot.Main' --root="$(dirname "$0")" --reload-supported "$@"
+		"$java_exe" $WEMI_JAVA_OPTS -classpath "${WEMI_LAUNCHER_FOLDER}/*" 'wemi.boot.Launch' --root="$(dirname "$0")" --reload-supported "$@"
 		wemi_exit_code="$?"
 		if [ "$?" -ne "$WEMI_RELOAD_CODE" ]; then
 			exit "$wemi_exit_code"

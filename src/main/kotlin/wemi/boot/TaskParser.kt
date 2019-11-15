@@ -30,7 +30,7 @@ object TaskParser : Parser {
     }
 
     class ParsedTaskLine(val line: String, val cursor: Int) : ParsedLine {
-        private val parsed = PartitionedLine(listOf(line), true, false)
+        private val parsed = PartitionedLine(arrayOf(line), true, false)
 
         val words:List<String>
         val tokenTypes:List<TokenType?>
@@ -152,7 +152,7 @@ object TaskParser : Parser {
             }
     }
 
-    class PartitionedLine(sources: Collection<String>,
+    class PartitionedLine (sources: Array<String>,
                           allowQuotes: Boolean,
                           machineReadable: Boolean) {
 
@@ -169,7 +169,7 @@ object TaskParser : Parser {
          *
          * Escape on end of the line is treated as a regular character, so are unmatched quotes.
          */
-        private fun createParts(sources: Collection<String>, allowQuotes: Boolean):MutableList<Part> {
+        private fun createParts(sources: Array<String>, allowQuotes: Boolean):MutableList<Part> {
             val parts = ArrayList<Part>()
             var indexBase = 0
 

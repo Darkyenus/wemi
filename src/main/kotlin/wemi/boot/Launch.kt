@@ -1,8 +1,13 @@
+@file:JvmName("Launch")
 package wemi.boot
 
 import com.darkyen.tproll.TPLogger
 import com.darkyen.tproll.integration.JavaLoggingIntegration
-import com.darkyen.tproll.logfunctions.*
+import com.darkyen.tproll.logfunctions.DateTimeFileCreationStrategy
+import com.darkyen.tproll.logfunctions.FileLogFunction
+import com.darkyen.tproll.logfunctions.LogFileHandler
+import com.darkyen.tproll.logfunctions.LogFunctionMultiplexer
+import com.darkyen.tproll.logfunctions.SimpleLogFunction
 import com.darkyen.tproll.util.PrettyPrinter
 import com.darkyen.tproll.util.TimeFormatter
 import com.darkyen.tproll.util.prettyprint.PrettyPrinterFileModule
@@ -12,15 +17,64 @@ import org.jline.reader.UserInterruptException
 import org.jline.utils.OSUtils
 import org.joda.time.Duration
 import org.slf4j.LoggerFactory
-import wemi.*
-import wemi.boot.Main.*
+import wemi.AllProjects
+import wemi.BooleanValidator
+import wemi.BuildScriptData
+import wemi.Configurations
+import wemi.Project
+import wemi.WemiException
+import wemi.WithExitCode
 import wemi.dependency.DependencyExclusion
-import wemi.util.*
-import java.io.*
+import wemi.util.Color
+import wemi.util.FileSet
+import wemi.util.WemiPrettyPrintFileModule
+import wemi.util.WemiPrettyPrintFunctionModule
+import wemi.util.WemiPrettyPrintLocatedPathModule
+import wemi.util.WemiPrettyPrintPathModule
+import wemi.util.directorySynchronized
+import wemi.util.div
+import wemi.util.format
+import wemi.util.include
+import wemi.util.matchingFiles
+import java.io.BufferedReader
+import java.io.File
+import java.io.FileDescriptor
+import java.io.FileOutputStream
+import java.io.IOException
+import java.io.InputStreamReader
+import java.io.PrintStream
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.nio.file.Paths
 import kotlin.system.exitProcess
 
-private val LOG = LoggerFactory.getLogger("Main")
+private val LOG = LoggerFactory.getLogger("Launch")
+
+// Standard exit codes
+const val EXIT_CODE_SUCCESS = 0
+const val EXIT_CODE_OTHER_ERROR = 1
+const val EXIT_CODE_ARGUMENT_ERROR = 2
+const val EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR = 3
+/** Exit code to be returned when all conditions for [wemi.WithExitCode] are met,
+ * but the key evaluation failed, for any reason, including unset key and evaluation throwing an exception. */
+const val EXIT_CODE_TASK_ERROR = 4
+/** Exit code reserved for general purpose task failure,
+ * for example to be returned by [wemi.WithExitCode.processExitCode]. */
+const val EXIT_CODE_TASK_FAILURE = 5
+/** When Wemi exits, but wants to be restarted right after that. */
+const val EXIT_CODE_RELOAD = 6
+
+// Machine-output exit codes
+const val EXIT_CODE_MACHINE_OUTPUT_THROWN_EXCEPTION_ERROR = 51
+const val EXIT_CODE_MACHINE_OUTPUT_NO_PROJECT_ERROR = 52
+const val EXIT_CODE_MACHINE_OUTPUT_NO_CONFIGURATION_ERROR = 53
+const val EXIT_CODE_MACHINE_OUTPUT_NO_KEY_ERROR = 54
+const val EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR = 55
+const val EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND = 56
+
+/** Version of Wemi build system */
+const val WemiVersion:String = "0.10-SNAPSHOT"
 
 internal var WemiRunningInInteractiveMode = false
     private set
@@ -76,8 +130,19 @@ const val WemiBuildScriptProjectName = "wemi-build"
 lateinit var WemiBuildScriptProject:Project
     private set
 
-lateinit var WemiRuntimeClasspath:List<Path>
-    private set
+val WemiRuntimeClasspath:List<Path> = ArrayList<Path>().apply {
+    val fullClassPath = System.getProperty("java.class.path") ?: ""
+    var start = 0
+    while (start < fullClassPath.length) {
+        var end = fullClassPath.indexOf(File.pathSeparatorChar, start)
+        if (end == -1) {
+            end = fullClassPath.length
+        }
+
+        add(Paths.get(fullClassPath.substring(start, end)))
+        start = end + 1
+    }
+}
 
 internal val MainThread = Thread.currentThread()
 
@@ -97,26 +162,98 @@ internal val WemiBundledLibrariesExclude = listOf(
 internal var autoRunTasks:ArrayList<Task>? = ArrayList()
 
 /** Entry point for the WEMI build tool. */
-fun launch(rawOptions:Array<Any?>) {
-    WemiRootFolder = rawOptions[OPTION_PATH_ROOT_FOLDER] as Path
-    WemiBuildFolder = rawOptions[OPTION_PATH_BUILD_FOLDER] as Path
-    WemiCacheFolder = rawOptions[OPTION_PATH_CACHE_FOLDER] as Path
-    val cleanBuild = rawOptions[OPTION_BOOL_CLEAN_BUILD] as Boolean
-    var interactive = rawOptions[OPTION_BOOL_INTERACTIVE] as Boolean?
-    val machineReadableOutput = rawOptions[OPTION_BOOL_MACHINE_READABLE] as Boolean
-    val allowBrokenBuildScripts  = rawOptions[OPTION_BOOL_ALLOW_BROKEN_BUILD_SCRIPTS] as Boolean
-    WemiReloadSupported = rawOptions[OPTION_BOOL_RELOAD_SUPPORTED] as Boolean
-    @Suppress("UNCHECKED_CAST")
-    val taskArguments = rawOptions[OPTION_LIST_OF_STRING_TASKS] as List<String>
-    @Suppress("UNCHECKED_CAST")
-    WemiRuntimeClasspath = rawOptions[OPTION_LIST_OF_PATH_RUNTIME_CLASSPATH] as List<Path>
-    when (rawOptions[OPTION_LOG_LEVEL] as Byte) {
-        TPLogger.TRACE -> TPLogger.TRACE()
-        TPLogger.DEBUG -> TPLogger.DEBUG()
-        TPLogger.INFO -> TPLogger.INFO()
-        TPLogger.WARN -> TPLogger.WARN()
-        TPLogger.ERROR -> TPLogger.ERROR()
+fun main(args: Array<String>) {
+    var cleanBuild = false
+    var interactiveArg:Boolean? = null
+    var machineReadableOutput = false
+    var allowBrokenBuildScripts = false
+    var reloadSupported = false
+    var rootDirectory:Path? = null
+
+    val options = arrayOf(
+            Option('c', "clean", "perform a clean rebuild of build scripts") { _, _ ->
+                cleanBuild = true
+            },
+            Option('l', "log", "set the log level (single letter variants also allowed)", true, "{trace|debug|info|warn|error}") { level, _ ->
+                when (level.toLowerCase()) {
+                    "trace", "t" -> TPLogger.TRACE()
+                    "debug", "d" -> TPLogger.DEBUG()
+                    "info", "i" -> TPLogger.INFO()
+                    "warning", "warn", "w" -> TPLogger.WARN()
+                    "error", "e" -> TPLogger.ERROR()
+                    else -> {
+                        System.err.println("Unknown log level: $level")
+                        exitProcess(EXIT_CODE_ARGUMENT_ERROR)
+                    }
+                }
+            },
+            Option('i', "interactive", "enable interactive mode even in presence of tasks") { _, _ ->
+                interactiveArg = true
+            },
+            Option(Option.NO_SHORT_NAME, "non-interactive", "disable interactive mode even when no tasks are present") { _, _ ->
+                interactiveArg = false
+            },
+            Option('v', "verbose", "verbose mode, same as --log=debug") { _, _ ->
+                TPLogger.DEBUG()
+            },
+            Option(Option.NO_SHORT_NAME, "root", "set the root directory of the built project", true, "DIR") { root, _ ->
+                val newRoot = Paths.get(root).toAbsolutePath()
+                if (Files.isDirectory(newRoot)) {
+                    rootDirectory = newRoot
+                } else {
+                    if (Files.exists(newRoot)) {
+                        System.err.println("Can't use $newRoot as root, not a directory")
+                    } else {
+                        System.err.println("Can't use $newRoot as root, file does not exist")
+                    }
+                    exitProcess(EXIT_CODE_ARGUMENT_ERROR)
+                }
+            },
+            Option(Option.NO_SHORT_NAME, "machine-readable-output", "create machine readable output, disables implicit interactivity") { _, _ ->
+                machineReadableOutput = true
+            },
+            Option(Option.NO_SHORT_NAME, "allow-broken-build-scripts", "ignore build scripts which fail to compile and allow to run without them") { _, _ ->
+                allowBrokenBuildScripts = true
+            },
+            Option(Option.NO_SHORT_NAME, "reload-supported", "signal that launcher will handle reload requests (exit code $EXIT_CODE_RELOAD), enables 'reload' command") { _, _ ->
+                reloadSupported = true
+            },
+            Option('h', "help", "show this help and exit", false, null) { _, options ->
+                Option.printWemiHelp(options)
+                exitProcess(EXIT_CODE_SUCCESS)
+            },
+            Option(Option.NO_SHORT_NAME, "version", "output version information and exit", false, null) { _, _ ->
+                System.err.println("Wemi $WemiVersion")
+                System.err.println("Copyright 2017–2019 Jan Polák")
+                System.err.println("<https://github.com/Darkyenus/WEMI>")
+                exitProcess(EXIT_CODE_SUCCESS)
+            })
+
+    val taskArguments = Option.parseOptions(args, options)
+    if (taskArguments == null) {
+        Option.printWemiHelp(options)
+        exitProcess(EXIT_CODE_ARGUMENT_ERROR)
     }
+
+    if (rootDirectory == null) {
+        rootDirectory = Paths.get(".")
+    }
+
+    try {
+        rootDirectory = rootDirectory!!.toRealPath(LinkOption.NOFOLLOW_LINKS)
+    } catch (e: IOException) {
+        System.err.println("Failed to resolve real path of root directory: $rootDirectory")
+        e.printStackTrace(System.err)
+        exitProcess(EXIT_CODE_OTHER_ERROR)
+    }
+
+    val buildDirectory = rootDirectory!!.resolve("build")
+    val cacheDirectory = buildDirectory.resolve("cache")
+
+    WemiRootFolder = rootDirectory!!
+    WemiBuildFolder = buildDirectory
+    WemiCacheFolder = cacheDirectory
+    WemiReloadSupported = reloadSupported
 
     TPLogger.attachUnhandledExceptionLogger()
     JavaLoggingIntegration.enable()
@@ -140,12 +277,12 @@ fun launch(rawOptions:Array<Any?>) {
         PrettyPrinter.PRETTY_PRINT_MODULES.add(WemiPrettyPrintFunctionModule())
 
         machineOutput = null
-        if (interactive == null && taskArguments.isEmpty()) {
-            interactive = true
+        if (interactiveArg == null && taskArguments.isEmpty()) {
+            interactiveArg = true
         }
     }
 
-    interactive = interactive ?: false
+    val interactive = interactiveArg ?: false
 
     WemiRunningInInteractiveMode = interactive
     LOG.trace("Starting Wemi from root: {}", WemiRootFolder)
@@ -244,7 +381,7 @@ fun launch(rawOptions:Array<Any?>) {
             while (true) {
                 val line = reader.readLine() ?: break
 
-                val parsed = TaskParser.PartitionedLine(listOf(line), allowQuotes = true, machineReadable = true)
+                val parsed = TaskParser.PartitionedLine(arrayOf(line), allowQuotes = true, machineReadable = true)
                 parsed.machineReadableCheckErrors()
 
                 for (task in parsed.tasks) {
@@ -426,7 +563,7 @@ internal fun findDefaultProject(root: Path): Project? {
                     else -> // Compare how close they are!
                         try {
                             if (closestDist == -1) {
-                                closestDist = root.relativize(closest.projectRoot).nameCount
+                                closestDist = root.relativize(closest.projectRoot!!).nameCount
                             }
                             val projectDist = root.relativize(project.projectRoot).nameCount
                             if (projectDist < closestDist) {

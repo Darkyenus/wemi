@@ -9,11 +9,15 @@ import wemi.Configurations.assembling
 import wemi.Configurations.compilingJava
 import wemi.Configurations.compilingKotlin
 import wemi.Configurations.publishing
-import wemi.assembly.*
+import wemi.assembly.AssemblyOperation
+import wemi.assembly.DefaultAssemblyMapFilter
+import wemi.assembly.DefaultRenameFunction
+import wemi.assembly.NoConflictStrategyChooser
+import wemi.assembly.NoPrependData
 import wemi.boot.CLI
-import wemi.boot.Main
 import wemi.boot.WemiBundledLibrariesExclude
 import wemi.boot.WemiRuntimeClasspath
+import wemi.boot.WemiVersion
 import wemi.collections.WMutableList
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompiler
@@ -21,8 +25,20 @@ import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.internal.MessageLocation
 import wemi.compile.internal.render
-import wemi.dependency.*
+import wemi.dependency.DEFAULT_OPTIONAL
+import wemi.dependency.DEFAULT_SCOPE
+import wemi.dependency.DEFAULT_TYPE
+import wemi.dependency.Dependency
+import wemi.dependency.DependencyId
+import wemi.dependency.JCenter
+import wemi.dependency.MavenCentral
+import wemi.dependency.NoClassifier
+import wemi.dependency.ProjectDependency
+import wemi.dependency.ResolvedDependency
 import wemi.dependency.internal.publish
+import wemi.dependency.joinClassifiers
+import wemi.dependency.resolveDependencies
+import wemi.dependency.resolveDependencyArtifacts
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
@@ -30,8 +46,27 @@ import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
-import wemi.util.*
 import wemi.util.CliStatusDisplay.Companion.withStatus
+import wemi.util.CycleChecker
+import wemi.util.EnclaveClassLoader
+import wemi.util.LineReadingWriter
+import wemi.util.LocatedPath
+import wemi.util.Magic
+import wemi.util.Partial
+import wemi.util.absolutePath
+import wemi.util.appendCentered
+import wemi.util.appendTimes
+import wemi.util.constructLocatedFiles
+import wemi.util.div
+import wemi.util.ensureEmptyDirectory
+import wemi.util.exists
+import wemi.util.isDirectory
+import wemi.util.name
+import wemi.util.parseJavaVersion
+import wemi.util.pathExtension
+import wemi.util.pathWithoutExtension
+import wemi.util.prettyPrint
+import wemi.util.toSafeFileName
 import java.io.BufferedReader
 import java.io.File
 import java.net.URLClassLoader
@@ -42,7 +77,12 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.ZonedDateTime
 import java.util.*
-import javax.tools.*
+import javax.tools.Diagnostic
+import javax.tools.DiagnosticListener
+import javax.tools.DocumentationTool
+import javax.tools.JavaFileObject
+import javax.tools.StandardLocation
+import javax.tools.ToolProvider
 import kotlin.collections.ArrayList
 import kotlin.collections.LinkedHashSet
 
@@ -625,7 +665,7 @@ object KeyDefaults {
                         .append('|').appendCentered(projectName, nameWidth, ' ')
                         .append('|').appendCentered(projectVersion, versionWidth, ' ').append("|\n")
 
-                md.append("\n*Built by Wemi ").append(Main.WEMI_VERSION).append("*\n")
+                md.append("\n*Built by Wemi $WemiVersion*\n")
                 md.append("*").append(ZonedDateTime.now()).append("*\n")
 
                 assemblyOperation.addSource(

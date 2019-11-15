@@ -1,9 +1,7 @@
 package wemi.boot;
 
+import java.io.PrintStream;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.function.Consumer;
 
 /** Lightweight, GNU compatible (to some extent) command line option parsing. */
 final class Option {
@@ -27,23 +25,32 @@ final class Option {
 	private final String argumentDescription;
 
 	/** Function to call when this option is encountered, with */
-	private final Consumer<String> handle;
+	private final OptionHandler handler;
 
-	Option(char shortName, String longName, String description, Boolean argument, String argumentDescription, Consumer<String> handle) {
+	Option(char shortName, String longName, String description, Boolean argument, String argumentDescription, OptionHandler handler) {
 		this.shortName = shortName;
 		this.longName = longName;
 		this.description = description;
 		this.argument = argument;
 		this.argumentDescription = argumentDescription;
-		this.handle = handle;
+		this.handler = handler;
 	}
 
+	Option(char shortName, String longName, String description, OptionHandler handler) {
+		this.shortName = shortName;
+		this.longName = longName;
+		this.description = description;
+		this.argument = Boolean.FALSE;
+		this.argumentDescription = null;
+		this.handler = handler;
+	}
 
 	/** Print option help. */
 	static void printWemiHelp(Option[] options) {
 		// https://www.gnu.org/prep/standards/html_node/_002d_002dhelp.html
-		System.err.println("Usage: wemi [OPTION]... [TASK]...");
-		System.err.println("Wemi build system");
+		final PrintStream err = System.err;
+		err.println("Usage: wemi [OPTION]... [TASK]...");
+		err.println("Wemi build system");
 
 		final StringBuilder[] lines = new StringBuilder[options.length];
 		for (int i = 0; i < options.length; i++) {
@@ -90,16 +97,17 @@ final class Option {
 				line.append(' ');
 			}
 			line.append(option.description);
-			System.err.println(line);
+			err.println(line);
 		}
 
-		System.err.println("Wemi on Github: <https://github.com/Darkyenus/WEMI>");
+		err.println("Wemi on Github: <https://github.com/Darkyenus/WEMI>");
 	}
 
 	/** Parse given command line options, handling them as they are encountered.
 	 * @return remaining, non-option arguments or null if arguments are wrong */
-	static List<String> parseOptions(String[] args, Option[] options) {
+	static String[] parseOptions(String[] args, Option[] options) {
 		// https://www.gnu.org/software/libc/manual/html_node/Argument-Syntax.html
+		final PrintStream err = System.err;
 		int argsIndex = 0;
 		while (argsIndex < args.length) {
 			final String arg = args[argsIndex++];
@@ -119,23 +127,23 @@ final class Option {
 				}
 
 				if (option == null) {
-					System.err.println("wemi: unrecognized option '--"+optName+"'");
+					err.println("wemi: unrecognized option '--"+optName+"'");
 					return null;
 				}
 
 				if (option.argument == Boolean.FALSE && equalsIndex >= 0) {
-					System.err.println("wemi: option '--"+optName+"' doesn't allow an argument");
+					err.println("wemi: option '--"+optName+"' doesn't allow an argument");
 					return null;
 				}
 
 				if (option.argument == Boolean.TRUE && equalsIndex < 0) {
-					System.err.println("wemi: option '--"+optName+"' requires an argument");
+					err.println("wemi: option '--"+optName+"' requires an argument");
 					return null;
 				}
 
 				final String argument = equalsIndex >= 0 ? arg.substring(equalsIndex+1) : null;
 
-				option.handle.accept(argument);
+				option.handler.handle(argument, options);
 			} else if (arg.startsWith("-") && arg.length() > 1) {
 				// Short options
 				int shortOptIndex = 1;
@@ -151,7 +159,7 @@ final class Option {
 					}
 
 					if (option == null) {
-						System.err.println("wemi: unrecognized option '-"+optName+"'");
+						err.println("wemi: unrecognized option '-"+optName+"'");
 						return null;
 					}
 
@@ -165,7 +173,7 @@ final class Option {
 							// Argument is in the next args
 							argument = args[argsIndex++];
 						} else {
-							System.err.println("wemi: option '-"+optName+"' requires an argument");
+							err.println("wemi: option '-"+optName+"' requires an argument");
 							return null;
 						}
 						shortOptIndex = arg.length(); // No more short options in this arg
@@ -173,7 +181,7 @@ final class Option {
 						argument = null;
 					}
 
-					option.handle.accept(argument);
+					option.handler.handle(argument, options);
 				}
 			} else {
 				// Not part of options
@@ -184,8 +192,17 @@ final class Option {
 
 		final int freeSize = args.length - argsIndex;
 		if (freeSize <= 0) {
-			return Collections.emptyList();
+			return new String[0];
 		}
-		return Arrays.asList(args).subList(args.length - freeSize, args.length);
+		return Arrays.copyOfRange(args, args.length - freeSize, args.length);
+	}
+
+	public interface OptionHandler {
+		/**
+		 * Called when an option has been parsed.
+		 * @param arg may be null, the argument parsed with the option, if any
+		 * @param allOptions that are being parsed, for introspective options like --help
+		 */
+		void handle(String arg, Option[] allOptions);
 	}
 }
