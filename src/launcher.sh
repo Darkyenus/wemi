@@ -1,8 +1,6 @@
 #!/bin/sh
-# Target platform: Reasonably POSIX compliant systems
-# https://pubs.opengroup.org/onlinepubs/009695399/
-
-# Wemi Launcher - This file is distributed under MIT License
+# Wemi Launcher - https://github.com/Darkyenus/wemi
+# Target platform: Reasonably POSIX compliant systems (https://pubs.opengroup.org/onlinepubs/009695399/)
 
 # Copyright 2019 Jan Polák
 #
@@ -20,84 +18,99 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+# Configurable with:
+#   Environment variables:
+# 		WEMI_JAVA - number, Java version number to use (e.g. 8, 9, 13)
+#			WEMI_LAUNCHER - path of a directory which contains .jar files needed to launch Wemi (useful for custom builds)
+#			WEMI_JAVA_OPTS - options passed to 'java' command used to launch Wemi
+#		Environment variables for automatic JDK download, values must be understood by https://api.adoptopenjdk.net/
+#			WEMI_JDK_OS - name of this operating system, needed only if detection fails
+#			WEMI_JDK_ARCH - architecture of this machine, needed only if detection fails
+#			WEMI_JDK_IMPLEMENTATION - implementation of JDK, default is 'hotspot'
+#			WEMI_JDK_HEAP_SIZE - heap size for which the JDK is build, default is 'normal'
+#			WEMI_JDK_RELEASE - specific release number of requested JDK, default is 'latest'
+#		Parameters (must appear first, before parameters for Wemi itself, and in this order):
+#			--java=<number> - same as WEMI_JAVA, with higher precedence
+#			--debug									-|
+#			--debug=<port>					-| launch Wemi with debugger on specified <port> or 5005,
+#			--debug-suspend					-| optionally suspended until debugger connects
+#			--debug-suspend=<port> 	-|
+
+readonly wemi_version='0.10-SNAPSHOT'
+readonly java_min_version='8'
+
 log() { echo "$@" 1>&2; }
 fail() { log "$@"; exit 1; }
 fail_unsatisfied() { log "Unsatisfied software dependency - install this software and try again: $*"; exit 2; }
 
-###################################
-# Wemi settings
-###################################
-# Wemi version to use
-readonly WEMI_VERSION=0.10-SNAPSHOT
-
-###################################
-# Java settings
-# see https://api.adoptopenjdk.net/
-###################################
-readonly JDK_JAVA_MIN_VERSION=8
-{ # Detect Java version (from --java=<version> argument, WEMI_JAVA env-var, or default)
+{
+	# Detect Java version (from --java=<version> argument, WEMI_JAVA env-var, or default)
 	if echo "$1" | grep -q -x -e "--java=[0-9][0-9]*" ; then
-		jdk_version_number="${1#--java=}"
+		version_="${1#--java=}"
 		shift
-		readonly JDK_JAVA_VERSION_FORCED=true
+		readonly java_version_forced=true
 	elif [ -n "$WEMI_JAVA" ]; then
-		jdk_version_number="${WEMI_JAVA}"
-		readonly JDK_JAVA_VERSION_FORCED=true
+		version_="${WEMI_JAVA}"
+		readonly java_version_forced=true
 	else
-		jdk_version_number="$JDK_JAVA_MIN_VERSION"
-		readonly JDK_JAVA_VERSION_FORCED=false
+		version_="$java_min_version"
+		readonly java_version_forced=false
 	fi
 
-	if [ -z "$jdk_version_number" ] || [ "$jdk_version_number" -lt "$JDK_JAVA_MIN_VERSION" ]; then
-		log "Requested version number '$jdk_version_number' is too low, defaulting to $JDK_JAVA_MIN_VERSION"
-		jdk_version_number="$JDK_JAVA_MIN_VERSION"
+	if [ -z "$version_" ] || [ "$version_" -lt "$java_min_version" ]; then
+		log "Requested version number '$version_' is too low, defaulting to $java_min_version"
+		version_="$java_min_version"
 	fi
 
-	readonly JDK_JAVA_VERSION="${jdk_version_number}"
+	readonly java_version="$version_"
 }
-readonly JDK_VERSION="openjdk${JDK_JAVA_VERSION}" # openjdk8, openjdk9, openjdk10, openjdk11, openjdk12, openjdk13
-readonly JDK_IMPLEMENTATION=hotspot # hotspot, openj9
-readonly JDK_HEAP_SIZE=normal # normal, large
-readonly JDK_RELEASE_TYPE=releases # releases, nightly
-readonly JDK_RELEASE=latest
+readonly jdk_version="openjdk${java_version}"
+readonly jdk_implementation="${WEMI_JDK_IMPLEMENTATION:-hotspot}"
+readonly jdk_heap_size="${WEMI_JDK_HEAP_SIZE:-normal}"
+readonly jdk_release="${WEMI_JDK_RELEASE:-latest}"
 ###################################
-{ # Detect OS
-	os_name=$(uname)
-	os_name=${os_name:-${OSTYPE}}
-	os_name=$(echo "$os_name" | tr '[:upper:]' '[:lower:]') # to lowercase
+if [ -n "$WEMI_JDK_OS" ]; then # Detect OS
+	jdk_os="$WEMI_JDK_OS"
+else
+	os_=$(uname)
+	# shellcheck disable=SC2039
+	os_=${os_:-${OSTYPE}}
+	os_=$(echo "$os_" | tr '[:upper:]' '[:lower:]') # to lowercase
 
-	case "$os_name" in
-		*linux*) readonly JDK_OS='linux' ;;
-		*darwin*) readonly JDK_OS='mac' ;;
-		*windows* | *cygwin* | *mingw* | *msys*) readonly JDK_OS='windows' ;;
-		*sunos*) readonly JDK_OS='solaris' ;;
-		aix) readonly JDK_OS='aix' ;;
-		*) fail "Unrecognized or unsupported operating system: $os_name" ;;
+	case "$os_" in
+		*linux*) readonly jdk_os='linux' ;;
+		*darwin*) readonly jdk_os='mac' ;;
+		*windows* | *cygwin* | *mingw* | *msys*) readonly jdk_os='windows' ;;
+		*sunos*) readonly jdk_os='solaris' ;;
+		aix) readonly jdk_os='aix' ;;
+		*) fail "Unrecognized or unsupported operating system: $os_ (specify manually via WEMI_JDK_OS)" ;;
 	esac
-}
+fi
 ###################################
-{ # Detect architecture
-	arch_name=$(uname -m | tr '[:upper:]' '[:lower:]') # to lowercase
+if [ -n "$WEMI_JDK_ARCH" ]; then # Detect architecture
+	jdk_arch="$WEMI_JDK_ARCH"
+else
+	arch_=$(uname -m | tr '[:upper:]' '[:lower:]') # to lowercase
 
-	case "$arch_name" in
-		*x86_64* | *amd64* | *i[3456]86-64*) readonly JDK_ARCH='x64' ;;
-		*x86* | *i[3456]86* | *i86pc*) readonly JDK_ARCH='x32' ;;
-		*ppc64le*) readonly JDK_ARCH='ppc64le' ;; # I guess?
-		*ppc64*) readonly JDK_ARCH='ppc64' ;;
+	case "$arch_" in
+		*x86_64* | *amd64* | *i[3456]86-64*) readonly jdk_arch='x64' ;;
+		*x86* | *i[3456]86* | *i86pc*) readonly jdk_arch='x32' ;;
+		*ppc64le*) readonly jdk_arch='ppc64le' ;; # I guess?
+		*ppc64*) readonly jdk_arch='ppc64' ;;
 		*power* | *ppc*) fail "32-bit PowerPC architecture is not supported" ;;
-		*s390*) readonly JDK_ARCH='s390x' ;;
-		*aarch64*) readonly JDK_ARCH='aarch64' ;; # 64-bit ARM
-		*arm*) readonly JDK_ARCH='arm32' ;;
-		*) fail "Unrecognized or unsupported CPU architecture: $arch_name" ;;
+		*s390*) readonly jdk_arch='s390x' ;;
+		*aarch64*) readonly jdk_arch='aarch64' ;; # 64-bit ARM
+		*arm*) readonly jdk_arch='arm32' ;;
+		*) fail "Unrecognized or unsupported CPU architecture: $arch_ (specify manually via WEMI_JDK_ARCH)" ;;
 	esac
-}
+fi
 ###################################
 
-readonly WEMI_CACHE_DIR=${WEMI_HOME:-"${HOME}/.wemi"}
-if [ ! -e "$WEMI_CACHE_DIR" ]; then
-	log "Creating '$WEMI_CACHE_DIR' as a cache for Wemi related files"
-	mkdir -p "$WEMI_CACHE_DIR" || fail "Wemi cache directory creation failed (mkdir returned $?)"
-	cat <<EOF >"$WEMI_CACHE_DIR/readme.txt"
+readonly wemi_home_dir=${WEMI_HOME:-"${HOME}/.wemi"}
+if [ ! -e "$wemi_home_dir" ]; then
+	log "Creating '$wemi_home_dir' as a cache for Wemi related files"
+	mkdir -p "$wemi_home_dir" || fail "Wemi cache directory creation failed (mkdir returned $?)"
+	cat <<EOF >"$wemi_home_dir/readme.txt"
 This directory is used by Wemi to store downloaded Wemi versions and JDKs.
 Feel free do delete this directory to completely remove Wemi from your system.
 
@@ -109,11 +122,6 @@ wemi/ contains downloaded Wemi distributions.
 You can delete anything from these folders to reclaim disk space, as long as it is currently not used.
 EOF
 fi
-
-# Contains all versions of this type of JDK
-readonly WEMI_JDK_TYPE_FOLDER="${WEMI_CACHE_DIR}/jdk/${JDK_VERSION}-${JDK_IMPLEMENTATION}-${JDK_HEAP_SIZE}"
-# Contains the Wemi classpath jars
-readonly WEMI_LAUNCHER_FOLDER="${WEMI_CACHE_DIR}/wemi/${WEMI_VERSION}"
 
 # $1: Command name
 # $?: Whether or not the command exists
@@ -128,9 +136,9 @@ command_exists() {
 download_to_file() {
 	mkdir -p "$(dirname "$2")"
 	if command_exists curl; then
-		curl -C - --fail --retry 3 --location --output "$2" --url "$1" || fail "Failed to fetch $1 to $2 (curl returned $?)"
+		curl -C - --fail --retry 3 --location --output_ "$2" --url "$1" || fail "Failed to fetch $1 to $2 (curl returned $?)"
 	elif command_exists wget; then
-		wget --tries=3 --continue --compression=auto --show-progress --output-document="$2" "$1" || fail "Failed to fetch $1 to $2 (wget returned $?)"
+		wget --tries=3 --continue --compression=auto --show-progress --output_-document="$2" "$1" || fail "Failed to fetch $1 to $2 (wget returned $?)"
 	else
 		fail_unsatisfied "curl or wget"
 	fi
@@ -142,7 +150,7 @@ download_to_output() {
 	if command_exists curl; then
 		curl --fail --retry 3 --location --silent --show-error --url "$1" || fail "Failed to fetch $1 (curl returned $?)"
 	elif command_exists wget; then
-		wget --tries=3 --quiet --compression=auto --output-document=- "$1" || fail "Failed to fetch $1 (wget returned $?)"
+		wget --tries=3 --quiet --compression=auto --output_-document=- "$1" || fail "Failed to fetch $1 (wget returned $?)"
 	else
 		fail_unsatisfied "curl or wget"
 	fi
@@ -151,16 +159,16 @@ download_to_output() {
 # URL encode parameter $1
 # NOTE: Usually does not handle Unicode characters correctly
 url_encode() {
-	input="$1"; output=""
-	while [ -n "$input" ]; do
-		# Take first character from input
-		tail="${input#?}"; head="${input%"$tail"}"; input="$tail"
+	input_="$1"; output_=""
+	while [ -n "$input_" ]; do
+		# Take first character from input_
+		tail_="${input_#?}"; head="${input_%"$tail_"}"; input_="$tail_"
 		case "$head" in
-			[-_.~a-zA-Z0-9]) output="$output$head";;
-			*) output="${output}%$(printf '%02x' "'$head")";;
+			[-_.~a-zA-Z0-9]) output_="$output_$head";;
+			*) output_="${output_}%$(printf '%02x' "'$head")";;
 		esac
 	done
-	echo "$output"
+	echo "$output_"
 }
 
 # @1 .zip archive
@@ -205,108 +213,108 @@ extract_targz() {
 	fi
 }
 
+# Contains all versions of this type of JDK
+readonly jdk_type_dir="${wemi_home_dir}/jdk/${jdk_version}-${jdk_implementation}-${jdk_heap_size}"
+
 # Download, extract and test a JDK distribution according to JDK_* constants and the JDK release argument.
 # Returns immediately if already downloaded.
 # $1: JDK release (not 'latest')
 # echo: Path to the JDK home
 fetch_jdk() {
-	jdk_version_folder="${WEMI_JDK_TYPE_FOLDER}/$1"
-	if [ -d "$jdk_version_folder" ]; then
+	jdk_dir_="${jdk_type_dir}/$1"
+	if [ -d "$jdk_dir_" ]; then
 		# This version already exists
-		echo "$jdk_version_folder"
+		echo "$jdk_dir_"
 		return 0
 	fi
 
 	# Download the archive to a temporary directory
-	download_file="${jdk_version_folder}.download"
+	jdk_dir_download_="${jdk_dir_}.download"
 
 	# Using the adoptopenjdk builds
-	jdk_url="https://api.adoptopenjdk.net/v2/binary/${JDK_RELEASE_TYPE}/${JDK_VERSION}?openjdk_impl=${JDK_IMPLEMENTATION}&os=${JDK_OS}&arch=${JDK_ARCH}&release=$(url_encode "$1")&type=jdk&heap_size=${JDK_HEAP_SIZE}"
-	log "Downloading ${JDK_VERSION}(${JDK_IMPLEMENTATION}) for ${JDK_OS} (${JDK_ARCH}): ${1}"
-	download_to_file "$jdk_url" "$download_file" 1>&2
+	log "Downloading ${jdk_version}(${jdk_implementation}) for ${jdk_os} (${jdk_arch}): ${1}"
+	jdk_url_="https://api.adoptopenjdk.net/v2/binary/releases/${jdk_version}?openjdk_impl=${jdk_implementation}&os=${jdk_os}&arch=${jdk_arch}&release=$(url_encode "$1")&type=jdk&heap_size=${jdk_heap_size}"
+	download_to_file "$jdk_url_" "$jdk_dir_download_" 1>&2
 	# Now we need to decompress it
 	# Windows binaries are packaged as zip, others as tar.gz.
 	# This is a bit iffy, but getting the filename from curl/wget reliably is not easy.
 
-	decompressed_folder="${jdk_version_folder}.decompressed"
+	jdk_dir_decompressed_="${jdk_dir_}.decompressed"
 
-	if [ ${JDK_OS} = 'windows' ]; then
-		extract_zip "$download_file" "$decompressed_folder"
+	if [ ${jdk_os} = 'windows' ]; then
+		extract_zip "$jdk_dir_download_" "$jdk_dir_decompressed_"
 	else
-		extract_targz "$download_file" "$decompressed_folder"
+		extract_targz "$jdk_dir_download_" "$jdk_dir_decompressed_"
 	fi
 
 	# Unpack the folder (it is bundled in a different directory structure according to the platform)
 	# 'release' is a file inside the directory which we want
-	if downloaded_jdk_release="$(echo "${decompressed_folder}/"*"/release")" && [ -f "$downloaded_jdk_release" ]; then
-		downloaded_jdk_home="${downloaded_jdk_release%/release}"
-	elif [ "$JDK_OS" = 'mac' ] && downloaded_jdk_release="$(echo "${decompressed_folder}/"*"/Contents/Home/release")" && [ -f "$downloaded_jdk_release" ]; then
-		downloaded_jdk_home="${downloaded_jdk_release%/release}"
+	if release_file_="$(echo "${jdk_dir_decompressed_}/"*"/release")" && [ -f "$release_file_" ]; then
+		jdk_dir_decompressed_home_="${release_file_%/release}"
+	elif [ "$jdk_os" = 'mac' ] && release_file_="$(echo "${jdk_dir_decompressed_}/"*"/Contents/Home/release")" && [ -f "$release_file_" ]; then
+		jdk_dir_decompressed_home_="${release_file_%/release}"
 	else
-		fail "Failed to recognize downloaded JDK directory structure at '${decompressed_folder}'"
+		fail "Failed to recognize downloaded JDK directory structure at '${jdk_dir_decompressed_}'"
 	fi
 
 	# Test the downloaded JDK
-	downloaded_jdk_java_exe="${downloaded_jdk_home}/bin/java"
-	if [ ! -f "$downloaded_jdk_java_exe" ]; then
-		fail "Downloaded JDK does not contain 'java' executable at the expected location (${downloaded_jdk_java_exe})"
+	downloaded_java_="${jdk_dir_decompressed_home_}/bin/java"
+	if [ ! -f "$downloaded_java_" ]; then
+		fail "Downloaded JDK does not contain 'java' executable at the expected location (${downloaded_java_})"
 	fi
 
-	"$downloaded_jdk_java_exe" -version 2>/dev/null 1>&2 || fail "Downloaded JDK 'java' executable does not work"
+	"$downloaded_java_" -version 2>/dev/null 1>&2 || fail "Downloaded JDK 'java' executable does not work (returned $?)"
 
 	# Move home into the valid directory
-	mv "$downloaded_jdk_home" "$jdk_version_folder" 1>&2 || fail "Failed to move downloaded JDK into a correct destination (mv returned $?)"
+	mv "$jdk_dir_decompressed_home_" "$jdk_dir_" 1>&2 || fail "Failed to move downloaded JDK into a correct destination (mv returned $?)"
 
 	# Delete original archive
-	rm "$download_file" 1>&2 || log "warning: Failed to delete downloaded file ${download_file}"
+	rm "$jdk_dir_download_" 1>&2 || log "warning: Failed to delete downloaded file ${jdk_dir_download_} (rm returned $?)"
 
 	# Delete downloaded folder
-	rm -rf "${decompressed_folder?:SAFEGUARD_AGAINST_EMPTY_PATH}" 1>&2 || log "Failed to delete leftover downloaded files (rm returned $?)"
+	rm -rf "${jdk_dir_decompressed_?:EMPTY_PATH}" 1>&2 || log "Failed to delete leftover downloaded files (rm returned $?)"
 
-	log "Downloaded a new JDK at: ${jdk_version_folder}"
-
-	# Done
-	echo "$jdk_version_folder"
+	log "Downloaded a new JDK at: ${jdk_dir_}"
+	echo "$jdk_dir_"
 }
 
 fetch_latest_jdk_release_name() {
-	jdk_latest_info_url="https://api.adoptopenjdk.net/v2/info/${JDK_RELEASE_TYPE}/${JDK_VERSION}?openjdk_impl=${JDK_IMPLEMENTATION}&os=${JDK_OS}&arch=${JDK_ARCH}&release=latest&type=jdk&heap_size=${JDK_HEAP_SIZE}"
+	latest_info_url_="https://api.adoptopenjdk.net/v2/info/releases/${jdk_version}?openjdk_impl=${jdk_implementation}&os=${jdk_os}&arch=${jdk_arch}&release=latest&type=jdk&heap_size=${jdk_heap_size}"
 	# Get the json, remove all linebreaks and spaces (for easier processing)
-	latest_info_json="$(download_to_output "$jdk_latest_info_url" | tr -d '\n ')"
+	latest_info_json_="$(download_to_output "$latest_info_url_" | tr -d '\n ')"
 	# Delete everything except for the release name. Since the format is very simple, this should work, even if it is an abomination
-	latest_release_name="$(echo "$latest_info_json" | sed 's/.*"release_name":"\([^"][^"]*\)".*/\1/')"
-	echo "$latest_release_name"
+	echo "$latest_info_json_" | sed 's/.*"release_name":"\([^"][^"]*\)".*/\1/'
 }
 
 fetch_latest_jdk() {
 	# Check whether 'latest' symlink exists and is fresh enough. If it does and is, download it.
 	# If it isn't, download and use the newest release.
-	latest_version_folder="${WEMI_JDK_TYPE_FOLDER}/latest"
+	latest_dir_="${jdk_type_dir}/latest"
 
-	if [ -e "$latest_version_folder" ] && [ ! -L "$latest_version_folder" ]; then
-		fail "'${latest_version_folder}' should be a symlink, but isn't"
+	if [ -e "$latest_dir_" ] && [ ! -L "$latest_dir_" ]; then
+		fail "'${latest_dir_}' should be a symlink, but isn't"
 	fi
 
 	# If the 'latest' exists and is less than 60 days old, no need to refresh it
-	if [ -z "$(find "$latest_version_folder" -mtime -60 -print 2>/dev/null)" ]; then
+	if [ -z "$(find "$latest_dir_" -mtime -60 -print 2>/dev/null)" ]; then
 		log "Checking for JDK update"
 		# Get new latest version
-		if latest_jdk_release_name="$(fetch_latest_jdk_release_name)"; then
-			if latest_jdk_release_folder="$(fetch_jdk "$latest_jdk_release_name")"; then
+		if latest_release_="$(fetch_latest_jdk_release_name)"; then
+			if latest_release_dir_="$(fetch_jdk "$latest_release_")"; then
 				# Everything was successful, remove old symlink a create a new one
-				if [ -L "$latest_version_folder" ]; then
-					unlink "$latest_version_folder" || log "Failed to unlink previous 'latest' symlink (unlink returned $?)"
+				if [ -L "$latest_dir_" ]; then
+					unlink "$latest_dir_" || log "Failed to unlink previous 'latest' symlink (unlink returned $?)"
 				fi
-				ln -s "$latest_jdk_release_folder" "$latest_version_folder" || log "Failed to link ${latest_version_folder} to ${latest_jdk_release_folder}"
+				ln -s "$latest_release_dir_" "$latest_dir_" || log "Failed to link ${latest_dir_} to ${latest_release_dir_}"
 			else
-				log "Failed to fetch latest JDK release (${latest_jdk_release_name})"
+				log "Failed to fetch latest JDK release (${latest_release_})"
 			fi
 		else
 			log "Failed to fetch latest JDK release name"
 		fi
 	fi
 
-	echo "$latest_version_folder"
+	echo "$latest_dir_"
 }
 
 can_use_java_from_path() {
@@ -314,100 +322,111 @@ can_use_java_from_path() {
 		return 1
 	fi
 
-	if [ "$JDK_JAVA_VERSION_FORCED" = 'true' ] && ! command_exists javac; then
+	if [ "$java_version_forced" = 'true' ] && ! command_exists javac; then
 		log "Not using java on PATH, bacause javac is not on PATH and explicit version has been specified"
 		return 1
 	fi
 
-	if ! java_version="$(java -version 2>&1 | head -n 1)"; then
+	if ! java_version_="$(java -version 2>&1 | head -n 1)"; then
 		log "Failed to get verion of java on PATH, using downloaded openjdk"
 		return 1
 	fi
 
-	if echo "$java_version" | grep -q -x -e '.* version ".*"'; then
+	if echo "$java_version_" | grep -q -x -e '.* version ".*"'; then
 		# Matching standard versioning (java version "1.8.0", openjdk version "11.0.3", openjdk version "9", etc.)
 		# https://www.oracle.com/technetwork/java/javase/versioning-naming-139433.html
-		java_version="$(echo "$java_version" | sed 's/.* version "\(.*\)".*/\1/')"
+		java_version_="$(echo "$java_version_" | sed 's/.* version "\(.*\)".*/\1/')"
 
-		java_version_major="$(echo "$java_version" | sed 's/\([0-9]*\).*/\1/')"
+		java_version_major_="$(echo "$java_version_" | sed 's/\([0-9]*\).*/\1/')"
 		# Until java 9, the java version was in minor, from 9 onwards it was in major
-		if [ "$java_version_major" -gt 1 ]; then
-			java_version_number="$java_version_major"
+		if [ "$java_version_major_" -gt 1 ]; then
+			java_version_number_="$java_version_major_"
 		else
-			java_version_number="$(echo "$java_version" | sed 's/[0-9]*\.\([0-9]*\).*/\1/')"
+			java_version_number_="$(echo "$java_version_" | sed 's/[0-9]*\.\([0-9]*\).*/\1/')"
 		fi
 
 		# If the user specified a speficic version, use it no matter what.
-		if [ "$JDK_JAVA_VERSION_FORCED" = 'true' ]; then
-			if [ "$java_version_number" -eq "$JDK_JAVA_VERSION" ]; then
+		if [ "$java_version_forced" = 'true' ]; then
+			if [ "$java_version_number_" -eq "$java_version" ]; then
 				return 0
 			else
 				return 1
 			fi
 		else # Otherwise: we can use it if the version is high enough
-			if [ "$java_version_number" -ge "$JDK_JAVA_MIN_VERSION" ]; then
+			if [ "$java_version_number_" -ge "$java_min_version" ]; then
 				return 0
 			else
-				log "java on PATH is too old ($java_version, at least $JDK_JAVA_MIN_VERSION required)"
+				log "java on PATH is too old ($java_version_, at least $java_min_version required)"
 				return 1
 			fi
 		fi
 	else
-		log "java on PATH has unrecognized version ($java_version)"
-		if [ "$JDK_JAVA_VERSION_FORCED" = 'true' ]; then
+		log "java on PATH has unrecognized version ($java_version_)"
+		if [ "$java_version_forced" = 'true' ]; then
 			log "Using Wemi OpenJDK"
 			return 1
 		else
-			log "Using java on PATH - to force Wemi OpenJDK, put '--java=$JDK_JAVA_MIN_VERSION' as the first argument or set 'export WEMI_JAVA=$JDK_JAVA_MIN_VERSION' (or higher version)"
+			log "Using java on PATH - to force Wemi OpenJDK, put '--java=$java_min_version' as the first argument or set 'export WEMI_JAVA=$java_min_version' (or higher version)"
 			return 0
 		fi
 	fi
 }
 
 # Get command to execute 'java'
-get_runtime_java_exe() {
+fetch_java() {
 	if can_use_java_from_path; then
 		echo 'java'
 		return 0
 	fi
 
-	if [ "$JDK_RELEASE" = 'latest' ]; then
-		jdk_home="$(fetch_latest_jdk)"
+	if [ "$jdk_release" = 'latest' ]; then
+		jdk_home_="$(fetch_latest_jdk)"
 	else
-		jdk_home="$(fetch_jdk "$JDK_RELEASE")"
+		jdk_home_="$(fetch_jdk "$jdk_release")"
 	fi
 
-	if [ ! -d "${jdk_home?:EMPTY_JDK_HOME}" ]; then
-		fail "Failed to obtain JDK (release: ${JDK_RELEASE})"
+	if [ ! -d "${jdk_home_?:EMPTY_JDK_HOME}" ]; then
+		fail "Failed to obtain JDK (release: ${jdk_release})"
 	fi
 
-	echo "${jdk_home}/bin/java"
+	echo "${jdk_home_}/bin/java"
 }
 
 fetch_wemi() {
-	redownload='false'
-	if [ "${WEMI_VERSION%-SNAPSHOT}" != "${WEMI_VERSION}" ]; then
+	if [ -n "$WEMI_LAUNCHER" ]; then
+		if [ -d "$WEMI_LAUNCHER" ]; then
+			echo "$WEMI_LAUNCHER"
+			return 0
+		fi
+		fail "WEMI_LAUNCHER specified, but '${WEMI_LAUNCHER}' is not a directory"
+	fi
+
+	# Contains the Wemi classpath jars
+	wemi_launcher_dir_="${wemi_home_dir}/wemi/${wemi_version}"
+
+	redownload_='false'
+	if [ "${wemi_version%-SNAPSHOT}" != "${wemi_version}" ]; then
 		# Snapshot version
-		wemi_download_url="https://darkyen.com/wemi/${WEMI_VERSION}/wemi.tar.gz"
+		wemi_url_="https://darkyen.com/wemi/${wemi_version}/wemi.tar.gz"
 		# If the snapshot folder exists and is less than 3 days old, we should download a new snapshot
-		if [ -z "$(find "$WEMI_LAUNCHER_FOLDER" -type d -name "$(basename "$WEMI_LAUNCHER_FOLDER")" -mtime -60 -print 2>/dev/null)" ]; then
+		if [ -z "$(find "$wemi_launcher_dir_" -type d -name "$(basename "$wemi_launcher_dir_")" -mtime -60 -print 2>/dev/null)" ]; then
 			log "Checking for a newer Wemi snapshot"
-			redownload='true'
+			redownload_='true'
 		fi
 	else
 		# Normal version
-		wemi_download_url="https://github.com/Darkyenus/wemi/releases/download/v${WEMI_VERSION}/wemi.tar.gz"
+		wemi_url_="https://github.com/Darkyenus/wemi/releases/download/v${wemi_version}/wemi.tar.gz"
 	fi
 
-	if [ ! -e "$WEMI_LAUNCHER_FOLDER" ] || [ "$redownload" = 'true' ]; then
-		wemi_launcher_download_file="${WEMI_LAUNCHER_FOLDER}.downloading"
-		log "Downloading Wemi launcher (version ${WEMI_VERSION})"
-		if ( download_to_file "$wemi_download_url" "$wemi_launcher_download_file" ); then
+	if [ ! -e "$wemi_launcher_dir_" ] || [ "$redownload_" = 'true' ]; then
+		wemi_launcher_download_file_="${wemi_launcher_dir_}.downloading"
+		log "Downloading Wemi launcher (version ${wemi_version})"
+		if ( download_to_file "$wemi_url_" "$wemi_launcher_download_file_" ); then
 			# Success
-			rm -rf "${WEMI_LAUNCHER_FOLDER}"
-			extract_targz "$wemi_launcher_download_file" "${WEMI_LAUNCHER_FOLDER}"
-			rm "$wemi_launcher_download_file" || log "Failed to remove downloaded Wemi archive (rm returned $?)"
-		elif [ -e "$WEMI_LAUNCHER_FOLDER" ]; then
+			rm -rf "${wemi_launcher_dir_?:EMPTY_PATH}"
+			extract_targz "$wemi_launcher_download_file_" "${wemi_launcher_dir_}"
+			rm "$wemi_launcher_download_file_" || log "Failed to remove downloaded Wemi archive (rm returned $?)"
+		elif [ -e "$wemi_launcher_dir_" ]; then
 			# Failure, but we can use old version
 			log "Failed to download newer Wemi snapshot, continuing with the old one"
 		else
@@ -415,31 +434,32 @@ fetch_wemi() {
 			fail "Failed to download Wemi. Make sure that your internet connection works and then try again."
 		fi
 	fi
+
+	echo "$wemi_launcher_dir_"
 }
 
 # Launch as a Wemi launcher
 launch_wemi() {
-	# Retrieve it here, so that if it fails, it is now
-	java_exe="$(get_runtime_java_exe)"
-
-	fetch_wemi
+	java_exe_="$(fetch_java)"
+	wemi_launcher_dir_="$(fetch_wemi)"
+	java_options_="${WEMI_JAVA_OPTS}"
 
 	# Parse --debug, --debug-suspend, --debug=<port> and --debug-suspend=<port> flags, which are mutually exclusive and
 	# must be the first flag to appear.
 	if echo "$1" | grep -E -q -x -e '--debug(-suspend|=[0-9]+|-suspend=[0-9]+)?'; then
-		echo "$1" | grep -q -e 'suspend' && java_debug_suspend='y'
-		java_debug_port="$(echo "$1" | sed 's/[^0-9]*\([0-9]*\)[^0-9]*/\1/')"
-		WEMI_JAVA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=${java_debug_suspend:-n},address=${java_debug_port:-5005}"
+		suspend_='n'
+		echo "$1" | grep -q -e 'suspend' && suspend_='y'
+		port_="$(echo "$1" | sed 's/[^0-9]*\([0-9]*\)[^0-9]*/\1/')"
+		java_options_="${java_options_} -agentlib:jdwp=transport=dt_socket,server=y,suspend=${suspend_},address=${port_:-5005}"
 		shift
 	fi
 
-	readonly WEMI_RELOAD_CODE=6
 	while true; do
 		# shellcheck disable=SC2086
-		"$java_exe" $WEMI_JAVA_OPTS -classpath "${WEMI_LAUNCHER_FOLDER}/*" 'wemi.boot.Launch' --root="$(dirname "$0")" --reload-supported "$@"
-		wemi_exit_code="$?"
-		if [ "$?" -ne "$WEMI_RELOAD_CODE" ]; then
-			exit "$wemi_exit_code"
+		"$java_exe_" $java_options_ -classpath "${wemi_launcher_dir_}/*" 'wemi.boot.Launch' --root="$(dirname "$0")" --reload-supported "$@"
+		exit_code_="$?"
+		if [ "$exit_code_" -ne 6 ]; then # Wemi reload-requested exit code
+			exit "$exit_code_"
 		fi
 	done
 }
