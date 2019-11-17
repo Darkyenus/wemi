@@ -21,8 +21,9 @@
 # Configurable with:
 #   Environment variables:
 # 		WEMI_JAVA - number, Java version number to use (e.g. 8, 9, 13)
-#			WEMI_LAUNCHER - path of a directory which contains .jar files needed to launch Wemi (useful for custom builds)
+#			WEMI_DIST - path of a directory which contains .jar files needed to launch Wemi (useful for custom builds)
 #			WEMI_JAVA_OPTS - options passed to 'java' command used to launch Wemi
+#			WEMI_ROOT - root directory of the project, do not use unless you know what you are doing
 #		Environment variables for automatic JDK download, values must be understood by https://api.adoptopenjdk.net/
 #			WEMI_JDK_OS - name of this operating system, needed only if detection fails
 #			WEMI_JDK_ARCH - architecture of this machine, needed only if detection fails
@@ -64,47 +65,6 @@ fail_unsatisfied() { log "Unsatisfied software dependency - install this softwar
 
 	readonly java_version="$version_"
 }
-readonly jdk_version="openjdk${java_version}"
-readonly jdk_implementation="${WEMI_JDK_IMPLEMENTATION:-hotspot}"
-readonly jdk_heap_size="${WEMI_JDK_HEAP_SIZE:-normal}"
-readonly jdk_release="${WEMI_JDK_RELEASE:-latest}"
-###################################
-if [ -n "$WEMI_JDK_OS" ]; then # Detect OS
-	jdk_os="$WEMI_JDK_OS"
-else
-	os_=$(uname)
-	# shellcheck disable=SC2039
-	os_=${os_:-${OSTYPE}}
-	os_=$(echo "$os_" | tr '[:upper:]' '[:lower:]') # to lowercase
-
-	case "$os_" in
-		*linux*) readonly jdk_os='linux' ;;
-		*darwin*) readonly jdk_os='mac' ;;
-		*windows* | *cygwin* | *mingw* | *msys*) readonly jdk_os='windows' ;;
-		*sunos*) readonly jdk_os='solaris' ;;
-		aix) readonly jdk_os='aix' ;;
-		*) fail "Unrecognized or unsupported operating system: $os_ (specify manually via WEMI_JDK_OS)" ;;
-	esac
-fi
-###################################
-if [ -n "$WEMI_JDK_ARCH" ]; then # Detect architecture
-	jdk_arch="$WEMI_JDK_ARCH"
-else
-	arch_=$(uname -m | tr '[:upper:]' '[:lower:]') # to lowercase
-
-	case "$arch_" in
-		*x86_64* | *amd64* | *i[3456]86-64*) readonly jdk_arch='x64' ;;
-		*x86* | *i[3456]86* | *i86pc*) readonly jdk_arch='x32' ;;
-		*ppc64le*) readonly jdk_arch='ppc64le' ;; # I guess?
-		*ppc64*) readonly jdk_arch='ppc64' ;;
-		*power* | *ppc*) fail "32-bit PowerPC architecture is not supported" ;;
-		*s390*) readonly jdk_arch='s390x' ;;
-		*aarch64*) readonly jdk_arch='aarch64' ;; # 64-bit ARM
-		*arm*) readonly jdk_arch='arm32' ;;
-		*) fail "Unrecognized or unsupported CPU architecture: $arch_ (specify manually via WEMI_JDK_ARCH)" ;;
-	esac
-fi
-###################################
 
 readonly wemi_home_dir=${WEMI_HOME:-"${HOME}/.wemi"}
 if [ ! -e "$wemi_home_dir" ]; then
@@ -119,7 +79,7 @@ Then you can delete this directory or move it to the new location.
 
 jdk/ contains downloaded OpenJDK Java distributions.
 wemi/ contains downloaded Wemi distributions.
-You can delete anything from these folders to reclaim disk space, as long as it is currently not used.
+You can delete anything from these directories to reclaim disk space, as long as it is currently not used.
 EOF
 fi
 
@@ -213,108 +173,160 @@ extract_targz() {
 	fi
 }
 
-# Contains all versions of this type of JDK
-readonly jdk_type_dir="${wemi_home_dir}/jdk/${jdk_version}-${jdk_implementation}-${jdk_heap_size}"
-
-# Download, extract and test a JDK distribution according to JDK_* constants and the JDK release argument.
-# Returns immediately if already downloaded.
-# $1: JDK release (not 'latest')
-# echo: Path to the JDK home
 fetch_jdk() {
-	jdk_dir_="${jdk_type_dir}/$1"
-	if [ -d "$jdk_dir_" ]; then
-		# This version already exists
-		echo "$jdk_dir_"
-		return 0
-	fi
+	# Initialize JDK parameters
+	if [ -z "$jdk_type_dir" ]; then
+		readonly jdk_version="openjdk${java_version}"
+		readonly jdk_implementation="${WEMI_JDK_IMPLEMENTATION:-hotspot}"
+		readonly jdk_heap_size="${WEMI_JDK_HEAP_SIZE:-normal}"
+		readonly jdk_release="${WEMI_JDK_RELEASE:-latest}"
 
-	# Download the archive to a temporary directory
-	jdk_dir_download_="${jdk_dir_}.download"
-
-	# Using the adoptopenjdk builds
-	log "Downloading ${jdk_version}(${jdk_implementation}) for ${jdk_os} (${jdk_arch}): ${1}"
-	jdk_url_="https://api.adoptopenjdk.net/v2/binary/releases/${jdk_version}?openjdk_impl=${jdk_implementation}&os=${jdk_os}&arch=${jdk_arch}&release=$(url_encode "$1")&type=jdk&heap_size=${jdk_heap_size}"
-	download_to_file "$jdk_url_" "$jdk_dir_download_" 1>&2
-	# Now we need to decompress it
-	# Windows binaries are packaged as zip, others as tar.gz.
-	# This is a bit iffy, but getting the filename from curl/wget reliably is not easy.
-
-	jdk_dir_decompressed_="${jdk_dir_}.decompressed"
-
-	if [ ${jdk_os} = 'windows' ]; then
-		extract_zip "$jdk_dir_download_" "$jdk_dir_decompressed_"
-	else
-		extract_targz "$jdk_dir_download_" "$jdk_dir_decompressed_"
-	fi
-
-	# Unpack the folder (it is bundled in a different directory structure according to the platform)
-	# 'release' is a file inside the directory which we want
-	if release_file_="$(echo "${jdk_dir_decompressed_}/"*"/release")" && [ -f "$release_file_" ]; then
-		jdk_dir_decompressed_home_="${release_file_%/release}"
-	elif [ "$jdk_os" = 'mac' ] && release_file_="$(echo "${jdk_dir_decompressed_}/"*"/Contents/Home/release")" && [ -f "$release_file_" ]; then
-		jdk_dir_decompressed_home_="${release_file_%/release}"
-	else
-		fail "Failed to recognize downloaded JDK directory structure at '${jdk_dir_decompressed_}'"
-	fi
-
-	# Test the downloaded JDK
-	downloaded_java_="${jdk_dir_decompressed_home_}/bin/java"
-	if [ ! -f "$downloaded_java_" ]; then
-		fail "Downloaded JDK does not contain 'java' executable at the expected location (${downloaded_java_})"
-	fi
-
-	"$downloaded_java_" -version 2>/dev/null 1>&2 || fail "Downloaded JDK 'java' executable does not work (returned $?)"
-
-	# Move home into the valid directory
-	mv "$jdk_dir_decompressed_home_" "$jdk_dir_" 1>&2 || fail "Failed to move downloaded JDK into a correct destination (mv returned $?)"
-
-	# Delete original archive
-	rm "$jdk_dir_download_" 1>&2 || log "warning: Failed to delete downloaded file ${jdk_dir_download_} (rm returned $?)"
-
-	# Delete downloaded folder
-	rm -rf "${jdk_dir_decompressed_?:EMPTY_PATH}" 1>&2 || log "Failed to delete leftover downloaded files (rm returned $?)"
-
-	log "Downloaded a new JDK at: ${jdk_dir_}"
-	echo "$jdk_dir_"
-}
-
-fetch_latest_jdk_release_name() {
-	latest_info_url_="https://api.adoptopenjdk.net/v2/info/releases/${jdk_version}?openjdk_impl=${jdk_implementation}&os=${jdk_os}&arch=${jdk_arch}&release=latest&type=jdk&heap_size=${jdk_heap_size}"
-	# Get the json, remove all linebreaks and spaces (for easier processing)
-	latest_info_json_="$(download_to_output "$latest_info_url_" | tr -d '\n ')"
-	# Delete everything except for the release name. Since the format is very simple, this should work, even if it is an abomination
-	echo "$latest_info_json_" | sed 's/.*"release_name":"\([^"][^"]*\)".*/\1/'
-}
-
-fetch_latest_jdk() {
-	# Check whether 'latest' symlink exists and is fresh enough. If it does and is, download it.
-	# If it isn't, download and use the newest release.
-	latest_dir_="${jdk_type_dir}/latest"
-
-	if [ -e "$latest_dir_" ] && [ ! -L "$latest_dir_" ]; then
-		fail "'${latest_dir_}' should be a symlink, but isn't"
-	fi
-
-	# If the 'latest' exists and is less than 60 days old, no need to refresh it
-	if [ -z "$(find "$latest_dir_" -mtime -60 -print 2>/dev/null)" ]; then
-		log "Checking for JDK update"
-		# Get new latest version
-		if latest_release_="$(fetch_latest_jdk_release_name)"; then
-			if latest_release_dir_="$(fetch_jdk "$latest_release_")"; then
-				# Everything was successful, remove old symlink a create a new one
-				if [ -L "$latest_dir_" ]; then
-					unlink "$latest_dir_" || log "Failed to unlink previous 'latest' symlink (unlink returned $?)"
-				fi
-				ln -s "$latest_release_dir_" "$latest_dir_" || log "Failed to link ${latest_dir_} to ${latest_release_dir_}"
-			else
-				log "Failed to fetch latest JDK release (${latest_release_})"
-			fi
+		if [ -n "$WEMI_JDK_OS" ]; then
+			jdk_os="$WEMI_JDK_OS"
 		else
-			log "Failed to fetch latest JDK release name"
+			os_=$(uname)
+			# shellcheck disable=SC2039
+			os_=${os_:-${OSTYPE}}
+			os_=$(echo "$os_" | tr '[:upper:]' '[:lower:]') # to lowercase
+
+			case "$os_" in
+				*linux*) readonly jdk_os='linux' ;;
+				*darwin*) readonly jdk_os='mac' ;;
+				*windows* | *cygwin* | *mingw* | *msys*) readonly jdk_os='windows' ;;
+				*sunos*) readonly jdk_os='solaris' ;;
+				aix) readonly jdk_os='aix' ;;
+				*) fail "Unrecognized or unsupported operating system: $os_ (specify manually via WEMI_JDK_OS)" ;;
+			esac
 		fi
+
+		if [ -n "$WEMI_JDK_ARCH" ]; then
+			jdk_arch="$WEMI_JDK_ARCH"
+		else
+			arch_=$(uname -m | tr '[:upper:]' '[:lower:]') # to lowercase
+
+			case "$arch_" in
+				*x86_64* | *amd64* | *i[3456]86-64*) readonly jdk_arch='x64' ;;
+				*x86* | *i[3456]86* | *i86pc*) readonly jdk_arch='x32' ;;
+				*ppc64le*) readonly jdk_arch='ppc64le' ;; # I guess?
+				*ppc64*) readonly jdk_arch='ppc64' ;;
+				*power* | *ppc*) fail "32-bit PowerPC architecture is not supported" ;;
+				*s390*) readonly jdk_arch='s390x' ;;
+				*aarch64*) readonly jdk_arch='aarch64' ;; # 64-bit ARM
+				*arm*) readonly jdk_arch='arm32' ;;
+				*) fail "Unrecognized or unsupported CPU architecture: $arch_ (specify manually via WEMI_JDK_ARCH)" ;;
+			esac
+		fi
+
+		# Contains all versions of this type of JDK
+		readonly jdk_type_dir="${wemi_home_dir}/jdk/${jdk_version}-${jdk_implementation}-${jdk_heap_size}"
 	fi
 
-	echo "$latest_dir_"
+	# Download, extract and test a JDK distribution according to JDK_* constants and the JDK release argument.
+	# Returns immediately if already downloaded.
+	# $1: JDK release (not 'latest')
+	# echo: Path to the JDK home
+	fetch_jdk_version() {
+		jdk_dir_="${jdk_type_dir}/$1"
+		if [ -d "$jdk_dir_" ]; then
+			# This version already exists
+			echo "$jdk_dir_"
+			return 0
+		fi
+
+		# Download the archive to a temporary directory
+		jdk_dir_download_="${jdk_dir_}.download"
+
+		# Using the adoptopenjdk builds
+		log "Downloading ${jdk_version}(${jdk_implementation}) for ${jdk_os} (${jdk_arch}): ${1}"
+		jdk_url_="https://api.adoptopenjdk.net/v2/binary/releases/${jdk_version}?openjdk_impl=${jdk_implementation}&os=${jdk_os}&arch=${jdk_arch}&release=$(url_encode "$1")&type=jdk&heap_size=${jdk_heap_size}"
+		download_to_file "$jdk_url_" "$jdk_dir_download_" 1>&2
+		# Now we need to decompress it
+		# Windows binaries are packaged as zip, others as tar.gz.
+		# This is a bit iffy, but getting the filename from curl/wget reliably is not easy.
+
+		jdk_dir_decompressed_="${jdk_dir_}.decompressed"
+
+		if [ ${jdk_os} = 'windows' ]; then
+			extract_zip "$jdk_dir_download_" "$jdk_dir_decompressed_"
+		else
+			extract_targz "$jdk_dir_download_" "$jdk_dir_decompressed_"
+		fi
+
+		# Unpack the directory (it is bundled in a different directory structure according to the platform)
+		# 'release' is a file inside the directory which we want
+		if release_file_="$(echo "${jdk_dir_decompressed_}/"*"/release")" && [ -f "$release_file_" ]; then
+			jdk_dir_decompressed_home_="${release_file_%/release}"
+		elif [ "$jdk_os" = 'mac' ] && release_file_="$(echo "${jdk_dir_decompressed_}/"*"/Contents/Home/release")" && [ -f "$release_file_" ]; then
+			jdk_dir_decompressed_home_="${release_file_%/release}"
+		else
+			fail "Failed to recognize downloaded JDK directory structure at '${jdk_dir_decompressed_}'"
+		fi
+
+		# Test the downloaded JDK
+		downloaded_java_="${jdk_dir_decompressed_home_}/bin/java"
+		if [ ! -f "$downloaded_java_" ]; then
+			fail "Downloaded JDK does not contain 'java' executable at the expected location (${downloaded_java_})"
+		fi
+
+		"$downloaded_java_" -version 2>/dev/null 1>&2 || fail "Downloaded JDK 'java' executable does not work (returned $?)"
+
+		# Move home into the valid directory
+		mv "$jdk_dir_decompressed_home_" "$jdk_dir_" 1>&2 || fail "Failed to move downloaded JDK into a correct destination (mv returned $?)"
+
+		# Delete original archive
+		rm "$jdk_dir_download_" 1>&2 || log "warning: Failed to delete downloaded file ${jdk_dir_download_} (rm returned $?)"
+
+		# Delete downloaded directory
+		rm -rf "${jdk_dir_decompressed_?:EMPTY_PATH}" 1>&2 || log "Failed to delete leftover downloaded files (rm returned $?)"
+
+		log "Downloaded a new JDK at: ${jdk_dir_}"
+		echo "$jdk_dir_"
+	}
+
+	fetch_latest_jdk_release() {
+		latest_info_url_="https://api.adoptopenjdk.net/v2/info/releases/${jdk_version}?openjdk_impl=${jdk_implementation}&os=${jdk_os}&arch=${jdk_arch}&release=latest&type=jdk&heap_size=${jdk_heap_size}"
+		# Get the json, remove all linebreaks and spaces (for easier processing)
+		latest_info_json_="$(download_to_output "$latest_info_url_" | tr -d '\n ')"
+		# Delete everything except for the release name. Since the format is very simple, this should work, even if it is an abomination
+		echo "$latest_info_json_" | sed 's/.*"release_name":"\([^"][^"]*\)".*/\1/'
+	}
+
+	fetch_latest_jdk() {
+		# Check whether 'latest' symlink exists and is fresh enough. If it does and is, download it.
+		# If it isn't, download and use the newest release.
+		latest_dir_="${jdk_type_dir}/latest"
+
+		if [ -e "$latest_dir_" ] && [ ! -L "$latest_dir_" ]; then
+			fail "'${latest_dir_}' should be a symlink, but isn't"
+		fi
+
+		# If the 'latest' exists and is less than 60 days old, no need to refresh it
+		if [ -z "$(find "$latest_dir_" -mtime -60 -print 2>/dev/null)" ]; then
+			log "Checking for JDK update"
+			# Get new latest version
+			if latest_release_="$(fetch_latest_jdk_release)"; then
+				if latest_release_dir_="$(fetch_jdk_version "$latest_release_")"; then
+					# Everything was successful, remove old symlink a create a new one
+					if [ -L "$latest_dir_" ]; then
+						unlink "$latest_dir_" || log "Failed to unlink previous 'latest' symlink (unlink returned $?)"
+					fi
+					ln -s "$latest_release_dir_" "$latest_dir_" || log "Failed to link ${latest_dir_} to ${latest_release_dir_}"
+				else
+					log "Failed to fetch latest JDK release (${latest_release_})"
+				fi
+			else
+				log "Failed to fetch latest JDK release name"
+			fi
+		fi
+
+		echo "$latest_dir_"
+	}
+
+	if [ "$jdk_release" = 'latest' ]; then
+		fetch_latest_jdk
+	else
+		fetch_jdk_version "$jdk_release"
+	fi
 }
 
 can_use_java_from_path() {
@@ -379,11 +391,7 @@ fetch_java() {
 		return 0
 	fi
 
-	if [ "$jdk_release" = 'latest' ]; then
-		jdk_home_="$(fetch_latest_jdk)"
-	else
-		jdk_home_="$(fetch_jdk "$jdk_release")"
-	fi
+	jdk_home_="$(fetch_jdk)"
 
 	if [ ! -d "${jdk_home_?:EMPTY_JDK_HOME}" ]; then
 		fail "Failed to obtain JDK (release: ${jdk_release})"
@@ -393,23 +401,23 @@ fetch_java() {
 }
 
 fetch_wemi() {
-	if [ -n "$WEMI_LAUNCHER" ]; then
-		if [ -d "$WEMI_LAUNCHER" ]; then
-			echo "$WEMI_LAUNCHER"
+	if [ -n "$WEMI_DIST" ]; then
+		if [ -d "$WEMI_DIST" ]; then
+			echo "$WEMI_DIST"
 			return 0
 		fi
-		fail "WEMI_LAUNCHER specified, but '${WEMI_LAUNCHER}' is not a directory"
+		fail "WEMI_DIST specified, but '${WEMI_DIST}' is not a directory (pwd=$(pwd))"
 	fi
 
 	# Contains the Wemi classpath jars
-	wemi_launcher_dir_="${wemi_home_dir}/wemi/${wemi_version}"
+	wemi_dist_dir_="${wemi_home_dir}/wemi/${wemi_version}"
 
 	redownload_='false'
 	if [ "${wemi_version%-SNAPSHOT}" != "${wemi_version}" ]; then
 		# Snapshot version
 		wemi_url_="https://darkyen.com/wemi/${wemi_version}/wemi.tar.gz"
-		# If the snapshot folder exists and is less than 3 days old, we should download a new snapshot
-		if [ -z "$(find "$wemi_launcher_dir_" -type d -name "$(basename "$wemi_launcher_dir_")" -mtime -60 -print 2>/dev/null)" ]; then
+		# If the snapshot directory exists and is less than 3 days old, we should download a new snapshot
+		if [ -z "$(find "$wemi_dist_dir_" -type d -name "$(basename "$wemi_dist_dir_")" -mtime -60 -print 2>/dev/null)" ]; then
 			log "Checking for a newer Wemi snapshot"
 			redownload_='true'
 		fi
@@ -418,15 +426,15 @@ fetch_wemi() {
 		wemi_url_="https://github.com/Darkyenus/wemi/releases/download/v${wemi_version}/wemi.tar.gz"
 	fi
 
-	if [ ! -e "$wemi_launcher_dir_" ] || [ "$redownload_" = 'true' ]; then
-		wemi_launcher_download_file_="${wemi_launcher_dir_}.downloading"
-		log "Downloading Wemi launcher (version ${wemi_version})"
-		if ( download_to_file "$wemi_url_" "$wemi_launcher_download_file_" ); then
+	if [ ! -e "$wemi_dist_dir_" ] || [ "$redownload_" = 'true' ]; then
+		wemi_dist_download_file_="${wemi_dist_dir_}.downloading"
+		log "Downloading Wemi distribution (version ${wemi_version})"
+		if ( download_to_file "$wemi_url_" "$wemi_dist_download_file_" ); then
 			# Success
-			rm -rf "${wemi_launcher_dir_?:EMPTY_PATH}"
-			extract_targz "$wemi_launcher_download_file_" "${wemi_launcher_dir_}"
-			rm "$wemi_launcher_download_file_" || log "Failed to remove downloaded Wemi archive (rm returned $?)"
-		elif [ -e "$wemi_launcher_dir_" ]; then
+			rm -rf "${wemi_dist_dir_?:EMPTY_PATH}"
+			extract_targz "$wemi_dist_download_file_" "${wemi_dist_dir_}"
+			rm "$wemi_dist_download_file_" || log "Failed to remove downloaded Wemi archive (rm returned $?)"
+		elif [ -e "$wemi_dist_dir_" ]; then
 			# Failure, but we can use old version
 			log "Failed to download newer Wemi snapshot, continuing with the old one"
 		else
@@ -435,13 +443,13 @@ fetch_wemi() {
 		fi
 	fi
 
-	echo "$wemi_launcher_dir_"
+	echo "$wemi_dist_dir_"
 }
 
 # Launch as a Wemi launcher
 launch_wemi() {
 	java_exe_="$(fetch_java)"
-	wemi_launcher_dir_="$(fetch_wemi)"
+	wemi_dist_dir_="$(fetch_wemi)"
 	java_options_="${WEMI_JAVA_OPTS}"
 
 	# Parse --debug, --debug-suspend, --debug=<port> and --debug-suspend=<port> flags, which are mutually exclusive and
@@ -454,9 +462,12 @@ launch_wemi() {
 		shift
 	fi
 
+	wemi_root_="$(dirname "$0")"
+	wemi_root_="${WEMI_ROOT:-$wemi_root_}"
+
 	while true; do
 		# shellcheck disable=SC2086
-		"$java_exe_" $java_options_ -classpath "${wemi_launcher_dir_}/*" 'wemi.boot.Launch' --root="$(dirname "$0")" --reload-supported "$@"
+		"$java_exe_" $java_options_ -classpath "${wemi_dist_dir_}/*" 'wemi.boot.Launch' --root="$wemi_root_" --reload-supported "$@"
 		exit_code_="$?"
 		if [ "$exit_code_" -ne 6 ]; then # Wemi reload-requested exit code
 			exit "$exit_code_"
