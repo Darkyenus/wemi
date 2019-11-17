@@ -303,7 +303,7 @@ object CLI {
                 // Do not update too often
                 return
             }
-            nextActivityProgress = now + 1000 //ms
+            nextActivityProgress = now + 100 //ms
 
             val originalMessageLength = messageBuilder.length
             try {

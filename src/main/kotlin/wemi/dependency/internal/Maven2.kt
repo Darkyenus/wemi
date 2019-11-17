@@ -273,8 +273,8 @@ private fun resolveInM2Repository(
             return ResolvedDependency(resolvedDependencyId, resultScope, emptyList(), repository, retrievedPom.path.artifactPath)
         }
 
-        val resolvedPom = resolveRawPom(retrievedPom.path.artifactPath, transitiveDependencyManagement, usedRepositories, progressTracker).fold { rawPom ->
-            resolvePom(rawPom, transitiveDependencyManagement, usedRepositories, progressTracker)
+        val resolvedPom = resolveRawPom(retrievedPom.path.artifactPath, transitiveDependencyManagement, usedRepositories, progressTracker).fold {
+            it.resolve(transitiveDependencyManagement, usedRepositories, progressTracker)
         }
 
         val pom = resolvedPom.use({ it }, { log ->
@@ -436,56 +436,6 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
     }
 
     return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve pom xml"))
-}
-
-private fun resolvePom(rawPom: RawPom, transitiveDependencyManagement:List<Dependency>, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?): Failable<Pom, String> {
-    val partialPom = rawPom.resolve(transitiveDependencyManagement)
-    if (!partialPom.complete) {
-        return Failable.failure("Pom is invalid")
-    }
-    val pom = partialPom.value
-
-    // Resolve <dependencyManagement> <scope>import
-    // http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope
-    //TODO Untested, no known project that uses it
-    val flatDependencyManagement = ArrayList<Dependency>(pom.dependencyManagement.size * 2)
-
-    for (dependency in pom.dependencyManagement) {
-        val dep = dependency.dependencyId
-        if (!dependency.scope.equals("import", ignoreCase = true)) {
-            flatDependencyManagement.add(dependency)
-            continue
-        }
-        if (!dep.type.equals("pom", ignoreCase = true)) {
-            LOG.warn("Dependency {} has scope \"import\", but type is not \"pom\", ignoring", dep)
-            continue
-        }
-
-        LOG.trace("Resolving dependencyManagement import {} in '{}'", dep, rawPom.url)
-
-        val resolvedPom = resolveInM2Repository(dep, dependency.dependencyManagement, repositories, "", progressTracker)
-        if (resolvedPom.hasError) {
-            LOG.warn("dependencyManagement import in {} of {} failed: failed to retrieve pom - {}", rawPom.url, dep, resolvedPom)
-            return Failable.failure(resolvedPom.log?.toString() ?: "failed to retrieve")
-        }
-        val artifact = resolvedPom.artifact!!
-        resolveRawPom(artifact, transitiveDependencyManagement, repositories, progressTracker).fold { retrievedRawPom ->
-            resolvePom(retrievedRawPom, transitiveDependencyManagement, repositories, progressTracker)
-        }.use({ importedPom ->
-            val imported = importedPom.dependencyManagement
-            if (imported.isNotEmpty()) {
-                LOG.trace("dependencyManagement of {} imported {} from {}", rawPom.url, imported, dep)
-
-                // Specification says, that it should be replaced
-                flatDependencyManagement.addAll(imported)
-            }
-        }, { error ->
-            LOG.warn("dependencyManagement import in {} of {} failed: {}", rawPom.url, dep, error)
-            return Failable.failure(error)
-        })
-    }
-
-    return Failable.success(pom)
 }
 
 private fun pomPath(group:String, name:String, version:String, snapshotVersion:String):String {
@@ -714,6 +664,52 @@ private fun resolveDependencyManagement(
     return usedDependency.resolve(combinedDependencyManagement)
 }
 
+/** Given a [dependencyManagement] list, replace all elements of scope import with their imported counterparts.
+ * @param pomUrl url of the pom in which the [dependencyManagement] was found, for logging
+ * @param repositories in which to resolve the imports */
+private fun flattedDependencyManagementImports(dependencyManagement:List<Dependency>, transitiveDependencyManagement:List<Dependency>, pomUrl:URL, repositories:SortedRepositories, progressTracker:ActivityListener?):Failable<List<Dependency>, String> {
+    // Resolve <dependencyManagement> <scope>import
+    // http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope
+    val flatDependencyManagement = ArrayList<Dependency>(dependencyManagement.size * 2)
+
+    for (dependency in dependencyManagement) {
+        val dep = dependency.dependencyId
+        if (!dependency.scope.equals("import", ignoreCase = true)) {
+            flatDependencyManagement.add(dependency)
+            continue
+        }
+        if (!dep.type.equals("pom", ignoreCase = true)) {
+            LOG.warn("Dependency {} has scope \"import\", but type is not \"pom\", ignoring", dep)
+            continue
+        }
+
+        LOG.trace("Resolving dependencyManagement import {} in '{}'", dep, pomUrl)
+
+        val resolvedPom = resolveInM2Repository(dep, dependency.dependencyManagement, repositories, "", progressTracker)
+        if (resolvedPom.hasError) {
+            LOG.warn("dependencyManagement import in {} of {} failed: failed to retrieve pom - {}", pomUrl, dep, resolvedPom)
+            return Failable.failure(resolvedPom.log?.toString() ?: "failed to retrieve")
+        }
+        val artifact = resolvedPom.artifact!!
+        resolveRawPom(artifact, transitiveDependencyManagement, repositories, progressTracker).fold {
+            it.resolve(transitiveDependencyManagement, repositories, progressTracker)
+        }.use({ importedPom ->
+            val imported = importedPom.dependencyManagement
+            if (imported.isNotEmpty()) {
+                LOG.trace("dependencyManagement of {} imported {} from {}", pomUrl, imported, dep)
+
+                // Specification says, that it should be replaced
+                flatDependencyManagement.addAll(imported)
+            }
+        }, { error ->
+            LOG.warn("dependencyManagement import in {} of {} failed: {}", pomUrl, dep, error)
+            return Failable.failure(error)
+        })
+    }
+
+    return Failable.success(flatDependencyManagement)
+}
+
 /**
  * Contains raw data from a Pom file.
  * Note that when accessing some fields, it is also necessary to check the parent if not set.
@@ -732,7 +728,7 @@ private class RawPom(
     val dependencies = ArrayList<RawPomDependency>()
     val dependencyManagement = ArrayList<RawPomDependency>()
 
-    fun resolve(transitiveDependencyManagement: List<Dependency>): Partial<Pom> {
+    fun resolve(transitiveDependencyManagement: List<Dependency>, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?): Failable<Pom, String> {
         val resolvedGroupId = get { groupId }?.translate()
         val resolvedArtifactId = artifactId?.translate()
         val resolvedVersion = get { version }?.translate()
@@ -758,18 +754,27 @@ private class RawPom(
             pomIsParent = true
         }
 
-        // Further dependencies should use this thing's dependencyManagement, but only after what parent provided is considered
-        val combinedDependencyManagement = transitiveDependencyManagement + ownDependencyManagement
+        val expandedOwnDependencyManagement = flattedDependencyManagementImports(ownDependencyManagement, transitiveDependencyManagement, url, repositories, progressTracker).let {
+            if (it.successful) {
+                it.value!!
+            } else {
+                return it.reFail()
+            }
+        }
 
-        var complete = true
+        // Further dependencies should use this thing's dependencyManagement, but only after what parent provided is considered
+        val combinedDependencyManagement = transitiveDependencyManagement + expandedOwnDependencyManagement
+
         val newDependencies = ArrayList<Dependency>(dependencies.size)
         translatedDependencies.mapTo(newDependencies) { dependency ->
-            val (dep, depComplete) = resolveDependencyManagement(dependency, transitiveDependencyManagement, ownDependencyManagement, combinedDependencyManagement)
-            complete = complete && depComplete
+            val (dep, depComplete) = resolveDependencyManagement(dependency, transitiveDependencyManagement, expandedOwnDependencyManagement, combinedDependencyManagement)
+            if (!depComplete) {
+                return Failable.failure("Could not resolve $dependency through dependency management")
+            }
             dep
         }
 
-        return Partial(Pom(resolvedGroupId, resolvedArtifactId, resolvedVersion, resolvedPackaging, newDependencies, ownDependencyManagement), complete)
+        return Failable.success(Pom(resolvedGroupId, resolvedArtifactId, resolvedVersion, resolvedPackaging, newDependencies, ownDependencyManagement))
     }
 
     class RawPomDependency(val group: String?, val name: String?, val version: String?,
@@ -1080,7 +1085,7 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
         }
 
         // Repositories
-        else if (atElement(RepoReleases)) {
+        /*else if (atElement(RepoReleases)) {
 
         } else if (atElement(RepoSnapshots)) {
 
@@ -1092,7 +1097,7 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
 
         } else if (atElement(RepoLayout)) {
 
-        } else if (atElement(Repo)) {
+        }*/ else if (atElement(Repo)) {
             //TODO Add support
             LOG.debug("Pom at {} uses custom repositories, which are not supported yet", pom.url)
         }

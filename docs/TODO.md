@@ -1,5 +1,9 @@
 # Things to do next
 
+- Java 13 invalid reflexive access
+- IDE: Run Main from whatever buttons
+- Unit test output from Wemi in IDE
+
 ## For next release
 
 - Better error message when compilation fails because JAVA_HOME is just JRE
@@ -19,7 +23,7 @@
 - Consider using https://github.com/Kotlin/KEEP/blob/master/proposals/scripting-support.md
 
 - Maven dependency resolution improvements:
-	- <profiles> support
+	- `<profiles>` support
 		- https://dzone.com/articles/maven-profile-best-practices
 		- https://blog.gradle.org/maven-pom-profiles
 	

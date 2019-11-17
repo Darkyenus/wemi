@@ -521,6 +521,17 @@ val problematic_2 by configuration("") {
     }
 }
 
+val problematic_3 by configuration("") {
+    setTestCacheRepository("problematic_3")
+
+    // Uses BOM in combination with dependencyManagement
+    libraryDependencies set { setOf(dependency("org.jboss.arquillian.junit:arquillian-junit-container:1.5.0.Final")) }
+
+    checkResolution set {
+        assertClasspathContainsFiles("arquillian-junit-container-1.5.0.Final.jar", "arquillian-junit-core-1.5.0.Final.jar", "arquillian-test-api-1.5.0.Final.jar", "arquillian-test-spi-1.5.0.Final.jar", "arquillian-container-test-api-1.5.0.Final.jar", "arquillian-container-test-spi-1.5.0.Final.jar", "arquillian-core-impl-base-1.5.0.Final.jar", "arquillian-test-impl-base-1.5.0.Final.jar", "arquillian-container-impl-base-1.5.0.Final.jar", "arquillian-container-test-impl-base-1.5.0.Final.jar", "shrinkwrap-impl-base-1.2.6.jar", "arquillian-core-api-1.5.0.Final.jar", "arquillian-core-spi-1.5.0.Final.jar", "shrinkwrap-api-1.2.6.jar", "shrinkwrap-descriptors-api-base-2.0.0.jar", "arquillian-container-spi-1.5.0.Final.jar", "arquillian-config-api-1.5.0.Final.jar", "arquillian-config-impl-base-1.5.0.Final.jar", "shrinkwrap-descriptors-spi-2.0.0.jar", "shrinkwrap-spi-1.2.6.jar", "arquillian-config-spi-1.5.0.Final.jar")
+    }
+}
+
 val unsafeRepositoryDownload by configuration("") {
     repositories set { setOf(MavenCentral, Repository("jitpack", java.net.URL("https://jitpack.io/"), useUnsafeTransport = true)) }
 
@@ -606,6 +617,7 @@ val dependency_resolution by project() {
     if (longRunning) {
         autoRun(checkResolution, problematic_1)
         autoRun(checkResolution, problematic_2)
+        autoRun(checkResolution, problematic_3)
     }
 
     if (longRunning) {

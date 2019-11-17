@@ -340,7 +340,7 @@ fun main(args: Array<String>) {
         val result = task.evaluateKey(null, null)
         when (result.status) {
             TaskEvaluationStatus.Success -> {
-                LOG.info("Success")
+                LOG.debug("Success")
             }
             TaskEvaluationStatus.NoProject -> {
                 LOG.warn("Failure: invalid or missing project")
@@ -358,7 +358,7 @@ fun main(args: Array<String>) {
                 LOG.warn("Failure: failed with exception", result.data)
             }
             TaskEvaluationStatus.Command -> {
-                LOG.info("Success (command)")
+                LOG.debug("Success (command)")
             }
         }
     }
