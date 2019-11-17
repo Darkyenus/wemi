@@ -212,7 +212,7 @@ object KeyDefaults {
         classpath
     }
 
-    val InternalClasspathOfBlankProject: Value<List<LocatedPath>> = {
+    val InternalClasspathOfAggregateProject: Value<List<LocatedPath>> = {
         val resources = Keys.resources.getLocatedPaths()
 
         val classpath = WMutableList<LocatedPath>(resources.size + 128)
@@ -567,6 +567,14 @@ object KeyDefaults {
             expiresNow()
             report
         }
+    }
+
+    val TestOfAggregateProject: Value<TestReport> = {
+        val resultReport = TestReport()
+        inProjectDependencies(true) { depProject ->
+            resultReport.putAll(using(depProject.project, *depProject.configurations) { Keys.test.get() })
+        }
+        resultReport
     }
 
     val Archive: Value<Path> = {

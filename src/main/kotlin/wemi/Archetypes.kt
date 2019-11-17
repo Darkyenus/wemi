@@ -112,12 +112,9 @@ object Archetypes {
     internal val DefaultArchetype
         get() = JavaKotlinProject
 
-    /**
-     * Archetype for projects that have no sources of their own.
-     * Those can serve as an aggregation of dependencies or as a Maven-like parent projects.
-     */
-    val BlankJVMProject by archetype(::JVMBase) {
-        Keys.internalClasspath set KeyDefaults.InternalClasspathOfBlankProject
+    /** Archetype for projects that have no sources of their own, but are aggregation of their dependencies. */
+    val AggregateJVMProject by archetype(::JVMBase) {
+        Keys.internalClasspath set KeyDefaults.InternalClasspathOfAggregateProject
 
         Keys.sources set { null }
         Keys.resources set { null }
@@ -125,6 +122,8 @@ object Archetypes {
             Keys.sources set { null }
             Keys.resources set { null }
         }
+
+        Keys.test set KeyDefaults.TestOfAggregateProject
     }
 
     /** Primary archetype for projects that use pure Java. */
