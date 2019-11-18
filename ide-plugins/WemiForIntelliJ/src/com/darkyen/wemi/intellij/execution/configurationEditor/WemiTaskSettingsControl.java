@@ -24,7 +24,11 @@ import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings;
 import com.intellij.openapi.externalSystem.service.execution.TaskCompletionProvider;
 import com.intellij.openapi.externalSystem.service.ui.ExternalProjectPathField;
-import com.intellij.openapi.externalSystem.util.*;
+import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil;
+import com.intellij.openapi.externalSystem.util.ExternalSystemBundle;
+import com.intellij.openapi.externalSystem.util.ExternalSystemSettingsControl;
+import com.intellij.openapi.externalSystem.util.ExternalSystemUiUtil;
+import com.intellij.openapi.externalSystem.util.PaintAwarePanel;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.options.ConfigurationException;
@@ -35,13 +39,13 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.RawCommandLineEditor;
 import com.intellij.ui.components.JBLabel;
-import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.GridBag;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.DefaultComboBoxModel;
+import javax.swing.*;
 import java.awt.*;
+import java.util.HashMap;
 
 import static com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil.normalizePath;
 
@@ -182,7 +186,7 @@ public class WemiTaskSettingsControl implements ExternalSystemSettingsControl<Ex
 		final DebugMode debugMode = (DebugMode) this.debugMode.getSelectedItem();
 		settings.setScriptParameters(debugMode != null ? debugMode.scriptParameters : DebugMode.DEBUG_FORKED_PROGRAM.scriptParameters);
 		settings.setPassParentEnvs(myEnvVariablesComponent.isPassParentEnvs());
-		settings.setEnv(ContainerUtil.newHashMap(myEnvVariablesComponent.getEnvs()));
+		settings.setEnv(new HashMap<>(myEnvVariablesComponent.getEnvs()));
 	}
 
 	@Override

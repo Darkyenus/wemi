@@ -43,7 +43,7 @@ fun findWemiLauncher(project:Project):WemiLauncher? {
 }
 
 fun findWemiLauncher(projectDir:String):WemiLauncher? {
-    val wemiJar = Paths.get(projectDir).resolve(WemiLauncherFileName)?.toAbsolutePath() ?: return null
+    val wemiJar = Paths.get(projectDir).resolve(WemiLauncherFileName).toAbsolutePath() ?: return null
 
     if (!Files.isRegularFile(wemiJar)) return null
 
@@ -77,7 +77,7 @@ class WemiLauncher internal constructor(val file: Path) {
         return WemiLauncherSession(command, prefixConfigurations, tracker)
     }
 
-    fun createTaskSession(javaExecutable: String, jvmOptions: Set<String>, env: Map<String, String>, inheritEnv: Boolean, tasks: List<String>, tracker:ExternalStatusTracker?):WemiLauncherSession {
+    fun createTaskSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, tasks: List<String>, tracker:ExternalStatusTracker?):WemiLauncherSession {
         val command = GeneralCommandLine()
         command.exePath = javaExecutable
         command.charset = Charsets.UTF_8
@@ -86,9 +86,7 @@ class WemiLauncher internal constructor(val file: Path) {
         command.environment["WEMI_UNICODE"] = "true"
         command.workDirectory = file.parent.toFile()
         command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
-        jvmOptions.forEach {
-            command.addParameter(it)
-        }
+        command.addParameters(jvmOptions)
         command.addParameter("-jar")
         command.addParameter(file.toString())
         command.isRedirectErrorStream = false
@@ -197,22 +195,22 @@ class WemiLauncherSession(
                 extraDataStreamCache.apply {
                     readFully(this, inputStream, buffer)
                     if (this.size() > 0) {
-                        WemiLauncherSession.LOG.warn("Extra data found $occasion: ${contentToString()}")
+                        LOG.warn("Extra data found $occasion: ${contentToString()}")
                     }
                 }
             } catch (e:Exception) {
-                WemiLauncherSession.LOG.warn("Exception while checking for extra data in stdout", e)
+                LOG.warn("Exception while checking for extra data in stdout", e)
             }
 
             try {
                 extraDataStreamCache.apply {
                     readFully(this, errorStream)
                     if (this.size() > 0) {
-                        WemiLauncherSession.LOG.warn("Extra output found $occasion: ${contentToString()}")
+                        LOG.warn("Extra output found $occasion: ${contentToString()}")
                     }
                 }
             } catch (e:Exception) {
-                WemiLauncherSession.LOG.warn("Exception while checking for extra data in stderr", e)
+                LOG.warn("Exception while checking for extra data in stderr", e)
             }
         }
 
@@ -297,7 +295,7 @@ class WemiLauncherSession(
                     }
 
                     readFully(extraData, inputStream)
-                    WemiLauncherSession.LOG.warn("Extra data for task '$task' found: ${extraData.contentToString()}")
+                    LOG.warn("Extra data for task '$task' found: ${extraData.contentToString()}")
                     return@run true
                 }
 

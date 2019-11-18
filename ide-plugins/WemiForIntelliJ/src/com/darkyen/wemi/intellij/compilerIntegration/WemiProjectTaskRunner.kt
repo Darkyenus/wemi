@@ -75,7 +75,15 @@ class WemiProjectTaskRunner : ProjectTaskRunner() {
     }
 
     override fun canRun(projectTask: ProjectTask): Boolean {
-        return projectTask.wemiModuleType() != null
+        return when (projectTask) {
+            is ModuleBuildTask -> {
+                projectTask.module.getComponent(WemiModuleComponent::class.java)?.moduleType != null
+            }
+            is ExecuteRunConfigurationTask -> {
+                false
+            }
+            else -> false
+        }
     }
 
 }

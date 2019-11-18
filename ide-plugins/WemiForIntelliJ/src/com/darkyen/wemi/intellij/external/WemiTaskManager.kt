@@ -74,7 +74,7 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                 }
             }
 
-            val vmOptions = if (jvmAgent == null) settings.vmOptions else settings.vmOptions + jvmAgent
+            val vmOptions = if (jvmAgent == null) settings.jvmArguments else settings.jvmArguments + jvmAgent
 
             val prefixConfigurations = settings.prefixConfigurationsArray()
             val tasks = taskNames.map {

@@ -10,6 +10,7 @@ import com.intellij.openapi.externalSystem.service.project.wizard.AbstractExtern
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.*
+import com.intellij.openapi.util.NotNullFactory
 import icons.WemiIcons
 import java.io.File
 
@@ -19,8 +20,7 @@ import java.io.File
 class ImportFromWemiControlBuilder
     : AbstractExternalProjectImportBuilder<ImportFromWemiControl>(
         ProjectDataManager.getInstance(),
-        // TODO(jp): Make this lazy when it breaks (caused by https://github.com/JetBrains/intellij-community/commit/3da632b6acc01747284014cdcd26e2421daac7a6 which is too recent as of time of writing)
-        ImportFromWemiControl(),
+        NotNullFactory { ImportFromWemiControl() },
         WemiProjectSystemId) {
 
     override fun getIcon() = WemiIcons.ACTION

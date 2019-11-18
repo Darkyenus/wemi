@@ -31,7 +31,7 @@ class WemiRunConfiguration(project: Project,
     }
 
     override fun getState(executor: Executor, env: ExecutionEnvironment): RunProfileState? {
-        val state = super.getState(executor, env) as ExternalSystemRunConfiguration.MyRunnableState
+        val state = super.getState(executor, env) as MyRunnableState
         state.putUserData(EXECUTION_DEFER_DEBUG_TO_WEMI, settings.scriptParameters == WEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG)
         return state
     }

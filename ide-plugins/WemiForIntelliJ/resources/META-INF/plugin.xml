@@ -22,62 +22,11 @@
         <li>Compatibility with Wemi 0.10 (to 0.6)</li>
         <li>Bug fixes</li>
       </ul>
-      <h2>0.9</h2>
-      <ul>
-        <li>Compatibility with Wemi 0.9 (to 0.6)</li>
-        <li>Bug fixes</li>
-      </ul>
-      <h3>0.8</h3>
-      <ul>
-        <li>Compatibility with Wemi 0.8 (to 0.6)</li>
-        <li>File path highlighting in Terminal is now less obtrusive</li>
-        <li>Source roots are no longer created for projects without sources</li>
-      </ul>
-      <h3>0.7</h3>
-      <ul>
-        <li>Compatibility with Wemi 0.7 (to 0.6)</li>
-        <li>File paths in Terminal are now clickable</li>
-      </ul>
-      <h3>0.6</h3>
-      <ul>
-        <li>Compatibility with Wemi 0.6</li>
-        <li>Add "convert to Wemi" action</li>
-        <li>Add "(re)install Wemi launcher" action</li>
-        <li>Show what is Wemi doing during import (which task is running)</li>
-      </ul>
-      <h3>0.5</h3>
-      <ul>
-        <li>Compatibility with Wemi 0.5</li>
-        <li>Initial import should succeed even when build scripts are broken</li>
-      </ul>
-      <h3>0.4</h3>
-      <ul>
-        <li>Compatibility with Wemi 0.4</li>
-        <li>Project importing is now possible even with no/broken build scripts</li>
-        <li>Bug-fixes</li>
-      </ul>
-      <h3>0.3</h3>
-      <ul>
-        <li>Compatibility with Wemi 0.3</li>
-        <li>Windows support</li>
-        <li>Smarter dependency importing</li>
-        <li>Improve reimport-detection logic</li>
-        <li>Bug fixes and robustness enhancements</li>
-      </ul>
-      <h3>0.2</h3>
-      <ul>
-        <li>New logo</li>
-        <li>Compatibility with Wemi 0.2</li>
-      </ul>
-      <h3>0.1</h3>
-      <ul>
-        <li>First numbered release</li>
-      </ul>
     ]]>
     </change-notes>
 
     <!-- http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html -->
-    <idea-version since-build="181"/>
+    <idea-version since-build="183.3647"/>
 
     <!--  http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
     <depends>com.intellij.modules.platform</depends>

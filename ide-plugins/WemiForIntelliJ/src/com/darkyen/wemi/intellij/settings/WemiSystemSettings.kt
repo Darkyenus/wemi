@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.settings
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.ServiceManager
 import com.intellij.openapi.components.State
@@ -29,9 +30,13 @@ class WemiSystemSettings(project: Project) :
 
     //endregion
 
+    override fun subscribe(listener: ExternalSystemSettingsListener<WemiProjectSettings>, parentDisposable: Disposable) {
+        doSubscribe(WemiSettingsListenerDelegatingAdapter(listener), parentDisposable)
+    }
+
+    @Deprecated("(by Jetbrains) Present for backwards compatibility")
     override fun subscribe(listener: ExternalSystemSettingsListener<WemiProjectSettings>) {
-        val project = project
-        project.messageBus.connect(project).subscribe(WemiSettingsListener.TOPIC, WemiSettingsListenerDelegatingAdapter(listener))
+        subscribe(listener, project)
     }
 
     override fun copyExtraSettingsFrom(settings: WemiSystemSettings) {
