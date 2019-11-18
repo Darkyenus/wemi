@@ -344,8 +344,8 @@ can_use_java_from_path() {
 		return 1
 	fi
 
-	if echo "$java_version_" | grep -q -x -e '.* version ".*"'; then
-		# Matching standard versioning (java version "1.8.0", openjdk version "11.0.3", openjdk version "9", etc.)
+	if echo "$java_version_" | grep -q -x -e '.* version ".*".*'; then
+		# Matching standard versioning (java version "1.8.0", openjdk version "11.0.3" 2019-10-15, openjdk version "9", etc.)
 		# https://www.oracle.com/technetwork/java/javase/versioning-naming-139433.html
 		java_version_="$(echo "$java_version_" | sed 's/.* version "\(.*\)".*/\1/')"
 

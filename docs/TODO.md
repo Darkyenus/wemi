@@ -3,10 +3,10 @@
 - Java 13 invalid reflexive access
 - IDE: Run Main from whatever buttons
 - Unit test output from Wemi in IDE
+- DO NOT USE `extend(compiling or whatever)` to denote scopes!
+    It is flawed and will cause runtime only dependencies to appear in compile classpath!
 
 ## For next release
-
-- Better error message when compilation fails because JAVA_HOME is just JRE
 
 ## For later
 - Test everything, especially javadoc/dokka/tests/plugins
