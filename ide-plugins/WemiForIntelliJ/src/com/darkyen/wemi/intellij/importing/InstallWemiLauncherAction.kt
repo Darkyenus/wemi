@@ -9,6 +9,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import icons.WemiIcons
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
@@ -49,11 +50,11 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
         private const val REINSTALL_TITLE = "Reinstall Wemi launcher"
 
         fun reinstallWemiLauncher(project:Project, failNotificationTitle:String):Pair<Path, WemiLauncher>? {
-            val wemiBinaryStream = InstallWemiLauncherAction::class.java.classLoader
-                    .getResourceAsStream("wemi-binary")
+            val wemiLauncherStream: InputStream? = InstallWemiLauncherAction::class.java.classLoader
+                    .getResourceAsStream("wemi-launcher")
 
-            if (wemiBinaryStream == null) {
-                LOG.error("wemi-binary resource does not exist")
+            if (wemiLauncherStream == null) {
+                LOG.error("wemi-launcher resource does not exist")
                 WemiNotificationGroup.showBalloon(project, failNotificationTitle,
                         "Plugin installation is corrupted - no bundled launcher",
                         NotificationType.ERROR)
@@ -72,8 +73,8 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
 
             try {
                 Files.newOutputStream(wemiLauncherPath).use { wemiFile ->
-                    wemiBinaryStream.use { wemiBinary ->
-                        wemiBinary.copyTo(wemiFile)
+                    wemiLauncherStream.use {
+                        it.copyTo(wemiFile)
                     }
                 }
             } catch (e:Exception) {

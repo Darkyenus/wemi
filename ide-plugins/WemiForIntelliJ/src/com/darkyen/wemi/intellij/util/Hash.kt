@@ -6,7 +6,7 @@ import java.security.MessageDigest
 /**
  *
  */
-private val HexDigits = "0123456789abcdef"
+private const val HexDigits = "0123456789abcdef"
 
 fun toHexString(data: ByteArray): String {
     val chars = CharArray(data.size * 2)

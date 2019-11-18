@@ -12,8 +12,8 @@ import com.intellij.openapi.vfs.VirtualFile
 /**
  * Provides 'import from external model' functionality.
  */
-class WemiProjectImportProvider(builder: ImportFromWemiControlBuilder)
-    : AbstractExternalProjectImportProvider(builder, WemiProjectSystemId) {
+class WemiProjectImportProvider
+    : AbstractExternalProjectImportProvider(ImportFromWemiControlBuilder(), WemiProjectSystemId) {
 
     override fun canCreateNewProject(): Boolean {
         return true

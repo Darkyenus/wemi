@@ -11,8 +11,10 @@ import com.intellij.openapi.externalSystem.model.ProjectSystemId
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationEvent
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
+import com.intellij.openapi.externalSystem.util.ExternalSystemConstants
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.util.registry.Registry
 import java.io.*
 import java.nio.file.Files
 import java.nio.file.Path
@@ -22,7 +24,11 @@ import java.util.concurrent.TimeUnit
 // Must be a subset of Kotlin file extensions
 val WemiBuildFileExtensions = listOf("kt")
 
-val WemiProjectSystemId = ProjectSystemId("WEMI", "Wemi")
+val WemiProjectSystemId = ProjectSystemId("WEMI", "Wemi").apply {
+    // Do not launch our WemiProjectResolver and WemiTaskManager in external process,
+    // because it just adds delays and is messy
+    Registry.get("${id}${ExternalSystemConstants.USE_IN_PROCESS_COMMUNICATION_REGISTRY_KEY_SUFFIX}").setValue(true)
+}
 
 const val WemiBuildScriptProjectName = "wemi-build"
 
@@ -52,7 +58,7 @@ fun findWemiLauncher(projectDir:String):WemiLauncher? {
 
 class WemiLauncher internal constructor(val file: Path) {
 
-    fun createMachineReadableResolverSession(javaExecutable: String, jvmOptions: Set<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>, allowBrokenBuildScripts:Boolean, tracker:ExternalStatusTracker?):WemiLauncherSession {
+    fun createMachineReadableResolverSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>, allowBrokenBuildScripts:Boolean, tracker:ExternalStatusTracker?):WemiLauncherSession {
         val command = GeneralCommandLine()
         command.exePath = javaExecutable
         command.charset = Charsets.UTF_8

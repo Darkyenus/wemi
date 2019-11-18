@@ -56,10 +56,8 @@ class ImportProjectAction : AnAction("Import Wemi Project",
         }
 
         fun importUnlinkedProject(project: Project, launcher: WemiLauncher) {
-            val importBuilder = ImportFromWemiControlBuilder()
-
             val projectDirectory = launcher.file.parent
-            val wizard = AddModuleWizard(project, projectDirectory.toString(), WemiProjectImportProvider(importBuilder))
+            val wizard = AddModuleWizard(project, projectDirectory.toString(), WemiProjectImportProvider())
             if (wizard.stepCount <= 0 || wizard.showAndGet()) {
                 ImportModuleAction.createFromWizard(project, wizard)
             }

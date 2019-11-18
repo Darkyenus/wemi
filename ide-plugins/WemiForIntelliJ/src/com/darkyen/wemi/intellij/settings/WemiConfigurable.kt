@@ -15,7 +15,7 @@ class WemiConfigurable(project: Project) : AbstractExternalSystemConfigurable<We
 
     override fun createSystemSettingsControl(settings: WemiSystemSettings) = WemiSystemSettingsControl(settings)
 
-    override fun getHelpTopic() = null
+    override fun getHelpTopic():String? = null
 
     override fun getId() = "com.darkyen.wemi.configurable-settings"
 }

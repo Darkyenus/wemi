@@ -1,9 +1,5 @@
 package com.darkyen.wemi.intellij.util
 
-/**
- *
- */
-
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -17,10 +13,6 @@ import java.nio.charset.CharsetDecoder
 import java.nio.charset.CodingErrorAction
 import java.nio.file.Path
 import java.nio.file.Paths
-
-/**
- * Stream utilities
- */
 
 fun readFully(into: OutputStream, stream: InputStream, buffer:ByteArray = ByteArray(1024)):Int {
     var read = 0

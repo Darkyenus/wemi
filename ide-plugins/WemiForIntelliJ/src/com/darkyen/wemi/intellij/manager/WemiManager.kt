@@ -8,7 +8,12 @@ import com.darkyen.wemi.intellij.external.WemiTaskManager
 import com.darkyen.wemi.intellij.file.isWemiScriptSource
 import com.darkyen.wemi.intellij.file.pathHasExtension
 import com.darkyen.wemi.intellij.findWemiLauncher
-import com.darkyen.wemi.intellij.settings.*
+import com.darkyen.wemi.intellij.settings.WemiConfigurable
+import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
+import com.darkyen.wemi.intellij.settings.WemiLocalSettings
+import com.darkyen.wemi.intellij.settings.WemiProjectSettings
+import com.darkyen.wemi.intellij.settings.WemiSettingsListener
+import com.darkyen.wemi.intellij.settings.WemiSystemSettings
 import com.esotericsoftware.jsonbeans.JsonReader
 import com.intellij.execution.configurations.SimpleJavaParameters
 import com.intellij.openapi.externalSystem.ExternalSystemAutoImportAware
@@ -30,7 +35,6 @@ import com.intellij.util.PathUtil
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.containers.ContainerUtilRt
 import icons.WemiIcons
-import java.net.URL
 import java.nio.file.Paths
 
 /**
@@ -89,7 +93,7 @@ class WemiManager : ExternalSystemUiAware,
 
 
             WemiExecutionSettings(
-                    findWemiLauncher(pair.second) ?: throw RuntimeException("Project $project does not have a Wemi launcher!"),
+                    findWemiLauncher(pair.second) ?: throw RuntimeException("Project ${project.name} does not have a Wemi launcher!"),
                     javaVmExecutablePath,
                     projectSettings?.downloadDocs ?: true,
                     projectSettings?.downloadSources ?: true,
@@ -121,9 +125,6 @@ class WemiManager : ExternalSystemUiAware,
     }
 
     //endregion
-
-    @Deprecated("Only for backwards compatibility with IntelliJ < 2018.3 (abstract back then)")
-    fun enhanceLocalProcessing(urls: MutableList<URL>) {}
 
     /**
      * Called when:

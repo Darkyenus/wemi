@@ -26,7 +26,7 @@
     </change-notes>
 
     <!-- http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html -->
-    <idea-version since-build="183.3647"/>
+    <idea-version since-build="191"/>
 
     <!--  http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
@@ -68,12 +68,6 @@
             <add-to-group group-id="ProjectViewPopupMenuRunGroup" anchor="last"/>
         </action>
     </actions>
-
-    <application-components>
-        <component>
-            <implementation-class>com.darkyen.wemi.intellij.WemiApplicationComponent</implementation-class>
-        </component>
-    </application-components>
 
     <module-components>
         <component>
@@ -117,6 +111,7 @@
         <!-- File -->
         <fileIconProvider id="wemi-script-file" order="first" implementation="com.darkyen.wemi.intellij.file.ScriptIconProvider"/>
         <iconProvider id="wemi-script-file" order="first" implementation="com.darkyen.wemi.intellij.file.ScriptIconProvider"/>
+        <fileTypeFactory implementation="com.darkyen.wemi.intellij.file.WemiFileTypeFactory"/>
 
         <!-- Terminal highlighting -->
         <consoleFilterProvider implementation="com.darkyen.wemi.intellij.util.WemiTerminalFilterProvider"/>
