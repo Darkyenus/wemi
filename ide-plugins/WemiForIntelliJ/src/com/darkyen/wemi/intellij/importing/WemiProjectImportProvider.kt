@@ -72,6 +72,6 @@ class WemiProjectImportProvider
     }
 
     override fun getFileSample(): String {
-        return "<b>WEMI</b> project"
+        return "<b>WEMI</b> project (wemi, build/*.kt)"
     }
 }

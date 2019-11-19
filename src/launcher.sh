@@ -20,7 +20,7 @@
 
 # Configurable with:
 #   Environment variables:
-# 		WEMI_JAVA - number, Java version number to use (e.g. 8, 9, 13)
+# 		WEMI_JAVA - number, Java version number to use (e.g. 8, 9, 13) OR path to Java executable to use
 #			WEMI_DIST - path of a directory which contains .jar files needed to launch Wemi (useful for custom builds)
 #			WEMI_JAVA_OPTS - options passed to 'java' command used to launch Wemi
 #			WEMI_ROOT - root directory of the project, do not use unless you know what you are doing
@@ -45,8 +45,8 @@ fail() { log "$@"; exit 1; }
 fail_unsatisfied() { log "Unsatisfied software dependency - install this software and try again: $*"; exit 2; }
 
 {
-	# Detect Java version (from --java=<version> argument, WEMI_JAVA env-var, or default)
-	if echo "$1" | grep -q -x -e "--java=[0-9][0-9]*" ; then
+	# Detect Java version (from --java=<version|home> argument, WEMI_JAVA env-var, or default)
+	if echo "$1" | grep -q -x -e '--java=.*' ; then
 		version_="${1#--java=}"
 		shift
 		readonly java_version_forced=true
@@ -58,12 +58,17 @@ fail_unsatisfied() { log "Unsatisfied software dependency - install this softwar
 		readonly java_version_forced=false
 	fi
 
-	if [ -z "$version_" ] || [ "$version_" -lt "$java_min_version" ]; then
-		log "Requested version number '$version_' is too low, defaulting to $java_min_version"
-		version_="$java_min_version"
+	if echo "$version_" | grep -q -x -e '[0-9]*'; then
+		if [ -z "$version_" ] || [ "$version_" -lt "$java_min_version" ]; then
+			log "Requested version number '$version_' is too low, defaulting to $java_min_version"
+			version_="$java_min_version"
+		fi
+		readonly java_version="$version_"
+		readonly java_exe=''
+	else
+		readonly java_version=''
+		readonly java_exe="$version_"
 	fi
-
-	readonly java_version="$version_"
 }
 
 readonly wemi_home_dir=${WEMI_HOME:-"${HOME}/.wemi"}
@@ -386,6 +391,11 @@ can_use_java_from_path() {
 
 # Get command to execute 'java'
 fetch_java() {
+	if [ -n "$java_exe" ]; then
+		echo "${java_exe}"
+		return 0
+	fi
+
 	if can_use_java_from_path; then
 		echo 'java'
 		return 0

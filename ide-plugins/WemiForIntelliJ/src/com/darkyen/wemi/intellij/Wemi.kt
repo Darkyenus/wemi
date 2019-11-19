@@ -15,11 +15,15 @@ import com.intellij.openapi.externalSystem.util.ExternalSystemConstants
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.registry.Registry
-import java.io.*
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.io.OutputStream
+import java.io.OutputStreamWriter
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipFile
 
 // Must be a subset of Kotlin file extensions
 val WemiBuildFileExtensions = listOf("kt")
@@ -58,7 +62,68 @@ fun findWemiLauncher(projectDir:String):WemiLauncher? {
 
 class WemiLauncher internal constructor(val file: Path) {
 
+    /** Wemi launchers pre-0.10 were self contained Jars and were launched differently. */
+    private val versionPre010:Boolean by lazy {
+        val result = try {
+            ZipFile(file.toFile()).close()
+            true
+        } catch (t:Throwable) {
+            false
+        }
+        result
+    }
+
     fun createMachineReadableResolverSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>, allowBrokenBuildScripts:Boolean, tracker:ExternalStatusTracker?):WemiLauncherSession {
+        if (versionPre010) {
+            return pre010_createMachineReadableResolverSession(if(javaExecutable.isBlank()) "java" else javaExecutable, jvmOptions, env, inheritEnv, prefixConfigurations, allowBrokenBuildScripts, tracker)
+        }
+        val command = GeneralCommandLine()
+        command.exePath = file.toAbsolutePath().toString()
+        command.charset = Charsets.UTF_8
+        command.environment.putAll(env)
+        command.environment["WEMI_COLOR"] = "false"
+        command.environment["WEMI_UNICODE"] = "true"
+        command.environment["WEMI_JAVA_OPTS"] = jvmOptions.joinToString(" ")
+        if (javaExecutable.isNotBlank()) {
+            command.environment["WEMI_JAVA"] = javaExecutable
+        }
+        command.workDirectory = file.parent.toFile()
+        command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
+        command.isRedirectErrorStream = false
+
+        command.addParameter("--interactive")
+        command.addParameter("--machine-readable-output")
+        if (allowBrokenBuildScripts) {
+            command.addParameter("--allow-broken-build-scripts")
+        }
+
+        return WemiLauncherSession(command, prefixConfigurations, tracker)
+    }
+
+    fun createTaskSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, tasks: List<String>, tracker:ExternalStatusTracker?):WemiLauncherSession {
+        if (versionPre010) {
+            return pre010_createTaskSession(if(javaExecutable.isBlank()) "java" else javaExecutable, jvmOptions, env, inheritEnv, tasks, tracker)
+        }
+        val command = GeneralCommandLine()
+        command.exePath = file.toAbsolutePath().toString()
+        command.charset = Charsets.UTF_8
+        command.environment.putAll(env)
+        command.environment["WEMI_COLOR"] = "true"
+        command.environment["WEMI_UNICODE"] = "true"
+        command.environment["WEMI_JAVA_OPTS"] = jvmOptions.joinToString(" ")
+        if (javaExecutable.isNotBlank()) {
+            command.environment["WEMI_JAVA"] = javaExecutable
+        }
+        command.workDirectory = file.parent.toFile()
+        command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
+        command.isRedirectErrorStream = false
+
+        command.addParameters(tasks)
+
+        return WemiLauncherSession(command, tracker = tracker)
+    }
+
+    private fun pre010_createMachineReadableResolverSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>, allowBrokenBuildScripts:Boolean, tracker:ExternalStatusTracker?):WemiLauncherSession {
         val command = GeneralCommandLine()
         command.exePath = javaExecutable
         command.charset = Charsets.UTF_8
@@ -83,7 +148,7 @@ class WemiLauncher internal constructor(val file: Path) {
         return WemiLauncherSession(command, prefixConfigurations, tracker)
     }
 
-    fun createTaskSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, tasks: List<String>, tracker:ExternalStatusTracker?):WemiLauncherSession {
+    private fun pre010_createTaskSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, tasks: List<String>, tracker:ExternalStatusTracker?):WemiLauncherSession {
         val command = GeneralCommandLine()
         command.exePath = javaExecutable
         command.charset = Charsets.UTF_8
@@ -103,7 +168,7 @@ class WemiLauncher internal constructor(val file: Path) {
     }
 }
 
-class ExternalStatusTracker(val id:ExternalSystemTaskId, val listener:ExternalSystemTaskNotificationListener) {
+class ExternalStatusTracker(val id:ExternalSystemTaskId, private val listener:ExternalSystemTaskNotificationListener) {
 
     private fun updateListenerStatus() {
         val message = task?.let { "$stage - $it" } ?: stage

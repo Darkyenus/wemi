@@ -34,7 +34,7 @@ import java.util.zip.ZipFile
  */
 class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings> {
 
-    private val taskThreadBinding = mutableMapOf<ExternalSystemTaskId, Thread>()
+    private val taskThreadBinding = HashMap<ExternalSystemTaskId, Thread>()
 
     /**
      * Builds object-level representation of the external system config file contained at the given path.
@@ -78,9 +78,8 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
                 prefixConfigurations += "offline"
             }
 
-            val javaExecutable = if (settings.javaVmExecutable.isBlank()) "java" else settings.javaVmExecutable
             session = launcher.createMachineReadableResolverSession(
-                    javaExecutable, settings.jvmArguments, settings.env, settings.isPassParentEnvs,
+                    settings.javaVmExecutable, settings.jvmArguments, settings.env, settings.isPassParentEnvs,
                     prefixConfigurations, settings.allowBrokenBuildScripts, tracker)
 
             // First request on session will be probably waiting for build scripts to compile
