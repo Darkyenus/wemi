@@ -1,6 +1,7 @@
 package com.darkyen.wemi.intellij.compilerIntegration
 
 import com.darkyen.wemi.intellij.WemiNotificationGroup
+import com.darkyen.wemi.intellij.execution.WemiTaskConfiguration
 import com.darkyen.wemi.intellij.module.WemiModuleComponent
 import com.darkyen.wemi.intellij.module.WemiModuleType
 import com.darkyen.wemi.intellij.showBalloon
@@ -26,6 +27,7 @@ class WemiProjectTaskRunner : ProjectTaskRunner() {
 
     override fun run(project: Project, context: ProjectTaskContext,
                      callback: ProjectTaskNotification?, tasks: MutableCollection<out ProjectTask>) {
+        println("WemiProjectTaskRunner.run")
         var onlyBadModuleBuilds:Boolean? = null
         var aborted = false
         var errors = 0
@@ -80,7 +82,7 @@ class WemiProjectTaskRunner : ProjectTaskRunner() {
                 projectTask.module.getComponent(WemiModuleComponent::class.java)?.moduleType != null
             }
             is ExecuteRunConfigurationTask -> {
-                false
+                projectTask.runProfile is WemiTaskConfiguration
             }
             else -> false
         }

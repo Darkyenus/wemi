@@ -93,10 +93,13 @@
 
         <!-- Execution -->
         <configurationType implementation="com.darkyen.wemi.intellij.execution.WemiTaskConfigurationType"/>
+        <programRunner implementation="com.darkyen.wemi.intellij.execution.WemiProgramRunner"/>
+        <stepsBeforeRunProvider implementation="com.darkyen.wemi.intellij.execution.WemiBeforeRunTaskProvider"/>
+        <runConfigurationProducer implementation="com.darkyen.wemi.intellij.execution.WemiTaskConfigurationProducer"/>
+
+        <!-- (get rid of later) -->
         <externalSystemExecutionConsoleManager
                 implementation="com.darkyen.wemi.intellij.execution.WemiExecutionConsoleManager" order="last"/>
-        <stepsBeforeRunProvider implementation="com.darkyen.wemi.intellij.execution.WemiBeforeRunTaskProvider"/>
-        <runConfigurationProducer implementation="com.darkyen.wemi.intellij.execution.WemiRunConfigurationProducer"/>
 
         <!-- Compiler Integration -->
         <projectTaskRunner order="first" implementation="com.darkyen.wemi.intellij.compilerIntegration.WemiProjectTaskRunner"/>

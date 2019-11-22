@@ -10,9 +10,7 @@ import com.intellij.openapi.externalSystem.settings.ExternalProjectSettings
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 
-/**
- * Specifies which files are taken into consideration when configuring a Wemi project.
- */
+/** Specifies which files are taken into consideration when configuring a Wemi project. */
 class WemiConfigLocator : ExternalSystemConfigLocator {
 
     override fun getTargetExternalSystemId(): ProjectSystemId = WemiProjectSystemId

@@ -1,11 +1,14 @@
 package com.darkyen.wemi.intellij
 
+import com.darkyen.wemi.intellij.execution.WemiTaskConfiguration
+import com.darkyen.wemi.intellij.util.OSProcessHandlerForWemi
 import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.readFully
 import com.darkyen.wemi.intellij.util.toPath
 import com.esotericsoftware.jsonbeans.JsonReader
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.execution.configurations.GeneralCommandLine
+import com.intellij.execution.process.OSProcessHandler
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.externalSystem.model.ProjectSystemId
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
@@ -15,6 +18,8 @@ import com.intellij.openapi.externalSystem.util.ExternalSystemConstants
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.util.EnvironmentUtil
+import com.pty4j.PtyProcessBuilder
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
@@ -72,6 +77,149 @@ class WemiLauncher internal constructor(val file: Path) {
         }
         result
     }
+
+    enum class DebugScheme {
+        DISABLED,
+        WEMI_BUILD_SCRIPTS,
+        WEMI_FORKED_PROCESSES
+    }
+
+    private fun pre010_createWemiProcess(options: WemiTaskConfiguration.BaseOptions,
+                                         debugPort:Int, debugConfig: DebugScheme,
+                                         allowBrokenBuildScripts:Boolean,
+                                         interactive:Boolean, machineReadable:Boolean) : OSProcessHandler {
+        val env = HashMap<String, String>()
+        if (options.passParentEnvironmentVariables) {
+            env.putAll(EnvironmentUtil.getEnvironmentMap())
+        }
+        env["WEMI_COLOR"] = "true"
+        env["WEMI_UNICODE"] = "true"
+        env.putAll(options.environmentVariables)
+
+        val commandLine = ArrayList<String>()
+        if (options.javaExecutable.isNotBlank()) {
+            commandLine.add(options.javaExecutable)
+        } else {
+            commandLine.add("java")
+        }
+        commandLine.addAll(options.javaOptions)
+
+        when (debugConfig) {
+            DebugScheme.WEMI_BUILD_SCRIPTS -> {
+                commandLine.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=$debugPort")
+            }
+            DebugScheme.WEMI_FORKED_PROCESSES -> {
+                env["WEMI_RUN_DEBUG_PORT"] = debugPort.toString()
+            }
+            DebugScheme.DISABLED -> {}
+        }
+
+        commandLine.add("-jar")
+        commandLine.add(file.toAbsolutePath().toString())
+
+        if (allowBrokenBuildScripts) {
+            commandLine.add("--allow-broken-build-scripts")
+        }
+        if (interactive) {
+            commandLine.add("--interactive")
+        }
+        if (machineReadable) {
+            commandLine.add("--machine-readable-output")
+        }
+
+        for ((i, task) in options.tasks.withIndex()) {
+            commandLine.addAll(task)
+            if (i + 1 < options.tasks.size) {
+                commandLine.add(";")
+            }
+        }
+
+        val builder = PtyProcessBuilder()
+        builder.setDirectory(file.toAbsolutePath().parent.toString())
+        builder.setCygwin(true)
+        builder.setEnvironment(env)
+        builder.setWindowsAnsiColorEnabled(false) // We don't emit those
+        builder.setCommand(commandLine.toTypedArray())
+        builder.setRedirectErrorStream(false)
+        builder.setConsole(true)
+        return OSProcessHandlerForWemi(builder.start(), commandLine.joinToString(" "))
+
+    }
+
+    fun createWemiProcess(options: WemiTaskConfiguration.BaseOptions,
+                          debugPort:Int, debugConfig: DebugScheme,
+                          allowBrokenBuildScripts:Boolean,
+                          interactive:Boolean, machineReadable:Boolean) : OSProcessHandler {
+        if (versionPre010) {
+            return pre010_createWemiProcess(options, debugPort, debugConfig, allowBrokenBuildScripts, interactive, machineReadable)
+        }
+
+        val env = HashMap<String, String>()
+        if (options.passParentEnvironmentVariables) {
+            env.putAll(EnvironmentUtil.getEnvironmentMap())
+        }
+        env["WEMI_COLOR"] = "true"
+        env["WEMI_UNICODE"] = "true"
+        env.putAll(options.environmentVariables)
+        if (options.javaExecutable.isNotBlank()) {
+            env["WEMI_JAVA"] = options.javaExecutable
+        }
+        if (options.javaOptions.isNotEmpty()) {
+            env["WEMI_JAVA_OPTS"] = options.javaOptions.joinToString(" ")
+        }
+
+        val commandLine = ArrayList<String>()
+        commandLine.add(file.toAbsolutePath().toString())
+
+        when (debugConfig) {
+            DebugScheme.WEMI_BUILD_SCRIPTS -> {
+                commandLine.add("--debug-suspend=$debugPort")
+            }
+            DebugScheme.WEMI_FORKED_PROCESSES -> {
+                env["WEMI_RUN_DEBUG_PORT"] = debugPort.toString()
+            }
+            DebugScheme.DISABLED -> {}
+        }
+
+        if (allowBrokenBuildScripts) {
+            commandLine.add("--allow-broken-build-scripts")
+        }
+        if (interactive) {
+            commandLine.add("--interactive")
+        }
+        if (machineReadable) {
+            commandLine.add("--machine-readable-output")
+        }
+
+        for ((i, task) in options.tasks.withIndex()) {
+            commandLine.addAll(task)
+            if (i + 1 < options.tasks.size) {
+                commandLine.add(";")
+            }
+        }
+
+        val builder = PtyProcessBuilder()
+        builder.setDirectory(file.toAbsolutePath().parent.toString())
+        builder.setCygwin(true)
+        builder.setEnvironment(env)
+        builder.setWindowsAnsiColorEnabled(false) // We don't emit those
+        builder.setCommand(commandLine.toTypedArray())
+        builder.setRedirectErrorStream(false)
+        builder.setConsole(true)
+        return OSProcessHandlerForWemi(builder.start(), commandLine.joinToString(" "))
+    }
+
+
+
+
+
+
+
+
+
+
+
+
 
     fun createMachineReadableResolverSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>, allowBrokenBuildScripts:Boolean, tracker:ExternalStatusTracker?):WemiLauncherSession {
         if (versionPre010) {

@@ -526,6 +526,7 @@ object TaskParser : Parser {
 
             while (hasNextPart()) {
                 tasks.add(matchTask(machineReadable) ?: break)
+                consumeWhitespaceParts()
             }
 
             return tasks
