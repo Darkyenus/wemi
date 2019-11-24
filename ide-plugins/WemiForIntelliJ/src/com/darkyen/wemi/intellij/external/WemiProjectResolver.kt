@@ -168,7 +168,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
             tracker.stage = "Resolving project "+project.projectName
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, project.moduleData(projectPath))
             project.contentRoot()?.let { moduleNode.createChild(ProjectKeys.CONTENT_ROOT, it) } // Do not add content root if it is empty
-            moduleNode.createChild(WEMI_MODULE_DATA_KEY, WemiModuleComponentData(WemiModuleType.PROJECT))
+            moduleNode.createChild(WEMI_MODULE_DATA_KEY, WemiModuleComponentData(project.projectName, WemiModuleType.PROJECT))
             projectModules[project.projectName] = moduleNode
 
             // Collect dependencies
@@ -262,7 +262,7 @@ class WemiProjectResolver : ExternalSystemProjectResolver<WemiExecutionSettings>
 
             // Module Node
             val moduleNode = projectDataNode.createChild(ProjectKeys.MODULE, moduleData)
-            moduleNode.createChild(WEMI_MODULE_DATA_KEY, WemiModuleComponentData(WemiModuleType.BUILD_SCRIPT))
+            moduleNode.createChild(WEMI_MODULE_DATA_KEY, WemiModuleComponentData(WemiBuildScriptProjectName, WemiModuleType.BUILD_SCRIPT))
 
             val contentRoot = ContentRootData(WemiProjectSystemId, buildFolder)
             contentRoot.storePath(ExternalSystemSourceType.SOURCE, buildFolder)

@@ -3,7 +3,10 @@ package com.darkyen.wemi.intellij.execution
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
 import com.intellij.execution.BeforeRunTask
 import com.intellij.execution.BeforeRunTaskProvider
+import com.intellij.execution.RunManager
 import com.intellij.execution.configurations.RunConfiguration
+import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.impl.RunConfigurationBeforeRunProvider
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.components.PersistentStateComponent
@@ -130,7 +133,7 @@ class WemiBeforeRunTaskProvider(private val project: Project) : BeforeRunTaskPro
 
 	override fun configureTask(context: DataContext, configuration: RunConfiguration, task: WemiBeforeRunTask): Promise<Boolean> {
 		val dialog = EditBeforeRunDialog(project, task.options)
-		dialog.isModal = false
+		dialog.isModal = true
 		val promise = AsyncPromise<Boolean>()
 		dialog.disposable.attach {
 			promise.setResult(dialog.isOK)
@@ -140,25 +143,16 @@ class WemiBeforeRunTaskProvider(private val project: Project) : BeforeRunTaskPro
 	}
 
 	override fun executeTask(context: DataContext, configuration: RunConfiguration, env: ExecutionEnvironment, beforeRunTask: WemiBeforeRunTask): Boolean {
-		TODO("implement executeTask")
-		/*
-		final ExternalSystemTaskExecutionSettings executionSettings = beforeRunTask.getTaskExecutionSettings();
+		val runner = WemiProgramRunner.instance()
+		val executor = DefaultRunExecutor.getRunExecutorInstance()
 
-		final List<ExternalTaskPojo> tasks = new ArrayList<>();
-		for (String taskName : executionSettings.getTaskNames()) {
-			tasks.add(new ExternalTaskPojo(taskName, executionSettings.getExternalProjectPath(), null));
-		}
-		if (tasks.isEmpty()) return true;
+		val taskConfiguration = WemiTaskConfiguration(project, WemiTaskConfigurationType.INSTANCE.taskConfigurationFactory, beforeRunTask.options.shortTaskSummary())
+		beforeRunTask.options.copyTo(taskConfiguration.options)
+		val runnerAndConfigurationSettings = RunManager.getInstance(project).createConfiguration(taskConfiguration, taskConfiguration.factory)
+		val environment = ExecutionEnvironment(executor, runner, runnerAndConfigurationSettings, project)
+		environment.executionId = env.executionId
 
-		ExecutionEnvironment environment =
-		ExternalSystemUtil.createExecutionEnvironment(myProject, mySystemId, executionSettings, DefaultRunExecutor.EXECUTOR_ID);
-		if (environment == null) return false;
-
-		final ProgramRunner runner = environment.getRunner();
-		environment.setExecutionId(env.getExecutionId());
-
-		return RunConfigurationBeforeRunProvider.doRunTask(DefaultRunExecutor.getRunExecutorInstance().getId(), environment, runner);
-		*/
+		return RunConfigurationBeforeRunProvider.doRunTask(executor.id, environment, runner)
 	}
 
 	companion object {

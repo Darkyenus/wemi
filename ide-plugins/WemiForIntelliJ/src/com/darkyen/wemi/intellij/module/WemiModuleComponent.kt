@@ -10,9 +10,10 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 @com.intellij.openapi.components.State(name = "wemi.WemiModuleComponent", reloadable = true, defaultStateAsResource = false)
 class WemiModuleComponent : ModuleComponent, PersistentStateComponent<WemiModuleComponent> {
 
-    /**
-     * Type of Wemi module this represents. Null if this module is not a wemi module.
-     */
+    /** Name of Wemi project corresponding to this module. */
+    var wemiModuleName:String? = null
+
+    /** Type of Wemi module this represents. Null if this module is not a wemi module. */
     var moduleType:WemiModuleType? = null
 
     override fun getState(): WemiModuleComponent = this

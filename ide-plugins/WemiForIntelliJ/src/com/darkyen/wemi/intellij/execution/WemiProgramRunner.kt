@@ -13,6 +13,7 @@ import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.runners.AsyncProgramRunner
 import com.intellij.execution.runners.ExecutionEnvironment
+import com.intellij.execution.runners.ProgramRunner
 import com.intellij.execution.runners.RunContentBuilder
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -27,7 +28,7 @@ import org.jetbrains.concurrency.resolvedPromise
 /** I don't even know what it does. One more abstraction layer I guess. */
 class WemiProgramRunner : AsyncProgramRunner<RunnerSettings>() {
 
-	override fun getRunnerId(): String = "WemiProgramRunner"
+	override fun getRunnerId(): String = ID
 
 	override fun canRun(executorId: String, profile: RunProfile): Boolean {
 		return (executorId == DefaultRunExecutor.EXECUTOR_ID || executorId == DefaultDebugExecutor.EXECUTOR_ID)
@@ -63,6 +64,14 @@ class WemiProgramRunner : AsyncProgramRunner<RunnerSettings>() {
 					return JavaDebugProcess.create(session, debuggerSession)
 				}
 			}).runContentDescriptor)
+		}
+	}
+
+	companion object {
+		const val ID = "WemiProgramRunner"
+
+		fun instance():WemiProgramRunner {
+			return ProgramRunner.PROGRAM_RUNNER_EP.findExtensionOrFail(WemiProgramRunner::class.java)
 		}
 	}
 }

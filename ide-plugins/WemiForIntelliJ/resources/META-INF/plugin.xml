@@ -20,6 +20,7 @@
       <h2>0.10</h2>
       <ul>
         <li>Compatibility with Wemi 0.10 (to 0.6)</li>
+        <li>Major rewrite of Run configurations, should be much more reliable</li>
         <li>Bug fixes</li>
       </ul>
     ]]>
@@ -96,13 +97,11 @@
         <programRunner implementation="com.darkyen.wemi.intellij.execution.WemiProgramRunner"/>
         <stepsBeforeRunProvider implementation="com.darkyen.wemi.intellij.execution.WemiBeforeRunTaskProvider"/>
         <runConfigurationProducer implementation="com.darkyen.wemi.intellij.execution.WemiTaskConfigurationProducer"/>
+        <projectTaskRunner order="first" implementation="com.darkyen.wemi.intellij.execution.WemiModuleBuildTaskRunner"/>
 
         <!-- (get rid of later) -->
         <externalSystemExecutionConsoleManager
                 implementation="com.darkyen.wemi.intellij.execution.WemiExecutionConsoleManager" order="last"/>
-
-        <!-- Compiler Integration -->
-        <projectTaskRunner order="first" implementation="com.darkyen.wemi.intellij.compilerIntegration.WemiProjectTaskRunner"/>
 
         <!-- Manager -->
         <externalSystemManager implementation="com.darkyen.wemi.intellij.manager.WemiManager"/>

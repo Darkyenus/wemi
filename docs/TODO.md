@@ -1,7 +1,6 @@
 # Things to do next
 
 - IDE rewrite:
-    - Before run does not work yet
     - Remove what is not needed anymore
     - Check all TODOs
 - Java 13 invalid reflexive access

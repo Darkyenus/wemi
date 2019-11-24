@@ -26,6 +26,7 @@ class WemiModuleComponentDataService : AbstractProjectDataService<WemiModuleComp
             val module = modelsProvider.findIdeModule(moduleData) ?: continue
             val wemiComponent = module.getComponent(WemiModuleComponent::class.java)
             wemiComponent.moduleType = dataNode.data.moduleType
+            wemiComponent.wemiModuleName = dataNode.data.wemiModuleName
         }
     }
 }
@@ -35,4 +36,4 @@ class WemiModuleComponentDataService : AbstractProjectDataService<WemiModuleComp
  */
 val WEMI_MODULE_DATA_KEY = Key.create(WemiModuleComponentData::class.java, 1000)
 
-class WemiModuleComponentData(val moduleType: WemiModuleType) : AbstractExternalEntityData(WemiProjectSystemId)
+class WemiModuleComponentData(val wemiModuleName:String, val moduleType: WemiModuleType) : AbstractExternalEntityData(WemiProjectSystemId)

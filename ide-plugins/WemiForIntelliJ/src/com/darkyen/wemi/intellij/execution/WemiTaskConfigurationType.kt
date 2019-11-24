@@ -4,7 +4,6 @@ import com.darkyen.wemi.intellij.settings.WemiProjectSettings
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationType
 import com.intellij.execution.configurations.ConfigurationTypeUtil
-import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.openapi.project.Project
 import icons.WemiIcons
 import javax.swing.Icon
@@ -16,21 +15,22 @@ class WemiTaskConfigurationType : ConfigurationType {
     override fun getDisplayName(): String = "Wemi Task"
 
     /** For persistency */
-    override fun getId(): String = "WemiRunConfiguration"
+    override fun getId(): String = ID
 
     override fun getIcon(): Icon = WemiIcons.ACTION
 
     override fun getConfigurationTypeDescription(): String = "Wemi build system task"
 
-    val taskConfigurationFactory = object : ConfigurationFactory(this) {
+    val taskConfigurationFactory = WemiTaskConfigurationFactory(this)
 
-        override fun getId(): String = this@WemiTaskConfigurationType.id
+    class WemiTaskConfigurationFactory(configurationType:ConfigurationType) : ConfigurationFactory(configurationType) {
+        override fun getId(): String = ID
 
         override fun isApplicable(project: Project): Boolean {
             return WemiProjectSettings.getInstance(project) != null
         }
 
-        override fun createTemplateConfiguration(project: Project): RunConfiguration {
+        override fun createTemplateConfiguration(project: Project): WemiTaskConfiguration {
             return WemiTaskConfiguration(project, this, "")
         }
     }
@@ -40,6 +40,8 @@ class WemiTaskConfigurationType : ConfigurationType {
     override fun getConfigurationFactories(): Array<ConfigurationFactory> = CONFIGURATION_FACTORIES
 
     companion object {
+        const val ID = "WemiRunConfiguration"
+
         val INSTANCE:WemiTaskConfigurationType
             get() = ConfigurationTypeUtil.findConfigurationType(WemiTaskConfigurationType::class.java)
     }
