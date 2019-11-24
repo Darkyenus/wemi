@@ -2,6 +2,7 @@ package com.darkyen.wemi.intellij.execution
 
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
 import com.intellij.openapi.options.SettingsEditor
+import com.intellij.openapi.project.Project
 import javax.swing.JComponent
 
 /** Editor for WemiTaskConfiguration */

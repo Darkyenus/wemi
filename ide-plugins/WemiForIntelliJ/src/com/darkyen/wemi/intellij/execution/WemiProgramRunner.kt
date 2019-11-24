@@ -45,8 +45,9 @@ class WemiProgramRunner : AsyncProgramRunner<RunnerSettings>() {
 			onProcessStarted(environment.runnerSettings, result)
 			return resolvedPromise(RunContentBuilder(result, environment).showRunContent(environment.contentToReuse))
 		} else {
-			val connection = RemoteConnection(true, "localhost", state.debugPort.toString(), /* Wemi is server */ false)
-			val debugEnvironment: DebugEnvironment = DefaultDebugEnvironment(environment, state, connection, 0)
+			val connection = RemoteConnection(true, "localhost", state.debugPort.toString(),
+					/* Wemi is a server when debugging build scripts, but forked processes connect to IDE */ !state.options.debugWemiItself)
+			val debugEnvironment: DebugEnvironment = DefaultDebugEnvironment(environment, state, connection, Long.MAX_VALUE)
 			val debuggerSession = DebuggerManagerEx.getInstanceEx(environment.project).attachVirtualMachine(debugEnvironment) ?: return resolvedPromise(null)
 			val executionResult = debuggerSession.process.executionResult
 

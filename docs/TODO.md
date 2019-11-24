@@ -1,6 +1,11 @@
 # Things to do next
 
+- IDE rewrite:
+    - Before run does not work yet
+    - Remove what is not needed anymore
+    - Check all TODOs
 - Java 13 invalid reflexive access
+- http://tutorials.jenkov.com/java/modules.html
 - IDE: Run Main from whatever buttons
 - Unit test output from Wemi in IDE
 - DO NOT USE `extend(compiling or whatever)` to denote scopes!
@@ -13,6 +18,7 @@
 
 - Fatjars in Java 9+ ?
 	- Put all libraries in separate packages?
+	- Maybe we don't need fatjars, because Java 9 has jlink
 
 - Automated tests
 

@@ -112,3 +112,27 @@ class BooleanXmlSerializer : XmlValueSerializer<Boolean> {
 	}
 }
 
+class StringXmlSerializer : XmlValueSerializer<String> {
+	override fun writeExternal(value: String, element: Element) {
+		element.setAttribute("str", value)
+	}
+
+	override fun readExternal(element: Element, default:String): String {
+		return element.getAttributeValue("str") ?: default
+	}
+}
+
+class ListOfStringXmlSerializer : XmlValueSerializer<List<String>> {
+	override fun writeExternal(value: List<String>, element: Element) {
+		for (s in value) {
+			element.addContent(Element("str").also { strElement ->
+				strElement.setAttribute("value", s)
+			})
+		}
+	}
+
+	override fun readExternal(element: Element, default:List<String>): List<String> {
+		return element.getChildren("str").mapNotNull { it.getAttributeValue("value") }
+	}
+}
+

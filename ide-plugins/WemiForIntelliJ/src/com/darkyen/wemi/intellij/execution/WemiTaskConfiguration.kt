@@ -3,12 +3,16 @@ package com.darkyen.wemi.intellij.execution
 import com.darkyen.wemi.intellij.WemiLauncher
 import com.darkyen.wemi.intellij.findWemiLauncher
 import com.darkyen.wemi.intellij.ui.BooleanPropertyEditor
+import com.darkyen.wemi.intellij.ui.CommandArgumentEditor
 import com.darkyen.wemi.intellij.ui.EnvironmentVariablesEditor
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
 import com.darkyen.wemi.intellij.ui.TaskListPropertyEditor
+import com.darkyen.wemi.intellij.ui.WemiJavaExecutableEditor
 import com.darkyen.wemi.intellij.util.BooleanXmlSerializer
 import com.darkyen.wemi.intellij.util.ListOfStringArraysXmlSerializer
+import com.darkyen.wemi.intellij.util.ListOfStringXmlSerializer
 import com.darkyen.wemi.intellij.util.MapStringStringXmlSerializer
+import com.darkyen.wemi.intellij.util.StringXmlSerializer
 import com.darkyen.wemi.intellij.util.XmlSerializable
 import com.intellij.execution.BeforeRunTask
 import com.intellij.execution.DefaultExecutionResult
@@ -93,7 +97,7 @@ class WemiTaskConfiguration(
         return clone
     }
 
-    class WemiRunProfileState(private val project:Project, private val options: RunOptions, val debugPort:Int) : RunProfileState {
+    class WemiRunProfileState(private val project:Project, val options: RunOptions, val debugPort:Int) : RunProfileState {
 
         override fun execute(executor: Executor?, runner: ProgramRunner<*>): ExecutionResult {
             val launcher = findWemiLauncher(project) ?: throw ExecutionException("Wemi launcher is missing")
@@ -209,7 +213,7 @@ class WemiTaskConfiguration(
         var tasks:List<Array<String>> = emptyList()
         var environmentVariables: Map<String, String> = emptyMap()
         var passParentEnvironmentVariables:Boolean = true
-        // TODO(jp): Integrate this
+
         var javaExecutable:String = ""
         var javaOptions:List<String> = emptyList()
 
@@ -217,6 +221,8 @@ class WemiTaskConfiguration(
             register(BaseOptions::tasks, ListOfStringArraysXmlSerializer::class)
             register(BaseOptions::environmentVariables, MapStringStringXmlSerializer::class)
             register(BaseOptions::passParentEnvironmentVariables, BooleanXmlSerializer::class)
+            register(BaseOptions::javaExecutable, StringXmlSerializer::class)
+            register(BaseOptions::javaOptions, ListOfStringXmlSerializer::class)
         }
 
         fun shortTaskSummary():String {
@@ -233,12 +239,18 @@ class WemiTaskConfiguration(
         fun copyTo(o:BaseOptions) {
             o.tasks = tasks
             o.environmentVariables = environmentVariables
+            o.passParentEnvironmentVariables = passParentEnvironmentVariables
+            o.javaExecutable = javaExecutable
+            o.javaOptions = javaOptions
         }
 
         open fun createUi(panel: PropertyEditorPanel) {
             panel.edit(TaskListPropertyEditor(this::tasks))
-            panel.gap(25)
+            panel.gap(5)
             panel.edit(EnvironmentVariablesEditor(this::environmentVariables, this::passParentEnvironmentVariables))
+            panel.gap(5)
+            panel.edit(WemiJavaExecutableEditor(this::javaExecutable))
+            panel.edit(CommandArgumentEditor(this::javaOptions))
         }
 
         override fun equals(other: Any?): Boolean {
@@ -246,12 +258,21 @@ class WemiTaskConfiguration(
             if (other !is BaseOptions) return false
 
             if (tasks != other.tasks) return false
+            if (environmentVariables != other.environmentVariables) return false
+            if (passParentEnvironmentVariables != other.passParentEnvironmentVariables) return false
+            if (javaExecutable != other.javaExecutable) return false
+            if (javaOptions != other.javaOptions) return false
 
             return true
         }
 
         override fun hashCode(): Int {
-            return tasks.hashCode()
+            var result = tasks.hashCode()
+            result = 31 * result + environmentVariables.hashCode()
+            result = 31 * result + passParentEnvironmentVariables.hashCode()
+            result = 31 * result + javaExecutable.hashCode()
+            result = 31 * result + javaOptions.hashCode()
+            return result
         }
     }
 

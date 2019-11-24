@@ -101,9 +101,9 @@ command_exists() {
 download_to_file() {
 	mkdir -p "$(dirname "$2")"
 	if command_exists curl; then
-		curl -C - --fail --retry 3 --location --output_ "$2" --url "$1" || fail "Failed to fetch $1 to $2 (curl returned $?)"
+		curl -C - --fail --retry 3 --location --output "$2" --url "$1" || fail "Failed to fetch $1 to $2 (curl returned $?)"
 	elif command_exists wget; then
-		wget --tries=3 --continue --compression=auto --show-progress --output_-document="$2" "$1" || fail "Failed to fetch $1 to $2 (wget returned $?)"
+		wget --tries=3 --continue --compression=auto --show-progress --output-document="$2" "$1" || fail "Failed to fetch $1 to $2 (wget returned $?)"
 	else
 		fail_unsatisfied "curl or wget"
 	fi
@@ -115,7 +115,7 @@ download_to_output() {
 	if command_exists curl; then
 		curl --fail --retry 3 --location --silent --show-error --url "$1" || fail "Failed to fetch $1 (curl returned $?)"
 	elif command_exists wget; then
-		wget --tries=3 --quiet --compression=auto --output_-document=- "$1" || fail "Failed to fetch $1 (wget returned $?)"
+		wget --tries=3 --quiet --compression=auto --output-document=- "$1" || fail "Failed to fetch $1 (wget returned $?)"
 	else
 		fail_unsatisfied "curl or wget"
 	fi

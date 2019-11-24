@@ -2,13 +2,42 @@ package com.darkyen.wemi.intellij.ui
 
 import com.intellij.execution.configuration.EnvironmentVariablesComponent
 import com.intellij.execution.configuration.EnvironmentVariablesData
+import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CustomShortcutSet
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.externalSystem.util.PaintAwarePanel
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
+import com.intellij.openapi.keymap.KeymapUtil
+import com.intellij.openapi.progress.PerformInBackgroundOption
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
+import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.projectRoots.JavaSdk
+import com.intellij.openapi.projectRoots.JavaSdkVersion
+import com.intellij.openapi.projectRoots.ProjectJdkTable
+import com.intellij.openapi.projectRoots.Sdk
+import com.intellij.openapi.roots.ui.configuration.JdkComboBox
+import com.intellij.openapi.roots.ui.configuration.projectRoot.ProjectSdksModel
+import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.JBIntSpinner
+import com.intellij.ui.RawCommandLineEditor
 import com.intellij.ui.ToolbarDecorator
+import com.intellij.ui.UserActivityProviderComponent
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTabbedPane
 import com.intellij.ui.components.JBTextField
+import com.intellij.ui.components.fields.ExtendableTextComponent
+import com.intellij.ui.components.fields.ExtendableTextField
 import com.intellij.ui.table.JBTable
+import com.intellij.util.EnvironmentUtil
 import com.intellij.util.ui.AbstractTableCellEditor
 import com.intellij.util.ui.GridBag
 import com.intellij.util.ui.JBEmptyBorder
@@ -20,12 +49,21 @@ import java.awt.Component
 import java.awt.Dimension
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
+import java.awt.event.InputEvent
+import java.awt.event.KeyEvent
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import javax.swing.BorderFactory
 import javax.swing.Box
+import javax.swing.BoxLayout
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JTable
+import javax.swing.KeyStroke
 import javax.swing.ListSelectionModel
 import javax.swing.ScrollPaneConstants
 import javax.swing.SwingConstants
@@ -269,4 +307,215 @@ class BooleanPropertyEditor(property:KMutableProperty0<Boolean>,
 		set(value) {
 			checkBox.isSelected = value
 		}
+}
+
+class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPropertyEditor<String>(property) {
+
+	private val minJavaVersion = 8
+	private val minJavaVersionSdk = JavaSdkVersion.JDK_1_8
+	private val maxJavaVersionHint = 13
+
+	private val javaSdkType = JavaSdk.getInstance()
+	private val possibleJavaSdkList = ProjectJdkTable.getInstance().getSdksOfType(javaSdkType)
+			.filter { javaSdkType.isOfVersionOrHigher(it, minJavaVersionSdk) && it.homePath != null } // Intentionally allowing JREs
+
+	private val panel0JavaFromPath = JBLabel("").apply { verticalAlignment = SwingConstants.CENTER }
+
+	init {
+		ProgressManager.getInstance().run(object : Task.Backgroundable(null, "Check which Java is on PATH", false, PerformInBackgroundOption.ALWAYS_BACKGROUND) {
+			override fun run(indicator: ProgressIndicator) {
+				val process = ProcessBuilder("command", "-v", "java").run {
+					environment().putAll(EnvironmentUtil.getEnvironmentMap())
+					redirectError(ProcessBuilder.Redirect.PIPE)
+					redirectOutput(ProcessBuilder.Redirect.PIPE)
+					redirectInput(ProcessBuilder.Redirect.PIPE)
+					start()
+				}
+				process.errorStream.close()
+				process.outputStream.close()
+				val javaPath = process.inputStream.bufferedReader(Charsets.UTF_8).use {
+					it.readLine()
+				}
+				try {
+					process.waitFor(1000, TimeUnit.MILLISECONDS)
+				} catch (ignored:InterruptedException) {}
+
+				if (process.isAlive) {
+					process.destroyForcibly()
+				}
+				if (!process.isAlive && process.exitValue() == 0 && javaPath.isNotBlank()) {
+					ApplicationManager.getApplication().invokeLater({
+						panel0JavaFromPath.text = " (currently $javaPath)"
+					}, ModalityState.any())
+				}
+			}
+		})
+	}
+
+	private val panel1JavaFromPath = JBIntSpinner(maxJavaVersionHint, minJavaVersion, Integer.MAX_VALUE, 1)
+	// NOTE: Other editors use JrePathEditor here, but I don't understand its API
+	private val panel2JavaFromSdk = JdkComboBox(ProjectSdksModel().apply {
+		for (sdk in possibleJavaSdkList) {
+			addSdk(sdk)
+		}
+	})
+	private val panel3JavaCustom = run {
+		val textField = ExtendableTextField()
+
+		// TODO(jp): Use BrowseFolderRunnable if it ever stabilizes
+		val action = Runnable {
+			val fileChooserDescriptor = FileChooserDescriptor(false, true, false, false, false, false)
+			fileChooserDescriptor.title = "Select JRE"
+			fileChooserDescriptor.description = "Select directory with JRE to run Wemi with"
+
+			FileChooser.chooseFile(fileChooserDescriptor, null, textField, findInitialFile(textField.text)) { chosenFile: VirtualFile? ->
+				textField.text = chosenFile?.presentableUrl ?: ""
+			}
+		}
+
+		val keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK)
+		val browseExtension = ExtendableTextComponent.Extension.create(AllIcons.General.OpenDisk, AllIcons.General.OpenDiskHover, "Browse (" + KeymapUtil.getKeystrokeText(keyStroke) + ")", action)
+
+		object : DumbAwareAction() {
+			override fun actionPerformed(e: AnActionEvent) {
+				action.run()
+			}
+		}.registerCustomShortcutSet(CustomShortcutSet(keyStroke), textField)
+		textField.addExtension(browseExtension)
+
+		textField
+	}
+
+	private fun panelWrap(label:String, c:JComponent, center:Boolean = false):JComponent {
+		return JPanel().apply {
+			layout = BoxLayout(this, BoxLayout.LINE_AXIS)
+			if (center) {
+				add(Box.createHorizontalGlue())
+			}
+
+			add(JBLabel(label).apply {
+				verticalAlignment = SwingConstants.CENTER
+				alignmentY = Component.CENTER_ALIGNMENT
+			})
+			c.alignmentY = Component.CENTER_ALIGNMENT
+			add(c)
+
+			if (center) {
+				add(Box.createHorizontalGlue())
+			}
+
+			background = JBUI.CurrentTheme.CustomFrameDecorations.titlePaneBackground()
+			border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+		}
+	}
+
+	private val panel = object : JBTabbedPane(JBTabbedPane.TOP), UserActivityProviderComponent {
+
+	}.apply {
+		addTab("From PATH", panelWrap("Using Java on PATH", panel0JavaFromPath, center = true))
+		addTab("Specific version", panelWrap("Java version: ", panel1JavaFromPath, center = true))
+		addTab("SDK", panelWrap("JRE/JDK:", panel2JavaFromSdk))
+		addTab("Custom", panelWrap("JRE/JDK/Java executable:", panel3JavaCustom))
+
+		border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground(), 1, true), "Java Executable")
+	}
+
+	override val component: JComponent = panel
+
+	override var componentValue: String
+		get() = when (panel.selectedIndex) {
+			0 -> "" // From PATH
+			1 -> panel1JavaFromPath.number.toString()
+			2 -> panel2JavaFromSdk.selectedJdk?.let { sdk ->
+				javaFromSdk(sdk)?.toString()
+			}
+			3 -> findExistingFileFromAlternatives(Paths.get(panel3JavaCustom.text), "java", "java.exe", "bin/java", "bin/java.exe")?.toString()
+			else -> null
+		} ?: ""
+		set(value) {
+			if (value.isBlank()) {
+				panel.selectedIndex = 0
+				return
+			}
+			val version = value.toIntOrNull()
+			if (version != null) {
+				panel.selectedIndex = 1
+				panel1JavaFromPath.number = version
+				return
+			}
+			var path = Paths.get(value)
+			if (path.endsWith("bin/java") || path.endsWith("bin/java.exe")) {
+				path = path.parent.parent
+			}
+
+			val realPath = try { path.toRealPath() } catch(e: IOException) { path.toAbsolutePath() }
+			val sdk = possibleJavaSdkList.find {
+				val sdkPath = Paths.get(it.homePath ?: return@find false)
+				val sdkRealPath = try { sdkPath.toRealPath() } catch(e: IOException) { sdkPath.toAbsolutePath() }
+				realPath.startsWith(sdkRealPath)
+			}
+
+			if (sdk != null) {
+				panel.selectedIndex = 2
+				panel2JavaFromSdk.selectedJdk = sdk
+				panel3JavaCustom.text = javaFromSdk(sdk)?.toString() ?: ""
+				return
+			}
+
+			panel.selectedIndex = 3
+			panel3JavaCustom.text = value
+		}
+
+	private fun findInitialFile(path:String?):VirtualFile? {
+		if (path == null || path.isBlank()) {
+			return null
+		}
+
+		var directoryName = FileUtil.toSystemIndependentName(path.trim())
+		var resultPath = LocalFileSystem.getInstance().findFileByPath(directoryName)
+		while (resultPath == null && directoryName.isNotEmpty()) {
+			val pos = directoryName.lastIndexOf('/')
+			if (pos <= 0) break
+			directoryName = directoryName.substring(0, pos)
+			resultPath = LocalFileSystem.getInstance().findFileByPath(directoryName)
+		}
+		return resultPath
+	}
+
+	private fun findExistingFileFromAlternatives(base:Path, vararg alternatives:String): Path? {
+		for (s in alternatives) {
+			val f = base.resolve(s)
+			if (Files.exists(f)) {
+				return f.toAbsolutePath()
+			}
+		}
+		return null
+	}
+
+	private fun javaFromSdk(sdk: Sdk):Path? {
+		return findExistingFileFromAlternatives(Paths.get(javaSdkType.getBinPath(sdk)), "java", "java.exe")
+	}
+}
+
+class CommandArgumentEditor(property:KMutableProperty0<List<String>>) : AbstractPropertyEditor<List<String>>(property) {
+
+	private val splitPattern = Pattern.compile("\\s+")
+
+	override val component: RawCommandLineEditor = RawCommandLineEditor().apply {
+		border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground(), 1, true), "Java Options")
+	}
+
+	override var componentValue: List<String>
+		get() {
+			val text = component.text.trim()
+			if (text.isBlank()) {
+				return emptyList()
+			} else {
+				return text.split(splitPattern)
+			}
+		}
+		set(value) {
+			component.text = value.joinToString(" ")
+		}
+
 }
