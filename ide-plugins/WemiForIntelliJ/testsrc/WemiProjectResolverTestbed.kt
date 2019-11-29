@@ -69,12 +69,8 @@ fun main(args: Array<String>) {
             System.err.println("onStart: $id $workingDir")
         }
 
-        override fun onQueued(id: ExternalSystemTaskId, workingDir: String?) {
-            System.err.println("DEPRECATED: onQueued: $id $workingDir")
-        }
-
         override fun onStart(id: ExternalSystemTaskId) {
-            System.err.println("DEPRECATED: onStart: $id")
+            TODO("not implemented")
         }
     }
     val project = resolver.resolveProjectInfo(taskId,

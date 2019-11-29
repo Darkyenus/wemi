@@ -17,7 +17,6 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.Key
 import com.intellij.util.xmlb.annotations.Tag
 import icons.WemiIcons
-import org.jdom.Element
 import org.jetbrains.concurrency.AsyncPromise
 import org.jetbrains.concurrency.Promise
 import javax.swing.JComponent
@@ -28,20 +27,6 @@ val WemiBeforeRunTaskKey = Key.create<WemiBeforeRunTask>("Wemi.BeforeRunTask")
 class WemiBeforeRunTask : BeforeRunTask<WemiBeforeRunTask>(WemiBeforeRunTaskKey), PersistentStateComponent<WemiBeforeRunTask.BeforeRunOptions> {
 
 	var options = BeforeRunOptions()
-
-	@Suppress("DEPRECATION")
-	override fun readExternal(element: Element) {
-		super.readExternal(element)
-		options = BeforeRunOptions().apply {
-			readExternal(element)
-		}
-	}
-
-	@Suppress("DEPRECATION")
-	override fun writeExternal(element: Element) {
-		super.writeExternal(element)
-		options.writeExternal(element)
-	}
 
 	override fun getState(): BeforeRunOptions? = options
 
@@ -123,12 +108,6 @@ class WemiBeforeRunTaskProvider(private val project: Project) : BeforeRunTaskPro
 	override fun createTask(runConfiguration: RunConfiguration): WemiBeforeRunTask? {
 		// NOTE: Creating Wemi before run tasks is intentionally allowed for chains with other tasks
 		return WemiBeforeRunTask()
-	}
-
-	override fun configureTask(runConfiguration: RunConfiguration, task: WemiBeforeRunTask): Boolean {
-		val dialog = EditBeforeRunDialog(project, task.options)
-		dialog.isModal = true
-		return dialog.showAndGet()
 	}
 
 	override fun configureTask(context: DataContext, configuration: RunConfiguration, task: WemiBeforeRunTask): Promise<Boolean> {

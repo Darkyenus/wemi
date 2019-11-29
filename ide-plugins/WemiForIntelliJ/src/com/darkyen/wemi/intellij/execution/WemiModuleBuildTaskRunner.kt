@@ -1,7 +1,5 @@
 package com.darkyen.wemi.intellij.execution
 
-import com.darkyen.wemi.intellij.execution.WemiProgramRunner
-import com.darkyen.wemi.intellij.execution.WemiTaskConfigurationType
 import com.darkyen.wemi.intellij.module.WemiModuleComponent
 import com.darkyen.wemi.intellij.module.WemiModuleType
 import com.intellij.execution.RunManager
@@ -13,9 +11,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.task.ModuleBuildTask
 import com.intellij.task.ProjectTask
 import com.intellij.task.ProjectTaskContext
-import com.intellij.task.ProjectTaskNotification
-import com.intellij.task.ProjectTaskResult
 import com.intellij.task.ProjectTaskRunner
+import org.jetbrains.concurrency.Promise
+import org.jetbrains.concurrency.resolvedPromise
 
 /**
  * Catches requests to build modules/project and handles them.
@@ -25,8 +23,7 @@ class WemiModuleBuildTaskRunner : ProjectTaskRunner() {
 
     private val LOG = Logger.getInstance("#com.darkyen.wemi.intellij.compilerIntegration.WemiProjectTaskRunner")
 
-    override fun run(project: Project, context: ProjectTaskContext,
-                     callback: ProjectTaskNotification?, tasks: MutableCollection<out ProjectTask>) {
+    override fun run(project: Project, context: ProjectTaskContext, vararg tasks: ProjectTask?): Promise<Result> {
         var compileBuildScript = false
         val projectsToCompile = ArrayList<String>()
 
@@ -49,8 +46,11 @@ class WemiModuleBuildTaskRunner : ProjectTaskRunner() {
 
         val configuration = WemiTaskConfigurationType.INSTANCE.taskConfigurationFactory.createTemplateConfiguration(project)
         if (projectsToCompile.isEmpty() && !compileBuildScript) {
-            callback?.finished(ProjectTaskResult(false, 0, 0))
-            return
+            return resolvedPromise(object : Result {
+                override fun hasErrors(): Boolean = false
+
+                override fun isAborted(): Boolean = false
+            })
         }
         configuration.options.tasks = projectsToCompile.map { arrayOf("$it/compile") }
         configuration.useSuggestedName()
@@ -61,7 +61,11 @@ class WemiModuleBuildTaskRunner : ProjectTaskRunner() {
         environment.assignNewExecutionId()
 
         val result = RunConfigurationBeforeRunProvider.doRunTask(executor.id, environment, runner)
-        callback?.finished(ProjectTaskResult(false, if (result) 0 else 1, 0))
+        return resolvedPromise(object : Result {
+            override fun hasErrors(): Boolean = !result
+
+            override fun isAborted(): Boolean = false
+        })
     }
 
     override fun canRun(projectTask: ProjectTask): Boolean {

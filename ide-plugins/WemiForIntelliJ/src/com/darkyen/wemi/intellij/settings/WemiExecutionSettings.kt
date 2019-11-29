@@ -1,9 +1,7 @@
 package com.darkyen.wemi.intellij.settings
 
 import com.darkyen.wemi.intellij.WemiLauncher
-import com.darkyen.wemi.intellij.execution.WemiTaskConfiguration
 import com.intellij.openapi.externalSystem.model.settings.ExternalSystemExecutionSettings
-import com.intellij.openapi.util.Key
 import java.nio.file.Paths
 
 /**
@@ -42,13 +40,5 @@ class WemiExecutionSettings(val wemiLauncher: String?,
     fun prefixConfigurationsArray():Array<String> = when {
         prefixConfigurations.isBlank() -> emptyArray()
         else -> prefixConfigurations.split(':').toTypedArray()
-    }
-
-    override fun <U : Any?> putUserData(key: Key<U>, value: U?) {
-        if (key == WemiTaskConfiguration.EXECUTION_DEFER_DEBUG_TO_WEMI) {
-            deferDebugToWemi = value as? Boolean
-        } else {
-            super.putUserData(key, value)
-        }
     }
 }

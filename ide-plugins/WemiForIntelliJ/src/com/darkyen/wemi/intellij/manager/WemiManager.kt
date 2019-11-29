@@ -33,7 +33,6 @@ import com.intellij.openapi.vfs.CharsetToolkit
 import com.intellij.util.Function
 import com.intellij.util.PathUtil
 import com.intellij.util.containers.ContainerUtil
-import com.intellij.util.containers.ContainerUtilRt
 import icons.WemiIcons
 import java.nio.file.Paths
 
@@ -134,8 +133,8 @@ class WemiManager : ExternalSystemUiAware,
         // Add Kotlin runtime. This is a workaround because at the moment RemoteExternalSystemCommunicationManager
         // has classpath without Kotlin and cannot call ProjectResolver
         val additionalClasspath = mutableListOf<String>()
-        ContainerUtilRt.addIfNotNull(additionalClasspath, PathUtil.getJarPathForClass(Unit::class.java))
-        ContainerUtilRt.addIfNotNull(additionalClasspath, PathUtil.getJarPathForClass(JsonReader::class.java))
+        ContainerUtil.addIfNotNull(additionalClasspath, PathUtil.getJarPathForClass(Unit::class.java))
+        ContainerUtil.addIfNotNull(additionalClasspath, PathUtil.getJarPathForClass(JsonReader::class.java))
         parameters.classPath.addAll(additionalClasspath)
         parameters.charset = CharsetToolkit.UTF8_CHARSET
         parameters.vmParametersList.addProperty("file.encoding", CharsetToolkit.UTF8)

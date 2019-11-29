@@ -51,7 +51,7 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
 
         fun reinstallWemiLauncher(project:Project, failNotificationTitle:String):Pair<Path, WemiLauncher>? {
             val wemiLauncherStream: InputStream? = InstallWemiLauncherAction::class.java.classLoader
-                    .getResourceAsStream("wemi-launcher")
+                    .getResourceAsStream("wemi-launcher.sh")
 
             if (wemiLauncherStream == null) {
                 LOG.error("wemi-launcher resource does not exist")
@@ -78,7 +78,7 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
                     }
                 }
             } catch (e:Exception) {
-                LOG.error("Failed to copy Wemi binary to $wemiLauncherPath", e)
+                LOG.error("Failed to copy Wemi launcher to $wemiLauncherPath", e)
                 WemiNotificationGroup.showBalloon(project, failNotificationTitle,
                         "Failed to create \"wemi\" file",
                         NotificationType.ERROR)
@@ -91,7 +91,7 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
                 options.add(PosixFilePermission.OTHERS_EXECUTE)
                 Files.setPosixFilePermissions(wemiLauncherPath, options)
             } catch (e:Exception) {
-                LOG.error("Failed to make Wemi binary ($wemiLauncherPath) executable", e)
+                LOG.error("Failed to make Wemi launcher ($wemiLauncherPath) executable", e)
                 WemiNotificationGroup.showBalloon(project, failNotificationTitle,
                         "Failed to make \"wemi\" launcher executable, you may need to make it manually",
                         NotificationType.WARNING)

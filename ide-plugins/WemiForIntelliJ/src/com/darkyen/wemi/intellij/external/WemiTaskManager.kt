@@ -2,7 +2,6 @@ package com.darkyen.wemi.intellij.external
 
 import com.darkyen.wemi.intellij.ExternalStatusTracker
 import com.darkyen.wemi.intellij.WemiLauncherSession
-import com.darkyen.wemi.intellij.execution.WemiTaskConfiguration
 import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
 import com.darkyen.wemi.intellij.util.LineReadingOutputStream
 import com.intellij.openapi.externalSystem.model.ExternalSystemException
@@ -67,7 +66,9 @@ class WemiTaskManager : ExternalSystemTaskManager<WemiExecutionSettings> {
                 if (matcher.matches()) {
                     val port = matcher.group(1)
 
-                    env[WemiTaskConfiguration.WEMI_FORCE_DEBUG_IN_RUN_ENV] = port
+                    // Setting this environment variable to a number will cause ./wemi run and other tasks
+                    // to be launched with a debugger that is suspended until it connects to this port.
+                    env["WEMI_RUN_DEBUG_PORT"] = port
                     jvmAgent = null
                 } else {
                     listener.onTaskOutput(id, "WEMI: Wanted to defer debug, but failed to extract port from: $jvmAgent\n", false)

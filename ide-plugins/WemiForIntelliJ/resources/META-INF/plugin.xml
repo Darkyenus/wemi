@@ -27,7 +27,7 @@
     </change-notes>
 
     <!-- http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html -->
-    <idea-version since-build="191"/>
+    <idea-version since-build="192.6603"/>
 
     <!--  http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
@@ -113,7 +113,7 @@
         <!-- File -->
         <fileIconProvider id="wemi-script-file" order="first" implementation="com.darkyen.wemi.intellij.file.ScriptIconProvider"/>
         <iconProvider id="wemi-script-file" order="first" implementation="com.darkyen.wemi.intellij.file.ScriptIconProvider"/>
-        <fileTypeFactory implementation="com.darkyen.wemi.intellij.file.WemiFileTypeFactory"/>
+        <fileType name="Wemi Launcher" implementationClass="com.darkyen.wemi.intellij.file.WemiLauncherFileType" fieldName="INSTANCE" fileNames="wemi" fileNamesCaseInsensitive="wemi"/>
 
         <!-- Terminal highlighting -->
         <consoleFilterProvider implementation="com.darkyen.wemi.intellij.util.WemiTerminalFilterProvider"/>

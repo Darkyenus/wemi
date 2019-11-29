@@ -33,11 +33,9 @@ import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ProgramRunner
 import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.options.SettingsEditorGroup
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Key
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
 import com.intellij.refactoring.listeners.RefactoringElementListener
@@ -321,32 +319,5 @@ class WemiTaskConfiguration(
             result = 31 * result + debugWemiItself.hashCode()
             return result
         }
-    }
-
-    companion object {
-
-        /**
-         * If true, debug (through vmParameters) should not be applied to the Wemi process but to the processes launched by Wemi.
-         */
-        @Deprecated("solved differently")
-        val EXECUTION_DEFER_DEBUG_TO_WEMI = Key.create<Boolean>("EXECUTION_DEFER_DEBUG_TO_WEMI")
-
-        /**
-         * Value to which [ExternalSystemTaskExecutionSettings.getScriptParameters] is set,
-         * if debug agent should not be applied to the Wemi launcher directly.
-         *
-         * Then, if, for example, 'run' task is executed with the debugger enabled, IDE will connect to the project
-         * that is being run, not to the Wemi launcher which runs it.
-         *
-         * In that case, IDE will launch Wemi with environment variable [WEMI_FORCE_DEBUG_IN_RUN_ENV]
-         * (= "WEMI_RUN_DEBUG_PORT") so that the project can be run with the debugger on the correct port.
-         */
-        @Deprecated("solved differently")
-        const val WEMI_CONFIGURATION_ARGUMENT_SUPPRESS_DEBUG = "wemi.defer-debug"
-
-        /** Setting this environment variable to a number will cause ./wemi run and other tasks to be launched with
-         * a debugger that is suspended until it connects to this port. */
-        @Deprecated("solved differently, move elsewhere")
-        const val WEMI_FORCE_DEBUG_IN_RUN_ENV = "WEMI_RUN_DEBUG_PORT"
     }
 }
