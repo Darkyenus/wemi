@@ -1,8 +1,15 @@
 package com.darkyen.wemi.intellij.importing.actions
 
-import com.darkyen.wemi.intellij.*
-import com.darkyen.wemi.intellij.importing.actions.ImportProjectAction.Companion.canOfferImportOfUnlinkedProject
+import com.darkyen.wemi.intellij.WemiBuildDirectoryName
+import com.darkyen.wemi.intellij.WemiBuildFileExtensions
+import com.darkyen.wemi.intellij.WemiNotificationGroup
 import com.darkyen.wemi.intellij.importing.actions.ImportProjectAction.Companion.importUnlinkedProject
+import com.darkyen.wemi.intellij.importing.allWemiModules
+import com.darkyen.wemi.intellij.importing.defaultWemiRootPathFor
+import com.darkyen.wemi.intellij.importing.hasNonWemiLinkedModules
+import com.darkyen.wemi.intellij.importing.isImportable
+import com.darkyen.wemi.intellij.importing.reinstallWemiLauncher
+import com.darkyen.wemi.intellij.showBalloon
 import com.darkyen.wemi.intellij.util.toPath
 import com.intellij.jarRepository.RepositoryLibraryType
 import com.intellij.notification.NotificationType
@@ -10,16 +17,22 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.module.Module
-import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.project.rootManager
-import com.intellij.openapi.roots.*
+import com.intellij.openapi.roots.DependencyScope
+import com.intellij.openapi.roots.JdkOrderEntry
+import com.intellij.openapi.roots.LibraryOrderEntry
+import com.intellij.openapi.roots.ModuleOrderEntry
+import com.intellij.openapi.roots.ModuleRootManager
+import com.intellij.openapi.roots.ModuleSourceOrderEntry
+import com.intellij.openapi.roots.OrderRootType
 import com.intellij.openapi.roots.impl.libraries.LibraryEx
+import com.intellij.openapi.vfs.LocalFileSystem
 import icons.WemiIcons
 import org.jetbrains.idea.maven.utils.library.RepositoryLibraryProperties
 import org.jetbrains.jps.model.java.JavaResourceRootType
 import org.jetbrains.jps.model.java.JavaSourceRootType
+import java.io.IOException
 import java.net.InetAddress
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -33,20 +46,41 @@ import java.nio.file.Path
 class ConvertProjectAction : AnAction("Convert to Wemi Project",
         "Convert project from different or no build system to Wemi", WemiIcons.ACTION) {
 
+    override fun update(e: AnActionEvent) {
+        val project = e.project
+        e.presentation.isEnabledAndVisible = project != null && isImportable(project) && hasNonWemiLinkedModules(project)
+    }
+
+    private fun Path.resolveNew(name:String, extension:String):Path {
+        for (i in -1..100) {
+            val resolved = when (i) {
+                -1 -> this.resolve("$name.$extension")
+                0 -> this.resolve("$name-converted.$extension")
+                else -> this.resolve("$name-converted-$i.$extension")
+            }
+
+            if (!Files.exists(resolved)) {
+                return resolved
+            }
+        }
+
+        throw IOException("There is too many build scripts in $this")
+    }
+
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project
-        if (project == null || !canOfferImportOfUnlinkedProject(project) || findWemiLauncher(project) != null) {
+        if (project == null || !(isImportable(project) && hasNonWemiLinkedModules(project))) {
             e.presentation.isEnabledAndVisible = false
             return
         }
 
-        val (projectBasePath, wemiLauncher) = InstallWemiLauncherAction.reinstallWemiLauncher(project, "Could not convert to Wemi")
+        val (projectBasePath, wemiLauncher) = reinstallWemiLauncher(defaultWemiRootPathFor(project) ?: return, "Could not convert to Wemi", project)
                 ?: return
 
 
         val buildDirectory = projectBasePath.resolve(WemiBuildDirectoryName)
         try {
-            if (!Files.exists(buildDirectory)) Files.createDirectory(buildDirectory)
+            Files.createDirectories(buildDirectory)
         } catch (e:Exception) {
             LOG.error("Failed to create build directory in $buildDirectory", e)
             WemiNotificationGroup.showBalloon(project,
@@ -56,26 +90,25 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
             return
         }
 
-        val buildScriptFile = buildDirectory.resolve("build.kt")
-        if (!Files.exists(buildScriptFile)) {
-            try {
-                createBuildScript(buildScriptFile, projectBasePath, project)
-            } catch (e:Exception) {
-                LOG.error("Failed to generate build script to $buildScriptFile", e)
-                WemiNotificationGroup.showBalloon(project,
-                        "Could not convert to Wemi",
-                        "Failed to generate \"build/build.kt\" script",
-                        NotificationType.ERROR)
-                return
-            }
+        val buildScriptFile = buildDirectory.resolveNew("build", WemiBuildFileExtensions.first())
+        try {
+            createBuildScript(buildScriptFile, projectBasePath, project)
+        } catch (e:Exception) {
+            LOG.error("Failed to generate build script to $buildScriptFile", e)
+            WemiNotificationGroup.showBalloon(project,
+                    "Could not convert to Wemi",
+                    "Failed to generate \"build/build.kt\" script",
+                    NotificationType.ERROR)
+            return
         }
 
-        project.guessProjectDir()?.refresh(true, true)
+        LocalFileSystem.getInstance().refreshAndFindFileByPath(projectBasePath.toAbsolutePath().toString())?.refresh(true, true)
+
         importUnlinkedProject(project, wemiLauncher)
     }
 
     private fun createBuildScript(file: Path, projectRoot:Path, project:Project) {
-        val modules = ModuleManager.getInstance(project).modules
+        val modules = allWemiModules(project, wemiModules = false).toList()
 
         val projectName = project.name
         val projectNameIdentifier = projectName.toIdentifier(PROJECT_PREFIX)
@@ -353,14 +386,6 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
             } else result?.append(c)
         }
         return result ?: this
-    }
-
-    override fun update(e: AnActionEvent) {
-        val project = e.project
-        e.presentation.isEnabledAndVisible =
-                project != null
-                && canOfferImportOfUnlinkedProject(project)
-                && findWemiLauncher(project) == null
     }
 
     companion object {

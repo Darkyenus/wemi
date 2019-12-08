@@ -1,14 +1,14 @@
 package com.darkyen.wemi.intellij.projectImport
 
 import com.darkyen.wemi.intellij.findWemiLauncher
-import com.darkyen.wemi.intellij.importing.actions.InstallWemiLauncherAction
+import com.darkyen.wemi.intellij.importing.reinstallWemiLauncher
+import com.darkyen.wemi.intellij.options.ProjectImportOptions
 import com.darkyen.wemi.intellij.util.getWemiCompatibleSdk
 import com.intellij.ide.util.projectWizard.WizardContext
 import com.intellij.openapi.module.ModifiableModuleModel
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.options.ConfigurationException
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.projectRoots.JavaSdkType
 import com.intellij.openapi.projectRoots.SdkTypeId
 import com.intellij.openapi.roots.ui.configuration.ModulesProvider
@@ -24,8 +24,6 @@ import java.nio.file.Paths
  */
 class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
 
-    val control by lazy { ImportFromWemiControl() }
-
     private var projectNode: ProjectNode? = null
 
     override fun getName() = "Wemi"
@@ -33,11 +31,6 @@ class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
     override fun getIcon() = WemiIcons.ACTION
 
     override fun setOpenProjectSettingsAfter(on: Boolean) {}
-
-    fun prepare(context: WizardContext) {
-        context.projectJdk = context.projectJdk ?: getWemiCompatibleSdk()
-        control.reset(context, null)
-    }
 
     override fun isSuitableSdkType(sdkType: SdkTypeId?): Boolean {
         return sdkType is JavaSdkType && !(sdkType as JavaSdkType).isDependent
@@ -54,13 +47,15 @@ class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
      * @throws ConfigurationException   if external project is not defined and can't be constructed
      */
     @Throws(ConfigurationException::class)
-    fun ensureProjectIsDefined(wizardContext: WizardContext) {
-        val project = wizardContext.project ?: ProjectManager.getInstance().defaultProject
-        val launcher = findWemiLauncher(project)
-                ?: InstallWemiLauncherAction.reinstallWemiLauncher(Paths.get(wizardContext.projectFileDirectory), "Failed to put Wemi launcher in the project directory", project)?.second
+    fun ensureProjectIsDefined(wizardContext: WizardContext, projectImportOptions:ProjectImportOptions) {
+        val project = wizardContext.project
+
+        val projectFileDirectory = Paths.get(wizardContext.projectFileDirectory)
+        val launcher = findWemiLauncher(projectFileDirectory)
+                ?: reinstallWemiLauncher(projectFileDirectory, "Failed to put Wemi launcher in the project directory", project)?.second
                 ?: return
 
-        val projectNode:ProjectNode = refreshProject(project, launcher, control.getProjectImportOptions()).get()
+        val projectNode:ProjectNode = refreshProject(project, launcher, projectImportOptions).get()
         this.projectNode = projectNode
 
         wizardContext.projectName = projectNode.name

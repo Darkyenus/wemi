@@ -28,7 +28,6 @@ import com.intellij.concurrency.AsyncFuture
 import com.intellij.concurrency.AsyncFutureFactory
 import com.intellij.icons.AllIcons
 import com.intellij.notification.NotificationType
-import com.intellij.openapi.components.ServiceManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.PerformInBackgroundOption
 import com.intellij.openapi.progress.ProgressIndicator
@@ -47,19 +46,23 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 /** Start project import process. */
-fun refreshProject(project: Project, launcher: WemiLauncher, options: ProjectImportOptions) : AsyncFuture<ProjectNode> {
+fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectImportOptions) : AsyncFuture<ProjectNode> {
 	val futureResult = AsyncFutureFactory.getInstance().createAsyncFutureResult<ProjectNode>()
 
 	object : Task.Backgroundable(project, "Importing Wemi Project", true, PerformInBackgroundOption.DEAF) {
 
 		override fun run(indicator: ProgressIndicator) {
-			DumbService.getInstance(project).suspendIndexingAndRun(title) {
+			if (project == null) {
 				executeImpl(indicator)
+			} else {
+				DumbService.getInstance(project).suspendIndexingAndRun(title) {
+					executeImpl(indicator)
+				}
 			}
 		}
 
 		private fun executeImpl(indicator: ProgressIndicator) {
-			if (project.isDisposed || indicator.isCanceled) {
+			if (project?.isDisposed == true || indicator.isCanceled) {
 				futureResult.cancel(true)
 				return
 			}
@@ -67,7 +70,7 @@ fun refreshProject(project: Project, launcher: WemiLauncher, options: ProjectImp
 			val importTracker = object : SessionActivityTracker {
 
 				private val buildId = "WemiImportProject${System.nanoTime()}"
-				private val syncViewManager = ServiceManager.getService(project, SyncViewManager::class.java)
+				private val syncViewManager = project?.getService(SyncViewManager::class.java)
 				private val buildProcessHandler = object : BuildProcessHandler() {
 
 					override fun getProcessInput(): OutputStream? = null
@@ -76,13 +79,9 @@ fun refreshProject(project: Project, launcher: WemiLauncher, options: ProjectImp
 
 					override fun getExecutionName(): String = "Wemi Project Resolution"
 
-					override fun detachProcessImpl() {
-						TODO("not implemented")
-					}
+					override fun detachProcessImpl() {}
 
-					override fun destroyProcessImpl() {
-						TODO("not implemented")
-					}
+					override fun destroyProcessImpl() {}
 				}
 
 				override fun sessionOutput(text: String, outputType: Key<*>) {
@@ -97,8 +96,8 @@ fun refreshProject(project: Project, launcher: WemiLauncher, options: ProjectImp
 
 				fun importBegin() {
 					checkIfCancelled()
-					syncViewManager.onEvent(buildId,
-							StartBuildEventImpl(DefaultBuildDescriptor(buildId, project.name, launcher.file.parent.toString(), System.currentTimeMillis()), "Importing Wemi Project...")
+					syncViewManager?.onEvent(buildId,
+							StartBuildEventImpl(DefaultBuildDescriptor(buildId, project?.name ?: "Wemi Project", launcher.file.parent.toString(), System.currentTimeMillis()), "Importing Wemi Project...")
 									.withProcessHandler(buildProcessHandler, null)
 									.withRestartAction(ReloadProjectAction().apply {
 										templatePresentation.icon = AllIcons.Actions.Refresh
@@ -121,19 +120,19 @@ fun refreshProject(project: Project, launcher: WemiLauncher, options: ProjectImp
 				}
 
 				fun importSuccess() {
-					syncViewManager.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Done", SuccessResultImpl()))
+					syncViewManager?.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Done", SuccessResultImpl()))
 
 					WemiNotificationGroup.showBalloon(project, "Wemi - Success", "Project imported successfully", NotificationType.INFORMATION)
 				}
 
 				fun importFailure(e: Exception) {
-					syncViewManager.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Failed", FailureResultImpl("Failed to import Wemi project", e)))
+					syncViewManager?.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Failed", FailureResultImpl("Failed to import Wemi project", e)))
 
 					WemiNotificationGroup.showBalloon(project, "Wemi - Failure", "Failed to import the project", NotificationType.WARNING)
 				}
 
 				fun importCancelled() {
-					syncViewManager.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Cancelled", FailureResultImpl("Import was cancelled")))
+					syncViewManager?.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Cancelled", FailureResultImpl("Import was cancelled")))
 				}
 
 				private val stageStack = ArrayList<String>()
@@ -144,7 +143,7 @@ fun refreshProject(project: Project, launcher: WemiLauncher, options: ProjectImp
 					checkIfCancelled()
 					stageStack.add(name)
 					stageTasksStack.add(0)
-					syncViewManager.onEvent(buildId, ProgressBuildEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name, -1, 0, "tasks"))
+					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name, -1, 0, "tasks"))
 				}
 
 				override fun stageEnd() {
@@ -155,13 +154,13 @@ fun refreshProject(project: Project, launcher: WemiLauncher, options: ProjectImp
 					}
 					val last = stageStack.removeAt(stageStack.lastIndex)
 					val taskCount = stageTasksStack.remove(stageTasksStack.size() - 1)
-					syncViewManager.onEvent(buildId, ProgressBuildEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, taskCount.toLong(), taskCount.toLong(), "tasks"))
+					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, taskCount.toLong(), taskCount.toLong(), "tasks"))
 				}
 
 				override fun taskBegin(name: String) {
 					checkIfCancelled()
 					taskStack.add(name)
-					syncViewManager.onEvent(buildId, ProgressBuildEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name, 100, 0, "%"))
+					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name, 100, 0, "%"))
 				}
 
 				override fun taskEnd() {
@@ -171,14 +170,14 @@ fun refreshProject(project: Project, launcher: WemiLauncher, options: ProjectImp
 						return
 					}
 					val last = taskStack.removeAt(taskStack.lastIndex)
-					syncViewManager.onEvent(buildId, ProgressBuildEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, 100, 100, "%"))
+					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, 100, 100, "%"))
 
 					if (stageStack.isNotEmpty()) {
 						val index = stageStack.lastIndex
 						val activeStage = stageStack[index]
 						val newTaskCount = stageTasksStack.get(index) + 1
 						stageTasksStack.setQuick(index, newTaskCount)
-						syncViewManager.onEvent(buildId, ProgressBuildEventImpl(activeStage, stageStack.getOrNull(index - 1), System.currentTimeMillis(), activeStage, newTaskCount.toLong(), newTaskCount.toLong(), "tasks"))
+						syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(activeStage, stageStack.getOrNull(index - 1), System.currentTimeMillis(), activeStage, newTaskCount.toLong(), newTaskCount.toLong(), "tasks"))
 					}
 				}
 
@@ -198,7 +197,7 @@ fun refreshProject(project: Project, launcher: WemiLauncher, options: ProjectImp
 				error = e
 				LOG.warn("Wemi [${launcher.file}] project resolution failed after ${System.currentTimeMillis() - startMs} ms", e)
 			} finally {
-				if (project.isDisposed) {
+				if (project?.isDisposed == true) {
 					futureResult.cancel(true)
 				} else if (result != null) {
 					importTracker.importSuccess()

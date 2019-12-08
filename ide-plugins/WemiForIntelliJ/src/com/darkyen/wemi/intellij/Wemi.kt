@@ -1,10 +1,13 @@
 package com.darkyen.wemi.intellij
 
+import com.darkyen.wemi.intellij.file.isWemiLauncher
+import com.darkyen.wemi.intellij.file.isWemiScriptSource
 import com.darkyen.wemi.intellij.options.RunOptions
 import com.darkyen.wemi.intellij.options.WemiLauncherOptions
 import com.darkyen.wemi.intellij.util.OSProcessHandlerForWemi
 import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.collectOutputAndKill
+import com.darkyen.wemi.intellij.util.executable
 import com.darkyen.wemi.intellij.util.toPath
 import com.esotericsoftware.jsonbeans.JsonException
 import com.esotericsoftware.jsonbeans.JsonReader
@@ -17,6 +20,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.StreamUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.EnvironmentUtil
 import com.pty4j.PtyProcessBuilder
@@ -43,8 +47,44 @@ const val WemiLauncherFileName = "wemi"
 
 const val WemiBuildDirectoryName = "build"
 
+/** Given any Wemi related file, return the root of the Wemi project. */
+fun wemiDirectoryToImport(base: VirtualFile): VirtualFile? {
+    if (base.isDirectory) {
+        // This is a wemi folder with wemi launcher?
+        val wemiLauncher = base.findChild(WemiLauncherFileName)
+        if (wemiLauncher.isWemiLauncher()) {
+            return base
+        }
+        // Ok, no launcher, but maybe build has some build scripts?
+        val buildFolder = base.findChild(WemiBuildDirectoryName)
+        if (buildFolder != null && buildFolder.children.any { it.isWemiScriptSource() }) {
+            return base
+        }
+
+        // Maybe this is the build folder?
+        if (base.name.equals(WemiBuildDirectoryName, ignoreCase = true) && base.children.any { it.isWemiScriptSource() }) {
+            return base.parent
+        }
+    } else {
+        // isFile
+        // Maybe this is the wemi launcher?
+        if (base.isWemiLauncher()) {
+            return base.parent
+        }
+        // Maybe this is one of wemi sources?
+        if (base.isWemiScriptSource()) {
+            val buildFolder = base.parent
+            if (buildFolder.name.equals(WemiBuildDirectoryName, ignoreCase = true)) {
+                return buildFolder.parent
+            }
+        }
+    }
+    return null
+}
+
 /** Finds project's Wemi launcher, if present.
  * Should be fairly cheap. */
+@Deprecated("")
 fun findWemiLauncher(project:Project):WemiLauncher? {
     if (project.isDefault)
         return null
@@ -55,10 +95,18 @@ fun findWemiLauncher(project:Project):WemiLauncher? {
     return WemiLauncher(wemiJar)
 }
 
-fun findWemiLauncher(projectDir:String):WemiLauncher? {
-    val wemiJar = Paths.get(projectDir).resolve(WemiLauncherFileName).toAbsolutePath() ?: return null
+fun findWemiLauncher(projectDir:Path):WemiLauncher? {
+    val wemiJar = projectDir.resolve(WemiLauncherFileName).toAbsolutePath()
 
     if (!Files.isRegularFile(wemiJar)) return null
+
+    try {
+        if (!wemiJar.executable) {
+            return null
+        }
+    } catch (e : Exception) {
+        // Filesystem may not support the executable permission
+    }
 
     return WemiLauncher(wemiJar)
 }

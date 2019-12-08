@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.projectImport
 
+import com.darkyen.wemi.intellij.util.getWemiCompatibleSdk
 import com.intellij.ide.util.projectWizard.WizardContext
 import com.intellij.openapi.options.ConfigurationException
 import com.intellij.projectImport.ProjectImportWizardStep
@@ -10,11 +11,11 @@ import javax.swing.JPanel
 
 class ConfigureWemiProjectStep(context: WizardContext) : ProjectImportWizardStep(context) {
 
-	private val control: ImportFromWemiControl by lazy { builder.control }
+	private val optionsControl = ImportFromWemiControl()
 
 	private val component:JPanel by lazy {
 		val panel = JPanel(BorderLayout())
-		panel.add(control.uiComponent)
+		panel.add(optionsControl.uiComponent)
 		panel
 	}
 
@@ -24,19 +25,23 @@ class ConfigureWemiProjectStep(context: WizardContext) : ProjectImportWizardStep
 
 	override fun updateStep() {
 		if (!builderPrepared) {
-			builder.prepare(wizardContext)
+			val context = wizardContext
+
+			context.projectJdk = context.projectJdk ?: getWemiCompatibleSdk()
+			optionsControl.reset(context, null)
+
 			builderPrepared = true
 		}
 	}
 
-	override fun updateDataModel() {}
+	override fun updateDataModel() {
+		val wizardContext = wizardContext
+		optionsControl.apply(wizardContext)
+	}
 
 	@Throws(ConfigurationException::class)
 	override fun validate(): Boolean {
-		val wizardContext = wizardContext
-		control.apply()
-		control.projectFormatPanel.updateData(wizardContext)
-		builder.ensureProjectIsDefined(wizardContext)
+		builder.ensureProjectIsDefined(this.wizardContext, optionsControl.getProjectImportOptions())
 		return true
 	}
 

@@ -27,7 +27,7 @@ class WemiTaskConfigurationType : ConfigurationType {
         override fun getId(): String = ID
 
         override fun isApplicable(project: Project): Boolean {
-            return project.getServiceIfCreated(WemiProjectService::class.java) != null
+            return project.getService(WemiProjectService::class.java) != null
         }
 
         override fun createTemplateConfiguration(project: Project): WemiTaskConfiguration {

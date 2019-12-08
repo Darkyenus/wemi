@@ -52,7 +52,7 @@ import java.nio.file.Path
 /**
  *
  */
-class ProjectNode(val name:String, val root: Path) {
+class ProjectNode constructor(val name:String, val root: Path) {
 
 	var javaSourceVersion: LanguageLevel = LanguageLevel.HIGHEST
 	var javaTargetVersion: JavaSdkVersion = JavaSdkVersion.fromLanguageLevel(javaSourceVersion)
@@ -281,7 +281,7 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 
 	for (module in ideModulesToRemove) {
 		// Remove modules that previously belonged to Wemi
-		if (module.getServiceIfCreated(WemiModuleService::class.java)?.wemiModuleType != null) {
+		if (module.getService(WemiModuleService::class.java)?.wemiModuleType != null) {
 			modifiableModuleModel.disposeModule(module)
 		}
 	}

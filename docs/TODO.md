@@ -3,6 +3,7 @@
 - IDE rewrite:
     - Remove what is not needed anymore
     - Check all TODOs
+    - Eliminate Project.guessProjectDir for explicit root storage
 - Java 13 invalid reflexive access
 - http://tutorials.jenkov.com/java/modules.html
 - IDE: Run Main from whatever buttons

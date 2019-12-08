@@ -29,7 +29,7 @@ class WemiModuleBuildTaskRunner : ProjectTaskRunner() {
 
         for (task in tasks) {
             if (task is ModuleBuildTask) {
-                val moduleComponent = task.module.getServiceIfCreated(WemiModuleService::class.java) ?: throw AssertionError("Module ${task.module} does not have WemiModuleComponent")
+                val moduleComponent = task.module.getService(WemiModuleService::class.java) ?: throw AssertionError("Module ${task.module} does not have WemiModuleComponent")
                 val moduleType = moduleComponent.wemiModuleType ?: throw AssertionError("Module ${task.module} is not a Wemi module")
                 when (moduleType) {
                     WemiModuleType.BUILD_SCRIPT -> {
@@ -71,7 +71,7 @@ class WemiModuleBuildTaskRunner : ProjectTaskRunner() {
     override fun canRun(projectTask: ProjectTask): Boolean {
         return when (projectTask) {
             is ModuleBuildTask -> {
-                projectTask.module.getServiceIfCreated(WemiModuleService::class.java)?.wemiModuleType != null
+                projectTask.module.getService(WemiModuleService::class.java)?.wemiModuleType != null
             }
             else -> false
         }

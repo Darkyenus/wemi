@@ -76,13 +76,7 @@
         <!-- Import -->
         <projectImportProvider implementation="com.darkyen.wemi.intellij.projectImport.ImportFromWemiProvider"/>
         <projectImportBuilder implementation="com.darkyen.wemi.intellij.projectImport.ImportFromWemiBuilder"/>
-        <!--TODO <projectOpenProcessor implementation=""/>-->
-
-        <postStartupActivity implementation="com.darkyen.wemi.intellij.importing.OfferImportStartupActivity"/>
-
-        <!-- TODO Delete? Handle differently? -->
-        <externalProjectDataService implementation="com.darkyen.wemi.intellij.importing.dataServices.KotlinCompilerSettingsDataService"/>
-        <externalProjectDataService implementation="com.darkyen.wemi.intellij.importing.dataServices.WemiModuleComponentDataService"/>
+        <projectOpenProcessor implementation="com.darkyen.wemi.intellij.projectImport.WemiProjectOpenProcessor"/>
 
         <!-- Settings -->
         <moduleService serviceImplementation="com.darkyen.wemi.intellij.settings.WemiModuleService"/>

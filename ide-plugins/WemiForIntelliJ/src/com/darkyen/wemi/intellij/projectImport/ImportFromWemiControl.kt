@@ -21,11 +21,12 @@ class ImportFromWemiControl : AbstractSettingsControl() {
     private val options = ProjectImportOptions()
     private val optionsEditor = PropertyEditorPanel().also { panel ->
         options.createUi(panel)
+        panel.loadFromProperties()
     }
 
     val uiComponent = PaintAwarePanel(GridBagLayout())
 
-    val projectFormatPanel = ProjectFormatPanel()
+    private val projectFormatPanel = ProjectFormatPanel()
 
     init {
         uiComponent.add(optionsEditor, ExternalSystemUiUtil.getFillLineConstraints(0))
@@ -42,11 +43,12 @@ class ImportFromWemiControl : AbstractSettingsControl() {
         optionsEditor.loadFromProperties()
     }
 
-    fun apply() {
+    fun apply(wizardContext:WizardContext) {
         this.project?.getService(WemiProjectService::class.java)?.let { projectState ->
             optionsEditor.saveToProperties()
             options.copyTo(projectState.options)
         }
+        projectFormatPanel.updateData(wizardContext)
     }
 
     fun getProjectImportOptions():ProjectImportOptions {
