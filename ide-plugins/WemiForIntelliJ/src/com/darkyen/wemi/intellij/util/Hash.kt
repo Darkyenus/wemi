@@ -1,6 +1,6 @@
 package com.darkyen.wemi.intellij.util
 
-import java.io.File
+import java.nio.file.Path
 import java.security.MessageDigest
 
 /**
@@ -31,8 +31,8 @@ fun MessageDigest.update(string: String) {
     }
 }
 
-fun MessageDigest.update(file: File) {
-    update(file.canonicalPath)
+fun MessageDigest.update(file: Path) {
+    update(file.toAbsolutePath().normalize().toString())
 }
 
 inline fun <T> MessageDigest.update(list:List<T>, updateElement: MessageDigest.(T)->Unit) {

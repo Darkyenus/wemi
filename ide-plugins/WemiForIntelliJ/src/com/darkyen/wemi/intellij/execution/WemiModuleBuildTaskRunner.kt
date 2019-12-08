@@ -1,7 +1,7 @@
 package com.darkyen.wemi.intellij.execution
 
-import com.darkyen.wemi.intellij.module.WemiModuleComponent
-import com.darkyen.wemi.intellij.module.WemiModuleType
+import com.darkyen.wemi.intellij.settings.WemiModuleService
+import com.darkyen.wemi.intellij.settings.WemiModuleType
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.impl.RunConfigurationBeforeRunProvider
@@ -29,14 +29,14 @@ class WemiModuleBuildTaskRunner : ProjectTaskRunner() {
 
         for (task in tasks) {
             if (task is ModuleBuildTask) {
-                val moduleComponent = task.module.getComponent(WemiModuleComponent::class.java) ?: throw AssertionError("Module ${task.module} does not have WemiModuleComponent")
-                val moduleType = moduleComponent.moduleType ?: throw AssertionError("Module ${task.module} is not a Wemi module")
+                val moduleComponent = task.module.getServiceIfCreated(WemiModuleService::class.java) ?: throw AssertionError("Module ${task.module} does not have WemiModuleComponent")
+                val moduleType = moduleComponent.wemiModuleType ?: throw AssertionError("Module ${task.module} is not a Wemi module")
                 when (moduleType) {
                     WemiModuleType.BUILD_SCRIPT -> {
                         compileBuildScript = true
                     }
                     WemiModuleType.PROJECT -> {
-                        projectsToCompile.add(moduleComponent.wemiModuleName ?: task.module.name)
+                        projectsToCompile.add(moduleComponent.wemiProjectName ?: task.module.name)
                     }
                 }
             } else {
@@ -71,7 +71,7 @@ class WemiModuleBuildTaskRunner : ProjectTaskRunner() {
     override fun canRun(projectTask: ProjectTask): Boolean {
         return when (projectTask) {
             is ModuleBuildTask -> {
-                projectTask.module.getComponent(WemiModuleComponent::class.java)?.moduleType != null
+                projectTask.module.getServiceIfCreated(WemiModuleService::class.java)?.wemiModuleType != null
             }
             else -> false
         }

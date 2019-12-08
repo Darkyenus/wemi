@@ -2,6 +2,10 @@
 
 package com.darkyen.wemi.intellij.util
 
+import com.intellij.openapi.util.io.FileUtilRt
+import com.intellij.openapi.vfs.JarFileSystem
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFileManager
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -11,8 +15,28 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
 import java.nio.channels.OverlappingFileLockException
-import java.nio.file.*
-import java.nio.file.attribute.*
+import java.nio.file.CopyOption
+import java.nio.file.DirectoryNotEmptyException
+import java.nio.file.FileAlreadyExistsException
+import java.nio.file.FileSystems
+import java.nio.file.FileVisitResult
+import java.nio.file.FileVisitor
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.NoSuchFileException
+import java.nio.file.OpenOption
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.AclFileAttributeView
+import java.nio.file.attribute.BasicFileAttributeView
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.attribute.DosFileAttributeView
+import java.nio.file.attribute.FileOwnerAttributeView
+import java.nio.file.attribute.FileTime
+import java.nio.file.attribute.PosixFileAttributeView
+import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.UserDefinedFileAttributeView
 import java.util.*
 
 private val LOG = LoggerFactory.getLogger("Files")
@@ -22,6 +46,29 @@ private val LOG = LoggerFactory.getLogger("Files")
  */
 inline operator fun URL.div(path: CharSequence): URL {
     return URL(this, path.toString())
+}
+
+fun Path.toUrl():String {
+    var fullPath = this.toAbsolutePath().normalize()
+    try {
+        fullPath = fullPath.toRealPath()
+    } catch (e:IOException) {
+        // Ignored, file probably does not exist
+    }
+    return VirtualFileManager.constructUrl(LocalFileSystem.PROTOCOL, FileUtilRt.toSystemIndependentName(fullPath.toString()))
+}
+
+fun Path.toClasspathUrl():String {
+    if (this.isDirectory() || !this.name.pathHasExtension("jar")) {
+        return this.toUrl()
+    }
+    var fullPath = this.toAbsolutePath().normalize()
+    try {
+        fullPath = fullPath.toRealPath()
+    } catch (e:IOException) {
+        // Ignored, file probably does not exist
+    }
+    return VirtualFileManager.constructUrl(JarFileSystem.PROTOCOL, FileUtilRt.toSystemIndependentName(fullPath.toString()) + JarFileSystem.JAR_SEPARATOR)
 }
 
 /**

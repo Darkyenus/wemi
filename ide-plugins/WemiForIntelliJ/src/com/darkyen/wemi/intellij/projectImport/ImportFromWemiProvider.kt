@@ -1,29 +1,25 @@
-package com.darkyen.wemi.intellij.importing
+package com.darkyen.wemi.intellij.projectImport
 
 import com.darkyen.wemi.intellij.WemiBuildDirectoryName
 import com.darkyen.wemi.intellij.WemiLauncherFileName
-import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.file.isWemiLauncher
 import com.darkyen.wemi.intellij.file.isWemiScriptSource
-import com.intellij.openapi.externalSystem.service.project.wizard.AbstractExternalProjectImportProvider
+import com.intellij.ide.util.projectWizard.ModuleWizardStep
+import com.intellij.ide.util.projectWizard.WizardContext
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.projectImport.ProjectImportProvider
 
 /**
  * Provides 'import from external model' functionality.
  */
-class WemiProjectImportProvider
-    : AbstractExternalProjectImportProvider(ImportFromWemiControlBuilder(), WemiProjectSystemId) {
+class ImportFromWemiProvider : ProjectImportProvider(ImportFromWemiBuilder()) {
 
-    override fun canCreateNewProject(): Boolean {
-        return true
-    }
+    override fun getId(): String = "com.darkyen.wemi.intellij.projectImport.WemiProjectImportProvider"
 
-    override fun canImportModule(): Boolean {
-        return false
-    }
+    override fun canCreateNewProject(): Boolean = true
 
-    override fun getId(): String = "com.darkyen.wemi.intellij.importing.WemiProjectImportProvider"
+    override fun canImportModule(): Boolean = false
 
     private fun VirtualFile.directoryToImport():VirtualFile? {
         if (this.isDirectory) {
@@ -71,7 +67,9 @@ class WemiProjectImportProvider
         return (file.directoryToImport()?: file).path
     }
 
-    override fun getFileSample(): String {
-        return "<b>WEMI</b> project (wemi, build/*.kt)"
+    override fun createSteps(context: WizardContext?): Array<ModuleWizardStep>? {
+        return arrayOf(ConfigureWemiProjectStep(context!!))
     }
+
+    override fun getFileSample(): String = "<b>WEMI</b> project directory (wemi, build/*.kt)"
 }

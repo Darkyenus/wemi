@@ -1,8 +1,8 @@
-package com.darkyen.wemi.intellij.importing
+package com.darkyen.wemi.intellij.importing.actions
 
 import com.darkyen.wemi.intellij.*
-import com.darkyen.wemi.intellij.importing.ImportProjectAction.Companion.canOfferImportOfUnlinkedProject
-import com.darkyen.wemi.intellij.importing.ImportProjectAction.Companion.importUnlinkedProject
+import com.darkyen.wemi.intellij.importing.actions.ImportProjectAction.Companion.canOfferImportOfUnlinkedProject
+import com.darkyen.wemi.intellij.importing.actions.ImportProjectAction.Companion.importUnlinkedProject
 import com.darkyen.wemi.intellij.util.toPath
 import com.intellij.jarRepository.RepositoryLibraryType
 import com.intellij.notification.NotificationType
@@ -40,8 +40,8 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
             return
         }
 
-        val (projectBasePath, wemiLauncher) = InstallWemiLauncherAction
-                .reinstallWemiLauncher(project, "Could not convert to Wemi") ?: return
+        val (projectBasePath, wemiLauncher) = InstallWemiLauncherAction.reinstallWemiLauncher(project, "Could not convert to Wemi")
+                ?: return
 
 
         val buildDirectory = projectBasePath.resolve(WemiBuildDirectoryName)

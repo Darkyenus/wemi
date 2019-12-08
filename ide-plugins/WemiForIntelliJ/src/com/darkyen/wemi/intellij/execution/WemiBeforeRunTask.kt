@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.execution
 
+import com.darkyen.wemi.intellij.options.BeforeRunOptions
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
 import com.intellij.execution.BeforeRunTask
 import com.intellij.execution.BeforeRunTaskProvider
@@ -15,7 +16,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.rd.attach
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.Key
-import com.intellij.util.xmlb.annotations.Tag
 import icons.WemiIcons
 import org.jetbrains.concurrency.AsyncPromise
 import org.jetbrains.concurrency.Promise
@@ -24,7 +24,7 @@ import javax.swing.JComponent
 val WemiBeforeRunTaskKey = Key.create<WemiBeforeRunTask>("Wemi.BeforeRunTask")
 
 /** Task that allows Wemi task to run before other tasks. */
-class WemiBeforeRunTask : BeforeRunTask<WemiBeforeRunTask>(WemiBeforeRunTaskKey), PersistentStateComponent<WemiBeforeRunTask.BeforeRunOptions> {
+class WemiBeforeRunTask : BeforeRunTask<WemiBeforeRunTask>(WemiBeforeRunTaskKey), PersistentStateComponent<BeforeRunOptions> {
 
 	var options = BeforeRunOptions()
 
@@ -56,29 +56,6 @@ class WemiBeforeRunTask : BeforeRunTask<WemiBeforeRunTask>(WemiBeforeRunTaskKey)
 		return result
 	}
 
-	@Tag("BeforeRunOptions")
-	class BeforeRunOptions : WemiTaskConfiguration.BaseOptions() {
-
-		init {
-			//register(BeforeRunOptions::thing, ThingXmlSerializer::class)
-		}
-
-		fun copyTo(o:BeforeRunOptions) {
-			copyTo(o as WemiTaskConfiguration.BaseOptions)
-		}
-
-		override fun equals(other: Any?): Boolean {
-			if (this === other) return true
-			if (other !is BeforeRunOptions) return false
-			if (!super.equals(other)) return false
-
-			return true
-		}
-
-		override fun hashCode(): Int {
-			return super.hashCode()
-		}
-	}
 }
 
 
@@ -138,7 +115,7 @@ class WemiBeforeRunTaskProvider(private val project: Project) : BeforeRunTaskPro
 		val ID = Key.create<ExternalSystemBeforeRunTask>("Wemi.BeforeRunTask")
 	}
 
-	private class EditBeforeRunDialog(project: Project, private val options: WemiBeforeRunTask.BeforeRunOptions) : DialogWrapper(project, true) {
+	private class EditBeforeRunDialog(project: Project, private val options: BeforeRunOptions) : DialogWrapper(project, true) {
 
 		private val contentPane: PropertyEditorPanel by lazy {
 			val panel = PropertyEditorPanel()

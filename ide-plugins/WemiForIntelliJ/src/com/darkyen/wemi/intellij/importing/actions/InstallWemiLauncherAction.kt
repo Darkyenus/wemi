@@ -1,6 +1,10 @@
-package com.darkyen.wemi.intellij.importing
+package com.darkyen.wemi.intellij.importing.actions
 
-import com.darkyen.wemi.intellij.*
+import com.darkyen.wemi.intellij.WemiLauncher
+import com.darkyen.wemi.intellij.WemiLauncherFileName
+import com.darkyen.wemi.intellij.WemiNotificationGroup
+import com.darkyen.wemi.intellij.findWemiLauncher
+import com.darkyen.wemi.intellij.showBalloon
 import com.darkyen.wemi.intellij.util.toPath
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnAction
@@ -10,8 +14,10 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import icons.WemiIcons
 import java.io.InputStream
+import java.lang.IllegalStateException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.PosixFilePermission
 
 /**
@@ -50,20 +56,7 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
         private const val REINSTALL_TITLE = "Reinstall Wemi launcher"
 
         fun reinstallWemiLauncher(project:Project, failNotificationTitle:String):Pair<Path, WemiLauncher>? {
-            val wemiLauncherStream: InputStream? = InstallWemiLauncherAction::class.java.classLoader
-                    .getResourceAsStream("wemi-launcher.sh")
-
-            if (wemiLauncherStream == null) {
-                LOG.error("wemi-launcher resource does not exist")
-                WemiNotificationGroup.showBalloon(project, failNotificationTitle,
-                        "Plugin installation is corrupted - no bundled launcher",
-                        NotificationType.ERROR)
-                return null
-            }
-
-            val projectBaseDir = project.guessProjectDir()
-            val projectBasePath = projectBaseDir?.toPath()
-            val wemiLauncherPath = projectBasePath?.resolve(WemiLauncherFileName)?.toAbsolutePath() ?: run {
+            val projectBasePath = project.guessProjectDir()?.toPath()?.toAbsolutePath() ?: run {
                 LOG.error("Project $project does not have baseDir convertible to Path")
                 WemiNotificationGroup.showBalloon(project, failNotificationTitle,
                         "Project's directory is in a strange place",
@@ -71,8 +64,18 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
                 return null
             }
 
+            return reinstallWemiLauncher(projectBasePath, failNotificationTitle, project)
+        }
+
+        fun reinstallWemiLauncher(projectBasePath:Path, failNotificationTitle:String, project:Project?):Pair<Path, WemiLauncher>? {
+            val wemiLauncherStream = InstallWemiLauncherAction::class.java.classLoader.getResourceAsStream("wemi-launcher.sh")
+                    ?: throw IllegalStateException("Corrupted Wemi plugin: wemi-launcher.sh resource does not exist")
+
+            val wemiLauncherPath = projectBasePath.resolve(WemiLauncherFileName)
+
             try {
-                Files.newOutputStream(wemiLauncherPath).use { wemiFile ->
+                Files.deleteIfExists(wemiLauncherPath)
+                Files.newOutputStream(wemiLauncherPath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE).use { wemiFile ->
                     wemiLauncherStream.use {
                         it.copyTo(wemiFile)
                     }

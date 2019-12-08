@@ -1,5 +1,9 @@
 package com.darkyen.wemi.intellij.ui
 
+import com.darkyen.wemi.intellij.util.MAX_JAVA_VERSION_FOR_WEMI_HINT
+import com.darkyen.wemi.intellij.util.MIN_JAVA_VERSION_FOR_WEMI
+import com.darkyen.wemi.intellij.util.SDK_TYPE_FOR_WEMI
+import com.darkyen.wemi.intellij.util.getWemiCompatibleSdkList
 import com.intellij.execution.configuration.EnvironmentVariablesComponent
 import com.intellij.execution.configuration.EnvironmentVariablesData
 import com.intellij.icons.AllIcons
@@ -16,9 +20,6 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.DumbAwareAction
-import com.intellij.openapi.projectRoots.JavaSdk
-import com.intellij.openapi.projectRoots.JavaSdkVersion
-import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.ui.configuration.JdkComboBox
 import com.intellij.openapi.roots.ui.configuration.projectRoot.ProjectSdksModel
@@ -286,8 +287,8 @@ class EnvironmentVariablesEditor(
 
 class BooleanPropertyEditor(property:KMutableProperty0<Boolean>,
                             private val title:String,
-                            private val trueInfo:String,
-                            private val falseInfo:String) : AbstractPropertyEditor<Boolean>(property) {
+                            private val trueInfo:String? = null,
+                            private val falseInfo:String? = null) : AbstractPropertyEditor<Boolean>(property) {
 
 	private val checkBox = JBCheckBox(checkBoxText(false), false).apply {
 		horizontalAlignment = SwingConstants.LEADING
@@ -297,7 +298,13 @@ class BooleanPropertyEditor(property:KMutableProperty0<Boolean>,
 	}
 
 	private fun checkBoxText(selected:Boolean):String {
-		return "$title (${if (selected) trueInfo else falseInfo})"
+		if (selected && trueInfo != null) {
+			return "$title ($trueInfo)"
+		} else if (!selected && falseInfo != null) {
+			return "$title ($falseInfo)"
+		} else {
+			return title
+		}
 	}
 
 	override val component: JComponent = checkBox
@@ -311,13 +318,7 @@ class BooleanPropertyEditor(property:KMutableProperty0<Boolean>,
 
 class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPropertyEditor<String>(property) {
 
-	private val minJavaVersion = 8
-	private val minJavaVersionSdk = JavaSdkVersion.JDK_1_8
-	private val maxJavaVersionHint = 13
-
-	private val javaSdkType = JavaSdk.getInstance()
-	private val possibleJavaSdkList = ProjectJdkTable.getInstance().getSdksOfType(javaSdkType)
-			.filter { javaSdkType.isOfVersionOrHigher(it, minJavaVersionSdk) && it.homePath != null } // Intentionally allowing JREs
+	private val possibleJavaSdkList = getWemiCompatibleSdkList()
 
 	private val panel0JavaFromPath = JBLabel("").apply { verticalAlignment = SwingConstants.CENTER }
 
@@ -352,7 +353,7 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 		})
 	}
 
-	private val panel1JavaFromPath = JBIntSpinner(maxJavaVersionHint, minJavaVersion, Integer.MAX_VALUE, 1)
+	private val panel1JavaFromPath = JBIntSpinner(MAX_JAVA_VERSION_FOR_WEMI_HINT, MIN_JAVA_VERSION_FOR_WEMI, Integer.MAX_VALUE, 1)
 	// NOTE: Other editors use JrePathEditor here, but I don't understand its API
 	private val panel2JavaFromSdk = JdkComboBox(ProjectSdksModel().apply {
 		for (sdk in possibleJavaSdkList) {
@@ -409,7 +410,7 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 		}
 	}
 
-	private val panel = object : JBTabbedPane(JBTabbedPane.TOP), UserActivityProviderComponent {
+	private val panel = object : JBTabbedPane(TOP), UserActivityProviderComponent {
 
 	}.apply {
 		addTab("From PATH", panelWrap("Using Java on PATH", panel0JavaFromPath, center = true))
@@ -493,16 +494,16 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 	}
 
 	private fun javaFromSdk(sdk: Sdk):Path? {
-		return findExistingFileFromAlternatives(Paths.get(javaSdkType.getBinPath(sdk)), "java", "java.exe")
+		return findExistingFileFromAlternatives(Paths.get(SDK_TYPE_FOR_WEMI.getBinPath(sdk)), "java", "java.exe")
 	}
 }
 
-class CommandArgumentEditor(property:KMutableProperty0<List<String>>) : AbstractPropertyEditor<List<String>>(property) {
+class CommandArgumentEditor(property:KMutableProperty0<List<String>>, title:String = "Java Options") : AbstractPropertyEditor<List<String>>(property) {
 
 	private val splitPattern = Pattern.compile("\\s+")
 
 	override val component: RawCommandLineEditor = RawCommandLineEditor().apply {
-		border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground(), 1, true), "Java Options")
+		border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground(), 1, true), title)
 	}
 
 	override var componentValue: List<String>

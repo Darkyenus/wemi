@@ -1,43 +1,41 @@
 package com.darkyen.wemi.intellij
 
-import com.darkyen.wemi.intellij.execution.WemiTaskConfiguration
+import com.darkyen.wemi.intellij.options.RunOptions
+import com.darkyen.wemi.intellij.options.WemiLauncherOptions
 import com.darkyen.wemi.intellij.util.OSProcessHandlerForWemi
 import com.darkyen.wemi.intellij.util.Version
-import com.darkyen.wemi.intellij.util.readFully
+import com.darkyen.wemi.intellij.util.collectOutputAndKill
 import com.darkyen.wemi.intellij.util.toPath
+import com.esotericsoftware.jsonbeans.JsonException
 import com.esotericsoftware.jsonbeans.JsonReader
 import com.esotericsoftware.jsonbeans.JsonValue
-import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.OSProcessHandler
+import com.intellij.execution.process.ProcessIOExecutorService
+import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.externalSystem.model.ProjectSystemId
-import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
-import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationEvent
-import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
-import com.intellij.openapi.externalSystem.util.ExternalSystemConstants
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
-import com.intellij.openapi.util.registry.Registry
+import com.intellij.openapi.util.Key
+import com.intellij.openapi.util.io.StreamUtil
+import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.EnvironmentUtil
 import com.pty4j.PtyProcessBuilder
 import java.io.ByteArrayOutputStream
+import java.io.CharArrayWriter
+import java.io.Closeable
 import java.io.InputStream
-import java.io.OutputStream
 import java.io.OutputStreamWriter
+import java.io.Writer
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
+import java.util.stream.Collectors
 import java.util.zip.ZipFile
 
 // Must be a subset of Kotlin file extensions
 val WemiBuildFileExtensions = listOf("kt")
-
-val WemiProjectSystemId = ProjectSystemId("WEMI", "Wemi").apply {
-    // Do not launch our WemiProjectResolver and WemiTaskManager in external process,
-    // because it just adds delays and is messy
-    Registry.get("${id}${ExternalSystemConstants.USE_IN_PROCESS_COMMUNICATION_REGISTRY_KEY_SUFFIX}").setValue(true)
-}
 
 const val WemiBuildScriptProjectName = "wemi-build"
 
@@ -78,16 +76,37 @@ class WemiLauncher internal constructor(val file: Path) {
         result
     }
 
+    private fun wemiHome(options: WemiLauncherOptions):Path? {
+        if (versionPre010) {
+            return null
+        }
+
+        return try {
+            val process = createWemiProcessBuilder(options, listOf("--print-wemi-home"), emptyList(), -1, DebugScheme.DISABLED).first.start()
+            StreamUtil.closeStream(process.outputStream)
+            val result = process.collectOutputAndKill(10, TimeUnit.SECONDS).toString()
+            if (result.isNotBlank()) {
+                LOG.info("Found wemiHome of $file at $result")
+                return Paths.get(result)
+            } else {
+                return null
+            }
+        } catch (e:Exception) {
+            LOG.warn("Failed to resolve wemiHome", e)
+            null
+        }
+    }
+
     enum class DebugScheme {
         DISABLED,
         WEMI_BUILD_SCRIPTS,
         WEMI_FORKED_PROCESSES
     }
 
-    private fun pre010_createWemiProcess(options: WemiTaskConfiguration.BaseOptions,
-                                         debugPort:Int, debugConfig: DebugScheme,
-                                         allowBrokenBuildScripts:Boolean,
-                                         interactive:Boolean, machineReadable:Boolean) : OSProcessHandler {
+    private fun pre010_createWemiProcessBuilder(
+            options: WemiLauncherOptions,
+            arguments:List<String>, tasks:List<Array<String>>,
+            debugPort:Int, debugConfig: DebugScheme) : Pair<PtyProcessBuilder, String> {
         val env = HashMap<String, String>()
         if (options.passParentEnvironmentVariables) {
             env.putAll(EnvironmentUtil.getEnvironmentMap())
@@ -117,19 +136,11 @@ class WemiLauncher internal constructor(val file: Path) {
         commandLine.add("-jar")
         commandLine.add(file.toAbsolutePath().toString())
 
-        if (allowBrokenBuildScripts) {
-            commandLine.add("--allow-broken-build-scripts")
-        }
-        if (interactive) {
-            commandLine.add("--interactive")
-        }
-        if (machineReadable) {
-            commandLine.add("--machine-readable-output")
-        }
+        commandLine.addAll(arguments)
 
-        for ((i, task) in options.tasks.withIndex()) {
+        for ((i, task) in tasks.withIndex()) {
             commandLine.addAll(task)
-            if (i + 1 < options.tasks.size) {
+            if (i + 1 < tasks.size) {
                 commandLine.add(";")
             }
         }
@@ -142,16 +153,14 @@ class WemiLauncher internal constructor(val file: Path) {
         builder.setCommand(commandLine.toTypedArray())
         builder.setRedirectErrorStream(false)
         builder.setConsole(true)
-        return OSProcessHandlerForWemi(builder.start(), commandLine.joinToString(" "))
-
+        return builder to commandLine.joinToString(" ")
     }
 
-    fun createWemiProcess(options: WemiTaskConfiguration.BaseOptions,
-                          debugPort:Int, debugConfig: DebugScheme,
-                          allowBrokenBuildScripts:Boolean,
-                          interactive:Boolean, machineReadable:Boolean) : OSProcessHandler {
+    fun createWemiProcessBuilder(options: WemiLauncherOptions,
+                          arguments:List<String>, tasks:List<Array<String>>,
+                          debugPort:Int, debugConfig: DebugScheme) : Pair<PtyProcessBuilder, String> {
         if (versionPre010) {
-            return pre010_createWemiProcess(options, debugPort, debugConfig, allowBrokenBuildScripts, interactive, machineReadable)
+            return pre010_createWemiProcessBuilder(options, arguments, tasks, debugPort, debugConfig)
         }
 
         val env = HashMap<String, String>()
@@ -181,19 +190,11 @@ class WemiLauncher internal constructor(val file: Path) {
             DebugScheme.DISABLED -> {}
         }
 
-        if (allowBrokenBuildScripts) {
-            commandLine.add("--allow-broken-build-scripts")
-        }
-        if (interactive) {
-            commandLine.add("--interactive")
-        }
-        if (machineReadable) {
-            commandLine.add("--machine-readable-output")
-        }
+        commandLine.addAll(arguments)
 
-        for ((i, task) in options.tasks.withIndex()) {
+        for ((i, task) in tasks.withIndex()) {
             commandLine.addAll(task)
-            if (i + 1 < options.tasks.size) {
+            if (i + 1 < tasks.size) {
                 commandLine.add(";")
             }
         }
@@ -206,148 +207,117 @@ class WemiLauncher internal constructor(val file: Path) {
         builder.setCommand(commandLine.toTypedArray())
         builder.setRedirectErrorStream(false)
         builder.setConsole(true)
-        return OSProcessHandlerForWemi(builder.start(), commandLine.joinToString(" "))
+        //return OSProcessHandlerForWemi(builder.start(), commandLine.joinToString(" "))
+        return builder to commandLine.joinToString(" ")
     }
 
+    fun createWemiProcessHandler(options:WemiLauncherOptions,
+                                 debugPort:Int, debugConfig:DebugScheme,
+                                 allowBrokenBuildScripts:Boolean,
+                                 interactive:Boolean,
+                                 machineReadable:Boolean):OSProcessHandler {
+        val arguments = ArrayList<String>()
 
-
-
-
-
-
-
-
-
-
-
-
-    fun createMachineReadableResolverSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>, allowBrokenBuildScripts:Boolean, tracker:ExternalStatusTracker?):WemiLauncherSession {
-        if (versionPre010) {
-            return pre010_createMachineReadableResolverSession(if(javaExecutable.isBlank()) "java" else javaExecutable, jvmOptions, env, inheritEnv, prefixConfigurations, allowBrokenBuildScripts, tracker)
-        }
-        val command = GeneralCommandLine()
-        command.exePath = file.toAbsolutePath().toString()
-        command.charset = Charsets.UTF_8
-        command.environment.putAll(env)
-        command.environment["WEMI_COLOR"] = "false"
-        command.environment["WEMI_UNICODE"] = "true"
-        command.environment["WEMI_JAVA_OPTS"] = jvmOptions.joinToString(" ")
-        if (javaExecutable.isNotBlank()) {
-            command.environment["WEMI_JAVA"] = javaExecutable
-        }
-        command.workDirectory = file.parent.toFile()
-        command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
-        command.isRedirectErrorStream = false
-
-        command.addParameter("--interactive")
-        command.addParameter("--machine-readable-output")
         if (allowBrokenBuildScripts) {
-            command.addParameter("--allow-broken-build-scripts")
+            arguments.add("--allow-broken-build-scripts")
+        }
+        if (interactive) {
+            arguments.add("--interactive")
+        }
+        if (machineReadable) {
+            arguments.add("--machine-readable-output")
         }
 
-        return WemiLauncherSession(command, prefixConfigurations, tracker)
+        // TODO(jp): Instanceof is a dangerous business
+        val tasks = if (options is RunOptions) options.tasks else emptyList()
+
+        val (builder, commandLine) = createWemiProcessBuilder(options, arguments, tasks, debugPort, debugConfig)
+        return OSProcessHandlerForWemi(builder.start(), commandLine)
     }
 
-    fun createTaskSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, tasks: List<String>, tracker:ExternalStatusTracker?):WemiLauncherSession {
-        if (versionPre010) {
-            return pre010_createTaskSession(if(javaExecutable.isBlank()) "java" else javaExecutable, jvmOptions, env, inheritEnv, tasks, tracker)
-        }
-        val command = GeneralCommandLine()
-        command.exePath = file.toAbsolutePath().toString()
-        command.charset = Charsets.UTF_8
-        command.environment.putAll(env)
-        command.environment["WEMI_COLOR"] = "true"
-        command.environment["WEMI_UNICODE"] = "true"
-        command.environment["WEMI_JAVA_OPTS"] = jvmOptions.joinToString(" ")
-        if (javaExecutable.isNotBlank()) {
-            command.environment["WEMI_JAVA"] = javaExecutable
-        }
-        command.workDirectory = file.parent.toFile()
-        command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
-        command.isRedirectErrorStream = false
+    fun createWemiProcess(options:WemiLauncherOptions,
+                                 debugPort:Int, debugConfig:DebugScheme,
+                                 allowBrokenBuildScripts:Boolean,
+                                 interactive:Boolean,
+                                 machineReadable:Boolean):Process {
+        val arguments = ArrayList<String>()
 
-        command.addParameters(tasks)
-
-        return WemiLauncherSession(command, tracker = tracker)
-    }
-
-    private fun pre010_createMachineReadableResolverSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, prefixConfigurations: Array<String>, allowBrokenBuildScripts:Boolean, tracker:ExternalStatusTracker?):WemiLauncherSession {
-        val command = GeneralCommandLine()
-        command.exePath = javaExecutable
-        command.charset = Charsets.UTF_8
-        command.environment.putAll(env)
-        command.environment["WEMI_COLOR"] = "false"
-        command.environment["WEMI_UNICODE"] = "true"
-        command.workDirectory = file.parent.toFile()
-        command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
-        jvmOptions.forEach {
-            command.addParameter(it)
-        }
-        command.addParameter("-jar")
-        command.addParameter(file.toString())
-        command.isRedirectErrorStream = false
-
-        command.addParameter("--interactive")
-        command.addParameter("--machine-readable-output")
         if (allowBrokenBuildScripts) {
-            command.addParameter("--allow-broken-build-scripts")
+            arguments.add("--allow-broken-build-scripts")
+        }
+        if (interactive) {
+            arguments.add("--interactive")
+        }
+        if (machineReadable) {
+            arguments.add("--machine-readable-output")
         }
 
-        return WemiLauncherSession(command, prefixConfigurations, tracker)
+        // TODO(jp): Instanceof is a dangerous business
+        val tasks = if (options is RunOptions) options.tasks else emptyList()
+
+        return createWemiProcessBuilder(options, arguments, tasks, debugPort, debugConfig).first.start()
     }
 
-    private fun pre010_createTaskSession(javaExecutable: String, jvmOptions: List<String>, env: Map<String, String>, inheritEnv: Boolean, tasks: List<String>, tracker:ExternalStatusTracker?):WemiLauncherSession {
-        val command = GeneralCommandLine()
-        command.exePath = javaExecutable
-        command.charset = Charsets.UTF_8
-        command.environment.putAll(env)
-        command.environment["WEMI_COLOR"] = "true"
-        command.environment["WEMI_UNICODE"] = "true"
-        command.workDirectory = file.parent.toFile()
-        command.withParentEnvironmentType(if (inheritEnv) GeneralCommandLine.ParentEnvironmentType.CONSOLE else GeneralCommandLine.ParentEnvironmentType.NONE)
-        command.addParameters(jvmOptions)
-        command.addParameter("-jar")
-        command.addParameter(file.toString())
-        command.isRedirectErrorStream = false
+    fun getClasspathSourceEntries(options:WemiLauncherOptions):List<Path> {
+        if (versionPre010) {
+            try {
+                ZipFile(file.toFile()).use { zipFile ->
+                    val sourceEntry = zipFile.getEntry("source.zip")
+                    if (sourceEntry != null) {
+                        val sourcesPath = file.parent.resolve("build/cache/wemi-libs-ide/wemi-source.jar")
 
-        command.addParameters(tasks)
+                        // Extract sources
+                        zipFile.getInputStream(sourceEntry).use { ins ->
+                            Files.copy(ins, sourcesPath)
+                        }
 
-        return WemiLauncherSession(command, tracker = tracker)
+                        return listOf(sourcesPath.toAbsolutePath())
+                    }
+                }
+            } catch (t:Throwable) {
+                LOG.warn("Failed to retrieve Wemi sources", t)
+                return emptyList()
+            }
+        }
+
+        return wemiHome(options)?.let { wemiHome ->
+            Files.list(wemiHome.resolve("sources")).collect(Collectors.toList())
+        } ?: emptyList()
+    }
+
+    private companion object {
+        private val LOG = Logger.getInstance(WemiLauncher::class.java)
     }
 }
 
-class ExternalStatusTracker(val id:ExternalSystemTaskId, private val listener:ExternalSystemTaskNotificationListener) {
+interface SessionActivityTracker {
+    fun stageBegin(name:String)
+    fun stageEnd()
 
-    private fun updateListenerStatus() {
-        val message = task?.let { "$stage - $it" } ?: stage
-        listener.onStatusChange(ExternalSystemTaskNotificationEvent(id, message))
+    fun taskBegin(name:String)
+    fun taskEnd()
+
+    fun sessionOutput(text:String, outputType: Key<*>)
+}
+
+inline fun <T> SessionActivityTracker.stage(name:String, action:()->T):T {
+    stageBegin(name)
+    try {
+        return action()
+    } finally {
+        stageEnd()
     }
-
-    var stage:String = "Initialized"
-        set(value) {
-            if (field != value) {
-                field = value
-                updateListenerStatus()
-            }
-        }
-
-    var task:CharSequence? = null
-        set(value) {
-            if (field != value) {
-                field = value
-                updateListenerStatus()
-            }
-        }
-
 }
 
 class WemiLauncherSession(
-        private val commandLine: GeneralCommandLine,
-        private val prefixConfigurations: Array<String> = emptyArray(),
-        val tracker: ExternalStatusTracker?) {
+        val launcher:WemiLauncher,
+        val options:WemiLauncherOptions,
+        private val createProcess: () -> Process,
+        private val prefixConfigurations: List<String> = emptyList(),
+        private val tracker: SessionActivityTracker?) : Closeable {
 
     var wemiVersion: Version = Version.NONE
-    private var process = SessionProcess(commandLine)
+    private var process = SessionProcess(createProcess(), tracker)
 
     fun task(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):Result {
         val taskPath = StringBuilder()
@@ -366,165 +336,148 @@ class WemiLauncherSession(
 
         try {
             if (process.isDead()) {
-                tracker?.task = "Restarting..."
-                process.close()
-                process = SessionProcess(commandLine)
+                tracker?.taskBegin("Restarting...")
+                try {
+                    process.close()
+                    process = SessionProcess(createProcess(), tracker)
+                } finally {
+                    tracker?.taskEnd()
+                }
             }
 
-            tracker?.task = taskPath
-            val taskData = ByteArrayOutputStream()
-            val taskOutput = ByteArrayOutputStream()
-            val taskResult = process.task(taskPath, taskData, taskOutput)
+            tracker?.taskBegin(taskPath.toString())
+            val taskData = CharArrayWriter()
+            val taskResult = process.task(taskPath, taskData)
 
             val jsonReader = JsonReader()
-            val jsonString = taskData.contentToString()
-            val json = jsonReader.parse(jsonString)
-
-            return Result(statusForNumber(taskResult), json, taskOutput.contentToString())
+            val taskDataCharArray = taskData.toCharArray()!!
+            try {
+                val json = jsonReader.parse(taskDataCharArray, 0, taskDataCharArray.size)
+                return Result(statusForNumber(taskResult), json)
+            } catch (e:JsonException) {
+                LOG.error("Failed to parse json", e)
+                LOG.debug("Broken json:\n${String(taskDataCharArray)}")
+                return Result(ResultStatus.CORRUPTED_RESPONSE_FORMAT, null)
+            }
         } finally {
-            tracker?.task = null
+            tracker?.taskEnd()
         }
     }
 
-    fun readOutputInteractive(stdout:OutputStream, stderr:OutputStream, input: InputStream) {
-        process.readOutputInteractive(stdout, stderr, input)
-    }
-
-    fun done() {
+    override fun close() {
         process.close()
     }
 
-    private class SessionProcess(commandLine: GeneralCommandLine) {
-        private val process = commandLine.createProcess()
-        private val outputStream = process.outputStream
-        private val output = OutputStreamWriter(outputStream, Charsets.UTF_8)
-        private val inputStream = process.inputStream
-        private val errorStream = process.errorStream
+    private class SessionProcess(val process:Process, private val tracker: SessionActivityTracker?) {
 
-        private val buffer = ByteArray(512)
+        private val output = OutputStreamWriter(process.outputStream, Charsets.UTF_8)
 
-        private val extraDataStreamCache = ByteArrayOutputStream()
-            get() {
-                field.reset()
-                return field
-            }
-
-        fun emptyBuffers(occasion:String) {
-            try {
-                extraDataStreamCache.apply {
-                    readFully(this, inputStream, buffer)
-                    if (this.size() > 0) {
-                        LOG.warn("Extra data found $occasion: ${contentToString()}")
-                    }
+        init {
+            ProcessIOExecutorService.INSTANCE.submit {
+                ConcurrencyUtil.runUnderThreadName("Wemi SessionProcess output reader ($process)") {
+                    readStreamContinuously(process.inputStream, true)
                 }
-            } catch (e:Exception) {
-                LOG.warn("Exception while checking for extra data in stdout", e)
             }
-
-            try {
-                extraDataStreamCache.apply {
-                    readFully(this, errorStream)
-                    if (this.size() > 0) {
-                        LOG.warn("Extra output found $occasion: ${contentToString()}")
-                    }
+            ProcessIOExecutorService.INSTANCE.submit {
+                ConcurrencyUtil.runUnderThreadName("Wemi SessionProcess error reader ($process)") {
+                    readStreamContinuously(process.errorStream, false)
                 }
-            } catch (e:Exception) {
-                LOG.warn("Exception while checking for extra data in stderr", e)
             }
         }
 
+        private fun readStreamContinuously(stream: InputStream, output:Boolean) {
+            try {
+                stream.reader(Charsets.UTF_8).use { reader ->
+                    val buffer = CharArray(1024)
+                    while (true) {
+                        val read = reader.read(buffer)
+                        if (read < 0) {
+                            break
+                        } else if (read > 0) {
+                            onProcessOutput(buffer, read, output)
+                        }
+                    }
+                }
+            } finally {
+                // Nothing will ever come from this, so don't block, ever
+                waitingForTaskSemaphore.release(1000)
+            }
+        }
+
+        @Volatile
+        private var taskOutput:Writer? = null
+        private val waitingForTaskSemaphore = Semaphore(0, false)
+
+        private fun onProcessOutput(data:CharArray, dataSize:Int, output:Boolean) {
+            if (!output) {
+                tracker?.sessionOutput(String(data, 0, dataSize), ProcessOutputTypes.STDERR)
+                return
+            }
+
+            var extraBegin = 0
+            val taskOutput = this.taskOutput
+            if (taskOutput != null) {
+                var end = dataSize
+                var done = false
+
+                for (i in 0 until dataSize) {
+                    if (data[i] == 0.toChar()) {
+                        end = i
+                        done = true
+                        break
+                    }
+                }
+
+                taskOutput.write(data, 0, end)
+                if (done) {
+                    this.taskOutput = null
+                    waitingForTaskSemaphore.release()
+                }
+
+                if (end >= dataSize) {
+                    return
+                }
+                extraBegin = end
+            }
+
+            tracker?.sessionOutput(String(data, extraBegin, dataSize - extraBegin), ProcessOutputTypes.STDOUT)
+        }
+
         fun close():Int {
-            emptyBuffers("when closing the session")
-            noThrow("close inputStream") { inputStream.close() }
-            noThrow("close errorStream") { errorStream.close() }
-            noThrow("close output") { output.close() }
+            StreamUtil.closeStream(output)
 
-
-            if (!process.waitForSafe(10, TimeUnit.SECONDS)) {
+            if (!process.waitFor(10, TimeUnit.SECONDS)) {
                 LOG.warn("Session $this does not want to end, shutting down")
                 process.destroy()
-                if (!process.waitForSafe(10, TimeUnit.SECONDS)) {
+                if (!process.waitFor(10, TimeUnit.SECONDS)) {
                     LOG.warn("Session $this is probably frozen, forcibly shutting down")
                     process.destroyForcibly()
-                    if (!process.waitForSafe(10, TimeUnit.SECONDS)) {
+                    if (!process.waitFor(10, TimeUnit.SECONDS)) {
                         LOG.warn("Session $this is frozen and can't be shut down")
-                        return -1
+                        return -2
                     }
                 }
             }
-            return process.exitValue()
+
+            return try { process.exitValue() } catch (e:IllegalThreadStateException) { -1 }
         }
 
         fun isDead():Boolean = !process.isAlive
 
-        fun task(task: CharSequence, taskData: OutputStream, taskOutput: OutputStream):Int {
+        fun task(task: CharSequence, taskData: Writer):Int {
             try {
                 // Read extra data/output in buffers
-                emptyBuffers("before task '$task' was run")
+                this.taskOutput = taskData
 
                 output.append(task).append('\n')
                 output.flush()
 
-                // Read data until \0
-                val dataOk = run {
-                    val extraData:ByteArrayOutputStream
+                waitingForTaskSemaphore.acquire()
 
-                    while (true) {
-                        // Read all output, process may be blocking on it
-                        readFully(taskOutput, errorStream)
-
-                        // Read data, if any
-                        val available = minOf(inputStream.available(), buffer.size)
-                        val size = inputStream.read(buffer, 0, available)
-                        if (size == -1) {
-                            // Premature exit, error perhaps?
-                            return@run false
-                        }
-
-                        var zeroAt = -1
-                        for (i in 0 until size) {
-                            if (buffer[i] == 0.toByte()) {
-                                zeroAt = i
-                                break
-                            }
-                        }
-
-                        if (zeroAt == -1) {
-                            // There is still more data
-                            taskData.write(buffer, 0, size)
-                            if (available == 0) {
-                                // Still no data... are we dead?
-                                if (!process.isAlive) {
-                                    return@run false
-                                }
-                                Thread.yield()
-                            }
-                        } else {
-                            taskData.write(buffer, 0, zeroAt)
-                            if (zeroAt == size - 1) {
-                                // There is no more data, and we have found a correct end
-                                return@run true
-                            } else {
-                                // We have all data we need, but there is still some more data?
-                                extraData = extraDataStreamCache
-                                extraData.write(buffer, zeroAt + 1, size - (zeroAt + 1))
-                                break
-                            }
-                        }
-                    }
-
-                    readFully(extraData, inputStream)
-                    LOG.warn("Extra data for task '$task' found: ${extraData.contentToString()}")
-                    return@run true
-                }
-
-                // We have all the data we need, maybe even more.
-                // taskOutput has been filled slowly during the data reading, read whatever it may contain next
-                readFully(taskOutput, errorStream)
-
-                return if (dataOk) {
+                return if (this.taskOutput == null) {
                     ResultStatus.SUCCESS.number
                 } else {
+                    // Semaphore was released because the stream was ended, not becauase the request completed
                     close()
                 }
             } catch (e:Exception) {
@@ -532,29 +485,12 @@ class WemiLauncherSession(
                 throw e
             }
         }
-
-        fun readOutputInteractive(stdout: OutputStream, stderr: OutputStream, input:InputStream) {
-            while (true) {
-                val out = readFully(stdout, inputStream)
-                val err = readFully(stderr, errorStream)
-                if (readFully(outputStream, input) > 0) {
-                    outputStream.flush()
-                }
-
-                if (out == 0 && err == 0 && !process.isAlive) {
-                    break
-                }
-
-                //TODO Solve this busy-loop
-                Thread.sleep(1)
-            }
-        }
     }
 
     companion object {
         private val LOG = Logger.getInstance(WemiLauncherSession::class.java)
 
-        data class Result (val status:ResultStatus, val data:JsonValue?, val output:String)
+        data class Result (val status:ResultStatus, val data:JsonValue?)
 
         enum class ResultStatus(val number:Int) {
             SUCCESS(0),
@@ -565,7 +501,9 @@ class WemiLauncherSession(
             MACHINE_OUTPUT_NO_PROJECT_ERROR(5),
             MACHINE_OUTPUT_NO_CONFIGURATION_ERROR(6),
             MACHINE_OUTPUT_NO_KEY_ERROR(7),
-            MACHINE_OUTPUT_KEY_NOT_SET_ERROR(8)
+            MACHINE_OUTPUT_KEY_NOT_SET_ERROR(8),
+
+            CORRUPTED_RESPONSE_FORMAT(-1)
         }
 
         fun statusForNumber(number: Int):ResultStatus {

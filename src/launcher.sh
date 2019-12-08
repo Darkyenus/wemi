@@ -30,12 +30,14 @@
 #			WEMI_JDK_IMPLEMENTATION - implementation of JDK, default is 'hotspot'
 #			WEMI_JDK_HEAP_SIZE - heap size for which the JDK is build, default is 'normal'
 #			WEMI_JDK_RELEASE - specific release number of requested JDK, default is 'latest'
-#		Parameters (must appear first, before parameters for Wemi itself, and in this order):
+#		Parameters (must appear first, before parameters for Wemi itself):
 #			--java=<number> - same as WEMI_JAVA, with higher precedence
 #			--debug									-|
 #			--debug=<port>					-| launch Wemi with debugger on specified <port> or 5005,
 #			--debug-suspend					-| optionally suspended until debugger connects
 #			--debug-suspend=<port> 	-|
+#			--print-java-exe	- Print path to java executable that would be used and exit
+#			--print-wemi-home	- Print path to directory with Wemi jars and exit
 
 readonly wemi_version='0.10-SNAPSHOT'
 readonly java_min_version='8'
@@ -44,13 +46,32 @@ log() { echo "$@" 1>&2; }
 fail() { log "$@"; exit 1; }
 fail_unsatisfied() { log "Unsatisfied software dependency - install this software and try again: $*"; exit 2; }
 
-{
-	# Detect Java version (from --java=<version|home> argument, WEMI_JAVA env-var, or default)
+# Parse command line options
+print_java_exe=false
+print_wemi_home=false
+while true; do
 	if echo "$1" | grep -q -x -e '--java=.*' ; then
-		version_="${1#--java=}"
-		shift
-		readonly java_version_forced=true
-	elif [ -n "$WEMI_JAVA" ]; then
+		WEMI_JAVA="${1#--java=}"
+	elif echo "$1" | grep -E -q -x -e '--debug(-suspend|=[0-9]+|-suspend=[0-9]+)?'; then
+		suspend_='n'
+		# Parse --debug, --debug-suspend, --debug=<port> and --debug-suspend=<port> flags, which are mutually exclusive and
+		# must be the first flag to appear.
+		echo "$1" | grep -q -e 'suspend' && suspend_='y'
+		port_="$(echo "$1" | sed 's/[^0-9]*\([0-9]*\)[^0-9]*/\1/')"
+		WEMI_JAVA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=${suspend_},address=${port_:-5005} ${WEMI_JAVA_OPTS}"
+	elif [ "$1" = '--print-java-exe' ]; then
+		print_java_exe=true
+	elif [ "$1" = '--print-wemi-home' ]; then
+		print_wemi_home=true
+	else
+		break
+	fi
+	shift
+done
+
+{
+	# Detect Java version (from WEMI_JAVA env-var (includes --java=<>, or default)
+	if [ -n "$WEMI_JAVA" ]; then
 		version_="${WEMI_JAVA}"
 		readonly java_version_forced=true
 	else
@@ -462,16 +483,6 @@ launch_wemi() {
 	wemi_dist_dir_="$(fetch_wemi)"
 	java_options_="${WEMI_JAVA_OPTS}"
 
-	# Parse --debug, --debug-suspend, --debug=<port> and --debug-suspend=<port> flags, which are mutually exclusive and
-	# must be the first flag to appear.
-	if echo "$1" | grep -E -q -x -e '--debug(-suspend|=[0-9]+|-suspend=[0-9]+)?'; then
-		suspend_='n'
-		echo "$1" | grep -q -e 'suspend' && suspend_='y'
-		port_="$(echo "$1" | sed 's/[^0-9]*\([0-9]*\)[^0-9]*/\1/')"
-		java_options_="${java_options_} -agentlib:jdwp=transport=dt_socket,server=y,suspend=${suspend_},address=${port_:-5005}"
-		shift
-	fi
-
 	wemi_root_="$(dirname "$0")"
 	wemi_root_="${WEMI_ROOT:-$wemi_root_}"
 
@@ -485,4 +496,10 @@ launch_wemi() {
 	done
 }
 
-launch_wemi "$@"
+if [ "$print_java_exe" = 'true' ]; then
+	fetch_java
+elif [ "$print_wemi_home" = 'true' ]; then
+	fetch_wemi
+else
+	launch_wemi "$@"
+fi

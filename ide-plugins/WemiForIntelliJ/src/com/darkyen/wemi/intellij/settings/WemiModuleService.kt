@@ -1,24 +1,24 @@
-package com.darkyen.wemi.intellij.module
+package com.darkyen.wemi.intellij.settings
 
 import com.intellij.openapi.components.PersistentStateComponent
-import com.intellij.openapi.module.ModuleComponent
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.State
 import com.intellij.util.xmlb.XmlSerializerUtil
 
-/**
- * Modules with this component belong to Wemi.
- */
-@com.intellij.openapi.components.State(name = "wemi.WemiModuleComponent", reloadable = true, defaultStateAsResource = false)
-class WemiModuleComponent : ModuleComponent, PersistentStateComponent<WemiModuleComponent> {
+/** Modules with this component belong to Wemi. */
+@Service
+@State(name = "wemi.WemiModuleService")
+class WemiModuleService : PersistentStateComponent<WemiModuleService> {
 
     /** Name of Wemi project corresponding to this module. */
-    var wemiModuleName:String? = null
+    var wemiProjectName:String? = null
 
     /** Type of Wemi module this represents. Null if this module is not a wemi module. */
-    var moduleType:WemiModuleType? = null
+    var wemiModuleType: WemiModuleType? = null
 
-    override fun getState(): WemiModuleComponent = this
+    override fun getState(): WemiModuleService = this
 
-    override fun loadState(state: WemiModuleComponent) {
+    override fun loadState(state: WemiModuleService) {
         XmlSerializerUtil.copyBean(state, this)
     }
 }

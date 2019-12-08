@@ -21,6 +21,7 @@
       <ul>
         <li>Compatibility with Wemi 0.10 (to 0.6)</li>
         <li>Major rewrite of Run configurations, should be much more reliable</li>
+        <li>Major rewrite of project importing</li>
         <li>Bug fixes</li>
       </ul>
     ]]>
@@ -36,32 +37,33 @@
     <depends>org.jetbrains.kotlin</depends>
 
     <actions>
-        <action id="com.darkyen.wemi.intellij.importing.ImportProjectAction"
-                class="com.darkyen.wemi.intellij.importing.ImportProjectAction"
+        <action id="com.darkyen.wemi.intellij.importing.actions.ImportProjectAction"
+                class="com.darkyen.wemi.intellij.importing.actions.ImportProjectAction"
                 text="Import Wemi Project"
                 description="Import an unlinked Wemi project in the project's root into the IDE"
                 icon="WemiIcons.ACTION">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
 
-        <action id="com.darkyen.wemi.intellij.importing.ConvertProjectAction"
-                class="com.darkyen.wemi.intellij.importing.ConvertProjectAction"
+        <action id="com.darkyen.wemi.intellij.importing.actions.ConvertProjectAction"
+                class="com.darkyen.wemi.intellij.importing.actions.ConvertProjectAction"
                 text="Convert to Wemi Project"
                 description="Convert project from different or not build system to Wemi"
                 icon="WemiIcons.ACTION">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
 
-        <action id="com.darkyen.wemi.intellij.importing.InstallWemiLauncherAction"
-                class="com.darkyen.wemi.intellij.importing.InstallWemiLauncherAction"
+        <!--suppress PluginXmlCapitalization -->
+        <action id="com.darkyen.wemi.intellij.importing.actions.InstallWemiLauncherAction"
+                class="com.darkyen.wemi.intellij.importing.actions.InstallWemiLauncherAction"
                 text="(Re)install Wemi launcher"
                 description="Place plugin's 'wemi' launcher file into the project's root, updating the existing one"
                 icon="WemiIcons.ACTION">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
 
-        <action id="com.darkyen.wemi.intellij.importing.ReloadProjectAction"
-                class="com.darkyen.wemi.intellij.importing.ReloadProjectAction"
+        <action id="com.darkyen.wemi.intellij.importing.actions.ReloadProjectAction"
+                class="com.darkyen.wemi.intellij.importing.actions.ReloadProjectAction"
                 text="Reload Wemi Project"
                 description="Re-import Wemi project in the project's root into the IDE"
                 icon="WemiIcons.ACTION">
@@ -70,27 +72,23 @@
         </action>
     </actions>
 
-    <module-components>
-        <component>
-            <implementation-class>com.darkyen.wemi.intellij.module.WemiModuleComponent</implementation-class>
-        </component>
-    </module-components>
-
     <extensions defaultExtensionNs="com.intellij">
         <!-- Import -->
+        <projectImportProvider implementation="com.darkyen.wemi.intellij.projectImport.ImportFromWemiProvider"/>
+        <projectImportBuilder implementation="com.darkyen.wemi.intellij.projectImport.ImportFromWemiBuilder"/>
+        <!--TODO <projectOpenProcessor implementation=""/>-->
+
         <postStartupActivity implementation="com.darkyen.wemi.intellij.importing.OfferImportStartupActivity"/>
-        <projectImportProvider implementation="com.darkyen.wemi.intellij.importing.WemiProjectImportProvider"/>
-        <projectImportBuilder implementation="com.darkyen.wemi.intellij.importing.ImportFromWemiControlBuilder"/>
-        <externalProjectDataService implementation="com.darkyen.wemi.intellij.importing.KotlinCompilerSettingsDataService"/>
-        <externalProjectDataService implementation="com.darkyen.wemi.intellij.importing.WemiModuleComponentDataService"/>
+
+        <!-- TODO Delete? Handle differently? -->
+        <externalProjectDataService implementation="com.darkyen.wemi.intellij.importing.dataServices.KotlinCompilerSettingsDataService"/>
+        <externalProjectDataService implementation="com.darkyen.wemi.intellij.importing.dataServices.WemiModuleComponentDataService"/>
 
         <!-- Settings -->
-        <projectService serviceImplementation="com.darkyen.wemi.intellij.settings.WemiSystemSettings"/>
-        <projectService serviceImplementation="com.darkyen.wemi.intellij.settings.WemiLocalSettings"/>
-
+        <moduleService serviceImplementation="com.darkyen.wemi.intellij.settings.WemiModuleService"/>
+        <moduleService serviceImplementation="com.darkyen.wemi.intellij.settings.WemiProjectService"/>
         <projectConfigurable groupId="build.tools" id="com.darkyen.wemi.configurable-settings"
-                             instance="com.darkyen.wemi.intellij.settings.WemiConfigurable"/>
-        <externalSystemConfigLocator implementation="com.darkyen.wemi.intellij.manager.WemiConfigLocator"/>
+                             instance="com.darkyen.wemi.intellij.settings.WemiProjectServiceConfigurable"/>
 
         <!-- Execution -->
         <configurationType implementation="com.darkyen.wemi.intellij.execution.WemiTaskConfigurationType"/>
@@ -98,17 +96,6 @@
         <stepsBeforeRunProvider implementation="com.darkyen.wemi.intellij.execution.WemiBeforeRunTaskProvider"/>
         <runConfigurationProducer implementation="com.darkyen.wemi.intellij.execution.WemiTaskConfigurationProducer"/>
         <projectTaskRunner order="first" implementation="com.darkyen.wemi.intellij.execution.WemiModuleBuildTaskRunner"/>
-
-        <!-- (get rid of later) -->
-        <externalSystemExecutionConsoleManager
-                implementation="com.darkyen.wemi.intellij.execution.WemiExecutionConsoleManager" order="last"/>
-
-        <!-- Manager -->
-        <externalSystemManager implementation="com.darkyen.wemi.intellij.manager.WemiManager"/>
-
-        <!-- Tasks -->
-        <externalSystemTaskNotificationListener
-                implementation="com.darkyen.wemi.intellij.importing.WemiProjectResolutionListener"/>
 
         <!-- File -->
         <fileIconProvider id="wemi-script-file" order="first" implementation="com.darkyen.wemi.intellij.file.ScriptIconProvider"/>

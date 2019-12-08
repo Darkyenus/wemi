@@ -2,6 +2,7 @@ package com.darkyen.wemi.intellij.importing
 
 import com.darkyen.wemi.intellij.WemiNotificationGroup
 import com.darkyen.wemi.intellij.findWemiLauncher
+import com.darkyen.wemi.intellij.importing.actions.ImportProjectAction
 import com.darkyen.wemi.intellij.showBalloon
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.notification.Notification
@@ -48,9 +49,9 @@ class OfferImportStartupActivity : StartupActivity {
     }
 
     companion object {
-        private val KEY_ASK_ABOUT_IMPORT = "com.darkyen.wemi.askedAboutImport"
-        private val HREF_IMPORT = "import"
-        private val HREF_HIDE = "hide"
+        private const val KEY_ASK_ABOUT_IMPORT = "com.darkyen.wemi.askedAboutImport"
+        private const val HREF_IMPORT = "import"
+        private const val HREF_HIDE = "hide"
     }
 }
 

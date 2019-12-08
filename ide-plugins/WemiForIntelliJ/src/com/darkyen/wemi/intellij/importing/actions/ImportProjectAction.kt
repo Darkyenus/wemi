@@ -1,8 +1,9 @@
-package com.darkyen.wemi.intellij.importing
+package com.darkyen.wemi.intellij.importing.actions
 
 import com.darkyen.wemi.intellij.WemiLauncher
 import com.darkyen.wemi.intellij.findWemiLauncher
-import com.darkyen.wemi.intellij.settings.WemiSystemSettings
+import com.darkyen.wemi.intellij.projectImport.ImportFromWemiProvider
+import com.darkyen.wemi.intellij.settings.WemiProjectService
 import com.intellij.ide.actions.ImportModuleAction
 import com.intellij.ide.util.newProjectWizard.AddModuleWizard
 import com.intellij.openapi.actionSystem.AnAction
@@ -46,10 +47,7 @@ class ImportProjectAction : AnAction("Import Wemi Project",
     companion object {
 
         fun canOfferImportOfUnlinkedProject(project: Project):Boolean {
-            if (project.isDefault) {
-                return false
-            }
-            if (!WemiSystemSettings.getInstance(project).linkedProjectsSettings.isEmpty() || project.guessProjectDir() == null) {
+            if (project.isDefault || project.getServiceIfCreated(WemiProjectService::class.java) != null || project.guessProjectDir() == null) {
                 return false
             }
             return true
@@ -57,7 +55,7 @@ class ImportProjectAction : AnAction("Import Wemi Project",
 
         fun importUnlinkedProject(project: Project, launcher: WemiLauncher) {
             val projectDirectory = launcher.file.parent
-            val wizard = AddModuleWizard(project, projectDirectory.toString(), WemiProjectImportProvider())
+            val wizard = AddModuleWizard(project, projectDirectory.toString(), ImportFromWemiProvider())
             if (wizard.stepCount <= 0 || wizard.showAndGet()) {
                 ImportModuleAction.createFromWizard(project, wizard)
             }

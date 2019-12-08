@@ -1,9 +1,6 @@
 @file:Suppress("ConstantConditionIf")
 
 import com.darkyen.wemi.intellij.WemiLauncherFileName
-import com.darkyen.wemi.intellij.WemiProjectSystemId
-import com.darkyen.wemi.intellij.external.WemiProjectResolver
-import com.darkyen.wemi.intellij.settings.WemiExecutionSettings
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationEvent
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
@@ -14,6 +11,7 @@ import java.lang.Exception
 /**
  *
  */
+/*
 
 val DEBUG_WEMI_LAUNCHER = false
 
@@ -77,4 +75,4 @@ fun main(args: Array<String>) {
             projectRoot.absolutePath, false, settings, externalSystemTaskNotificationListener)
 
     println("Done: $project")
-}
+}*/

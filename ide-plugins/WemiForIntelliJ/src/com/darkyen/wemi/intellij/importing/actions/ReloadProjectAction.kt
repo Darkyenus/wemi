@@ -1,35 +1,49 @@
-package com.darkyen.wemi.intellij.importing
+package com.darkyen.wemi.intellij.importing.actions
 
-import com.darkyen.wemi.intellij.WemiProjectSystemId
 import com.darkyen.wemi.intellij.file.isWemiScriptSource
-import com.darkyen.wemi.intellij.settings.WemiProjectSettings
-import com.darkyen.wemi.intellij.settings.WemiSystemSettings
+import com.darkyen.wemi.intellij.findWemiLauncher
+import com.darkyen.wemi.intellij.projectImport.ProjectNode
+import com.darkyen.wemi.intellij.projectImport.import
+import com.darkyen.wemi.intellij.projectImport.refreshProject
+import com.darkyen.wemi.intellij.settings.WemiProjectService
+import com.intellij.concurrency.ResultConsumer
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.externalSystem.service.execution.ProgressExecutionMode
-import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.util.concurrency.EdtExecutorService
 import icons.WemiIcons
 import org.jetbrains.kotlin.idea.refactoring.psiElement
 
-/**
- * Action to re-import the project explicitly.
- */
+/** Action to re-import the project explicitly. */
 class ReloadProjectAction : AnAction("Reload Wemi Project",
         "Re-import Wemi project in the project's root into the IDE",
         WemiIcons.ACTION) {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project
-        if (project == null || !canOfferReload(project)) {
+        val basePath = project?.basePath
+        if (project == null || basePath == null || !canOfferReload(project)) {
             e.presentation.isEnabledAndVisible = false
             return
         }
 
-        val basePath = WemiProjectSettings.getInstance(project)?.externalProjectPath ?: project.basePath!!
-        ExternalSystemUtil.refreshProject(project, WemiProjectSystemId, basePath, false, ProgressExecutionMode.START_IN_FOREGROUND_ASYNC)
+        val launcher = findWemiLauncher(project)
+        if (launcher == null) {
+            e.presentation.isEnabledAndVisible = false
+            return
+        }
+
+        val future = refreshProject(project, launcher,
+                project.getService(WemiProjectService::class.java)?.state?.options ?: return)
+        future.addConsumer(EdtExecutorService.getInstance(), object : ResultConsumer<ProjectNode> {
+            override fun onSuccess(value: ProjectNode) {
+                import(value, project)
+            }
+
+            override fun onFailure(t: Throwable) {}
+        })
     }
 
     override fun update(e: AnActionEvent) {
@@ -55,7 +69,7 @@ class ReloadProjectAction : AnAction("Reload Wemi Project",
             if (project.isDefault) {
                 return false
             }
-            if (!WemiSystemSettings.getInstance(project).linkedProjectsSettings.isEmpty() && project.guessProjectDir() != null) {
+            if (project.getServiceIfCreated(WemiProjectService::class.java) != null && project.guessProjectDir() != null) {
                 return true
             }
             return false
