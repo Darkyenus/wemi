@@ -31,7 +31,6 @@ import com.intellij.refactoring.listeners.RefactoringElementListener
 import com.intellij.terminal.TerminalExecutionConsole
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.net.NetUtils
-import com.intellij.util.xmlb.XmlSerializer
 import org.jdom.Element
 import org.jetbrains.kotlin.idea.run.KotlinRunConfigurationProducer
 import org.jetbrains.kotlin.psi.KtDeclarationContainer
@@ -176,12 +175,12 @@ class WemiTaskConfiguration(
 
     override fun readExternal(element: Element) {
         options = RunConfigOptions().apply {
-            XmlSerializer.deserializeInto(this, element)
+            readExternal(element)
         }
     }
 
     override fun writeExternal(element: Element) {
-        XmlSerializer.serializeInto(options, element)
+        options.writeExternal(element)
     }
 
     override fun setBeforeRunTasks(value: MutableList<BeforeRunTask<*>>) {

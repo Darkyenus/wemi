@@ -2,6 +2,7 @@ package com.darkyen.wemi.intellij.options
 
 import com.darkyen.wemi.intellij.ui.BooleanPropertyEditor
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
+import com.darkyen.wemi.intellij.util.BooleanXmlSerializer
 
 /** Options for Run configurations. */
 class RunConfigOptions : RunOptions() {
@@ -12,9 +13,10 @@ class RunConfigOptions : RunOptions() {
     // Run settings
     var debugWemiItself:Boolean = false
 
-    override fun createUi(panel: PropertyEditorPanel) {
-        super.createUi(panel)
-        panel.edit(BooleanPropertyEditor(this::debugWemiItself, "Debug build scripts", "Debugger will be attached to the Wemi process itself", "Debugger will be attached to any forked process"))
+    init {
+        register(RunConfigOptions::allowRunningInParallel, BooleanXmlSerializer::class)
+        register(RunConfigOptions::generatedName, BooleanXmlSerializer::class)
+        register(RunConfigOptions::debugWemiItself, BooleanXmlSerializer::class)
     }
 
     fun copyTo(o: RunConfigOptions) {
@@ -22,6 +24,11 @@ class RunConfigOptions : RunOptions() {
         o.allowRunningInParallel = allowRunningInParallel
         o.generatedName = generatedName
         o.debugWemiItself = debugWemiItself
+    }
+
+    override fun createUi(panel: PropertyEditorPanel) {
+        super.createUi(panel)
+        panel.edit(BooleanPropertyEditor(this::debugWemiItself, "Debug build scripts", "Debugger will be attached to the Wemi process itself", "Debugger will be attached to any forked process"))
     }
 
     override fun equals(other: Any?): Boolean {

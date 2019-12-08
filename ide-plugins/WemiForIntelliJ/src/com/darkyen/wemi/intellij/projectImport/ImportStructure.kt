@@ -168,7 +168,7 @@ private fun fillLibrary(library:Library, node:LibraryNode) {
 }
 
 private fun ProjectNode.importProjectNode(project: Project, modifiableModuleModel: ModifiableModuleModel, getRootModel:(Module) -> ModifiableRootModel, libraryModel: LibraryTable.ModifiableModel):List<Module> {
-	project.getService(WemiProjectService::class.java).state.tasks = tasks.map { it.taskName to it.taskDescription }.toMap()
+	project.getService(WemiProjectService::class.java).tasks = tasks.map { it.taskName to it.taskDescription }.toMap()
 
 	// Import Kotlin compiler data
 	run {

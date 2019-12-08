@@ -2,11 +2,16 @@ package com.darkyen.wemi.intellij.options
 
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
 import com.darkyen.wemi.intellij.ui.TaskListPropertyEditor
+import com.darkyen.wemi.intellij.util.ListOfStringArraysXmlSerializer
 
 /** General base for configurations that run tasks. */
 abstract class RunOptions : WemiLauncherOptions() {
 
     var tasks:List<Array<String>> = emptyList()
+
+    init {
+        register(RunOptions::tasks, ListOfStringArraysXmlSerializer::class)
+    }
 
     fun shortTaskSummary():String {
         val tasks = tasks

@@ -36,7 +36,7 @@ class ReloadProjectAction : AnAction("Reload Wemi Project",
         }
 
         val future = refreshProject(project, launcher,
-                project.getService(WemiProjectService::class.java)?.state?.options ?: return)
+                project.getService(WemiProjectService::class.java)?.options ?: return)
         future.addConsumer(EdtExecutorService.getInstance(), object : ResultConsumer<ProjectNode> {
             override fun onSuccess(value: ProjectNode) {
                 import(value, project)

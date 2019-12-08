@@ -4,15 +4,27 @@ import com.darkyen.wemi.intellij.ui.CommandArgumentEditor
 import com.darkyen.wemi.intellij.ui.EnvironmentVariablesEditor
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
 import com.darkyen.wemi.intellij.ui.WemiJavaExecutableEditor
+import com.darkyen.wemi.intellij.util.BooleanXmlSerializer
+import com.darkyen.wemi.intellij.util.ListOfStringXmlSerializer
+import com.darkyen.wemi.intellij.util.MapStringStringXmlSerializer
+import com.darkyen.wemi.intellij.util.StringXmlSerializer
+import com.darkyen.wemi.intellij.util.XmlSerializable
 
 /** Base options for Wemi launching. */
-abstract class WemiLauncherOptions {
+abstract class WemiLauncherOptions : XmlSerializable() {
 
 	var environmentVariables: Map<String, String> = emptyMap()
 	var passParentEnvironmentVariables:Boolean = true
 
 	var javaExecutable:String = ""
 	var javaOptions:List<String> = emptyList()
+
+	init {
+		register(WemiLauncherOptions::environmentVariables, MapStringStringXmlSerializer::class)
+		register(WemiLauncherOptions::passParentEnvironmentVariables, BooleanXmlSerializer::class)
+		register(WemiLauncherOptions::javaExecutable, StringXmlSerializer::class)
+		register(WemiLauncherOptions::javaOptions, ListOfStringXmlSerializer::class)
+	}
 
 	fun copyTo(o: WemiLauncherOptions) {
 		o.environmentVariables = environmentVariables

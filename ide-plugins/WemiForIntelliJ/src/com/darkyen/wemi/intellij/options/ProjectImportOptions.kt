@@ -3,6 +3,8 @@ package com.darkyen.wemi.intellij.options
 import com.darkyen.wemi.intellij.ui.BooleanPropertyEditor
 import com.darkyen.wemi.intellij.ui.CommandArgumentEditor
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
+import com.darkyen.wemi.intellij.util.BooleanXmlSerializer
+import com.darkyen.wemi.intellij.util.ListOfStringXmlSerializer
 
 /** Options for project importing */
 class ProjectImportOptions : WemiLauncherOptions() {
@@ -10,6 +12,12 @@ class ProjectImportOptions : WemiLauncherOptions() {
 	var prefixConfigurations:List<String> = emptyList()
 	var downloadSources:Boolean = true
 	var downloadDocumentation:Boolean = true
+
+	init {
+		register(ProjectImportOptions::prefixConfigurations, ListOfStringXmlSerializer::class)
+		register(ProjectImportOptions::downloadSources, BooleanXmlSerializer::class)
+		register(ProjectImportOptions::downloadDocumentation, BooleanXmlSerializer::class)
+	}
 
 	fun copyTo(o: ProjectImportOptions) {
 		copyTo(o as WemiLauncherOptions)

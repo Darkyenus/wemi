@@ -14,7 +14,7 @@ class WemiProjectServiceConfigurable(private val project: Project) : SearchableC
     override fun getDisplayName(): String = "Wemi"
 
     private val effectiveProjectSettings:ProjectImportOptions?
-        get() = project.getService(WemiProjectService::class.java)?.state?.options
+        get() = project.getService(WemiProjectService::class.java)?.options
 
     private val editorProjectSettings = ProjectImportOptions().also { editOptions ->
         effectiveProjectSettings?.copyTo(editOptions)

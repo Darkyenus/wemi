@@ -17,6 +17,7 @@ import com.intellij.openapi.rd.attach
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.Key
 import icons.WemiIcons
+import org.jdom.Element
 import org.jetbrains.concurrency.AsyncPromise
 import org.jetbrains.concurrency.Promise
 import javax.swing.JComponent
@@ -24,14 +25,14 @@ import javax.swing.JComponent
 val WemiBeforeRunTaskKey = Key.create<WemiBeforeRunTask>("Wemi.BeforeRunTask")
 
 /** Task that allows Wemi task to run before other tasks. */
-class WemiBeforeRunTask : BeforeRunTask<WemiBeforeRunTask>(WemiBeforeRunTaskKey), PersistentStateComponent<BeforeRunOptions> {
+class WemiBeforeRunTask : BeforeRunTask<WemiBeforeRunTask>(WemiBeforeRunTaskKey), PersistentStateComponent<Element> {
 
 	var options = BeforeRunOptions()
 
-	override fun getState(): BeforeRunOptions? = options
+	override fun getState(): Element? = options.state
 
-	override fun loadState(state: BeforeRunOptions) {
-		options = state
+	override fun loadState(state: Element) {
+		options.loadState(state)
 	}
 
 	override fun clone(): WemiBeforeRunTask {

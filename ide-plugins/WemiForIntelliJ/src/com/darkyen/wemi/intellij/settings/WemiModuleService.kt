@@ -1,36 +1,34 @@
 package com.darkyen.wemi.intellij.settings
 
-import com.intellij.openapi.components.PersistentStateComponent
+import com.darkyen.wemi.intellij.util.StringXmlSerializer
+import com.darkyen.wemi.intellij.util.XmlSerializable
+import com.darkyen.wemi.intellij.util.enumXmlSerializer
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
-import com.intellij.util.xmlb.XmlSerializerUtil
 
 /** Modules with this component belong to Wemi. */
 @Service
 @State(name = "wemi.WemiModuleService")
-class WemiModuleService : PersistentStateComponent<WemiModuleService> {
+class WemiModuleService : XmlSerializable() {
 
     /** Name of Wemi project corresponding to this module. */
-    var wemiProjectName:String? = null
+    var wemiProjectName:String = ""
 
     /** Type of Wemi module this represents. Null if this module is not a wemi module. */
-    var wemiModuleType: WemiModuleType? = null
+    var wemiModuleType: WemiModuleType = WemiModuleType.NON_WEMI_MODULE
 
-    override fun getState(): WemiModuleService = this
-
-    override fun loadState(state: WemiModuleService) {
-        XmlSerializerUtil.copyBean(state, this)
+    init {
+        register(WemiModuleService::wemiProjectName, StringXmlSerializer::class)
+        register(WemiModuleService::wemiModuleType, enumXmlSerializer())
     }
 }
 
 enum class WemiModuleType {
-    /**
-     * Standard Wemi project module.
-     */
+    /** This module does not belong to Wemi. */
+    NON_WEMI_MODULE,
+    /** Standard Wemi project module. */
     PROJECT,
-    /**
-     * Build script-holding module.
-     * For example, it is not possible to execute tasks on these modules.
-     */
+    /** Build script-holding module.
+     * For example, it is not possible to execute tasks on these modules. */
     BUILD_SCRIPT
 }

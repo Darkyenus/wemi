@@ -38,12 +38,12 @@ class ImportFromWemiControl : AbstractSettingsControl() {
 
     public override fun reset(wizardContext: WizardContext?, project: Project?) {
         super.reset(wizardContext, project)
-        this.project?.getService(WemiProjectService::class.java)?.state?.options?.copyTo(options)
+        this.project?.getService(WemiProjectService::class.java)?.options?.copyTo(options)
         optionsEditor.loadFromProperties()
     }
 
     fun apply() {
-        this.project?.getService(WemiProjectService::class.java)?.state?.let { projectState ->
+        this.project?.getService(WemiProjectService::class.java)?.let { projectState ->
             optionsEditor.saveToProperties()
             options.copyTo(projectState.options)
         }
