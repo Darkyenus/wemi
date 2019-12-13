@@ -5,6 +5,7 @@ import com.darkyen.wemi.intellij.importing.reinstallWemiLauncher
 import com.darkyen.wemi.intellij.options.ProjectImportOptions
 import com.darkyen.wemi.intellij.util.getWemiCompatibleSdk
 import com.intellij.ide.util.projectWizard.WizardContext
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.module.ModifiableModuleModel
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.options.ConfigurationException
@@ -37,7 +38,9 @@ class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
     }
 
     override fun commit(project: Project, model: ModifiableModuleModel?, modulesProvider: ModulesProvider?, artifactModel: ModifiableArtifactModel?): List<Module> {
-        return importProjectStructureToIDE(this.projectNode!!, project, model)
+        return WriteAction.compute<List<Module>, Nothing> {
+            importProjectStructureToIDE(this.projectNode!!, project, model)
+        }
     }
 
     /**

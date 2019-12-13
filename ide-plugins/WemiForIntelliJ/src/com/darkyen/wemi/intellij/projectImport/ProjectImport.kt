@@ -34,6 +34,8 @@ import com.intellij.concurrency.AsyncFutureFactory
 import com.intellij.concurrency.ResultConsumer
 import com.intellij.icons.AllIcons
 import com.intellij.notification.NotificationType
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.TransactionGuard
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.diagnostic.Logger
@@ -66,7 +68,7 @@ fun importWemiProject(project:Project, initial:Boolean) {
 			override fun onSuccess(value: ProjectNode) {
 				TransactionGuard.submitTransaction(project, Runnable {
 					WriteAction.run<Nothing> {
-						importProjectStructureToIDE(value, project)
+						importProjectStructureToIDE(value, project, importProjectName = initial)
 					}
 				})
 			}
@@ -138,7 +140,9 @@ fun importWemiProjectStructure(project: Project?, launcher: WemiLauncher, option
 				)
 
 				if (activateToolWindow && project != null && syncViewManager != null) {
-					ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.BUILD)?.show(null)
+					ApplicationManager.getApplication().invokeLater({
+						ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.BUILD)?.show(null)
+					}, ModalityState.NON_MODAL)
 				}
 			}
 

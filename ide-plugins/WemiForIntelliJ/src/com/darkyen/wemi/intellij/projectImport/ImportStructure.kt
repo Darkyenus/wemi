@@ -14,6 +14,7 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.module.StdModuleTypes
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ex.ProjectEx
 import com.intellij.openapi.projectRoots.JavaSdkVersion
 import com.intellij.openapi.roots.CompilerModuleExtension
 import com.intellij.openapi.roots.CompilerProjectExtension
@@ -43,6 +44,7 @@ import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
 import org.jetbrains.kotlin.idea.compiler.configuration.BaseKotlinCompilerSettings
 import org.jetbrains.kotlin.idea.compiler.configuration.Kotlin2JvmCompilerArgumentsHolder
 import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCommonCompilerArgumentsHolder
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -118,6 +120,8 @@ class LibraryDependencyNode(
 		val scope: DependencyScope,
 		val isExported:Boolean)
 
+private val LOG = LoggerFactory.getLogger("Wemi.ImportStructure")
+
 private fun <T: Freezable> settings(from: BaseKotlinCompilerSettings<T>, cache:T?):T {
 	@Suppress("UNCHECKED_CAST")
 	return cache ?: from.settings.unfrozen() as T
@@ -165,7 +169,7 @@ private fun fillLibrary(library:Library, node:LibraryNode) {
 	}
 }
 
-private fun ProjectNode.importProjectNode(project: Project, modifiableModuleModel: ModifiableModuleModel, getRootModel:(Module) -> ModifiableRootModel, libraryModel: LibraryTable.ModifiableModel):List<Module> {
+private fun ProjectNode.importProjectNode(project: Project, modifiableModuleModel: ModifiableModuleModel, getRootModel:(Module) -> ModifiableRootModel, libraryModel: LibraryTable.ModifiableModel, importProjectName:Boolean):List<Module> {
 	project.getService(WemiProjectService::class.java).tasks = tasks.map { it.taskName to it.taskDescription }.toMap()
 
 	// Import Kotlin compiler data
@@ -222,6 +226,16 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 		}
 	}
 
+	// Import project info
+	if (importProjectName && project.name != this.name && project is ProjectEx) {
+		try {
+			project.setProjectName(name)
+		} catch (e:Exception) {
+			LOG.warn("Failed to rename project", e)
+		}
+	}
+
+	// Import module info
 	val ideModulesToRemove = modifiableModuleModel.modules.toMutableSet()
 	val wemiModules = HashMap<String, Module>()
 
@@ -325,7 +339,7 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 }
 
 /** CALL IN TransactionGuard!!! */
-fun importProjectStructureToIDE(node:ProjectNode, project:Project, providedModifiableModuleModel: ModifiableModuleModel? = null): List<Module> {
+fun importProjectStructureToIDE(node:ProjectNode, project:Project, providedModifiableModuleModel: ModifiableModuleModel? = null, importProjectName:Boolean = false): List<Module> {
 	val moduleModel = providedModifiableModuleModel ?: ModuleManager.getInstance(project).modifiableModel
 	val rootModels = HashMap<Module, ModifiableRootModel>()
 	val getRootModel:(Module) -> ModifiableRootModel = { module ->
@@ -338,7 +352,7 @@ fun importProjectStructureToIDE(node:ProjectNode, project:Project, providedModif
 
 	var success = false
 	try {
-		val importedModules = node.importProjectNode(project, moduleModel, getRootModel, libraryModel)
+		val importedModules = node.importProjectNode(project, moduleModel, getRootModel, libraryModel, importProjectName)
 		success = true
 		result.addAll(importedModules)
 	} finally {
@@ -367,6 +381,8 @@ fun importProjectStructureToIDE(node:ProjectNode, project:Project, providedModif
 		} else {
 			Disposer.dispose(libraryModel)
 		}
+
+		project.save()
 	}
 
 	return result
