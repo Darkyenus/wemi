@@ -22,7 +22,6 @@ import com.intellij.build.events.EventResult
 import com.intellij.build.events.impl.FailureResultImpl
 import com.intellij.build.events.impl.FinishBuildEventImpl
 import com.intellij.build.events.impl.FinishEventImpl
-import com.intellij.build.events.impl.ProgressBuildEventImpl
 import com.intellij.build.events.impl.StartBuildEventImpl
 import com.intellij.build.events.impl.StartEventImpl
 import com.intellij.build.events.impl.SuccessResultImpl
@@ -42,11 +41,13 @@ import com.intellij.openapi.roots.DependencyScope
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.StreamUtil
 import com.intellij.pom.java.LanguageLevel
-import com.intellij.util.containers.IntArrayList
 import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.concurrent.atomic.AtomicInteger
+
+private val refreshProjectVisualizationTreeRootNextId = AtomicInteger(1)
 
 /** Start project import process. */
 fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectImportOptions) : AsyncFuture<ProjectNode> {
@@ -72,7 +73,7 @@ fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectIm
 
 			val importTracker = object : SessionActivityTracker {
 
-				private val buildId = "WemiImportProject${System.nanoTime()}"
+				private val buildId = "WemiImportProject${refreshProjectVisualizationTreeRootNextId.getAndIncrement()}"
 				private val syncViewManager = project?.getService(SyncViewManager::class.java)
 				private val buildProcessHandler = object : BuildProcessHandler() {
 
@@ -107,6 +108,7 @@ fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectIm
 										templatePresentation.text = "Reimport Wemi Project"
 										templatePresentation.description = "Force reimport of selected Wemi project"
 									})
+							// I am not entirely sure what should this do, but maybe we'll want it in the future?
 							/*.withContentDescriptorSupplier {
 								if (consoleView == null) {
 									null
@@ -140,15 +142,12 @@ fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectIm
 				private val NoResult = object : EventResult {}
 
 				private val stageStack = ArrayList<String>()
-				private val stageTasksStack = IntArrayList()
 				private val taskStack = ArrayList<String>()
 
 				override fun stageBegin(name: String) {
 					checkIfCancelled()
+					syncViewManager?.onEvent(buildId, StartEventImpl(name, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), name))
 					stageStack.add(name)
-					stageTasksStack.add(0)
-					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name, -1, 0, "tasks"))
-					syncViewManager?.onEvent(buildId, StartEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name))
 				}
 
 				override fun stageEnd() {
@@ -158,16 +157,13 @@ fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectIm
 						return
 					}
 					val last = stageStack.removeAt(stageStack.lastIndex)
-					val taskCount = stageTasksStack.remove(stageTasksStack.size() - 1)
-					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, taskCount.toLong(), taskCount.toLong(), "tasks"))
-					syncViewManager?.onEvent(buildId, FinishEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, NoResult))
+					syncViewManager?.onEvent(buildId, FinishEventImpl(last, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), last, NoResult))
 				}
 
 				override fun taskBegin(name: String) {
 					checkIfCancelled()
 					taskStack.add(name)
-					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name, 100, 0, "%"))
-					syncViewManager?.onEvent(buildId, StartEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name))
+					syncViewManager?.onEvent(buildId, StartEventImpl(name, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), name))
 				}
 
 				override fun taskEnd() {
@@ -177,16 +173,7 @@ fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectIm
 						return
 					}
 					val last = taskStack.removeAt(taskStack.lastIndex)
-					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, 100, 100, "%"))
-					syncViewManager?.onEvent(buildId, FinishEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, NoResult))
-
-					if (stageStack.isNotEmpty()) {
-						val index = stageStack.lastIndex
-						val activeStage = stageStack[index]
-						val newTaskCount = stageTasksStack.get(index) + 1
-						stageTasksStack.setQuick(index, newTaskCount)
-						syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(activeStage, stageStack.getOrNull(index - 1), System.currentTimeMillis(), activeStage, newTaskCount.toLong(), newTaskCount.toLong(), "tasks"))
-					}
+					syncViewManager?.onEvent(buildId, FinishEventImpl(last, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), last, NoResult))
 				}
 
 			}
