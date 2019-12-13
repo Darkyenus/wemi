@@ -12,6 +12,7 @@ import com.intellij.concurrency.ResultConsumer
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.application.TransactionGuard
 import com.intellij.util.concurrency.EdtExecutorService
 import icons.WemiIcons
 import org.jetbrains.kotlin.idea.refactoring.psiElement
@@ -50,7 +51,9 @@ class ReloadProjectAction : AnAction("Reload Wemi Project",
             val future = refreshProject(project, launcher, options)
             future.addConsumer(EdtExecutorService.getInstance(), object : ResultConsumer<ProjectNode> {
                 override fun onSuccess(value: ProjectNode) {
-                    import(value, project)
+                    TransactionGuard.submitTransaction(project, Runnable {
+                        import(value, project)
+                    })
                 }
 
                 override fun onFailure(t: Throwable) {}

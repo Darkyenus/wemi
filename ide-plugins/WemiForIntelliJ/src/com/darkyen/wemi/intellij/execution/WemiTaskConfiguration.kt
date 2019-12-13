@@ -1,7 +1,7 @@
 package com.darkyen.wemi.intellij.execution
 
 import com.darkyen.wemi.intellij.WemiLauncher
-import com.darkyen.wemi.intellij.findWemiLauncher
+import com.darkyen.wemi.intellij.importing.getWemiLauncher
 import com.darkyen.wemi.intellij.options.RunConfigOptions
 import com.intellij.execution.BeforeRunTask
 import com.intellij.execution.DefaultExecutionResult
@@ -87,7 +87,7 @@ class WemiTaskConfiguration(
     class WemiRunProfileState(private val project:Project, val options: RunConfigOptions, val debugPort:Int) : RunProfileState {
 
         override fun execute(executor: Executor?, runner: ProgramRunner<*>): ExecutionResult {
-            val launcher = findWemiLauncher(project) ?: throw ExecutionException("Wemi launcher is missing")
+            val launcher = project.getWemiLauncher() ?: throw ExecutionException("Wemi launcher is missing")
             val debugScheme =
                     if (debugPort <= 0)
                         WemiLauncher.DebugScheme.DISABLED
@@ -95,7 +95,7 @@ class WemiTaskConfiguration(
                         WemiLauncher.DebugScheme.WEMI_BUILD_SCRIPTS
                     else
                         WemiLauncher.DebugScheme.WEMI_FORKED_PROCESSES
-            val process: OSProcessHandler = launcher.createWemiProcessHandler(options, debugPort, debugScheme, allowBrokenBuildScripts = false, interactive = false, machineReadable = false)
+            val process: OSProcessHandler = launcher.createWemiProcessHandler(options, true, true, debugPort, debugScheme, allowBrokenBuildScripts = false, interactive = false, machineReadable = false)
             val terminal = TerminalExecutionConsole(project, process)
 
             return DefaultExecutionResult(terminal, process, *AnAction.EMPTY_ARRAY)

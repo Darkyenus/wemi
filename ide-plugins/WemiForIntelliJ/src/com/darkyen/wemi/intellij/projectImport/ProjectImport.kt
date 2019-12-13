@@ -18,10 +18,13 @@ import com.darkyen.wemi.intellij.util.update
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.build.DefaultBuildDescriptor
 import com.intellij.build.SyncViewManager
+import com.intellij.build.events.EventResult
 import com.intellij.build.events.impl.FailureResultImpl
 import com.intellij.build.events.impl.FinishBuildEventImpl
+import com.intellij.build.events.impl.FinishEventImpl
 import com.intellij.build.events.impl.ProgressBuildEventImpl
 import com.intellij.build.events.impl.StartBuildEventImpl
+import com.intellij.build.events.impl.StartEventImpl
 import com.intellij.build.events.impl.SuccessResultImpl
 import com.intellij.build.process.BuildProcessHandler
 import com.intellij.concurrency.AsyncFuture
@@ -49,7 +52,7 @@ import java.nio.file.Paths
 fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectImportOptions) : AsyncFuture<ProjectNode> {
 	val futureResult = AsyncFutureFactory.getInstance().createAsyncFutureResult<ProjectNode>()
 
-	object : Task.Backgroundable(project, "Importing Wemi Project", true, PerformInBackgroundOption.DEAF) {
+	object : Task.Backgroundable(project, "Importing Wemi Project", true, PerformInBackgroundOption { project != null }) {
 
 		override fun run(indicator: ProgressIndicator) {
 			if (project == null) {
@@ -116,7 +119,6 @@ fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectIm
 								}
 							}*/
 					)
-
 				}
 
 				fun importSuccess() {
@@ -135,6 +137,8 @@ fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectIm
 					syncViewManager?.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Cancelled", FailureResultImpl("Import was cancelled")))
 				}
 
+				private val NoResult = object : EventResult {}
+
 				private val stageStack = ArrayList<String>()
 				private val stageTasksStack = IntArrayList()
 				private val taskStack = ArrayList<String>()
@@ -144,6 +148,7 @@ fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectIm
 					stageStack.add(name)
 					stageTasksStack.add(0)
 					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name, -1, 0, "tasks"))
+					syncViewManager?.onEvent(buildId, StartEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name))
 				}
 
 				override fun stageEnd() {
@@ -155,12 +160,14 @@ fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectIm
 					val last = stageStack.removeAt(stageStack.lastIndex)
 					val taskCount = stageTasksStack.remove(stageTasksStack.size() - 1)
 					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, taskCount.toLong(), taskCount.toLong(), "tasks"))
+					syncViewManager?.onEvent(buildId, FinishEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, NoResult))
 				}
 
 				override fun taskBegin(name: String) {
 					checkIfCancelled()
 					taskStack.add(name)
 					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name, 100, 0, "%"))
+					syncViewManager?.onEvent(buildId, StartEventImpl(name, stageStack.lastOrNull(), System.currentTimeMillis(), name))
 				}
 
 				override fun taskEnd() {
@@ -171,6 +178,7 @@ fun refreshProject(project: Project?, launcher: WemiLauncher, options: ProjectIm
 					}
 					val last = taskStack.removeAt(taskStack.lastIndex)
 					syncViewManager?.onEvent(buildId, ProgressBuildEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, 100, 100, "%"))
+					syncViewManager?.onEvent(buildId, FinishEventImpl(last, stageStack.lastOrNull(), System.currentTimeMillis(), last, NoResult))
 
 					if (stageStack.isNotEmpty()) {
 						val index = stageStack.lastIndex
@@ -234,7 +242,7 @@ private fun gatherWemiProjectData(launcher:WemiLauncher,
 	try {
 		session = tracker.stage("Creating session") {
 			WemiLauncherSession(launcher, options, {
-				launcher.createWemiProcess(options, -1, WemiLauncher.DebugScheme.DISABLED, allowBrokenBuildScripts = true, interactive = true, machineReadable = true)
+				launcher.createWemiProcess(options, false, true,-1, WemiLauncher.DebugScheme.DISABLED, allowBrokenBuildScripts = true, interactive = true, machineReadable = true)
 			}, options.prefixConfigurations, tracker)
 		}
 

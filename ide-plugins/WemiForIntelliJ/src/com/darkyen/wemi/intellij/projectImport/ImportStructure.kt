@@ -9,7 +9,6 @@ import com.darkyen.wemi.intellij.util.toUrl
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.compiler.CompilerConfiguration
 import com.intellij.ide.highlighter.ModuleFileType
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.module.ModifiableModuleModel
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
@@ -30,7 +29,6 @@ import com.intellij.openapi.roots.impl.ModifiableModelCommitter
 import com.intellij.openapi.roots.libraries.Library
 import com.intellij.openapi.roots.libraries.LibraryTable
 import com.intellij.openapi.roots.libraries.LibraryTablesRegistrar
-import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.Disposer
 import com.intellij.pom.java.LanguageLevel
 import org.jetbrains.jps.model.java.JavaResourceRootProperties
@@ -326,6 +324,7 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 	return wemiModules.values.toList()
 }
 
+/** CALL IN TransactionGuard!!! */
 fun import(node:ProjectNode, project:Project, providedModifiableModuleModel: ModifiableModuleModel? = null): List<Module> {
 	val moduleModel = providedModifiableModuleModel ?: ModuleManager.getInstance(project).modifiableModel
 	val rootModels = HashMap<Module, ModifiableRootModel>()
@@ -335,40 +334,40 @@ fun import(node:ProjectNode, project:Project, providedModifiableModuleModel: Mod
 
 	val libraryModel = LibraryTablesRegistrar.getInstance().getLibraryTable(project).modifiableModel
 
-	return ApplicationManager.getApplication().runWriteAction( Computable {
-		var success = false
-		try {
-			val result = node.importProjectNode(project, moduleModel, getRootModel, libraryModel)
-			success = true
-			return@Computable result
-		} finally {
-			ApplicationManager.getApplication().runWriteAction {
-				if (providedModifiableModuleModel == null) {
-					if (success) {
-						ModifiableModelCommitter.multiCommit(rootModels.values, moduleModel)
-					} else {
-						for (model in rootModels.values) {
-							model.dispose()
-						}
-						moduleModel.dispose()
-					}
-				} else {
-					if (success) {
-						for (model in rootModels.values) {
-							model.commit()
-						}
-					} else {
-						for (model in rootModels.values) {
-							model.dispose()
-						}
-					}
+	val result = ArrayList<Module>()
+
+	var success = false
+	try {
+		val importedModules = node.importProjectNode(project, moduleModel, getRootModel, libraryModel)
+		success = true
+		result.addAll(importedModules)
+	} finally {
+		if (providedModifiableModuleModel == null) {
+			if (success) {
+				ModifiableModelCommitter.multiCommit(rootModels.values, moduleModel)
+			} else {
+				for (model in rootModels.values) {
+					model.dispose()
 				}
-				if (success) {
-					libraryModel.commit()
-				} else {
-					Disposer.dispose(libraryModel)
+				moduleModel.dispose()
+			}
+		} else {
+			if (success) {
+				for (model in rootModels.values) {
+					model.commit()
+				}
+			} else {
+				for (model in rootModels.values) {
+					model.dispose()
 				}
 			}
 		}
-	})
+		if (success) {
+			libraryModel.commit()
+		} else {
+			Disposer.dispose(libraryModel)
+		}
+	}
+
+	return result
 }

@@ -1,3 +1,5 @@
+@file:Suppress("BooleanLiteralArgument")
+
 package com.darkyen.wemi.intellij
 
 import com.darkyen.wemi.intellij.file.isWemiLauncher
@@ -8,7 +10,6 @@ import com.darkyen.wemi.intellij.util.OSProcessHandlerForWemi
 import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.collectOutputAndKill
 import com.darkyen.wemi.intellij.util.executable
-import com.darkyen.wemi.intellij.util.toPath
 import com.esotericsoftware.jsonbeans.JsonException
 import com.esotericsoftware.jsonbeans.JsonReader
 import com.esotericsoftware.jsonbeans.JsonValue
@@ -16,8 +17,6 @@ import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.process.ProcessIOExecutorService
 import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.StreamUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -82,19 +81,7 @@ fun wemiDirectoryToImport(base: VirtualFile): VirtualFile? {
     return null
 }
 
-/** Finds project's Wemi launcher, if present.
- * Should be fairly cheap. */
-@Deprecated("")
-fun findWemiLauncher(project:Project):WemiLauncher? {
-    if (project.isDefault)
-        return null
-    val wemiJar = project.guessProjectDir().toPath()?.resolve(WemiLauncherFileName)?.toAbsolutePath() ?: return null
-
-    if (!Files.isRegularFile(wemiJar)) return null
-
-    return WemiLauncher(wemiJar)
-}
-
+/** Finds Wemi launcher in given directory, if present. */
 fun findWemiLauncher(projectDir:Path):WemiLauncher? {
     val wemiJar = projectDir.resolve(WemiLauncherFileName).toAbsolutePath()
 
@@ -130,7 +117,7 @@ class WemiLauncher internal constructor(val file: Path) {
         }
 
         return try {
-            val process = createWemiProcessBuilder(options, listOf("--print-wemi-home"), emptyList(), -1, DebugScheme.DISABLED).first.start()
+            val process = createWemiProcessBuilder(options, false, false, listOf("--print-wemi-home"), emptyList(), -1, DebugScheme.DISABLED).first.start()
             StreamUtil.closeStream(process.outputStream)
             val result = process.collectOutputAndKill(10, TimeUnit.SECONDS).toString()
             if (result.isNotBlank()) {
@@ -153,14 +140,15 @@ class WemiLauncher internal constructor(val file: Path) {
 
     private fun pre010_createWemiProcessBuilder(
             options: WemiLauncherOptions,
+            color:Boolean, unicode:Boolean,
             arguments:List<String>, tasks:List<Array<String>>,
             debugPort:Int, debugConfig: DebugScheme) : Pair<PtyProcessBuilder, String> {
         val env = HashMap<String, String>()
         if (options.passParentEnvironmentVariables) {
             env.putAll(EnvironmentUtil.getEnvironmentMap())
         }
-        env["WEMI_COLOR"] = "true"
-        env["WEMI_UNICODE"] = "true"
+        env["WEMI_COLOR"] = color.toString()
+        env["WEMI_UNICODE"] = unicode.toString()
         env.putAll(options.environmentVariables)
 
         val commandLine = ArrayList<String>()
@@ -205,18 +193,19 @@ class WemiLauncher internal constructor(val file: Path) {
     }
 
     fun createWemiProcessBuilder(options: WemiLauncherOptions,
+                                 color:Boolean, unicode:Boolean,
                           arguments:List<String>, tasks:List<Array<String>>,
                           debugPort:Int, debugConfig: DebugScheme) : Pair<PtyProcessBuilder, String> {
         if (versionPre010) {
-            return pre010_createWemiProcessBuilder(options, arguments, tasks, debugPort, debugConfig)
+            return pre010_createWemiProcessBuilder(options, color, unicode, arguments, tasks, debugPort, debugConfig)
         }
 
         val env = HashMap<String, String>()
         if (options.passParentEnvironmentVariables) {
             env.putAll(EnvironmentUtil.getEnvironmentMap())
         }
-        env["WEMI_COLOR"] = "true"
-        env["WEMI_UNICODE"] = "true"
+        env["WEMI_COLOR"] = color.toString()
+        env["WEMI_UNICODE"] = unicode.toString()
         env.putAll(options.environmentVariables)
         if (options.javaExecutable.isNotBlank()) {
             env["WEMI_JAVA"] = options.javaExecutable
@@ -260,6 +249,7 @@ class WemiLauncher internal constructor(val file: Path) {
     }
 
     fun createWemiProcessHandler(options:WemiLauncherOptions,
+                                 color:Boolean, unicode:Boolean,
                                  debugPort:Int, debugConfig:DebugScheme,
                                  allowBrokenBuildScripts:Boolean,
                                  interactive:Boolean,
@@ -279,11 +269,12 @@ class WemiLauncher internal constructor(val file: Path) {
         // TODO(jp): Instanceof is a dangerous business
         val tasks = if (options is RunOptions) options.tasks else emptyList()
 
-        val (builder, commandLine) = createWemiProcessBuilder(options, arguments, tasks, debugPort, debugConfig)
+        val (builder, commandLine) = createWemiProcessBuilder(options, color, unicode, arguments, tasks, debugPort, debugConfig)
         return OSProcessHandlerForWemi(builder.start(), commandLine)
     }
 
     fun createWemiProcess(options:WemiLauncherOptions,
+                          color:Boolean, unicode:Boolean,
                                  debugPort:Int, debugConfig:DebugScheme,
                                  allowBrokenBuildScripts:Boolean,
                                  interactive:Boolean,
@@ -303,7 +294,7 @@ class WemiLauncher internal constructor(val file: Path) {
         // TODO(jp): Instanceof is a dangerous business
         val tasks = if (options is RunOptions) options.tasks else emptyList()
 
-        return createWemiProcessBuilder(options, arguments, tasks, debugPort, debugConfig).first.start()
+        return createWemiProcessBuilder(options, color, unicode, arguments, tasks, debugPort, debugConfig).first.start()
     }
 
     fun getClasspathSourceEntries(options:WemiLauncherOptions):List<Path> {
@@ -478,6 +469,7 @@ class WemiLauncherSession(
 
                 taskOutput.write(data, 0, end)
                 if (done) {
+	                end += 1 // Skip \0
                     this.taskOutput = null
                     waitingForTaskSemaphore.release()
                 }
