@@ -13,6 +13,7 @@ import com.darkyen.wemi.intellij.util.executable
 import com.esotericsoftware.jsonbeans.JsonException
 import com.esotericsoftware.jsonbeans.JsonReader
 import com.esotericsoftware.jsonbeans.JsonValue
+import com.esotericsoftware.jsonbeans.OutputType
 import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.process.ProcessIOExecutorService
 import com.intellij.execution.process.ProcessOutputTypes
@@ -334,7 +335,7 @@ interface SessionActivityTracker {
     fun stageEnd()
 
     fun taskBegin(name:String)
-    fun taskEnd()
+    fun taskEnd(output:String?)
 
     fun sessionOutput(text:String, outputType: Key<*>)
 }
@@ -358,6 +359,10 @@ class WemiLauncherSession(
     var wemiVersion: Version = Version.NONE
     private var process = SessionProcess(createProcess(), tracker)
 
+    private val jsonPrettyPrintSettings = JsonValue.PrettyPrintSettings().apply {
+        outputType = OutputType.json
+    }
+
     fun task(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):Result {
         val taskPath = StringBuilder()
         if (project != null) {
@@ -373,6 +378,7 @@ class WemiLauncherSession(
         }
         taskPath.append(task)
 
+        var jsonResult:String? = null
         try {
             if (process.isDead()) {
                 tracker?.taskBegin("Restarting...")
@@ -380,7 +386,7 @@ class WemiLauncherSession(
                     process.close()
                     process = SessionProcess(createProcess(), tracker)
                 } finally {
-                    tracker?.taskEnd()
+                    tracker?.taskEnd(null)
                 }
             }
 
@@ -392,14 +398,19 @@ class WemiLauncherSession(
             val taskDataCharArray = taskData.toCharArray()!!
             try {
                 val json = jsonReader.parse(taskDataCharArray, 0, taskDataCharArray.size)
+                try {
+                    jsonResult = json.prettyPrint(jsonPrettyPrintSettings)
+                } catch (e:Exception) {
+                    jsonResult = "Pretty print failed:\n$e"
+                }
                 return Result(statusForNumber(taskResult), json)
             } catch (e:JsonException) {
                 LOG.error("Failed to parse json", e)
-                LOG.debug("Broken json:\n${String(taskDataCharArray)}")
+                LOG.info("Broken json:\n${String(taskDataCharArray)}")
                 return Result(ResultStatus.CORRUPTED_RESPONSE_FORMAT, null)
             }
         } finally {
-            tracker?.taskEnd()
+            tracker?.taskEnd(jsonResult)
         }
     }
 

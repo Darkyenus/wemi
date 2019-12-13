@@ -325,7 +325,7 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 }
 
 /** CALL IN TransactionGuard!!! */
-fun import(node:ProjectNode, project:Project, providedModifiableModuleModel: ModifiableModuleModel? = null): List<Module> {
+fun importProjectStructureToIDE(node:ProjectNode, project:Project, providedModifiableModuleModel: ModifiableModuleModel? = null): List<Module> {
 	val moduleModel = providedModifiableModuleModel ?: ModuleManager.getInstance(project).modifiableModel
 	val rootModels = HashMap<Module, ModifiableRootModel>()
 	val getRootModel:(Module) -> ModifiableRootModel = { module ->

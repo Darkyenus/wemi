@@ -3,18 +3,12 @@ package com.darkyen.wemi.intellij.importing.actions
 import com.darkyen.wemi.intellij.file.isWemiScriptSource
 import com.darkyen.wemi.intellij.importing.isImportable
 import com.darkyen.wemi.intellij.importing.isWemiLinked
-import com.darkyen.wemi.intellij.importing.withWemiLauncher
-import com.darkyen.wemi.intellij.projectImport.ProjectNode
-import com.darkyen.wemi.intellij.projectImport.import
-import com.darkyen.wemi.intellij.projectImport.refreshProject
-import com.darkyen.wemi.intellij.settings.WemiProjectService
-import com.intellij.concurrency.ResultConsumer
+import com.darkyen.wemi.intellij.projectImport.importWemiProject
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.TransactionGuard
-import com.intellij.openapi.application.WriteAction
-import com.intellij.util.concurrency.EdtExecutorService
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import icons.WemiIcons
 import org.jetbrains.kotlin.idea.refactoring.psiElement
 
@@ -46,21 +40,11 @@ class ReloadProjectAction : AnAction("Reload Wemi Project",
             e.presentation.isEnabledAndVisible = false
             return
         }
-
-        project.withWemiLauncher("Wemi project reload") { launcher ->
-            val options = project.getService(WemiProjectService::class.java)!!.options
-            val future = refreshProject(project, launcher, options)
-            future.addConsumer(EdtExecutorService.getInstance(), object : ResultConsumer<ProjectNode> {
-                override fun onSuccess(value: ProjectNode) {
-                    TransactionGuard.submitTransaction(project, Runnable {
-                        WriteAction.run<Nothing> {
-                            import(value, project)
-                        }
-                    })
-                }
-
-                override fun onFailure(t: Throwable) {}
-            })
+        
+        TransactionGuard.getInstance().submitTransactionAndWait {
+            FileDocumentManager.getInstance().saveAllDocuments()
         }
+
+        importWemiProject(project, initial = false)
     }
 }

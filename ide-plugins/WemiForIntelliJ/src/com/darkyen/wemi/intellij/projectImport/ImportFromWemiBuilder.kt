@@ -37,7 +37,7 @@ class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
     }
 
     override fun commit(project: Project, model: ModifiableModuleModel?, modulesProvider: ModulesProvider?, artifactModel: ModifiableArtifactModel?): List<Module> {
-        return import(this.projectNode!!, project, model)
+        return importProjectStructureToIDE(this.projectNode!!, project, model)
     }
 
     /**
@@ -55,7 +55,7 @@ class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
                 ?: reinstallWemiLauncher(projectFileDirectory, "Failed to put Wemi launcher in the project directory", project)?.second
                 ?: return
 
-        val projectNode:ProjectNode = refreshProject(project, launcher, projectImportOptions).get()
+        val projectNode:ProjectNode = importWemiProjectStructure(project, launcher, projectImportOptions, activateToolWindow = false, modal = true).get()
         this.projectNode = projectNode
 
         wizardContext.projectName = projectNode.name
