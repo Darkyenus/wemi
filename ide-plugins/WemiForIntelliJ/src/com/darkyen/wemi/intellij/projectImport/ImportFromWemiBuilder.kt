@@ -71,8 +71,4 @@ class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
     override fun getList(): List<ProjectNode>? = projectNode?.let { listOf(it) } ?: emptyList()
     override fun setList(list: List<ProjectNode>?) {}
     override fun isMarked(element: ProjectNode?): Boolean = true
-
-    private companion object {
-        val LOG: Logger = LoggerFactory.getLogger(ImportFromWemiBuilder::class.java)
-    }
 }

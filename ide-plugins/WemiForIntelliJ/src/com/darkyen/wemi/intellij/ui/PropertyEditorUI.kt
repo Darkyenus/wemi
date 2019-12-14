@@ -298,12 +298,12 @@ class BooleanPropertyEditor(property:KMutableProperty0<Boolean>,
 	}
 
 	private fun checkBoxText(selected:Boolean):String {
-		if (selected && trueInfo != null) {
-			return "$title ($trueInfo)"
+		return if (selected && trueInfo != null) {
+			"$title ($trueInfo)"
 		} else if (!selected && falseInfo != null) {
-			return "$title ($falseInfo)"
+			"$title ($falseInfo)"
 		} else {
-			return title
+			title
 		}
 	}
 
@@ -509,10 +509,10 @@ class CommandArgumentEditor(property:KMutableProperty0<List<String>>, title:Stri
 	override var componentValue: List<String>
 		get() {
 			val text = component.text.trim()
-			if (text.isBlank()) {
-				return emptyList()
+			return if (text.isBlank()) {
+				emptyList()
 			} else {
-				return text.split(splitPattern)
+				text.split(splitPattern)
 			}
 		}
 		set(value) {

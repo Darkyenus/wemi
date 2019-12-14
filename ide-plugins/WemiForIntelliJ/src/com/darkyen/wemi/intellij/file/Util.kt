@@ -43,28 +43,6 @@ internal fun Path?.isWemiLauncher():Boolean {
     return this.fileName.toString() == WemiLauncherFileName
 }
 
-internal fun Path?.isWemiScriptSource(deepCheck:Boolean = false):Boolean {
-    val fileName = this?.fileName?.toString()
-    if (this == null || fileName == null || Files.isDirectory(this) || fileName.startsWith('.')) {
-        return false
-    }
-
-    if (!fileName.pathHasExtension(WemiBuildFileExtensions)) {
-        return false
-    }
-
-    if (deepCheck) {
-        val buildDirectory = this.parent ?: return false
-        if (buildDirectory.fileName?.toString()?.equals(WemiBuildDirectoryName, ignoreCase = true) != true) {
-            return false
-        }
-        val projectDirectory = buildDirectory.parent ?: return false
-        return projectDirectory.resolve(WemiLauncherFileName).isWemiLauncher()
-    }
-
-    return true
-}
-
 /**
  * Return true if this file path has any of the specified extensions.
  *

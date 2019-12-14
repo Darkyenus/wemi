@@ -25,8 +25,6 @@ class WemiTerminalFilterProvider : ConsoleFilterProvider {
 
     class WemiTerminalFilter(private val project:Project) : Filter {
 
-        private val hyperlinkInfoFactory = HyperlinkInfoFactory.getInstance()
-
         // From PrettyPrintModules
         private val PATH_TAG_BEGIN_DEFAULT = '\u200B'
 
@@ -68,17 +66,6 @@ class WemiTerminalFilterProvider : ConsoleFilterProvider {
             return result
         }
 
-        private fun getColonNumberLength(line:String, colon:Int):Int {
-            if (colon in line.indices && line[colon] == ':') {
-                var numberEnd = colon + 1
-                while (numberEnd in line.indices && line[numberEnd].isDigit()) {
-                    numberEnd++
-                }
-                return numberEnd - colon
-            }
-            return 0
-        }
-
         override fun applyFilter(line: String, entireLength: Int): Filter.Result? {
             val results = ArrayList<Filter.ResultItem>()
 
@@ -116,7 +103,7 @@ class WemiTerminalFilterProvider : ConsoleFilterProvider {
                 }
                 line.lastIndexOf('/', highlightEnd - 1).let {
                     val newHighlightStart = it + 1
-                    if (newHighlightStart >= highlightStart && newHighlightStart < highlightEnd) {
+                    if (newHighlightStart in highlightStart until highlightEnd) {
                         highlightStart = newHighlightStart
                     }
 

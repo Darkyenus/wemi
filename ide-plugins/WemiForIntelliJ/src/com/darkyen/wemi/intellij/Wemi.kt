@@ -377,10 +377,10 @@ class WemiLauncherSession(
             return taskResult.use({ taskDataCharArray ->
                 try {
                     val json = JsonReader().parse(taskDataCharArray, 0, taskDataCharArray.size)
-                    try {
-                        jsonResult = json.prettyPrint(jsonPrettyPrintSettings)
+                    jsonResult = try {
+                        json.prettyPrint(jsonPrettyPrintSettings)
                     } catch (e:Exception) {
-                        jsonResult = "Pretty print failed:\n$e"
+                        "Pretty print failed:\n$e"
                     }
                     Result(ResultStatus.SUCCESS, json)
                 } catch (e:JsonException) {
@@ -558,32 +558,6 @@ class WemiLauncherSession(
 
         fun statusForNumber(number: Int):ResultStatus {
             return ResultStatus.values().find { it.number == number } ?: ResultStatus.UNKNOWN_ERROR
-        }
-
-        private fun ByteArrayOutputStream.contentToString():String {
-            return String(toByteArray(), Charsets.UTF_8)
-        }
-
-        private inline fun noThrow(label:String, operation:()->Unit) {
-            try {
-                operation()
-            } catch (e:Exception) {
-                LOG.debug("noThrow($label)", e)
-            }
-        }
-
-        private fun Process.waitForSafe(timeout:Long, unit:TimeUnit):Boolean {
-            return try {
-                val interrupted = Thread.interrupted()
-                val result = this.waitFor(timeout, unit)
-                if (interrupted) {
-                    Thread.currentThread().interrupt()
-                }
-                result
-            } catch (e:InterruptedException) {
-                LOG.debug("waitForSafe interrupt ignored")
-                !this.isAlive
-            }
         }
     }
 }

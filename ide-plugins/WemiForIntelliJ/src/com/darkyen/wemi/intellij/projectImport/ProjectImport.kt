@@ -810,10 +810,10 @@ private val DependencyScope.exported:Boolean
 	get() = DependencyScope.COMPILE == this
 
 private fun artifactCriteriaPriority(dependency: LibraryDependencyNode):Int {
-	when {
-		dependency.onLibrary.sources.isNotEmpty() -> return 0
-		dependency.onLibrary.documentation.isNotEmpty() -> return 1
-		else -> return 2
+	return when {
+		dependency.onLibrary.sources.isNotEmpty() -> 0
+		dependency.onLibrary.documentation.isNotEmpty() -> 1
+		else -> 2
 	}
 }
 

@@ -30,18 +30,14 @@ class WemiProjectService(project: Project) : XmlSerializable() {
 	var wemiLauncher:WemiLauncher?
 		get() {
 			val cache = wemiLauncherCache ?: return null
-			if (Files.isRegularFile(cache.file)) {
-				return cache
+			return if (Files.isRegularFile(cache.file)) {
+				cache
 			} else {
-				return null
+				null
 			}
 		}
 		set(value) {
-			if (value == null) {
-				wemiLauncherPath = value ?: ""
-			} else {
-				wemiLauncherPath = value.file.toAbsolutePath().normalize().toString()
-			}
+			wemiLauncherPath = value?.file?.toAbsolutePath()?.normalize()?.toString() ?: ""
 			wemiLauncherCache = value
 		}
 

@@ -11,7 +11,6 @@ import com.intellij.execution.impl.RunConfigurationBeforeRunProvider
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.components.PersistentStateComponent
-import com.intellij.openapi.externalSystem.service.execution.ExternalSystemBeforeRunTask
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.rd.attach
 import com.intellij.openapi.ui.DialogWrapper
@@ -110,10 +109,6 @@ class WemiBeforeRunTaskProvider(private val project: Project) : BeforeRunTaskPro
 		environment.executionId = env.executionId
 
 		return RunConfigurationBeforeRunProvider.doRunTask(executor.id, environment, runner)
-	}
-
-	companion object {
-		val ID = Key.create<ExternalSystemBeforeRunTask>("Wemi.BeforeRunTask")
 	}
 
 	private class EditBeforeRunDialog(project: Project, private val options: BeforeRunOptions) : DialogWrapper(project, true) {

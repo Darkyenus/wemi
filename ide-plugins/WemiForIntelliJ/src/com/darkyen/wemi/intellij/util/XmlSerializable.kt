@@ -178,10 +178,10 @@ inline fun <reified T:Enum<T>> enumXmlSerializer():XmlValueSerializer<T> {
 
 		override fun readExternal(element: Element, default: T): T {
 			val enumName = element.getAttributeValue("enum") ?: return default
-			try {
-				return java.lang.Enum.valueOf(enumJavaClass, enumName.toUpperCase())
+			return try {
+				java.lang.Enum.valueOf(enumJavaClass, enumName.toUpperCase())
 			} catch (e : IllegalArgumentException) {
-				return default
+				default
 			}
 		}
 	}

@@ -6,7 +6,6 @@ import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.impl.RunConfigurationBeforeRunProvider
 import com.intellij.execution.runners.ExecutionEnvironment
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.task.ModuleBuildTask
 import com.intellij.task.ProjectTask
@@ -20,8 +19,6 @@ import org.jetbrains.concurrency.resolvedPromise
  * These requests come from "make" button in top, right-click on module->build, etc.
  */
 class WemiModuleBuildTaskRunner : ProjectTaskRunner() {
-
-    private val LOG = Logger.getInstance("#com.darkyen.wemi.intellij.compilerIntegration.WemiProjectTaskRunner")
 
     override fun run(project: Project, context: ProjectTaskContext, vararg tasks: ProjectTask?): Promise<Result> {
         var compileBuildScript = false

@@ -15,12 +15,12 @@ abstract class RunOptions : WemiLauncherOptions() {
 
     fun shortTaskSummary():String {
         val tasks = tasks
-        if (tasks.isEmpty()) {
-            return "No Wemi tasks"
+        return if (tasks.isEmpty()) {
+            "No Wemi tasks"
         } else if (tasks.size == 1) {
-            return tasks[0].joinToString(" ")
+            tasks[0].joinToString(" ")
         } else {
-            return "${tasks[0].joinToString(" ")}; (${tasks.size - 1} more)"
+            "${tasks[0].joinToString(" ")}; (${tasks.size - 1} more)"
         }
     }
 

@@ -11,8 +11,11 @@ class BeforeRunOptions : RunOptions() {
 		if (this === other) return true
 		if (other !is BeforeRunOptions) return false
 		if (!super.equals(other)) return false
-
 		return true
 	}
 
+	@Suppress("RedundantOverride")
+	override fun hashCode(): Int {
+		return super.hashCode()
+	}
 }
