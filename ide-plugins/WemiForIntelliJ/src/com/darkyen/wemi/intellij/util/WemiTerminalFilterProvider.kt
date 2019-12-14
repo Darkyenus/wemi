@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.util
 
+import com.darkyen.wemi.intellij.settings.WemiProjectService
 import com.intellij.execution.filters.ConsoleFilterProvider
 import com.intellij.execution.filters.Filter
 import com.intellij.execution.filters.HyperlinkInfoFactory
@@ -11,7 +12,6 @@ import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import java.awt.Font
-import java.io.File
 
 /**
  * Provides clickable hyperlinks into IntelliJ's Terminal.
@@ -32,7 +32,13 @@ class WemiTerminalFilterProvider : ConsoleFilterProvider {
 
         private val PATH_TAGS_END = charArrayOf('\u200C', '\u00A0')
 
-        private fun parseColonNumbers(line:String, start:Int, consecutiveNumbers:Int): IntArray {
+        private val relativeRoot = project.getService(WemiProjectService::class.java)
+                .wemiLauncher?.file?.parent?.toAbsolutePath()?.toString()
+                ?.let { LocalFileSystem.getInstance().findFileByPath(it) }
+                ?: project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
+                ?: project.guessProjectDir()
+
+        private fun parseColonNumbers(line:String, start:Int, @Suppress("SameParameterValue") consecutiveNumbers:Int): IntArray {
             val result = IntArray(consecutiveNumbers + 1)
             var resultI = -1
             var endI = start
@@ -96,11 +102,9 @@ class WemiTerminalFilterProvider : ConsoleFilterProvider {
                 start = pathEnd + 1 + colonNumLength
 
                 val file: VirtualFile =
-                        if (path.startsWith('/')) {
-                            LocalFileSystem.getInstance().findFileByIoFile(File(path))
-                        } else {
-                            project.guessProjectDir()?.findFileByRelativePath(path)
-                        } ?: continue
+                        LocalFileSystem.getInstance().findFileByPath(path)
+                                ?: relativeRoot?.findFileByRelativePath(path)
+                                ?: continue
 
                 val openFileHyperlinkInfo = OpenFileHyperlinkInfo(project, file, lineNum - 1, columnNum - 1)
                 // Highlight only the last file part
