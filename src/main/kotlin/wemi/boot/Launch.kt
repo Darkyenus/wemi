@@ -308,7 +308,7 @@ fun main(args: Array<String>) {
 
     val buildScriptInfo = prepareBuildScriptInfo(allowBrokenBuildScripts, interactive && !machineReadableOutput, cleanBuild)
 
-    if (buildScriptInfo == null) {
+    if (buildScriptInfo == null || buildScriptInfo.hasErrors) {
         if (!allowBrokenBuildScripts) {
             // Failure to prepare build script (already logged)
             exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
@@ -458,10 +458,10 @@ private fun prepareBuildScriptInfo(allowBrokenBuildScripts:Boolean, askUser:Bool
         var keepTrying = false
 
         val buildScriptSources = buildScriptSourceSet.matchingFiles()
-        if (buildScriptSources.isEmpty()) {
+        val noSources = if (buildScriptSources.isEmpty()) {
             if (allowBrokenBuildScripts) {
                 LOG.warn("No build script sources found in {}", WemiBuildFolder)
-                break
+                true
             } else if (!askUser) {
                 LOG.error("No build script sources found in {}", WemiBuildFolder)
                 break
@@ -469,47 +469,60 @@ private fun prepareBuildScriptInfo(allowBrokenBuildScripts:Boolean, askUser:Bool
                 keepTrying = buildScriptsBadAskIfReload("No build script sources found")
                 continue
             }
-        }
+        } else false
 
         finalBuildScriptInfo = directorySynchronized(WemiBuildFolder, {
             LOG.info("Waiting for lock on {}", WemiBuildFolder)
         }) {
             val buildScriptInfo = getBuildScript(WemiCacheFolder, buildScriptSourceSet, buildScriptSources, cleanBuild)
 
-            if (buildScriptInfo == null) {
+            if (buildScriptInfo == null || buildScriptInfo.hasErrors) {
                 if (allowBrokenBuildScripts) {
                     LOG.warn("Failed to prepare build script")
+                    if (buildScriptInfo == null) {
+                        return@directorySynchronized null
+                    }
                 } else if (!askUser) {
                     LOG.error("Failed to prepare build script")
+                    return@directorySynchronized null
                 } else {
                     keepTrying = buildScriptsBadAskIfReload("Failed to prepare build script")
+                    return@directorySynchronized null
                 }
-                null
-            } else {
-                LOG.debug("Obtained build script info {}", buildScriptInfo)
+            }
+            LOG.debug("Obtained build script info {}", buildScriptInfo)
 
-                try {
-                    compileBuildScript(buildScriptInfo)
-                    buildScriptInfo
-                } catch (ce: WemiException) {
-                    val message = ce.message
-                    if (ce.showStacktrace || message == null || message.isBlank()) {
-                        LOG.error("Build script failed to compile", ce)
-                    } else {
-                        LOG.error("Build script failed to compile: {}", message)
-                        LOG.debug("Build script failed to compile due to", ce)
-                    }
+            if (noSources) {
+                buildScriptInfo.hasErrors = true
+                LOG.info("Build script compilation skipped - no sources")
+                return@directorySynchronized buildScriptInfo
+            }
 
-                    if (!allowBrokenBuildScripts) {
-                        if (!askUser) {
-                            LOG.error("Build script failed to compile")
-                        } else {
-                            keepTrying = buildScriptsBadAskIfReload("Build script failed to compile")
-                        }
-                    }
-
-                    null
+            try {
+                compileBuildScript(buildScriptInfo)
+                return@directorySynchronized buildScriptInfo
+            } catch (ce: WemiException) {
+                val message = ce.message
+                if (ce.showStacktrace || message == null || message.isBlank()) {
+                    LOG.error("Build script failed to compile", ce)
+                } else {
+                    LOG.error("Build script failed to compile: {}", message)
+                    LOG.debug("Build script failed to compile due to", ce)
                 }
+
+                if (allowBrokenBuildScripts) {
+                    buildScriptInfo.hasErrors = true
+                    return@directorySynchronized buildScriptInfo
+                }
+
+                if (!askUser) {
+                    LOG.error("Build script failed to compile")
+                    keepTrying = false
+                } else {
+                    keepTrying = buildScriptsBadAskIfReload("Build script failed to compile")
+                }
+
+                return@directorySynchronized null
             }
         }
     } while (keepTrying)

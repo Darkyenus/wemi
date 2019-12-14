@@ -28,16 +28,11 @@ private val LOG = LoggerFactory.getLogger("BuildScript")
  * Tries to use existing files before compiling.
  */
 internal fun getBuildScript(cacheFolder: Path, buildScriptSourceSet:FileSet, buildScriptSources: List<Path>, forceCompile: Boolean): BuildScriptInfo? {
-    if (cacheFolder.exists() && !cacheFolder.isDirectory()) {
-        LOG.error("Build directory {} exists and is not a directory", cacheFolder)
+    try {
+        Files.createDirectories(cacheFolder)
+    } catch (e: IOException) {
+        LOG.error("Could not create build directory: {}", cacheFolder, e)
         return null
-    } else if (!cacheFolder.exists()) {
-        try {
-            Files.createDirectories(cacheFolder)
-        } catch (e: IOException) {
-            LOG.error("Could not create build directory {}", cacheFolder, e)
-            return null
-        }
     }
 
     val resultJar = cacheFolder / "build.jar"
@@ -116,17 +111,17 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSourceSet:FileSet, bui
     if (recompile) {
         LOG.info("Compiling build script: {}", recompileReason)
         resultJar.deleteRecursively()
-        if (!buildScriptInfo.resolve()) {
-            // Dependency resolution failed
-            return null
-        }
-
-        try {
-            Files.newBufferedWriter(buildScriptInfoFile, Charsets.UTF_8).use {
-                it.writeJson(buildScriptInfo, BuildScriptInfo::class.java)
+        if (buildScriptInfo.resolve()) {
+            try {
+                Files.newBufferedWriter(buildScriptInfoFile, Charsets.UTF_8).use {
+                    it.writeJson(buildScriptInfo, BuildScriptInfo::class.java)
+                }
+            } catch (e:Exception) {
+                LOG.warn("Failed to save build-script info, next run will have to construct it again", e)
             }
-        } catch (e:Exception) {
-            LOG.warn("Failed to save build-script info, next run will have to construct it again", e)
+        } else {
+            // Dependency resolution failed
+            buildScriptInfo.hasErrors = true
         }
         // Compilation is handled lazily later
     }
@@ -209,6 +204,8 @@ class BuildScriptInfo internal constructor(
 
     var recompilationNeeded:Boolean = true
 
+    var hasErrors:Boolean = false
+
     private fun consumeDirective(annotation:Class<out Annotation>, fields:Array<String>) {
         when (annotation) {
             BuildDependency::class.java -> {
@@ -274,13 +271,14 @@ class BuildScriptInfo internal constructor(
         }
 
         val (resolved, resolvedComplete) = resolveDependencies(dependencies, repositories)
+        for ((_, r) in resolved) {
+            _managedDependencies.add(r.artifact?.path ?: continue)
+        }
+
         if (!resolvedComplete) {
             // Dependencies failed to resolve
             // TODO Is this logged properly & nicely?
             return false
-        }
-        for ((_, r) in resolved) {
-            _managedDependencies.add(r.artifact?.path ?: continue)
         }
 
         return true

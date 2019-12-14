@@ -1,6 +1,5 @@
 # Things to do next
 
-- Make sure that broken build scripts work identically to no build scripts
 - Java 13 invalid reflexive access
 - http://tutorials.jenkov.com/java/modules.html
 - IDE: Run Main from whatever buttons

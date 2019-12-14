@@ -57,8 +57,6 @@ val wemi:Project by project(Archetypes.BlankJVMProject) {
             Files.copy(path.file, distFolder / path.file.name)
         }
 
-        ProcessBuilder("")
-
         distFolder
     }
 

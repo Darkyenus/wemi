@@ -340,16 +340,17 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 		defaultWemiProject.javaTargetVersion?.let {
 			ideProjectNode.javaTargetVersion = it
 		}
-
-		// Kotlin data
-		val kotlinCompilerData = HashMap<String, JsonValue>()
-		session.jsonArray(defaultWemiProject.projectName, task = "compilerOptions", configurations = *arrayOf("compilingKotlin")).forEach {
-			val key = it.getString("key")!!
-			val value = it.get("value")
-			kotlinCompilerData[key] = value
-		}
-		ideProjectNode.kotlinCompilerData = kotlinCompilerData
 	}
+
+	// Kotlin data
+	val kotlinCompilerData = HashMap<String, JsonValue>()
+	session.jsonArray(defaultWemiProject?.projectName ?: WemiBuildScriptProjectName, task = "compilerOptions", configurations = *arrayOf("compilingKotlin")).forEach {
+		val key = it.getString("key")!!
+		val value = it.get("value")
+		kotlinCompilerData[key] = value
+	}
+	ideProjectNode.kotlinCompilerData = kotlinCompilerData
+
 	tracker.stageEnd()
 
 	val projectModules = HashMap<String, ModuleNode>()
