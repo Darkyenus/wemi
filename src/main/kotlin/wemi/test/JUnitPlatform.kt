@@ -1,13 +1,22 @@
 package wemi.test
 
 import org.slf4j.LoggerFactory
-import wemi.EvalScope
 import wemi.boot.CLI
-import wemi.dependency.Dependency
 import wemi.dependency.DependencyId
 import wemi.dependency.MavenCentral
 import wemi.test.TestStatus.*
-import wemi.util.*
+import wemi.util.Color
+import wemi.util.Format
+import wemi.util.LineReadingOutputStream
+import wemi.util.TreeNode
+import wemi.util.appendPadded
+import wemi.util.appendTimeDuration
+import wemi.util.appendTimes
+import wemi.util.format
+import wemi.util.fromJson
+import wemi.util.printTree
+import wemi.util.readFully
+import wemi.util.writeJson
 import java.io.OutputStreamWriter
 import java.time.Instant
 import java.time.ZoneId
@@ -40,9 +49,7 @@ const val JUnitEngineVersion = "5.0.2"
  *
  * @see [JUnitEngineVersion] for used version (based on Wemi version)
  */
-@Suppress("unused")//Scope.
-val EvalScope.JUnitAPI: Dependency
-    get() = Dependency(DependencyId("org.junit.jupiter", "junit-jupiter-api", JUnitEngineVersion))
+val JUnitAPI = DependencyId("org.junit.jupiter", "junit-jupiter-api", JUnitEngineVersion)
 
 /**
  * Dependency on JUnit 5 Engine
@@ -52,9 +59,7 @@ val EvalScope.JUnitAPI: Dependency
  *
  * @see [JUnitEngineVersion] for used version (based on Wemi version)
  */
-@Suppress("unused")//Scope.
-val EvalScope.JUnitEngine: Dependency
-    get() = Dependency(DependencyId("org.junit.jupiter", "junit-jupiter-engine", JUnitEngineVersion))
+val JUnitEngine = DependencyId("org.junit.jupiter", "junit-jupiter-engine", JUnitEngineVersion)
 
 /**
  * Dependency on JUnit 4 Engine
@@ -62,9 +67,7 @@ val EvalScope.JUnitEngine: Dependency
  * To use JUnit 4 tests, add this as a testing dependency, together with JUnit 4.
  * Dependency is located in [MavenCentral] repository.
  */
-@Suppress("unused")//Scope. and not auto-imported
-val EvalScope.JUnit4Engine: Dependency
-    get() = Dependency(DependencyId("org.junit.vintage", "junit-vintage-engine", "4.12.2"))
+val JUnit4Engine = DependencyId("org.junit.vintage", "junit-vintage-engine", "4.12.2")
 
 /**
  * DependencyId for the launcher needed to execute tests based on JUnit platform.
@@ -322,9 +325,9 @@ private fun StringBuilder.appendReport(amount:Int, noun:String, action:String, z
     initialLength -= length
     if (amount != 0 && zeroIsGood != null) {
         if (zeroIsGood) {
-            this.format(foreground = wemi.util.Color.Red)
+            this.format(foreground = Color.Red)
         } else {
-            this.format(foreground = wemi.util.Color.Green)
+            this.format(foreground = Color.Green)
         }
     }
     initialLength += length

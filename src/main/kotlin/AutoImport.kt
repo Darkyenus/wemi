@@ -49,10 +49,19 @@ inline fun project(projectRoot: Path? = path("."), vararg archetypes: Archetype 
 
 // Helper functions
 inline fun EvalScope.kotlinDependency(name: String) = _kotlinDependency(name)
-inline val EvalScope.JUnitAPI
+inline val JUnitAPI
     inline get() = _JUnitAPI
-val EvalScope.JUnitEngine
+val JUnitEngine
     inline get() = _JUnitEngine
+
+val ScopeCompile
+    inline get() = wemi.dependency.ScopeCompile
+val ScopeProvided
+    inline get() = wemi.dependency.ScopeProvided
+val ScopeRuntime
+    inline get() = wemi.dependency.ScopeRuntime
+val ScopeTest
+    inline get() = wemi.dependency.ScopeTest
 
 fun dependency(group: String, name: String, version: String,
                classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:wemi.dependency.Scope = DEFAULT_SCOPE,

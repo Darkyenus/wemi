@@ -51,15 +51,13 @@ val basics by project {
         projectName set { "Greeting Simulator $startYear" }
     }
 
-    extend(testing) {
-        // JUnit 5
-        libraryDependencies add { JUnitAPI }
-        libraryDependencies add { JUnitEngine }
+    // JUnit 5
+    libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
+    libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
 
-        // JUnit 4
-        //libraryDependencies add { dependency("junit:junit:4.12") }
-        //libraryDependencies add { JUnit4Engine }
-    }
+    // JUnit 4
+    //libraryDependencies add { dependency("junit:junit:4.12") }
+    //libraryDependencies add { Dependency(JUnit4Engine, scope=ScopeTest) }
 
     mainClass set { "basics.GreeterMainKt" }
 
@@ -170,10 +168,10 @@ val bar:Configuration by configuration("") {
 //endregion
 
 /**
- * Running this project should produce the same result as running [hello], after it was published.
+ * Running this project should produce the same result as running [basics], after it was published with `basics/publish`.
  */
-val helloFromRepository by project(wemi.Archetypes.BlankJVMProject) {
+val basicsFromRepository by project(Archetypes.AggregateJVMProject) {
     libraryDependencies add { dependency("com.darkyen:basics:1.0-SNAPSHOT") }
 
-    mainClass set { "hello.HelloWemiKt" }
+    mainClass set { "basics.GreeterMainKt" }
 }

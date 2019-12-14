@@ -129,8 +129,8 @@ fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRoo
                     throw WemiException("Project named '$name' already exists (at ${otherProject.projectRoot})")
                 }
             }
-            if (checkRootUnique && otherProject.projectRoot != null && Files.isSameFile(otherProject.projectRoot, usedRoot)) {
-                LOG.warn("Project $name is at the same location as project ${otherProject.name}")
+            if (checkRootUnique && otherProject.projectRoot != null && usedRoot != null && Files.isSameFile(otherProject.projectRoot, usedRoot)) {
+                LOG.debug("Project $name is at the same location as project ${otherProject.name}")
             }
         }
         BuildScriptData.AllProjects.put(project.name, project)
