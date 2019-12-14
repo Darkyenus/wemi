@@ -230,7 +230,7 @@ class DependencyExclusion(val group: String? = null, val name: String? = null, v
  * @param exclusions to filter transitive dependencies with */
 @Json(Dependency.Serializer::class)
 class Dependency(val dependencyId: DependencyId,
-                 scope: String = DEFAULT_SCOPE,
+                 scope: Scope = DEFAULT_SCOPE,
                  /** Optional transitive dependencies are skipped by default by Wemi.
                   * See https://maven.apache.org/guides/introduction/introduction-to-optional-and-excludes-dependencies.html */
                  val optional: Boolean = DEFAULT_OPTIONAL,
@@ -363,7 +363,7 @@ class ResolvedDependency private constructor(
         /** That was being resolved */
         val id: DependencyId,
         /** Scope in which the dependency was resolved. */
-        val scope:String,
+        val scope:Scope,
         /** Of the [id] that were found */
         val dependencies: List<Dependency>,
         /** In which (non-cache) repository was [id] ultimately found in */

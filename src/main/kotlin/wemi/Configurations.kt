@@ -21,7 +21,7 @@ object Configurations {
     //region Stage configurations
     /** @see Keys.compile */
     val compiling by configuration("Configuration used when compiling") {
-        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeProvided) }
+        Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeProvided) }
 
         Keys.externalClasspath modify { classpath ->
             // Internal classpath of aggregate projects is not included in standard external classpath.
@@ -37,12 +37,12 @@ object Configurations {
 
     /** @see Keys.run */
     val running by configuration("Configuration used when running, sources are resources") {
-        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
+        Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeRuntime) }
     }
 
     /** @see Keys.test */
     val testing by configuration("Used when testing") {
-        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime, ScopeProvided, ScopeTest) }
+        Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeRuntime, ScopeProvided, ScopeTest) }
 
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
@@ -55,7 +55,7 @@ object Configurations {
 
     /** @see Keys.assembly */
     val assembling by configuration("Configuration used when assembling Jar with dependencies") {
-        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
+        Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeRuntime) }
     }
     //endregion
 

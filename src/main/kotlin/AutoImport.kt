@@ -1,12 +1,15 @@
 @file:Suppress("NOTHING_TO_INLINE", "unused")
 
-import wemi.Archetypes
-import wemi.Configurations
 import wemi.boot.Task
 import wemi.boot.WemiRootFolder
 import wemi.boot.autoRunTasks
+import wemi.dependency.Classifier
+import wemi.dependency.DEFAULT_OPTIONAL
+import wemi.dependency.DEFAULT_SCOPE
+import wemi.dependency.DEFAULT_SNAPSHOT_VERSION
+import wemi.dependency.DEFAULT_TYPE
+import wemi.dependency.NoClassifier
 import java.net.URL
-import java.nio.file.Paths
 import wemi.kotlinDependency as _kotlinDependency
 import wemi.test.JUnitAPI as _JUnitAPI
 import wemi.test.JUnitEngine as _JUnitEngine
@@ -51,9 +54,23 @@ inline val EvalScope.JUnitAPI
 val EvalScope.JUnitEngine
     inline get() = _JUnitEngine
 
+fun dependency(group: String, name: String, version: String,
+               classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:wemi.dependency.Scope = DEFAULT_SCOPE,
+               optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION,
+               exclusions:List<DependencyExclusion> = emptyList(),
+               dependencyManagement:List<Dependency> = emptyList()): Dependency =
+        wemi.dependency(group, name, version, classifier, type, scope, optional, snapshotVersion, exclusions, dependencyManagement)
+
+fun dependency(groupNameVersionClassifierType: String,
+               scope:wemi.dependency.Scope = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL,
+               exclusions:List<DependencyExclusion> = emptyList(),
+               snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION,
+               dependencyManagement:List<Dependency> = emptyList()): Dependency =
+        wemi.dependency(groupNameVersionClassifierType, scope, optional, exclusions, snapshotVersion, dependencyManagement)
+
 // Path helpers
 /**
- * Construct a path, from given string, like with [Paths.get].
+ * Construct a path, from given string, like with [java.nio.file.Paths.get].
  * If the resulting path is relative, make it absolute by resolving it on [WemiRootFolder].
  * Resulting path is normalized (though [java.nio.file.Path.normalize]).
  */
@@ -103,118 +120,118 @@ val publishing
 
 // Keys
 val projectGroup
-    inline get() = wemi.Keys.projectGroup
+    inline get() = Keys.projectGroup
 val projectName
-    inline get() = wemi.Keys.projectName
+    inline get() = Keys.projectName
 val projectVersion
-    inline get() = wemi.Keys.projectVersion
+    inline get() = Keys.projectVersion
 
 val projectRoot
-    inline get() = wemi.Keys.projectRoot
+    inline get() = Keys.projectRoot
 val buildDirectory
-    inline get() = wemi.Keys.buildDirectory
+    inline get() = Keys.buildDirectory
 val cacheDirectory
-    inline get() = wemi.Keys.cacheDirectory
+    inline get() = Keys.cacheDirectory
 
 val sources
-    inline get() = wemi.Keys.sources
+    inline get() = Keys.sources
 val resources
-    inline get() = wemi.Keys.resources
+    inline get() = Keys.resources
 
 val repositories
-    inline get() = wemi.Keys.repositories
+    inline get() = Keys.repositories
 val libraryDependencies
-    inline get() = wemi.Keys.libraryDependencies
+    inline get() = Keys.libraryDependencies
 @Deprecated("Renamed to libraryDependencyMapper, removed in 0.11", replaceWith = ReplaceWith("libraryDependencyMapper"))
 val libraryDependencyProjectMapper
-    inline get() = wemi.Keys.libraryDependencyMapper
+    inline get() = Keys.libraryDependencyMapper
 val libraryDependencyMapper
-    inline get() = wemi.Keys.libraryDependencyMapper
+    inline get() = Keys.libraryDependencyMapper
 val resolvedLibraryScopes
-    inline get() = wemi.Keys.resolvedLibraryScopes
+    inline get() = Keys.resolvedLibraryScopes
 val resolvedLibraryDependencies
-    inline get() = wemi.Keys.resolvedLibraryDependencies
+    inline get() = Keys.resolvedLibraryDependencies
 val unmanagedDependencies
-    inline get() = wemi.Keys.unmanagedDependencies
+    inline get() = Keys.unmanagedDependencies
 val projectDependencies
-    inline get() = wemi.Keys.projectDependencies
+    inline get() = Keys.projectDependencies
 
 val externalClasspath
-    inline get() = wemi.Keys.externalClasspath
+    inline get() = Keys.externalClasspath
 val internalClasspath
-    inline get() = wemi.Keys.internalClasspath
+    inline get() = Keys.internalClasspath
 
 val javaHome
-    inline get() = wemi.Keys.javaHome
+    inline get() = Keys.javaHome
 val javaExecutable
-    inline get() = wemi.Keys.javaExecutable
+    inline get() = Keys.javaExecutable
 val kotlinVersion
-    inline get() = wemi.Keys.kotlinVersion
+    inline get() = Keys.kotlinVersion
 val compilerOptions
-    inline get() = wemi.Keys.compilerOptions
+    inline get() = Keys.compilerOptions
 val outputClassesDirectory
-    inline get() = wemi.Keys.outputClassesDirectory
+    inline get() = Keys.outputClassesDirectory
 val outputSourcesDirectory
-    inline get() = wemi.Keys.outputSourcesDirectory
+    inline get() = Keys.outputSourcesDirectory
 val outputHeadersDirectory
-    inline get() = wemi.Keys.outputHeadersDirectory
+    inline get() = Keys.outputHeadersDirectory
 val kotlinCompiler
-    inline get() = wemi.Keys.kotlinCompiler
+    inline get() = Keys.kotlinCompiler
 val javaCompiler
-    inline get() = wemi.Keys.javaCompiler
+    inline get() = Keys.javaCompiler
 val compile
-    inline get() = wemi.Keys.compile
+    inline get() = Keys.compile
 
 val mainClass
-    inline get() = wemi.Keys.mainClass
+    inline get() = Keys.mainClass
 val runDirectory
-    inline get() = wemi.Keys.runDirectory
+    inline get() = Keys.runDirectory
 val runOptions
-    inline get() = wemi.Keys.runOptions
+    inline get() = Keys.runOptions
 val runArguments
-    inline get() = wemi.Keys.runArguments
+    inline get() = Keys.runArguments
 val run
-    inline get() = wemi.Keys.run
+    inline get() = Keys.run
 val runMain
-    inline get() = wemi.Keys.runMain
+    inline get() = Keys.runMain
 
 val testParameters
-    inline get() = wemi.Keys.testParameters
+    inline get() = Keys.testParameters
 val test
-    inline get() = wemi.Keys.test
+    inline get() = Keys.test
 
 val archiveOutputFile
-    inline get() = wemi.Keys.archiveOutputFile
+    inline get() = Keys.archiveOutputFile
 val archiveJavadocOptions
-    inline get() = wemi.Keys.archiveJavadocOptions
+    inline get() = Keys.archiveJavadocOptions
 val archiveDokkaOptions
-    inline get() = wemi.Keys.archiveDokkaOptions
+    inline get() = Keys.archiveDokkaOptions
 val archiveDokkaInterface
-    inline get() = wemi.Keys.archiveDokkaInterface
+    inline get() = Keys.archiveDokkaInterface
 val archive
-    inline get() = wemi.Keys.archive
+    inline get() = Keys.archive
 
 val publishMetadata
-    inline get() = wemi.Keys.publishMetadata
+    inline get() = Keys.publishMetadata
 val publishRepository
-    inline get() = wemi.Keys.publishRepository
+    inline get() = Keys.publishRepository
 val publishArtifacts
-    inline get() = wemi.Keys.publishArtifacts
+    inline get() = Keys.publishArtifacts
 val publish
-    inline get() = wemi.Keys.publish
+    inline get() = Keys.publish
 
 val assemblyMergeStrategy
-    inline get() = wemi.Keys.assemblyMergeStrategy
+    inline get() = Keys.assemblyMergeStrategy
 val assemblyRenameFunction
-    inline get() = wemi.Keys.assemblyRenameFunction
+    inline get() = Keys.assemblyRenameFunction
 val assemblyMapFilter
-    inline get() = wemi.Keys.assemblyMapFilter
+    inline get() = Keys.assemblyMapFilter
 val assemblyPrependData
-    inline get() = wemi.Keys.assemblyPrependData
+    inline get() = Keys.assemblyPrependData
 val assemblyOutputFile
-    inline get() = wemi.Keys.assemblyOutputFile
+    inline get() = Keys.assemblyOutputFile
 val assembly
-    inline get() = wemi.Keys.assembly
+    inline get() = Keys.assembly
 
 // Build script directive annotations
 typealias BuildDependency = wemi.boot.BuildDependency
