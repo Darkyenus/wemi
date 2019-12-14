@@ -168,6 +168,7 @@ fun main(args: Array<String>) {
     var machineReadableOutput = false
     var allowBrokenBuildScripts = false
     var reloadSupported = false
+    var skipAutoRun = false
     var rootDirectory:Path? = null
 
     val options = arrayOf(
@@ -217,6 +218,9 @@ fun main(args: Array<String>) {
             },
             Option(Option.NO_SHORT_NAME, "reload-supported", "signal that launcher will handle reload requests (exit code $EXIT_CODE_RELOAD), enables 'reload' command") { _, _ ->
                 reloadSupported = true
+            },
+            Option(Option.NO_SHORT_NAME, "skip-auto-run", "ignore autoRun() directives in build scripts") { _, _ ->
+                skipAutoRun = true
             },
             Option('h', "help", "show this help and exit", false, null) { _, options ->
                 Option.printWemiHelp(options)
@@ -335,35 +339,41 @@ fun main(args: Array<String>) {
     // ------------------------------------
 
     // Auto-run
-    for (task in autoRunTasks!!) {
-        LOG.info("Auto-run: {}", task)
-        val result = task.evaluateKey(null, null)
-        when (result.status) {
-            TaskEvaluationStatus.Success -> {
-                LOG.debug("Success")
-            }
-            TaskEvaluationStatus.NoProject -> {
-                LOG.warn("Failure: invalid or missing project")
-            }
-            TaskEvaluationStatus.NoConfiguration -> {
-                LOG.warn("Failure: invalid configuration")
-            }
-            TaskEvaluationStatus.NoKey -> {
-                LOG.warn("Failure: invalid key")
-            }
-            TaskEvaluationStatus.NotAssigned -> {
-                LOG.warn("Failure: key has no bound value")
-            }
-            TaskEvaluationStatus.Exception -> {
-                LOG.warn("Failure: failed with exception", result.data)
-            }
-            TaskEvaluationStatus.Command -> {
-                LOG.debug("Success (command)")
+    val autoRunTasks = autoRunTasks!!
+    wemi.boot.autoRunTasks = null
+    if (skipAutoRun) {
+        if (autoRunTasks.isNotEmpty()) {
+            LOG.info("Skipping {} auto run task(s)", autoRunTasks.size)
+        }
+    } else {
+        for (task in autoRunTasks) {
+            LOG.info("Auto-run: {}", task)
+            val result = task.evaluateKey(null, null)
+            when (result.status) {
+                TaskEvaluationStatus.Success -> {
+                    LOG.debug("Success")
+                }
+                TaskEvaluationStatus.NoProject -> {
+                    LOG.warn("Failure: invalid or missing project")
+                }
+                TaskEvaluationStatus.NoConfiguration -> {
+                    LOG.warn("Failure: invalid configuration")
+                }
+                TaskEvaluationStatus.NoKey -> {
+                    LOG.warn("Failure: invalid key")
+                }
+                TaskEvaluationStatus.NotAssigned -> {
+                    LOG.warn("Failure: key has no bound value")
+                }
+                TaskEvaluationStatus.Exception -> {
+                    LOG.warn("Failure: failed with exception", result.data)
+                }
+                TaskEvaluationStatus.Command -> {
+                    LOG.debug("Success (command)")
+                }
             }
         }
     }
-    autoRunTasks = null
-
 
     var exitCode = EXIT_CODE_SUCCESS
     val parsedArgs = TaskParser.PartitionedLine(taskArguments, false, machineReadableOutput)

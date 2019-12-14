@@ -77,6 +77,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.ZonedDateTime
 import java.util.*
+import java.util.regex.Pattern
 import javax.tools.Diagnostic
 import javax.tools.DiagnosticListener
 import javax.tools.DocumentationTool
@@ -238,6 +239,7 @@ object KeyDefaults {
 
     private val KotlincLOG = LoggerFactory.getLogger("Kotlinc")
     private val JavacLOG = LoggerFactory.getLogger("Javac")
+    private val JavaLintExtractorPattern = Pattern.compile(": \\[([a-zA-Z-._0-9]+)\\]")
 
     private val JavaDiagnosticListener : DiagnosticListener<JavaFileObject> = DiagnosticListener { diagnostic ->
         val source = diagnostic.source
@@ -268,24 +270,36 @@ object KeyDefaults {
             }
 
         var lint:String? = null
-        // Try to extract lint info from the message
+        // Try to extract lint info from the message (HACK)
         try {
-            // It is sadly not available through public api.
-            var jc = diagnostic
-            if (jc.javaClass.name == "com.sun.tools.javac.api.ClientCodeWrapper\$DiagnosticSourceUnwrapper") {
-                @Suppress("UNCHECKED_CAST")
-                jc = jc.javaClass.getDeclaredField("d").get(jc) as Diagnostic<JavaFileObject>
-            }
-            if (jc.javaClass.name == "com.sun.tools.javac.util.JCDiagnostic") {
-                val lintCategory = jc.javaClass.getMethod("getLintCategory").invoke(jc)
-                if (lintCategory != null) {
-                    lint = lintCategory.javaClass.getField("option").get(lintCategory) as String?
+            // If running on Java <= 1.8, use reflection.
+            // Otherwise ("java.version" will start with 9., 10., etc.) or if this fails,
+            // use different heuristics, because using reflection will cause warnings about illegal reflective access.
+            // (TODO: reconsider how to deal with this after Wemi is modularised)
+            if (System.getProperty("java.version")?.startsWith("1.") == true) {
+                // It is sadly not available through public api.
+                var jc = diagnostic
+                if (jc.javaClass.name == "com.sun.tools.javac.api.ClientCodeWrapper\$DiagnosticSourceUnwrapper") {
+                    @Suppress("UNCHECKED_CAST")
+                    jc = jc.javaClass.getDeclaredField("d").get(jc) as Diagnostic<JavaFileObject>
                 }
-            } else {
-                JavacLOG.debug("Failed to extract lint information from {}", diagnostic.javaClass)
+                if (jc.javaClass.name == "com.sun.tools.javac.util.JCDiagnostic") {
+                    val lintCategory = jc.javaClass.getMethod("getLintCategory").invoke(jc)
+                    if (lintCategory != null) {
+                        lint = lintCategory.javaClass.getField("option").get(lintCategory) as String?
+                    }
+                } else {
+                    JavacLOG.debug("Failed to extract lint information from {}", diagnostic.javaClass)
+                }
             }
         } catch (ex:Exception) {
             JavacLOG.debug("Failed to extract lint information from {}", diagnostic, ex)
+        }
+        if (lint == null) {
+            val match = JavaLintExtractorPattern.matcher(diagnostic.toString())
+            if (match.find()) {
+                lint = match.group(1)
+            }
         }
 
         var message = diagnostic.getMessage(Locale.getDefault())

@@ -1,10 +1,7 @@
 # Things to do next
 
-- Java 13 invalid reflexive access
 - http://tutorials.jenkov.com/java/modules.html
 - Unit test output from Wemi in IDE
-- DO NOT USE `extend(compiling or whatever)` to denote scopes!
-    It is flawed and will cause runtime only dependencies to appear in compile classpath!
 
 ## For next release
 
