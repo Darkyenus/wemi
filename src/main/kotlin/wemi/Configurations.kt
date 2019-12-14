@@ -28,7 +28,7 @@ object Configurations {
             // But it is needed for the compilation, so we add it explicitly.
 
             val result = classpath.toMutable()
-            inProjectDependencies(true) {
+            inProjectDependencies(true, Keys.resolvedLibraryScopes.get()) {
                 result.addAll(Keys.internalClasspath.get())
             }
             result
@@ -87,7 +87,9 @@ object Configurations {
 
     //region Archiving
     /** Used by [Keys.archive] */
-    val archiving by configuration("Used when archiving") {}
+    val archiving by configuration("Used when archiving") {
+        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
+    }
 
     /** Use this configuration to obtain sources archived in [Keys.archive]. */
     val archivingSources by configuration("Used when archiving sources") {

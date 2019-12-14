@@ -53,7 +53,7 @@ val wemi:Project by project(Archetypes.BlankJVMProject) {
 
         Files.copy(archive.get()!!, distFolder / "wemi.jar")
         Files.copy(using(archivingSources) { archive.get()!! }, distSourceFolder / "wemi.jar")
-        for (path in externalClasspath.get()) {
+        for (path in using(running) { externalClasspath.get() }) {
             Files.copy(path.file, distFolder / path.file.name)
         }
 
@@ -134,6 +134,7 @@ val core:Project by project {
             dependency("org.jline", "jline-reader", JLineVersion)
         ) }
 
+    // TODO(jp): Use scope directly
     // Compile-only (provided) libraries
     extend(compiling) {
         libraryDependencies add {
@@ -147,6 +148,7 @@ val core:Project by project {
         compilerOptions[KotlinCompilerFlags.incremental] = true
     }
 
+    // TODO(jp): Use scope directly
     extend(testing) {
         libraryDependencies add { JUnitAPI }
         libraryDependencies add { JUnitEngine }
@@ -199,6 +201,7 @@ fun createKotlinCompilerProject(version:String):Project {
 
         libraryDependencies set { emptySet() } // Disable default kotlin stdlib
 
+        // TODO(jp): Use scope directly
         extend(compiling) {
             projectDependencies add { ProjectDependency(core, false) }
 
@@ -218,6 +221,7 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
 
     libraryDependencies set { emptySet() } // Disable default kotlin stdlib
 
+    // TODO(jp): Use scope directly
     extend(compiling) {
         projectDependencies add { ProjectDependency(core, false) }
 

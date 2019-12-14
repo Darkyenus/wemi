@@ -145,7 +145,7 @@ object KeyDefaults {
     }
 
     private val ResolveProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
-    fun EvalScope.inProjectDependencies(aggregate:Boolean?, operation:EvalScope.(dep:ProjectDependency)->Unit) {
+    fun EvalScope.inProjectDependencies(aggregate:Boolean?, withScope:Set<wemi.dependency.Scope> = emptySet(), operation:EvalScope.(dep:ProjectDependency)->Unit) {
         ResolveProjectDependencies_CircularDependencyProtection.block(this.scope, failure = {
             //TODO Show cycle
             throw WemiException("Cyclic dependencies in projectDependencies are not allowed", showStacktrace = false)
@@ -154,6 +154,10 @@ object KeyDefaults {
 
             for (projectDependency in projectDependencies) {
                 if (aggregate != null && aggregate != projectDependency.aggregate) {
+                    continue
+                }
+
+                if (withScope.isNotEmpty() && projectDependency.scope !in withScope) {
                     continue
                 }
 
@@ -182,7 +186,7 @@ object KeyDefaults {
             result.add(LocatedPath(resolvedDependency.artifact?.path ?: continue))
         }
 
-        inProjectDependencies(null) { projectDependency ->
+        inProjectDependencies(null, scopes) { projectDependency ->
             ClasspathResolution_LOG.debug("Resolving project dependency on {}", this)
             result.addAll(Keys.externalClasspath.get())
             if (!projectDependency.aggregate) {
@@ -204,7 +208,7 @@ object KeyDefaults {
         constructLocatedFiles(compiled, classpath)
         classpath.addAll(resources)
 
-        inProjectDependencies(true) {
+        inProjectDependencies(true, Keys.resolvedLibraryScopes.get()) {
             ClasspathResolution_LOG.debug("Resolving internal project dependency on {}", this)
             classpath.addAll(Keys.internalClasspath.get())
         }
@@ -218,7 +222,7 @@ object KeyDefaults {
         val classpath = WMutableList<LocatedPath>(resources.size + 128)
         classpath.addAll(resources)
 
-        inProjectDependencies(true) {
+        inProjectDependencies(true, Keys.resolvedLibraryScopes.get()) {
             ClasspathResolution_LOG.debug("Resolving internal project dependency on {}", this)
             classpath.addAll(Keys.internalClasspath.get())
         }
