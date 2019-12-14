@@ -3,6 +3,7 @@ package com.darkyen.wemi.intellij.execution
 import com.darkyen.wemi.intellij.WemiLauncher
 import com.darkyen.wemi.intellij.importing.getWemiLauncher
 import com.darkyen.wemi.intellij.options.RunConfigOptions
+import com.darkyen.wemi.intellij.util.OSProcessHandlerForWemi
 import com.intellij.execution.BeforeRunTask
 import com.intellij.execution.DefaultExecutionResult
 import com.intellij.execution.ExecutionBundle
@@ -18,7 +19,6 @@ import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.configurations.RunProfileState
 import com.intellij.execution.configurations.RuntimeConfigurationException
 import com.intellij.execution.executors.DefaultDebugExecutor
-import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ProgramRunner
 import com.intellij.openapi.actionSystem.AnAction
@@ -95,10 +95,12 @@ class WemiTaskConfiguration(
                         WemiLauncher.DebugScheme.WEMI_BUILD_SCRIPTS
                     else
                         WemiLauncher.DebugScheme.WEMI_FORKED_PROCESSES
-            val process: OSProcessHandler = launcher.createWemiProcessHandler(options, true, true, debugPort, debugScheme, allowBrokenBuildScripts = false, interactive = false, machineReadable = false)
-            val terminal = TerminalExecutionConsole(project, process)
 
-            return DefaultExecutionResult(terminal, process, *AnAction.EMPTY_ARRAY)
+            val (process, commandLine) = launcher.createWemiProcess(options, color = true, unicode = true, arguments = emptyList(), tasks = options.tasks, debugPort = debugPort, debugConfig = debugScheme, pty=true)
+            val handler = OSProcessHandlerForWemi(process, commandLine)
+            val terminal = TerminalExecutionConsole(project, handler)
+
+            return DefaultExecutionResult(terminal, handler, *AnAction.EMPTY_ARRAY)
         }
 
     }

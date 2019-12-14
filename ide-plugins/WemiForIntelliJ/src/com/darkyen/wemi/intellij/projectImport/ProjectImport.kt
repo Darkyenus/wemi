@@ -279,7 +279,10 @@ private fun gatherWemiProjectData(launcher:WemiLauncher,
 	try {
 		session = tracker.stage("Creating session") {
 			WemiLauncherSession(launcher, options, {
-				launcher.createWemiProcess(options, false, true,-1, WemiLauncher.DebugScheme.DISABLED, allowBrokenBuildScripts = true, interactive = true, machineReadable = true)
+				launcher.createWemiProcess(options, color = false, unicode = true,
+						arguments = listOf("--allow-broken-build-scripts", "--interactive", "--machine-readable-output"),
+						tasks = emptyList(), debugPort = -1, debugConfig = WemiLauncher.DebugScheme.DISABLED,
+						pty = false).first
 			}, options.prefixConfigurations, tracker)
 		}
 

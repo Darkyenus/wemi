@@ -15,23 +15,15 @@ import java.util.concurrent.TimeUnit
 private val LOG = LoggerFactory.getLogger("Streams")
 
 /** Collect all output of the process, log error. If the process does not quit until timeout, kill it. */
-fun Process.collectOutputAndKill(timeout:Long, timeoutUnit: TimeUnit):CharSequence {
-    val result = StringBuilder()
+fun Process.collectOutputLineAndKill(timeout:Long, timeoutUnit: TimeUnit):String? {
+    var result:String? = null
     val resultSemaphore = Semaphore(0, false)
 
     ProcessIOExecutorService.INSTANCE.submit {
         try {
             ConcurrencyUtil.runUnderThreadName("collectOutputAndKill-output($this)") {
-                inputStream.reader(Charsets.UTF_8).use { reader ->
-                    val buffer = CharArray(1024)
-                    while (true) {
-                        val read = reader.read(buffer)
-                        if (read < 0) {
-                            break
-                        } else if (read > 0) {
-                            result.append(buffer, 0, read)
-                        }
-                    }
+                inputStream.reader(Charsets.UTF_8).useLines { lines ->
+                    result = lines.firstOrNull()
                 }
             }
         } finally {
@@ -61,7 +53,7 @@ fun Process.collectOutputAndKill(timeout:Long, timeoutUnit: TimeUnit):CharSequen
         LOG.error("collectOutputAndKill {} - process output still open")
     }
 
-    return result.toString()
+    return result
 }
 
 fun VirtualFile?.toPath(): Path? {

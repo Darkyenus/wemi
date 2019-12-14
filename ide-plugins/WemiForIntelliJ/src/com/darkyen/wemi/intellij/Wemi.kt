@@ -4,17 +4,15 @@ package com.darkyen.wemi.intellij
 
 import com.darkyen.wemi.intellij.file.isWemiLauncher
 import com.darkyen.wemi.intellij.file.isWemiScriptSource
-import com.darkyen.wemi.intellij.options.RunOptions
 import com.darkyen.wemi.intellij.options.WemiLauncherOptions
-import com.darkyen.wemi.intellij.util.OSProcessHandlerForWemi
+import com.darkyen.wemi.intellij.util.Failable
 import com.darkyen.wemi.intellij.util.Version
-import com.darkyen.wemi.intellij.util.collectOutputAndKill
+import com.darkyen.wemi.intellij.util.collectOutputLineAndKill
 import com.darkyen.wemi.intellij.util.executable
 import com.esotericsoftware.jsonbeans.JsonException
 import com.esotericsoftware.jsonbeans.JsonReader
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.esotericsoftware.jsonbeans.OutputType
-import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.process.ProcessIOExecutorService
 import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.openapi.diagnostic.Logger
@@ -27,16 +25,17 @@ import com.pty4j.PtyProcessBuilder
 import java.io.ByteArrayOutputStream
 import java.io.CharArrayWriter
 import java.io.Closeable
-import java.io.InputStream
+import java.io.IOException
 import java.io.OutputStreamWriter
-import java.io.Writer
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.concurrent.Semaphore
+import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.stream.Collectors
 import java.util.zip.ZipFile
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 // Must be a subset of Kotlin file extensions
 val WemiBuildFileExtensions = listOf("kt")
@@ -118,10 +117,10 @@ class WemiLauncher internal constructor(val file: Path) {
         }
 
         return try {
-            val process = createWemiProcessBuilder(options, false, false, listOf("--print-wemi-home"), emptyList(), -1, DebugScheme.DISABLED).first.start()
+            val process = createWemiProcess(options, false, false, listOf("--print-wemi-home"), emptyList(), -1, DebugScheme.DISABLED, pty=false).first
             StreamUtil.closeStream(process.outputStream)
-            val result = process.collectOutputAndKill(10, TimeUnit.SECONDS).toString()
-            if (result.isNotBlank()) {
+            val result = process.collectOutputLineAndKill(10, TimeUnit.SECONDS)
+            if (result != null && result.isNotBlank()) {
                 LOG.info("Found wemiHome of $file at $result")
                 return Paths.get(result)
             } else {
@@ -139,11 +138,12 @@ class WemiLauncher internal constructor(val file: Path) {
         WEMI_FORKED_PROCESSES
     }
 
-    private fun pre010_createWemiProcessBuilder(
+    private fun pre010_createWemiProcess(
             options: WemiLauncherOptions,
             color:Boolean, unicode:Boolean,
             arguments:List<String>, tasks:List<Array<String>>,
-            debugPort:Int, debugConfig: DebugScheme) : Pair<PtyProcessBuilder, String> {
+            debugPort:Int, debugConfig: DebugScheme,
+            pty:Boolean) : Pair<Process, String> {
         val env = HashMap<String, String>()
         if (options.passParentEnvironmentVariables) {
             env.putAll(EnvironmentUtil.getEnvironmentMap())
@@ -182,23 +182,39 @@ class WemiLauncher internal constructor(val file: Path) {
             }
         }
 
-        val builder = PtyProcessBuilder()
-        builder.setDirectory(file.toAbsolutePath().parent.toString())
-        builder.setCygwin(true)
-        builder.setEnvironment(env)
-        builder.setWindowsAnsiColorEnabled(false) // We don't emit those
-        builder.setCommand(commandLine.toTypedArray())
-        builder.setRedirectErrorStream(false)
-        builder.setConsole(true)
-        return builder to commandLine.joinToString(" ")
+        if (pty) {
+            val builder = PtyProcessBuilder()
+            builder.setDirectory(file.toAbsolutePath().parent.toString())
+            builder.setCygwin(true)
+            builder.setEnvironment(env)
+            builder.setWindowsAnsiColorEnabled(false) // We don't emit those
+            builder.setCommand(commandLine.toTypedArray())
+            builder.setRedirectErrorStream(false)
+            builder.setConsole(true)
+            return builder.start() to commandLine.joinToString(" ")
+        } else {
+            val builder = ProcessBuilder()
+            builder.directory(file.toAbsolutePath().parent.toFile())
+            builder.environment().putAll(env)
+            builder.command(commandLine)
+            builder.redirectInput(ProcessBuilder.Redirect.PIPE)
+            builder.redirectOutput(ProcessBuilder.Redirect.PIPE)
+            builder.redirectError(ProcessBuilder.Redirect.PIPE)
+            return builder.start() to commandLine.joinToString(" ")
+        }
     }
 
-    fun createWemiProcessBuilder(options: WemiLauncherOptions,
-                                 color:Boolean, unicode:Boolean,
-                          arguments:List<String>, tasks:List<Array<String>>,
-                          debugPort:Int, debugConfig: DebugScheme) : Pair<PtyProcessBuilder, String> {
+    /**
+     * @param pty whether or not a [com.pty4j.PtyProcess] should be created. This is needed for Intellij terminal, but
+     *            its implementation could be buggy for some byte-sensitive operations
+     */
+    fun createWemiProcess(options: WemiLauncherOptions,
+                                  color:Boolean, unicode:Boolean,
+                                  arguments:List<String>, tasks:List<Array<String>>,
+                                  debugPort:Int, debugConfig: DebugScheme,
+                                  pty:Boolean) : Pair<Process, String> {
         if (versionPre010) {
-            return pre010_createWemiProcessBuilder(options, color, unicode, arguments, tasks, debugPort, debugConfig)
+            return pre010_createWemiProcess(options, color, unicode, arguments, tasks, debugPort, debugConfig, pty)
         }
 
         val env = HashMap<String, String>()
@@ -237,65 +253,26 @@ class WemiLauncher internal constructor(val file: Path) {
             }
         }
 
-        val builder = PtyProcessBuilder()
-        builder.setDirectory(file.toAbsolutePath().parent.toString())
-        builder.setCygwin(true)
-        builder.setEnvironment(env)
-        builder.setWindowsAnsiColorEnabled(false) // We don't emit those
-        builder.setCommand(commandLine.toTypedArray())
-        builder.setRedirectErrorStream(false)
-        builder.setConsole(true)
-        //return OSProcessHandlerForWemi(builder.start(), commandLine.joinToString(" "))
-        return builder to commandLine.joinToString(" ")
-    }
-
-    fun createWemiProcessHandler(options:WemiLauncherOptions,
-                                 color:Boolean, unicode:Boolean,
-                                 debugPort:Int, debugConfig:DebugScheme,
-                                 allowBrokenBuildScripts:Boolean,
-                                 interactive:Boolean,
-                                 machineReadable:Boolean):OSProcessHandler {
-        val arguments = ArrayList<String>()
-
-        if (allowBrokenBuildScripts) {
-            arguments.add("--allow-broken-build-scripts")
+        if (pty) {
+            val builder = PtyProcessBuilder()
+            builder.setDirectory(file.toAbsolutePath().parent.toString())
+            builder.setCygwin(true)
+            builder.setEnvironment(env)
+            builder.setWindowsAnsiColorEnabled(false) // We don't emit those
+            builder.setCommand(commandLine.toTypedArray())
+            builder.setRedirectErrorStream(false)
+            builder.setConsole(true)
+            return builder.start() to commandLine.joinToString(" ")
+        } else {
+            val builder = ProcessBuilder()
+            builder.directory(file.toAbsolutePath().parent.toFile())
+            builder.environment().putAll(env)
+            builder.command(commandLine)
+            builder.redirectInput(ProcessBuilder.Redirect.PIPE)
+            builder.redirectOutput(ProcessBuilder.Redirect.PIPE)
+            builder.redirectError(ProcessBuilder.Redirect.PIPE)
+            return builder.start() to commandLine.joinToString(" ")
         }
-        if (interactive) {
-            arguments.add("--interactive")
-        }
-        if (machineReadable) {
-            arguments.add("--machine-readable-output")
-        }
-
-        // TODO(jp): Instanceof is a dangerous business
-        val tasks = if (options is RunOptions) options.tasks else emptyList()
-
-        val (builder, commandLine) = createWemiProcessBuilder(options, color, unicode, arguments, tasks, debugPort, debugConfig)
-        return OSProcessHandlerForWemi(builder.start(), commandLine)
-    }
-
-    fun createWemiProcess(options:WemiLauncherOptions,
-                          color:Boolean, unicode:Boolean,
-                                 debugPort:Int, debugConfig:DebugScheme,
-                                 allowBrokenBuildScripts:Boolean,
-                                 interactive:Boolean,
-                                 machineReadable:Boolean):Process {
-        val arguments = ArrayList<String>()
-
-        if (allowBrokenBuildScripts) {
-            arguments.add("--allow-broken-build-scripts")
-        }
-        if (interactive) {
-            arguments.add("--interactive")
-        }
-        if (machineReadable) {
-            arguments.add("--machine-readable-output")
-        }
-
-        // TODO(jp): Instanceof is a dangerous business
-        val tasks = if (options is RunOptions) options.tasks else emptyList()
-
-        return createWemiProcessBuilder(options, color, unicode, arguments, tasks, debugPort, debugConfig).first.start()
     }
 
     fun getClasspathSourceEntries(options:WemiLauncherOptions):List<Path> {
@@ -321,7 +298,12 @@ class WemiLauncher internal constructor(val file: Path) {
         }
 
         return wemiHome(options)?.let { wemiHome ->
-            Files.list(wemiHome.resolve("sources")).collect(Collectors.toList())
+            try {
+                Files.list(wemiHome.resolve("sources")).collect(Collectors.toList())
+            } catch (e: IOException) {
+                LOG.warn("Failed to resolve Wemi sources", e)
+                null
+            }
         } ?: emptyList()
     }
 
@@ -391,24 +373,24 @@ class WemiLauncherSession(
             }
 
             tracker?.taskBegin(taskPath.toString())
-            val taskData = CharArrayWriter()
-            val taskResult = process.task(taskPath, taskData)
-
-            val jsonReader = JsonReader()
-            val taskDataCharArray = taskData.toCharArray()!!
-            try {
-                val json = jsonReader.parse(taskDataCharArray, 0, taskDataCharArray.size)
+            val taskResult = process.task(taskPath)
+            return taskResult.use({ taskDataCharArray ->
                 try {
-                    jsonResult = json.prettyPrint(jsonPrettyPrintSettings)
-                } catch (e:Exception) {
-                    jsonResult = "Pretty print failed:\n$e"
+                    val json = JsonReader().parse(taskDataCharArray, 0, taskDataCharArray.size)
+                    try {
+                        jsonResult = json.prettyPrint(jsonPrettyPrintSettings)
+                    } catch (e:Exception) {
+                        jsonResult = "Pretty print failed:\n$e"
+                    }
+                    Result(ResultStatus.SUCCESS, json)
+                } catch (e:JsonException) {
+                    LOG.error("Failed to parse json", e)
+                    LOG.info("Broken json:\n${String(taskDataCharArray)}")
+                    Result(ResultStatus.CORRUPTED_RESPONSE_FORMAT, null)
                 }
-                return Result(statusForNumber(taskResult), json)
-            } catch (e:JsonException) {
-                LOG.error("Failed to parse json", e)
-                LOG.info("Broken json:\n${String(taskDataCharArray)}")
-                return Result(ResultStatus.CORRUPTED_RESPONSE_FORMAT, null)
-            }
+            }, { errorCode ->
+                Result(statusForNumber(errorCode), null)
+            })
         } finally {
             tracker?.taskEnd(jsonResult)
         }
@@ -422,76 +404,78 @@ class WemiLauncherSession(
 
         private val output = OutputStreamWriter(process.outputStream, Charsets.UTF_8)
 
+        private val taskOutputsLock = Object()
+        private var taskOutputsGenerated = true
+        private val taskOutputs = ArrayDeque<CharArray>(16)
+
         init {
             ProcessIOExecutorService.INSTANCE.submit {
                 ConcurrencyUtil.runUnderThreadName("Wemi SessionProcess output reader ($process)") {
-                    readStreamContinuously(process.inputStream, true)
+                    try {
+                        process.inputStream.reader(Charsets.UTF_8).use { reader ->
+                            val outputWriter = CharArrayWriter(2048)
+
+                            fun flushOutputWriter() {
+                                synchronized(taskOutputsLock) {
+                                    taskOutputs.addLast(outputWriter.toCharArray())
+                                    taskOutputsLock.notify()
+                                }
+                                outputWriter.reset()
+                            }
+
+                            val buffer = CharArray(1024)
+                            while (true) {
+                                val read = reader.read(buffer)
+                                if (read < 0) {
+                                    break
+                                }
+                                if (read == 0) {
+                                    continue
+                                }
+                                var partStart = 0
+                                var partEnd = 0
+                                while (partEnd < read) {
+                                    if (buffer[partEnd] == '\u0000') {
+                                        outputWriter.write(buffer, partStart, partEnd)
+                                        flushOutputWriter()
+                                        partStart = partEnd + 1
+                                        partEnd = partStart
+                                        continue
+                                    }
+                                    partEnd++
+                                }
+                                if (partStart < partEnd) {
+                                    outputWriter.write(buffer, partStart, partEnd)
+                                }
+                            }
+                        }
+                    } finally {
+                        // Nothing will ever come from this, so empty the
+                        synchronized(taskOutputsLock) {
+                            taskOutputsGenerated = false
+                            taskOutputs.addLast(charArrayOf())
+                            taskOutputsLock.notify()
+                        }
+                    }
                 }
             }
             ProcessIOExecutorService.INSTANCE.submit {
                 ConcurrencyUtil.runUnderThreadName("Wemi SessionProcess error reader ($process)") {
-                    readStreamContinuously(process.errorStream, false)
-                }
-            }
-        }
-
-        private fun readStreamContinuously(stream: InputStream, output:Boolean) {
-            try {
-                stream.reader(Charsets.UTF_8).use { reader ->
-                    val buffer = CharArray(1024)
-                    while (true) {
-                        val read = reader.read(buffer)
-                        if (read < 0) {
-                            break
-                        } else if (read > 0) {
-                            onProcessOutput(buffer, read, output)
+                    process.errorStream.reader(Charsets.UTF_8).use { reader ->
+                        val buffer = CharArray(1024)
+                        while (true) {
+                            val read = reader.read(buffer)
+                            if (read < 0) {
+                                break
+                            }
+                            if (read == 0) {
+                                continue
+                            }
+                            tracker?.sessionOutput(String(buffer, 0, read), ProcessOutputTypes.STDERR)
                         }
                     }
                 }
-            } finally {
-                // Nothing will ever come from this, so don't block, ever
-                waitingForTaskSemaphore.release(1000)
             }
-        }
-
-        @Volatile
-        private var taskOutput:Writer? = null
-        private val waitingForTaskSemaphore = Semaphore(0, false)
-
-        private fun onProcessOutput(data:CharArray, dataSize:Int, output:Boolean) {
-            if (!output) {
-                tracker?.sessionOutput(String(data, 0, dataSize), ProcessOutputTypes.STDERR)
-                return
-            }
-
-            var extraBegin = 0
-            val taskOutput = this.taskOutput
-            if (taskOutput != null) {
-                var end = dataSize
-                var done = false
-
-                for (i in 0 until dataSize) {
-                    if (data[i] == 0.toChar()) {
-                        end = i
-                        done = true
-                        break
-                    }
-                }
-
-                taskOutput.write(data, 0, end)
-                if (done) {
-	                end += 1 // Skip \0
-                    this.taskOutput = null
-                    waitingForTaskSemaphore.release()
-                }
-
-                if (end >= dataSize) {
-                    return
-                }
-                extraBegin = end
-            }
-
-            tracker?.sessionOutput(String(data, extraBegin, dataSize - extraBegin), ProcessOutputTypes.STDOUT)
         }
 
         fun close():Int {
@@ -515,21 +499,36 @@ class WemiLauncherSession(
 
         fun isDead():Boolean = !process.isAlive
 
-        fun task(task: CharSequence, taskData: Writer):Int {
+        fun task(task: CharSequence): Failable<CharArray, Int> {
             try {
                 // Read extra data/output in buffers
-                this.taskOutput = taskData
+                synchronized(taskOutputsLock) {
+                    while (true) {
+                        val extra = taskOutputs.pollFirst() ?: break
+                        tracker?.sessionOutput(String(extra), ProcessOutputTypes.STDOUT)
+                    }
+                }
 
+                // Write task command
                 output.append(task).append('\n')
                 output.flush()
 
-                waitingForTaskSemaphore.acquire()
+                val result = synchronized(taskOutputsLock) {
+                    while (taskOutputs.isEmpty() && taskOutputsGenerated) {
+                        taskOutputsLock.wait()
+                    }
+                    return@synchronized if (taskOutputs.isNotEmpty()) {
+                        taskOutputs.removeFirst()
+                    } else {
+                        null
+                    }
+                }
 
-                return if (this.taskOutput == null) {
-                    ResultStatus.SUCCESS.number
+                return if (result != null) {
+                    Failable.success(result)
                 } else {
-                    // Semaphore was released because the stream was ended, not becauase the request completed
-                    close()
+                    // No task outputs are generated, this process is over
+                    Failable.failure(close())
                 }
             } catch (e:Exception) {
                 LOG.error("Error while evaluating task '$task'", e)
