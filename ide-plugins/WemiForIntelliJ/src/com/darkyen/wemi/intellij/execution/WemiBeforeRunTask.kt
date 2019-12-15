@@ -1,6 +1,7 @@
 package com.darkyen.wemi.intellij.execution
 
 import com.darkyen.wemi.intellij.options.BeforeRunOptions
+import com.darkyen.wemi.intellij.settings.WemiProjectService
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
 import com.intellij.execution.BeforeRunTask
 import com.intellij.execution.BeforeRunTaskProvider
@@ -84,7 +85,9 @@ class WemiBeforeRunTaskProvider(private val project: Project) : BeforeRunTaskPro
 
 	override fun createTask(runConfiguration: RunConfiguration): WemiBeforeRunTask? {
 		// NOTE: Creating Wemi before run tasks is intentionally allowed for chains with other tasks
-		return WemiBeforeRunTask()
+		return WemiBeforeRunTask().apply {
+			project.getService(WemiProjectService::class.java)?.options?.copyTo(this.options)
+		}
 	}
 
 	override fun configureTask(context: DataContext, configuration: RunConfiguration, task: WemiBeforeRunTask): Promise<Boolean> {

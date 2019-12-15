@@ -4,6 +4,10 @@ import com.darkyen.wemi.intellij.util.MAX_JAVA_VERSION_FOR_WEMI_HINT
 import com.darkyen.wemi.intellij.util.MIN_JAVA_VERSION_FOR_WEMI
 import com.darkyen.wemi.intellij.util.SDK_TYPE_FOR_WEMI
 import com.darkyen.wemi.intellij.util.getWemiCompatibleSdkList
+import com.darkyen.wemi.intellij.util.shellCommandExecutable
+import com.esotericsoftware.tablelayout.BaseTableLayout
+import com.esotericsoftware.tablelayout.Cell
+import com.esotericsoftware.tablelayout.swing.Table
 import com.intellij.execution.configuration.EnvironmentVariablesComponent
 import com.intellij.execution.configuration.EnvironmentVariablesData
 import com.intellij.icons.AllIcons
@@ -11,7 +15,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CustomShortcutSet
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.externalSystem.util.PaintAwarePanel
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.keymap.KeymapUtil
@@ -38,25 +41,19 @@ import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.fields.ExtendableTextComponent
 import com.intellij.ui.components.fields.ExtendableTextField
 import com.intellij.ui.table.JBTable
-import com.intellij.util.EnvironmentUtil
 import com.intellij.util.ui.AbstractTableCellEditor
-import com.intellij.util.ui.GridBag
 import com.intellij.util.ui.JBEmptyBorder
-import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension
-import java.awt.GridBagConstraints
-import java.awt.GridBagLayout
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import javax.swing.BorderFactory
 import javax.swing.Box
@@ -98,23 +95,29 @@ abstract class AbstractPropertyEditor<T>(private val property: KMutableProperty0
 	}
 }
 
-class PropertyEditorPanel : PaintAwarePanel(GridBagLayout()) {
+class PropertyEditorPanel : Table() {
 
-	private val gridBag = GridBag().apply {
-		defaultInsets = JBInsets.create(5, 5)
-		defaultAnchor = GridBagConstraints.LINE_START
-		defaultFill = GridBagConstraints.HORIZONTAL
-		defaultWeightX = 1.0
-	}
 	private val editors = ArrayList<PropertyEditor<*>>()
 
-	fun edit(editor:PropertyEditor<*>) {
-		add(editor.component, gridBag.nextLine().next())
+	init {
+		pad(5f)
+		defaults().expandX().fillX().spaceBottom(10f)
+		align(BaseTableLayout.TOP)
+	}
+
+	fun editRow(editor:PropertyEditor<*>) {
 		editors.add(editor)
+		addCell(editor.component).colspan(2).row()
+	}
+
+	fun edit(editor:PropertyEditor<*>): Cell<JComponent> {
+		editors.add(editor)
+		@Suppress("UNCHECKED_CAST")
+		return addCell(editor.component) as Cell<JComponent>
 	}
 
 	fun gap(height:Int = 200) {
-		add(Box.Filler(Dimension(0, 0), Dimension(0, height), null), gridBag.nextLine().next().coverLine().fillCellHorizontally())
+		addCell().height(height.toFloat()).row()
 	}
 
 	fun loadFromProperties() {
@@ -325,30 +328,14 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 	init {
 		ProgressManager.getInstance().run(object : Task.Backgroundable(null, "Check which Java is on PATH", false, PerformInBackgroundOption.ALWAYS_BACKGROUND) {
 			override fun run(indicator: ProgressIndicator) {
-				val process = ProcessBuilder("command", "-v", "java").run {
-					environment().putAll(EnvironmentUtil.getEnvironmentMap())
-					redirectError(ProcessBuilder.Redirect.PIPE)
-					redirectOutput(ProcessBuilder.Redirect.PIPE)
-					redirectInput(ProcessBuilder.Redirect.PIPE)
-					start()
-				}
-				process.errorStream.close()
-				process.outputStream.close()
-				val javaPath = process.inputStream.bufferedReader(Charsets.UTF_8).use {
-					it.readLine()
-				}
-				try {
-					process.waitFor(1000, TimeUnit.MILLISECONDS)
-				} catch (ignored:InterruptedException) {}
-
-				if (process.isAlive) {
-					process.destroyForcibly()
-				}
-				if (!process.isAlive && process.exitValue() == 0 && javaPath.isNotBlank()) {
-					ApplicationManager.getApplication().invokeLater({
+				val javaPath = shellCommandExecutable("java")
+				ApplicationManager.getApplication().invokeLater({
+					if (javaPath == null) {
+						panel0JavaFromPath.text = " (currently none)"
+					} else {
 						panel0JavaFromPath.text = " (currently $javaPath)"
-					}, ModalityState.any())
-				}
+					}
+				}, ModalityState.any())
 			}
 		})
 	}
@@ -411,14 +398,14 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 	}
 
 	private val panel = object : JBTabbedPane(TOP), UserActivityProviderComponent {
+		init {
+			addTab("From PATH", panelWrap("Using Java on PATH", panel0JavaFromPath, center = true))
+			addTab("Specific version", panelWrap("Java version: ", panel1JavaFromPath, center = true))
+			addTab("SDK", panelWrap("JRE/JDK:", panel2JavaFromSdk))
+			addTab("Custom", panelWrap("JRE/JDK/Java executable:", panel3JavaCustom))
 
-	}.apply {
-		addTab("From PATH", panelWrap("Using Java on PATH", panel0JavaFromPath, center = true))
-		addTab("Specific version", panelWrap("Java version: ", panel1JavaFromPath, center = true))
-		addTab("SDK", panelWrap("JRE/JDK:", panel2JavaFromSdk))
-		addTab("Custom", panelWrap("JRE/JDK/Java executable:", panel3JavaCustom))
-
-		border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground(), 1, true), "Java Executable")
+			border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground(), 1, true), "Java Executable")
+		}
 	}
 
 	override val component: JComponent = panel
@@ -496,6 +483,50 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 	private fun javaFromSdk(sdk: Sdk):Path? {
 		return findExistingFileFromAlternatives(Paths.get(SDK_TYPE_FOR_WEMI.getBinPath(sdk)), "java", "java.exe")
 	}
+}
+
+class WindowsShellExecutableEditor(property:KMutableProperty0<String>) : AbstractPropertyEditor<String>(property) {
+
+	private val textField = run {
+		val textField = ExtendableTextField()
+
+		// TODO(jp): Use BrowseFolderRunnable if it ever stabilizes
+		val action = Runnable {
+			val fileChooserDescriptor = FileChooserDescriptor(true, false, false, false, false, false)
+			fileChooserDescriptor.title = "Select POSIX Shell"
+			fileChooserDescriptor.description = "Select executable of a POSIX compliant shell (for example bash)"
+
+			FileChooser.chooseFile(fileChooserDescriptor, null, textField, null) { chosenFile: VirtualFile? ->
+				textField.text = chosenFile?.presentableUrl ?: ""
+			}
+		}
+
+		val keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK)
+		val browseExtension = ExtendableTextComponent.Extension.create(AllIcons.General.OpenDisk, AllIcons.General.OpenDiskHover, "Browse (" + KeymapUtil.getKeystrokeText(keyStroke) + ")", action)
+
+		object : DumbAwareAction() {
+			override fun actionPerformed(e: AnActionEvent) {
+				action.run()
+			}
+		}.registerCustomShortcutSet(CustomShortcutSet(keyStroke), textField)
+		textField.addExtension(browseExtension)
+
+		textField
+	}
+
+	override val component = JPanel(BorderLayout()).apply {
+		border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground(), 1, true), "POSIX Shell executable")
+		add(textField, BorderLayout.CENTER)
+		add(JBLabel("<html><p>Wemi launcher requires a POSIX compliant shell to run. Unlike on Linux and UNIX systems, Windows does not have it built-in. If you don't have one installed, easiest option is to install <a href=\"https://git-scm.com/download/win\">Git, which comes bundled with it</a>. Alternatively, you can use <a href=\"https://www.msys2.org/\">MSYS2</a> directly, or even the full <a href=\"https://cygwin.com/\">Cygwin</a></p></html>").apply {
+			setAllowAutoWrapping(true)
+			setCopyable(true)
+		}, BorderLayout.SOUTH)
+	}
+	override var componentValue: String
+		get() = textField.text
+		set(value) {
+			textField.text = value
+		}
 }
 
 class CommandArgumentEditor(property:KMutableProperty0<List<String>>, title:String = "Java Options") : AbstractPropertyEditor<List<String>>(property) {

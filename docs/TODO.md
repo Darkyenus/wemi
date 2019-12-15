@@ -1,5 +1,6 @@
 # Things to do next
 
+- Catch import exceptions
 - http://tutorials.jenkov.com/java/modules.html
 - Unit test output from Wemi in IDE
 

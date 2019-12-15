@@ -30,7 +30,7 @@ abstract class RunOptions : WemiLauncherOptions() {
     }
 
     override fun createUi(panel: PropertyEditorPanel) {
-        panel.edit(TaskListPropertyEditor(this::tasks))
+        panel.editRow(TaskListPropertyEditor(this::tasks))
         panel.gap(5)
         super.createUi(panel)
     }

@@ -3,11 +3,12 @@ package com.darkyen.wemi.intellij.settings
 import com.darkyen.wemi.intellij.options.ProjectImportOptions
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
 import com.intellij.openapi.options.SearchableConfigurable
+import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import javax.swing.JComponent
 
 /** Allows to configure Wemi settings per project, presents the UI in settings. */
-class WemiProjectServiceConfigurable(private val project: Project) : SearchableConfigurable {
+class WemiProjectServiceConfigurable(private val project: Project) : SearchableConfigurable, DumbAware {
 
     override fun getId() = "com.darkyen.wemi.configurable-settings"
 
@@ -17,6 +18,7 @@ class WemiProjectServiceConfigurable(private val project: Project) : SearchableC
         get() = project.getService(WemiProjectService::class.java)?.options
 
     private val editorProjectSettings = ProjectImportOptions().also { editOptions ->
+        project.getService(WemiProjectService::class.java)?.updateWindowsShellExe()
         effectiveProjectSettings?.copyTo(editOptions)
     }
 

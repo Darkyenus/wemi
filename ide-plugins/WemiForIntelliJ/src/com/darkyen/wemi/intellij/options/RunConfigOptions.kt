@@ -28,7 +28,7 @@ class RunConfigOptions : RunOptions() {
 
     override fun createUi(panel: PropertyEditorPanel) {
         super.createUi(panel)
-        panel.edit(BooleanPropertyEditor(this::debugWemiItself, "Debug build scripts", "Debugger will be attached to the Wemi process itself", "Debugger will be attached to any forked process"))
+        panel.editRow(BooleanPropertyEditor(this::debugWemiItself, "Debug build scripts", "Debugger will be attached to the Wemi process itself", "Debugger will be attached to any forked process"))
     }
 
     override fun equals(other: Any?): Boolean {

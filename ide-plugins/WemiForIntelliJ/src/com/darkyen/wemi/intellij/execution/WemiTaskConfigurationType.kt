@@ -1,5 +1,6 @@
 package com.darkyen.wemi.intellij.execution
 
+import com.darkyen.wemi.intellij.importing.isWemiLinked
 import com.darkyen.wemi.intellij.settings.WemiProjectService
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationType
@@ -27,7 +28,7 @@ class WemiTaskConfigurationType : ConfigurationType {
         override fun getId(): String = ID
 
         override fun isApplicable(project: Project): Boolean {
-            return project.getService(WemiProjectService::class.java) != null
+            return isWemiLinked(project)
         }
 
         override fun createTemplateConfiguration(project: Project): WemiTaskConfiguration {

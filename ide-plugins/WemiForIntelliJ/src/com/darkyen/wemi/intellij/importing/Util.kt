@@ -8,6 +8,8 @@ import com.darkyen.wemi.intellij.settings.WemiModuleService
 import com.darkyen.wemi.intellij.settings.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiProjectService
 import com.darkyen.wemi.intellij.showBalloon
+import com.darkyen.wemi.intellij.util.executable
+import com.darkyen.wemi.intellij.util.getWindowsShellExe
 import com.darkyen.wemi.intellij.wemiDirectoryToImport
 import com.google.common.html.HtmlEscapers
 import com.intellij.notification.Notification
@@ -22,7 +24,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
-import java.nio.file.attribute.PosixFilePermission
 import javax.swing.event.HyperlinkEvent
 
 private val LOG = Logger.getInstance("wemi.importing")
@@ -142,11 +143,7 @@ fun reinstallWemiLauncher(projectBasePath:Path, failNotificationTitle:String, pr
 		return null
 	}
 	try {
-		val options = Files.getPosixFilePermissions(wemiLauncherPath).toMutableSet()
-		options.add(PosixFilePermission.OWNER_EXECUTE)
-		options.add(PosixFilePermission.GROUP_EXECUTE)
-		options.add(PosixFilePermission.OTHERS_EXECUTE)
-		Files.setPosixFilePermissions(wemiLauncherPath, options)
+		wemiLauncherPath.executable = true
 	} catch (e:Exception) {
 		LOG.error("Failed to make Wemi launcher ($wemiLauncherPath) executable", e)
 		WemiNotificationGroup.showBalloon(project, failNotificationTitle,
@@ -154,5 +151,14 @@ fun reinstallWemiLauncher(projectBasePath:Path, failNotificationTitle:String, pr
 				NotificationType.WARNING)
 	}
 
-	return Pair(projectBasePath, WemiLauncher(wemiLauncherPath))
+	val shellExe = project.getWindowsShellExe()
+
+	if (shellExe == null) {
+		WemiNotificationGroup.showBalloon(project, failNotificationTitle,
+				"Wemi launcher installed, but POSIX shell executable not found. Open Wemi preferences and set it up.",
+				NotificationType.WARNING)
+		return null
+	}
+
+	return Pair(projectBasePath, WemiLauncher(wemiLauncherPath, shellExe))
 }

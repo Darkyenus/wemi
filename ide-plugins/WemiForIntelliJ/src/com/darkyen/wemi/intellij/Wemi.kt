@@ -8,7 +8,6 @@ import com.darkyen.wemi.intellij.options.WemiLauncherOptions
 import com.darkyen.wemi.intellij.util.Failable
 import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.collectOutputLineAndKill
-import com.darkyen.wemi.intellij.util.executable
 import com.esotericsoftware.jsonbeans.JsonException
 import com.esotericsoftware.jsonbeans.JsonReader
 import com.esotericsoftware.jsonbeans.JsonValue
@@ -17,12 +16,12 @@ import com.intellij.execution.process.ProcessIOExecutorService
 import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.Key
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.StreamUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.EnvironmentUtil
 import com.pty4j.PtyProcessBuilder
-import java.io.ByteArrayOutputStream
 import java.io.CharArrayWriter
 import java.io.Closeable
 import java.io.IOException
@@ -81,24 +80,7 @@ fun wemiDirectoryToImport(base: VirtualFile): VirtualFile? {
     return null
 }
 
-/** Finds Wemi launcher in given directory, if present. */
-fun findWemiLauncher(projectDir:Path):WemiLauncher? {
-    val wemiJar = projectDir.resolve(WemiLauncherFileName).toAbsolutePath()
-
-    if (!Files.isRegularFile(wemiJar)) return null
-
-    try {
-        if (!wemiJar.executable) {
-            return null
-        }
-    } catch (e : Exception) {
-        // Filesystem may not support the executable permission
-    }
-
-    return WemiLauncher(wemiJar)
-}
-
-class WemiLauncher internal constructor(val file: Path) {
+class WemiLauncher internal constructor(val file: Path, private val windowsShellExecutable:String) {
 
     /** Wemi launchers pre-0.10 were self contained Jars and were launched differently. */
     private val versionPre010:Boolean by lazy {
@@ -119,7 +101,7 @@ class WemiLauncher internal constructor(val file: Path) {
         return try {
             val process = createWemiProcess(options, false, false, listOf("--print-wemi-home"), emptyList(), -1, DebugScheme.DISABLED, pty=false).first
             StreamUtil.closeStream(process.outputStream)
-            val result = process.collectOutputLineAndKill(10, TimeUnit.SECONDS)
+            val result = process.collectOutputLineAndKill(10, TimeUnit.SECONDS, true)
             if (result != null && result.isNotBlank()) {
                 LOG.info("Found wemiHome of $file at $result")
                 return Paths.get(result)
@@ -232,6 +214,10 @@ class WemiLauncher internal constructor(val file: Path) {
         }
 
         val commandLine = ArrayList<String>()
+        if (SystemInfo.isWindows) {
+            commandLine.add(windowsShellExecutable)
+        }
+
         commandLine.add(file.toAbsolutePath().toString())
 
         when (debugConfig) {

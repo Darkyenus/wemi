@@ -2,6 +2,7 @@
 
 package com.darkyen.wemi.intellij.util
 
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.vfs.JarFileSystem
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -92,6 +93,15 @@ operator fun CharSequence.div(path: CharSequence): StringBuilder {
     sb.append(path)
 
     return sb
+}
+
+/** Same as [Path.resolve], but returns `null` if the resolved file does not exist. */
+fun Path.resolveExisting(path:String): Path? {
+    val resolved = resolve(path)
+    if (Files.exists(resolved)) {
+        return resolved
+    }
+    return null
 }
 
 /**
@@ -253,26 +263,33 @@ inline fun Path.forEachLine(action: (String) -> Unit) {
  * Path is considered executable when at least one of Owner:Group:Others has executable bit set.
  * When setting executable, all three bits are set/cleared.
  */
-@Suppress("unused")
 var Path.executable: Boolean
     get() {
-        val permissions = Files.getPosixFilePermissions(this)
-        return permissions.contains(PosixFilePermission.OTHERS_EXECUTE)
-                || permissions.contains(PosixFilePermission.GROUP_EXECUTE)
-                || permissions.contains(PosixFilePermission.OWNER_EXECUTE)
+        if (SystemInfo.isWindows) {
+            return this.toFile().canExecute()
+        } else {
+            val permissions = Files.getPosixFilePermissions(this)
+            return permissions.contains(PosixFilePermission.OTHERS_EXECUTE)
+                    || permissions.contains(PosixFilePermission.GROUP_EXECUTE)
+                    || permissions.contains(PosixFilePermission.OWNER_EXECUTE)
+        }
     }
     set(value) {
-        val permissions = Files.getPosixFilePermissions(this).toMutableSet()
-        if (value) {
-            permissions.add(PosixFilePermission.OWNER_EXECUTE)
-            permissions.add(PosixFilePermission.GROUP_EXECUTE)
-            permissions.add(PosixFilePermission.OTHERS_EXECUTE)
+        if (SystemInfo.isWindows) {
+            this.toFile().setExecutable(true)
         } else {
-            permissions.remove(PosixFilePermission.OWNER_EXECUTE)
-            permissions.remove(PosixFilePermission.GROUP_EXECUTE)
-            permissions.remove(PosixFilePermission.OTHERS_EXECUTE)
+            val permissions = Files.getPosixFilePermissions(this).toMutableSet()
+            if (value) {
+                permissions.add(PosixFilePermission.OWNER_EXECUTE)
+                permissions.add(PosixFilePermission.GROUP_EXECUTE)
+                permissions.add(PosixFilePermission.OTHERS_EXECUTE)
+            } else {
+                permissions.remove(PosixFilePermission.OWNER_EXECUTE)
+                permissions.remove(PosixFilePermission.GROUP_EXECUTE)
+                permissions.remove(PosixFilePermission.OTHERS_EXECUTE)
+            }
+            Files.setPosixFilePermissions(this, permissions)
         }
-        Files.setPosixFilePermissions(this, permissions)
     }
 
 /**

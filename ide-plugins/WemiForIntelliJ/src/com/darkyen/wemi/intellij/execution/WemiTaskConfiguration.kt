@@ -3,6 +3,7 @@ package com.darkyen.wemi.intellij.execution
 import com.darkyen.wemi.intellij.WemiLauncher
 import com.darkyen.wemi.intellij.importing.getWemiLauncher
 import com.darkyen.wemi.intellij.options.RunConfigOptions
+import com.darkyen.wemi.intellij.settings.WemiProjectService
 import com.darkyen.wemi.intellij.util.OSProcessHandlerForWemi
 import com.intellij.execution.BeforeRunTask
 import com.intellij.execution.DefaultExecutionResult
@@ -44,7 +45,9 @@ class WemiTaskConfiguration(
         private var name:String)
     : RunConfiguration, LocatableConfiguration, RefactoringListenerProvider {
 
-    var options = RunConfigOptions()
+    var options = RunConfigOptions().apply {
+        project.getService(WemiProjectService::class.java)?.options?.copyTo(this)
+    }
         private set
     private var beforeRunTasks:MutableList<BeforeRunTask<*>> = Collections.emptyList()
 

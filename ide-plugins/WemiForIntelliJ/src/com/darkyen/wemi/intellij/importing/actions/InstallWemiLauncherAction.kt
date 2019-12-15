@@ -1,9 +1,12 @@
 package com.darkyen.wemi.intellij.importing.actions
 
+import com.darkyen.wemi.intellij.WemiNotificationGroup
 import com.darkyen.wemi.intellij.importing.defaultWemiRootPathFor
 import com.darkyen.wemi.intellij.importing.getWemiLauncher
 import com.darkyen.wemi.intellij.importing.isImportable
 import com.darkyen.wemi.intellij.importing.reinstallWemiLauncher
+import com.darkyen.wemi.intellij.showBalloon
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -35,8 +38,13 @@ class InstallWemiLauncherAction : AnAction(INSTALL_TITLE,
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val basePath = defaultWemiRootPathFor(project) ?: return
-        reinstallWemiLauncher(basePath, "Could not (re)install Wemi launcher", project)
-        LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath.toString())
+        val reinstalled = reinstallWemiLauncher(basePath, "Could not (re)install Wemi launcher", project)
+        if (reinstalled != null) {
+            LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath.toString())
+            WemiNotificationGroup.showBalloon(project, "Success",
+                    "Wemi launcher (re)created",
+                    NotificationType.INFORMATION)
+        }
     }
 
     companion object {

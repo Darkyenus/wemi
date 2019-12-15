@@ -5,6 +5,7 @@ import com.darkyen.wemi.intellij.ui.CommandArgumentEditor
 import com.darkyen.wemi.intellij.ui.PropertyEditorPanel
 import com.darkyen.wemi.intellij.util.BooleanXmlSerializer
 import com.darkyen.wemi.intellij.util.ListOfStringXmlSerializer
+import com.esotericsoftware.tablelayout.BaseTableLayout
 
 /** Options for project importing */
 class ProjectImportOptions : WemiLauncherOptions() {
@@ -29,9 +30,9 @@ class ProjectImportOptions : WemiLauncherOptions() {
 	override fun createUi(panel: PropertyEditorPanel) {
 		super.createUi(panel)
 
-		panel.edit(CommandArgumentEditor(this::prefixConfigurations, "Prefix configurations"))// TODO(jp): Better editor
-		panel.edit(BooleanPropertyEditor(this::downloadSources, "Download sources"))
-		panel.edit(BooleanPropertyEditor(this::downloadDocumentation, "Download documentation"))
+		panel.editRow(CommandArgumentEditor(this::prefixConfigurations, "Prefix configurations"))// TODO(jp): Better editor
+		panel.edit(BooleanPropertyEditor(this::downloadSources, "Download sources")).align(BaseTableLayout.RIGHT).spaceRight(20f)
+		panel.edit(BooleanPropertyEditor(this::downloadDocumentation, "Download documentation")).align(BaseTableLayout.LEFT).row()
 	}
 
 	override fun equals(other: Any?): Boolean {

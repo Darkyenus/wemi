@@ -15,14 +15,14 @@ import java.util.concurrent.TimeUnit
 private val LOG = LoggerFactory.getLogger("Streams")
 
 /** Collect all output of the process, log error. If the process does not quit until timeout, kill it. */
-fun Process.collectOutputLineAndKill(timeout:Long, timeoutUnit: TimeUnit):String? {
+fun Process.collectOutputLineAndKill(timeout:Long, timeoutUnit: TimeUnit, useStdOut:Boolean):String? {
     var result:String? = null
     val resultSemaphore = Semaphore(0, false)
 
     ProcessIOExecutorService.INSTANCE.submit {
         try {
             ConcurrencyUtil.runUnderThreadName("collectOutputAndKill-output($this)") {
-                inputStream.reader(Charsets.UTF_8).useLines { lines ->
+                (if (useStdOut) inputStream else errorStream).reader(Charsets.UTF_8).useLines { lines ->
                     result = lines.firstOrNull()
                 }
             }
@@ -33,7 +33,7 @@ fun Process.collectOutputLineAndKill(timeout:Long, timeoutUnit: TimeUnit):String
 
     ProcessIOExecutorService.INSTANCE.submit {
         ConcurrencyUtil.runUnderThreadName("collectOutputAndKill-error($this)") {
-            inputStream.reader(Charsets.UTF_8).useLines { lines ->
+            (if (useStdOut) errorStream else inputStream).reader(Charsets.UTF_8).useLines { lines ->
                 for (s in lines) {
                     if (s.isNotBlank()) {
                         LOG.warn("Process {} stderr: {}", this, s)
@@ -50,7 +50,12 @@ fun Process.collectOutputLineAndKill(timeout:Long, timeoutUnit: TimeUnit):String
         }
     }
     if (!resultSemaphore.tryAcquire(10, TimeUnit.SECONDS)) {
-        LOG.error("collectOutputAndKill {} - process output still open")
+        LOG.error("collectOutputAndKill {} - process output still open", this)
+    }
+
+    if (!isAlive && exitValue() != 0) {
+        LOG.warn("collectOutputAndKill {} - non-zero exit value ({})", this, exitValue())
+        return null
     }
 
     return result

@@ -1,8 +1,10 @@
 package com.darkyen.wemi.intellij.projectImport
 
-import com.darkyen.wemi.intellij.findWemiLauncher
+import com.darkyen.wemi.intellij.WemiLauncher
+import com.darkyen.wemi.intellij.WemiLauncherFileName
 import com.darkyen.wemi.intellij.importing.reinstallWemiLauncher
 import com.darkyen.wemi.intellij.options.ProjectImportOptions
+import com.darkyen.wemi.intellij.util.executable
 import com.darkyen.wemi.intellij.util.getWemiCompatibleSdk
 import com.intellij.ide.util.projectWizard.WizardContext
 import com.intellij.openapi.application.WriteAction
@@ -16,8 +18,7 @@ import com.intellij.openapi.roots.ui.configuration.ModulesProvider
 import com.intellij.packaging.artifacts.ModifiableArtifactModel
 import com.intellij.projectImport.ProjectImportBuilder
 import icons.WemiIcons
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import java.nio.file.Files
 import java.nio.file.Paths
 
 /**
@@ -54,9 +55,26 @@ class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
         val project = wizardContext.project
 
         val projectFileDirectory = Paths.get(wizardContext.projectFileDirectory)
-        val launcher = findWemiLauncher(projectFileDirectory)
-                ?: reinstallWemiLauncher(projectFileDirectory, "Failed to put Wemi launcher in the project directory", project)?.second
-                ?: return
+        val launcher = run {
+            val wemiJar = projectFileDirectory.resolve(WemiLauncherFileName).toAbsolutePath()
+            if (!Files.exists(wemiJar)) {
+                return@run null
+            }
+            if (!Files.isRegularFile(wemiJar)) {
+                throw ConfigurationException("Wemi launcher exists (file named \"wemi\"), but is not a file. Remove it to continue.")
+            }
+            try {
+                wemiJar.executable = true
+            } catch (e : Exception) {
+                // Filesystem may not support the executable permission
+            }
+
+            val windowsShell = projectImportOptions.getWindowsShellExecutable(project)
+                    ?: throw ConfigurationException("POSIX shell is not configured. Set it up to continue.")
+
+            WemiLauncher(wemiJar, windowsShell)
+        } ?: reinstallWemiLauncher(projectFileDirectory, "Failed to put Wemi launcher in the project directory", project)?.second
+        ?: return
 
         val projectNode:ProjectNode = importWemiProjectStructure(project, launcher, projectImportOptions, activateToolWindow = false, modal = true).get()
         this.projectNode = projectNode

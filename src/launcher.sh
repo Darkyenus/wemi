@@ -199,16 +199,9 @@ extract_targz() {
 	fi
 }
 
-fetch_jdk() {
-	# Initialize JDK parameters
-	if [ -z "$jdk_type_dir" ]; then
-		readonly jdk_version="openjdk${java_version}"
-		readonly jdk_implementation="${WEMI_JDK_IMPLEMENTATION:-hotspot}"
-		readonly jdk_heap_size="${WEMI_JDK_HEAP_SIZE:-normal}"
-		readonly jdk_release="${WEMI_JDK_RELEASE:-latest}"
-
-		if [ -n "$WEMI_JDK_OS" ]; then
-			jdk_os="$WEMI_JDK_OS"
+detect_os() {
+	if [ -n "$WEMI_JDK_OS" ]; then
+			echo "$WEMI_JDK_OS"
 		else
 			os_=$(uname)
 			# shellcheck disable=SC2039
@@ -216,43 +209,54 @@ fetch_jdk() {
 			os_=$(echo "$os_" | tr '[:upper:]' '[:lower:]') # to lowercase
 
 			case "$os_" in
-				*linux*) readonly jdk_os='linux' ;;
-				*darwin*) readonly jdk_os='mac' ;;
-				*windows* | *cygwin* | *mingw* | *msys*) readonly jdk_os='windows' ;;
-				*sunos*) readonly jdk_os='solaris' ;;
-				aix) readonly jdk_os='aix' ;;
+				*linux*) echo 'linux' ;;
+				*darwin*) echo 'mac' ;;
+				*windows* | *cygwin* | *mingw* | *msys*) echo 'windows' ;;
+				*sunos*) echo 'solaris' ;;
+				aix) echo 'aix' ;;
 				*) fail "Unrecognized or unsupported operating system: $os_ (specify manually via WEMI_JDK_OS)" ;;
 			esac
 		fi
+}
 
-		if [ -n "$WEMI_JDK_ARCH" ]; then
-			jdk_arch="$WEMI_JDK_ARCH"
+detect_arch() {
+	if [ -n "$WEMI_JDK_ARCH" ]; then
+			echo "$WEMI_JDK_ARCH"
 		else
 			arch_=$(uname -m | tr '[:upper:]' '[:lower:]') # to lowercase
 
 			case "$arch_" in
-				*x86_64* | *amd64* | *i[3456]86-64*) readonly jdk_arch='x64' ;;
-				*x86* | *i[3456]86* | *i86pc*) readonly jdk_arch='x32' ;;
-				*ppc64le*) readonly jdk_arch='ppc64le' ;; # I guess?
-				*ppc64*) readonly jdk_arch='ppc64' ;;
+				*x86_64* | *amd64* | *i[3456]86-64*) echo 'x64' ;;
+				*x86* | *i[3456]86* | *i86pc*) echo 'x32' ;;
+				*ppc64le*) echo 'ppc64le' ;; # I guess?
+				*ppc64*) echo 'ppc64' ;;
 				*power* | *ppc*) fail "32-bit PowerPC architecture is not supported" ;;
-				*s390*) readonly jdk_arch='s390x' ;;
-				*aarch64*) readonly jdk_arch='aarch64' ;; # 64-bit ARM
-				*arm*) readonly jdk_arch='arm32' ;;
+				*s390*) echo 's390x' ;;
+				*aarch64*) echo 'aarch64' ;; # 64-bit ARM
+				*arm*) echo 'arm32' ;;
 				*) fail "Unrecognized or unsupported CPU architecture: $arch_ (specify manually via WEMI_JDK_ARCH)" ;;
 			esac
 		fi
+}
 
-		# Contains all versions of this type of JDK
-		readonly jdk_type_dir="${wemi_home_dir}/jdk/${jdk_version}-${jdk_implementation}-${jdk_heap_size}"
-	fi
+# Initialize JDK parameters
+readonly jdk_version="openjdk${java_version}"
+readonly jdk_implementation="${WEMI_JDK_IMPLEMENTATION:-hotspot}"
+readonly jdk_heap_size="${WEMI_JDK_HEAP_SIZE:-normal}"
+readonly jdk_release="${WEMI_JDK_RELEASE:-latest}"
+readonly jdk_os="$(detect_os)"
+readonly jdk_arch="$(detect_arch)"
+
+fetch_jdk() {
+	# Contains all versions of this type of JDK
+	jdk_type_dir_="${wemi_home_dir}/jdk/${jdk_version}-${jdk_implementation}-${jdk_heap_size}"
 
 	# Download, extract and test a JDK distribution according to JDK_* constants and the JDK release argument.
 	# Returns immediately if already downloaded.
 	# $1: JDK release (not 'latest')
 	# echo: Path to the JDK home
 	fetch_jdk_version() {
-		jdk_dir_="${jdk_type_dir}/$1"
+		jdk_dir_="${jdk_type_dir_}/$1"
 		if [ -d "$jdk_dir_" ]; then
 			# This version already exists
 			echo "$jdk_dir_"
@@ -272,7 +276,7 @@ fetch_jdk() {
 
 		jdk_dir_decompressed_="${jdk_dir_}.decompressed"
 
-		if [ ${jdk_os} = 'windows' ]; then
+		if [ "$jdk_os" = 'windows' ]; then
 			extract_zip "$jdk_dir_download_" "$jdk_dir_decompressed_"
 		else
 			extract_targz "$jdk_dir_download_" "$jdk_dir_decompressed_"
@@ -320,7 +324,7 @@ fetch_jdk() {
 	fetch_latest_jdk() {
 		# Check whether 'latest' symlink exists and is fresh enough. If it does and is, download it.
 		# If it isn't, download and use the newest release.
-		latest_dir_="${jdk_type_dir}/latest"
+		latest_dir_="${jdk_type_dir_}/latest"
 
 		if [ -e "$latest_dir_" ] && [ ! -L "$latest_dir_" ]; then
 			fail "'${latest_dir_}' should be a symlink, but isn't"
@@ -477,6 +481,16 @@ fetch_wemi() {
 	echo "$wemi_dist_dir_"
 }
 
+# Given a path $1, return its native form.
+# Needed only on Windows, where cygwin & others use UNIX-like paths, which other programs don't understand
+nativize_path() {
+	if [ "$jdk_os" = 'windows' ] && command_exists cygpath; then
+		cygpath -w "$1"
+	else
+		echo "$1"
+	fi
+}
+
 # Launch as a Wemi launcher
 launch_wemi() {
 	java_exe_="$(fetch_java)"
@@ -485,6 +499,9 @@ launch_wemi() {
 
 	wemi_root_="$(dirname "$0")"
 	wemi_root_="${WEMI_ROOT:-$wemi_root_}"
+
+	wemi_dist_dir_="$(nativize_path "$wemi_dist_dir_")"
+	wemi_root_="$(nativize_path "$wemi_root_")"
 
 	while true; do
 		# shellcheck disable=SC2086
@@ -497,9 +514,9 @@ launch_wemi() {
 }
 
 if [ "$print_java_exe" = 'true' ]; then
-	fetch_java
+	nativize_path "$(fetch_java)"
 elif [ "$print_wemi_home" = 'true' ]; then
-	fetch_wemi
+	nativize_path "$(fetch_wemi)"
 else
 	launch_wemi "$@"
 fi

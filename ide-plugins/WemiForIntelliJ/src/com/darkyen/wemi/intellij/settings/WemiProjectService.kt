@@ -7,10 +7,12 @@ import com.darkyen.wemi.intellij.options.ProjectImportOptions
 import com.darkyen.wemi.intellij.util.MapStringStringXmlSerializer
 import com.darkyen.wemi.intellij.util.StringXmlSerializer
 import com.darkyen.wemi.intellij.util.XmlSerializable
+import com.darkyen.wemi.intellij.util.findWindowsShellExe
 import com.darkyen.wemi.intellij.util.xmlSerializableSerializer
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.SystemInfo
 import java.nio.file.Files
 import java.nio.file.Paths
 
@@ -23,9 +25,19 @@ class WemiProjectService(project: Project) : XmlSerializable() {
 	var options = ProjectImportOptions()
 	var tasks = emptyMap<String, String>()
 
-	private var wemiLauncherCache:WemiLauncher? = if (wemiLauncherPath.isBlank()) {
+	fun updateWindowsShellExe() {
+		if (SystemInfo.isWindows && options.windowsShellExecutable.isBlank()) {
+			findWindowsShellExe()?.let { options.windowsShellExecutable = it }
+		}
+	}
+
+	init {
+		updateWindowsShellExe()
+	}
+
+	private var wemiLauncherCache:WemiLauncher? = if (wemiLauncherPath.isBlank() || (SystemInfo.isWindows && options.windowsShellExecutable.isBlank())) {
 		null
-	} else WemiLauncher(Paths.get(wemiLauncherPath))
+	} else WemiLauncher(Paths.get(wemiLauncherPath), options.windowsShellExecutable)
 
 	var wemiLauncher:WemiLauncher?
 		get() {
