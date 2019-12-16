@@ -297,7 +297,7 @@ object CLI {
 
         private var nextActivityProgress = 0L
 
-        override fun activityProgressBytes(bytes: Long, totalBytes: Long, durationNs:Long) {
+        override fun activityDownloadProgress(bytes: Long, totalBytes: Long, durationNs:Long) {
             val now = System.currentTimeMillis()
             if (nextActivityProgress > now) {
                 // Do not update too often

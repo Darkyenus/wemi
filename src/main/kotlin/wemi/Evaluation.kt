@@ -368,14 +368,14 @@ interface ActivityListener {
     /** Begin some internal [activity]. Must be balanced with [endActivity]. */
     fun beginActivity(activity: String) {}
 
-    /** This activity concerns some data and the progress is measured in processed bytes,
-     * for example file downloading. Notify user about the progress of this processing.
+    /** This activity concerns some data that is being downloaded.
+     * Notify user about the progress of this processing.
      * Implicitly completed by end of [beginActivity]-[endActivity] block.
      *
      * @param bytes processed so far
      * @param totalBytes to be processed in total. 0 if unknown.
-     * @param durationNs how long in nanoseconds did it took to process this far*/
-    fun activityProgressBytes(bytes:Long, totalBytes:Long, durationNs:Long) {}
+     * @param durationNs how long in nanoseconds did it took to process this far */
+    fun activityDownloadProgress(bytes:Long, totalBytes:Long, durationNs:Long) {}
 
     /** End activity started by [beginActivity]. */
     fun endActivity() {}
@@ -497,9 +497,9 @@ interface EvaluationListener : ActivityListener {
                     second.beginActivity(activity)
                 }
 
-                override fun activityProgressBytes(bytes: Long, totalBytes: Long, durationNs:Long) {
-                    first.activityProgressBytes(bytes, totalBytes, durationNs)
-                    second.activityProgressBytes(bytes, totalBytes, durationNs)
+                override fun activityDownloadProgress(bytes: Long, totalBytes: Long, durationNs:Long) {
+                    first.activityDownloadProgress(bytes, totalBytes, durationNs)
+                    second.activityDownloadProgress(bytes, totalBytes, durationNs)
                 }
 
                 override fun endActivity() {

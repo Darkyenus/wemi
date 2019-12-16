@@ -441,7 +441,7 @@ private fun <T> Request.execute(listener:ActivityListener?, responseTranslator:R
                 override fun decode(response: Response<*>, originalIn: InputStream): T {
                     val totalLength = response.headers.entries.find { it.key.equals("Content-Length", ignoreCase = true) }?.value?.first()?.toLongOrNull() ?: 0L
 
-                    listener.activityProgressBytes(0L, totalLength, System.nanoTime() - startNs)
+                    listener.activityDownloadProgress(0L, totalLength, System.nanoTime() - startNs)
 
                     return responseTranslator.decode(response, object : InputStream() {
 
@@ -450,7 +450,7 @@ private fun <T> Request.execute(listener:ActivityListener?, responseTranslator:R
                                 field = value
                                 if (value > totalReadHighMark) {
                                     totalReadHighMark = value
-                                    listener.activityProgressBytes(value, totalLength, System.nanoTime() - startNs)
+                                    listener.activityDownloadProgress(value, totalLength, System.nanoTime() - startNs)
                                 }
                             }
                         private var totalReadMark = 0L
@@ -493,7 +493,6 @@ private fun <T> Request.execute(listener:ActivityListener?, responseTranslator:R
 
                         override fun close() {
                             originalIn.close()
-                            listener.activityProgressBytes(totalRead, totalLength, System.nanoTime() - startNs)
                         }
 
                         override fun reset() {

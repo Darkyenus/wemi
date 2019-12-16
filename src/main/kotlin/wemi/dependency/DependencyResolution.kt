@@ -6,10 +6,7 @@ import wemi.util.Partial
 import wemi.util.appendShortByteSize
 import wemi.util.directorySynchronized
 import java.nio.file.Path
-import java.util.*
-import kotlin.Comparator
-import kotlin.collections.ArrayList
-import kotlin.collections.HashSet
+import java.util.concurrent.TimeUnit
 
 /**
  * Utility method to [resolveDependencies] dependencies and retrieve their [artifacts].
@@ -36,35 +33,50 @@ fun Map<DependencyId, ResolvedDependency>.artifacts(): List<Path> {
 
 private object LoggingDownloadTracker : ActivityListener {
 
-    private val activityStack = Stack<String>()
-    private val activityLoggedStack = Stack<Boolean>()
+    private val activityStack = ArrayList<String>()
+    private var downloadStatuses = ArrayList<DownloadStatus?>()
 
     override fun beginActivity(activity: String) {
-        activityStack.push(activity)
-        activityLoggedStack.push(false)
+        activityStack.add(activity)
+        downloadStatuses.add(null)
     }
 
-    override fun activityProgressBytes(bytes: Long, totalBytes: Long, durationNs: Long) {
-        if (activityLoggedStack.isNotEmpty() && durationNs > 1000_000_000 /* 1s */ && !activityLoggedStack.peek()) {
-            activityLoggedStack.pop()
-            activityLoggedStack.push(true)
-
-            if (LOG.isInfoEnabled) {
-                val sb = StringBuilder()
-                sb.appendShortByteSize(bytes).append('/')
-                if (totalBytes > 0 && bytes < totalBytes) {
-                    sb.appendShortByteSize(totalBytes)
-                } else {
-                    sb.append("???")
-                }
-                LOG.info("Downloading {} ({})", activityStack.peek(), sb)
-            }
+    override fun activityDownloadProgress(bytes: Long, totalBytes: Long, durationNs: Long) {
+        if (!LOG.isInfoEnabled) {
+            return
         }
+
+        val downloadStatuses = downloadStatuses
+        var downloadStatus:DownloadStatus? = downloadStatuses.last()
+        if (downloadStatus == null) {
+            downloadStatus = DownloadStatus()
+            downloadStatuses[downloadStatuses.lastIndex] = downloadStatus
+        }
+
+        downloadStatus.lastDownloadBytes = bytes
+
+        // We only log if a lot of time elapsed since the last log
+        if (downloadStatus.lastLogAtDurationNs + TimeUnit.SECONDS.toNanos(3) >= durationNs) return
+        downloadStatus.lastLogAtDurationNs = durationNs
+
+        val sb = StringBuilder()
+        sb.appendShortByteSize(bytes).append('/')
+        if (totalBytes > 0 && bytes < totalBytes) {
+            sb.appendShortByteSize(totalBytes)
+        } else {
+            sb.append("???")
+        }
+        LOG.info("Downloading {} ({})", activityStack.last(), sb)
     }
 
     override fun endActivity() {
-        activityStack.pop()
-        activityLoggedStack.pop()
+        activityStack.removeAt(activityStack.lastIndex)
+        downloadStatuses.removeAt(downloadStatuses.lastIndex)
+    }
+
+    private class DownloadStatus {
+        var lastLogAtDurationNs:Long = Long.MIN_VALUE
+        var lastDownloadBytes:Long = 0
     }
 }
 
