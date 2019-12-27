@@ -212,6 +212,8 @@ fun createKotlinCompilerProject(version:String):Project {
     }
 }
 
+// Separate project, because Dokka is distributed through a fat-jar, which also includes kotlin stdlib.
+// This caused compile problems because it leads to two stdlibs on the classpath for the main project.
 val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
     sources set { FileSet(projectRoot.get() / "src") }
 

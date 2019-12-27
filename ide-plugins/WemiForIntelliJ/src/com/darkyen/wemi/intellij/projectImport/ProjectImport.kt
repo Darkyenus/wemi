@@ -12,6 +12,7 @@ import com.darkyen.wemi.intellij.settings.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiProjectService
 import com.darkyen.wemi.intellij.showBalloon
 import com.darkyen.wemi.intellij.stage
+import com.darkyen.wemi.intellij.util.SessionState
 import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.deleteRecursively
 import com.darkyen.wemi.intellij.util.digestToHexString
@@ -21,6 +22,7 @@ import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.build.DefaultBuildDescriptor
 import com.intellij.build.SyncViewManager
 import com.intellij.build.events.EventResult
+import com.intellij.build.events.FailureResult
 import com.intellij.build.events.impl.FailureResultImpl
 import com.intellij.build.events.impl.FinishBuildEventImpl
 import com.intellij.build.events.impl.FinishEventImpl
@@ -32,27 +34,34 @@ import com.intellij.build.process.BuildProcessHandler
 import com.intellij.concurrency.AsyncFuture
 import com.intellij.concurrency.AsyncFutureFactory
 import com.intellij.concurrency.ResultConsumer
+import com.intellij.execution.KillableProcess
+import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.icons.AllIcons
 import com.intellij.notification.NotificationType
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.TransactionGuard
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.PerformInBackgroundOption
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.JavaSdkVersion
 import com.intellij.openapi.roots.DependencyScope
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.io.StreamUtil
 import com.intellij.openapi.wm.ToolWindowId
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.pom.java.LanguageLevel
+import com.intellij.util.IncorrectOperationException
 import com.intellij.util.concurrency.EdtExecutorService
 import java.io.OutputStream
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -83,98 +92,76 @@ fun importWemiProjectStructure(project: Project?, launcher: WemiLauncher, option
 	val futureResult = AsyncFutureFactory.getInstance().createAsyncFutureResult<ProjectNode>()
 
 	fun executeImpl(indicator: ProgressIndicator) {
-		if (project?.isDisposed == true || indicator.isCanceled) {
+		val sessionState = SessionState(indicator)
+		if (project != null) {
+			if (project.isDisposed) {
+				sessionState.cancel(false)
+			} else {
+				try {
+					Disposer.register(project, Disposable { sessionState.cancel(false) })
+				} catch (e: IncorrectOperationException) {
+					// Thrown when project is disposed or being disposed
+					sessionState.cancel(false)
+				}
+			}
+		}
+
+		if (sessionState.isCancelled()) {
 			futureResult.cancel(true)
 			return
 		}
 
-		val importTracker = object : SessionActivityTracker {
+		val startMs = System.currentTimeMillis()
+		val buildId = "WemiImportProject${refreshProjectVisualizationTreeRootNextId.getAndIncrement()}"
+		val syncViewManager = project?.getService(SyncViewManager::class.java)
 
-			private val buildId = "WemiImportProject${refreshProjectVisualizationTreeRootNextId.getAndIncrement()}"
-			private val syncViewManager = project?.getService(SyncViewManager::class.java)
-			private val buildProcessHandler = object : BuildProcessHandler() {
+		val buildProcessHandler = object : BuildProcessHandler(), KillableProcess, SessionState.Listener {
 
-				override fun getProcessInput(): OutputStream? = null
+			override fun getProcessInput(): OutputStream? = null
+			override fun detachIsDefault(): Boolean = false
+			override fun getExecutionName(): String = "Wemi Project Resolution"
 
-				override fun detachIsDefault(): Boolean = false
-
-				override fun getExecutionName(): String = "Wemi Project Resolution"
-
-				override fun detachProcessImpl() {}
-
-				override fun destroyProcessImpl() {}
+			override fun detachProcessImpl() {
+				destroyProcessImpl()
 			}
 
+			override fun destroyProcessImpl() {
+				sessionState.cancel(false)
+			}
+
+			override fun killProcess() {
+				sessionState.cancel(true)
+			}
+
+			override fun canKillProcess(): Boolean = true
+
+			override fun sessionStateChange(newState: SessionState.State) {
+				if (newState == SessionState.State.FINISHED || newState == SessionState.State.FINISHED_CANCELLED) {
+					notifyProcessTerminated(sessionState.exitCode)
+				}
+			}
+		}
+		sessionState.addListener(buildProcessHandler)
+
+		val importTracker = object : SessionActivityTracker {
 			override fun sessionOutput(text: String, outputType: Key<*>) {
 				buildProcessHandler.notifyTextAvailable(text, outputType)
 			}
 
-			private fun checkIfCancelled() {
-				if (indicator.isCanceled) {
-					throw CancelImportException
-				}
-			}
-
-			fun importBegin() {
-				checkIfCancelled()
-				syncViewManager?.onEvent(buildId,
-						StartBuildEventImpl(DefaultBuildDescriptor(buildId, project?.name ?: "Wemi Project", launcher.file.parent.toString(), System.currentTimeMillis()), "Importing Wemi Project...")
-								.withProcessHandler(buildProcessHandler, null)
-								.withRestartAction(ReloadProjectAction().apply {
-									templatePresentation.icon = AllIcons.Actions.Refresh
-									templatePresentation.text = "Reimport Wemi Project"
-									templatePresentation.description = "Force reimport of selected Wemi project"
-								})
-						// I am not entirely sure what should this do, but maybe we'll want it in the future?
-						/*.withContentDescriptorSupplier {
-							if (consoleView == null) {
-								null
-							} else {
-								val contentDescriptor = BuildContentDescriptor(consoleView, processHandler, consoleView.component, "Sync")
-								contentDescriptor.isActivateToolWindowWhenAdded = true
-								contentDescriptor.isActivateToolWindowWhenFailed = true
-								contentDescriptor.isAutoFocusContent = true
-								contentDescriptor
-							}
-						}*/
-				)
-
-				if (activateToolWindow && project != null && syncViewManager != null) {
-					ApplicationManager.getApplication().invokeLater({
-						ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.BUILD)?.show(null)
-					}, ModalityState.NON_MODAL)
-				}
-			}
-
-			fun importSuccess() {
-				syncViewManager?.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Done", SuccessResultImpl()))
-
-				WemiNotificationGroup.showBalloon(project, "Wemi - Success", "Project imported successfully", NotificationType.INFORMATION)
-			}
-
-			fun importFailure(e: Exception) {
-				syncViewManager?.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Failed", FailureResultImpl("Failed to import Wemi project", e)))
-
-				WemiNotificationGroup.showBalloon(project, "Wemi - Failure", "Failed to import the project", NotificationType.WARNING)
-			}
-
-			fun importCancelled() {
-				syncViewManager?.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Cancelled", FailureResultImpl("Import was cancelled")))
-			}
-
 			private val NoResult = object : EventResult {}
+			private val FailResult = FailureResult { emptyList() }
 
 			private val stageStack = ArrayList<String>()
 			private val taskStack = ArrayList<String>()
 
 			override fun stageBegin(name: String) {
-				checkIfCancelled()
+				indicator.checkCanceled()
 				syncViewManager?.onEvent(buildId, StartEventImpl(name, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), name))
 				stageStack.add(name)
 			}
 
 			override fun stageEnd() {
-				checkIfCancelled()
+				indicator.checkCanceled()
 				if (stageStack.isEmpty()) {
 					LOG.error("stageEnd(), but stack is empty (task: $taskStack)", Exception())
 					return
@@ -184,35 +171,49 @@ fun importWemiProjectStructure(project: Project?, launcher: WemiLauncher, option
 			}
 
 			override fun taskBegin(name: String) {
-				checkIfCancelled()
+				indicator.checkCanceled()
 				taskStack.add(name)
 				syncViewManager?.onEvent(buildId, StartEventImpl(name, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), name))
 			}
 
-			override fun taskEnd(output: String?) {
-				checkIfCancelled()
+			override fun taskEnd(output: String?, success:Boolean) {
+				indicator.checkCanceled()
 				if (taskStack.isEmpty()) {
 					LOG.error("taskEnd(), but stack is empty (stage: $stageStack)", Exception())
 					return
 				}
 				val last = taskStack.removeAt(taskStack.lastIndex)
 				if (output != null) {
-					syncViewManager?.onEvent(buildId, OutputBuildEventImpl(last, output, true))
+					syncViewManager?.onEvent(buildId, OutputBuildEventImpl(last, output, success))
 				}
-				syncViewManager?.onEvent(buildId, FinishEventImpl(last, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), last, NoResult))
+				syncViewManager?.onEvent(buildId, FinishEventImpl(last, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), last, if (success) NoResult else FailResult))
 			}
 		}
 
-		val startMs = System.currentTimeMillis()
+		syncViewManager?.onEvent(buildId,
+				StartBuildEventImpl(DefaultBuildDescriptor(buildId, project.name, launcher.file.parent.toString(), System.currentTimeMillis()), "Importing Wemi Project...")
+						.withProcessHandler(buildProcessHandler, null)
+						.withRestartAction(ReloadProjectAction().also {
+							it.templatePresentation.apply {
+								icon = AllIcons.Actions.Refresh
+								text = "Reimport Wemi Project"
+								description = "Force reimport of selected Wemi project"
+							}
+						}))
+		if (activateToolWindow && project != null && syncViewManager != null) {
+			ApplicationManager.getApplication().invokeLater({
+				ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.BUILD)?.show(null)
+			}, ModalityState.NON_MODAL)
+		}
 
 		var result:ProjectNode? = null
 		var error:Exception? = null
-		importTracker.importBegin()
 		try {
-			result = gatherWemiProjectData(launcher, options, importTracker)
+			indicator.checkCanceled()
+			result = gatherWemiProjectData(launcher, options, importTracker, sessionState)
 			LOG.info("Wemi [${launcher.file}] project resolution completed in ${System.currentTimeMillis() - startMs} ms")
-		} catch (e:CancelImportException) {
-			LOG.warn("Wemi [${launcher.file}] project resolution cancelled after ${System.currentTimeMillis() - startMs} ms", e)
+		} catch (e:ProcessCanceledException) {
+			LOG.warn("Wemi [${launcher.file}] project resolution cancelled after ${System.currentTimeMillis() - startMs} ms")
 		} catch (e:Exception) {
 			error = e
 			LOG.warn("Wemi [${launcher.file}] project resolution failed after ${System.currentTimeMillis() - startMs} ms", e)
@@ -220,13 +221,15 @@ fun importWemiProjectStructure(project: Project?, launcher: WemiLauncher, option
 			if (project?.isDisposed == true) {
 				futureResult.cancel(true)
 			} else if (result != null) {
-				importTracker.importSuccess()
+				syncViewManager?.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Done", SuccessResultImpl()))
+				WemiNotificationGroup.showBalloon(project, "Wemi - Success", "Project imported successfully", NotificationType.INFORMATION)
 				futureResult.set(result)
 			} else if (error != null) {
-				importTracker.importFailure(error)
+				syncViewManager?.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Failed", FailureResultImpl("Failed to import Wemi project", error)))
+				WemiNotificationGroup.showBalloon(project, "Wemi - Failure", "Failed to import the project", NotificationType.WARNING)
 				futureResult.setException(error)
 			} else {
-				importTracker.importCancelled()
+				syncViewManager?.onEvent(buildId, FinishBuildEventImpl(buildId, null, System.currentTimeMillis(), "Cancelled", FailureResultImpl("Import was cancelled")))
 				futureResult.cancel(true)
 			}
 		}
@@ -261,20 +264,14 @@ fun importWemiProjectStructure(project: Project?, launcher: WemiLauncher, option
 	return futureResult
 }
 
-private object CancelImportException : Throwable("ImportCancelled", null, false, false)
-
 /**
  * Builds object-level representation of the external system config file contained at the given path.
  *
- * @return object-level representation of the target external system project;
- * {@code null} if it's not possible to resolve the project
- * @throws java.lang.IllegalArgumentException if given path is invalid
- * @throws java.lang.IllegalStateException    if it's not possible to resolve target project info
+ * @return object-level representation of the target external system project
+ * @throws Throwable on failure
  */
-@Throws(IllegalArgumentException::class, IllegalStateException::class)
-private fun gatherWemiProjectData(launcher:WemiLauncher,
-                          options: ProjectImportOptions,
-                          tracker: SessionActivityTracker): ProjectNode {
+private fun gatherWemiProjectData(launcher:WemiLauncher, options: ProjectImportOptions,
+                          tracker: SessionActivityTracker, sessionState:SessionState): ProjectNode {
 	var session: WemiLauncherSession? = null
 	try {
 		session = tracker.stage("Creating session") {
@@ -283,21 +280,33 @@ private fun gatherWemiProjectData(launcher:WemiLauncher,
 						arguments = listOf("--allow-broken-build-scripts", "--interactive", "--machine-readable-output"),
 						tasks = emptyList(), debugPort = -1, debugConfig = WemiLauncher.DebugScheme.DISABLED,
 						pty = false).first
-			}, options.prefixConfigurations, tracker)
+			}, options.prefixConfigurations, tracker, sessionState)
 		}
 
-		// First request on session will be probably waiting for build scripts to compile
+		// First request on a session will be probably waiting for build scripts to compile
 		tracker.stage("Loading build scripts") {
 			val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
 			LOG.info("Wemi version is $wemiVersion")
 			session.wemiVersion = Version(wemiVersion)
 		}
 
-		@Suppress("UnnecessaryVariable") // Creates place for breakpoint
-		val resolvedProject = resolveProjectInfo(launcher, session, launcher.file.parent.toAbsolutePath(), options.downloadSources, options.downloadDocumentation, tracker)
+		val resolvedProject: ProjectNode
+		try {
+			resolvedProject = resolveProjectInfo(launcher, session, launcher.file.parent.toAbsolutePath(), options.downloadSources, options.downloadDocumentation, tracker)
+		} catch (e:ProcessCanceledException) {
+			throw e
+		} catch (e:InvalidTaskResultException) {
+			tracker.sessionOutput(e.toString(), ProcessOutputTypes.SYSTEM)
+			throw e
+		} catch (e:Exception) {
+			val writer = StringWriter()
+			PrintWriter(writer).use { e.printStackTrace(it) }
+			tracker.sessionOutput(writer.toString(), ProcessOutputTypes.SYSTEM)
+			throw e
+		}
 		return resolvedProject
 	} finally {
-		StreamUtil.closeStream(session)
+		session?.close()
 	}
 }
 
@@ -582,7 +591,7 @@ private fun createWemiProjectDependencies(session: WemiLauncherSession, projectN
 
 			add(file.toString(), WemiLibraryDependency(file.fileName.toString(), file))
 		}
-	} catch (e: ProjectImportException) {
+	} catch (e: InvalidTaskResultException) {
 		LOG.warn("Failed to resolve dependencies for ${config.joinToString("") { "$it:" }}$projectName", e)
 	}
 
@@ -774,13 +783,13 @@ private fun JsonValue.mapGet(key:String): JsonValue? {
 private fun WemiLauncherSession.Companion.Result.data(type: JsonValue.ValueType? = null, orNull:Boolean = false): JsonValue {
 	if (this.data == null || this.status != WemiLauncherSession.Companion.ResultStatus.SUCCESS) {
 		LOG.warn("Failed to retrieve data of type $type - task request failed ($this)")
-		throw ProjectImportException(this, type)
+		throw InvalidTaskResultException(this, type)
 	}
 	val valueType = this.data.type()
 	val typeIsValid = type == null || (valueType == type) || (orNull && valueType == JsonValue.ValueType.nullValue)
 	if (!typeIsValid) {
 		LOG.warn("Failed to retrieve data of type $type - type mismatch ($this)")
-		throw ProjectImportException(this, type)
+		throw InvalidTaskResultException(this, type)
 	}
 	return data
 }
@@ -832,6 +841,6 @@ private val DependencyComparator:Comparator<LibraryDependencyNode> = Comparator 
 	a1.compareTo(b1)
 }
 
-private class ProjectImportException(val result:WemiLauncherSession.Companion.Result,
-                                     expectedType:JsonValue.ValueType?)
+private class InvalidTaskResultException(val result:WemiLauncherSession.Companion.Result,
+                                         expectedType:JsonValue.ValueType?)
 	: Exception("Got $result but expected $expectedType")

@@ -6,6 +6,7 @@ import com.darkyen.wemi.intellij.file.isWemiLauncher
 import com.darkyen.wemi.intellij.file.isWemiScriptSource
 import com.darkyen.wemi.intellij.options.WemiLauncherOptions
 import com.darkyen.wemi.intellij.util.Failable
+import com.darkyen.wemi.intellij.util.SessionState
 import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.collectOutputLineAndKill
 import com.esotericsoftware.jsonbeans.JsonException
@@ -23,9 +24,10 @@ import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.EnvironmentUtil
 import com.pty4j.PtyProcessBuilder
 import java.io.CharArrayWriter
-import java.io.Closeable
 import java.io.IOException
 import java.io.OutputStreamWriter
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -303,7 +305,7 @@ interface SessionActivityTracker {
     fun stageEnd()
 
     fun taskBegin(name:String)
-    fun taskEnd(output:String?)
+    fun taskEnd(output:String?, success:Boolean)
 
     fun sessionOutput(text:String, outputType: Key<*>)
 }
@@ -318,11 +320,12 @@ inline fun <T> SessionActivityTracker.stage(name:String, action:()->T):T {
 }
 
 class WemiLauncherSession(
-        val launcher:WemiLauncher,
-        val options:WemiLauncherOptions,
+        val launcher: WemiLauncher,
+        val options: WemiLauncherOptions,
         private val createProcess: () -> Process,
         private val prefixConfigurations: List<String> = emptyList(),
-        private val tracker: SessionActivityTracker?) : Closeable {
+        private val tracker: SessionActivityTracker?,
+        private val sessionState: SessionState) : SessionState.Listener {
 
     var wemiVersion: Version = Version.NONE
     private var process = SessionProcess(createProcess(), tracker)
@@ -332,6 +335,7 @@ class WemiLauncherSession(
     }
 
     fun task(project:String?, vararg configurations:String, task:String, includeUserConfigurations:Boolean = true):Result {
+        sessionState.checkCancelled()
         val taskPath = StringBuilder()
         if (project != null) {
             taskPath.append(project).append('/')
@@ -347,46 +351,74 @@ class WemiLauncherSession(
         taskPath.append(task)
 
         var jsonResult:String? = null
+        var success = false
         try {
             if (process.isDead()) {
                 tracker?.taskBegin("Restarting...")
                 try {
-                    process.close()
+                    process.kill()
                     process = SessionProcess(createProcess(), tracker)
                 } finally {
-                    tracker?.taskEnd(null)
+                    tracker?.taskEnd(null, !process.isDead())
                 }
             }
 
             tracker?.taskBegin(taskPath.toString())
-            val taskResult = process.task(taskPath)
-            return taskResult.use({ taskDataCharArray ->
-                try {
-                    val json = JsonReader().parse(taskDataCharArray, 0, taskDataCharArray.size)
-                    jsonResult = try {
-                        json.prettyPrint(jsonPrettyPrintSettings)
-                    } catch (e:Exception) {
-                        "Pretty print failed:\n$e"
+            try {
+                val taskResult = process.task(taskPath)
+                return taskResult.use({ taskDataCharArray ->
+                    try {
+                        val json = JsonReader().parse(taskDataCharArray, 0, taskDataCharArray.size)
+                        jsonResult = try {
+                            json.prettyPrint(jsonPrettyPrintSettings)
+                        } catch (e: Exception) {
+                            "Pretty print failed:\n$e"
+                        }
+                        success = true
+                        Result(ResultStatus.SUCCESS, json)
+                    } catch (e: JsonException) {
+                        LOG.error("Failed to parse json", e)
+                        val taskDataString = String(taskDataCharArray)
+                        LOG.info("Broken json:\n$taskDataString")
+                        jsonResult = taskDataString
+                        Result(ResultStatus.CORRUPTED_RESPONSE_FORMAT, null)
                     }
-                    Result(ResultStatus.SUCCESS, json)
-                } catch (e:JsonException) {
-                    LOG.error("Failed to parse json", e)
-                    LOG.info("Broken json:\n${String(taskDataCharArray)}")
-                    Result(ResultStatus.CORRUPTED_RESPONSE_FORMAT, null)
+                }, { errorCode ->
+                    val status = statusForNumber(errorCode)
+                    jsonResult = status.name
+                    Result(status, null)
+                })
+            } catch (e:Exception) {
+                if (jsonResult == null) {
+                    val writer = StringWriter()
+                    PrintWriter(writer).use { e.printStackTrace(it) }
+                    jsonResult = writer.toString()
                 }
-            }, { errorCode ->
-                Result(statusForNumber(errorCode), null)
-            })
+                throw e
+            }
         } finally {
-            tracker?.taskEnd(jsonResult)
+            tracker?.taskEnd(jsonResult, success)
         }
     }
 
-    override fun close() {
-        process.close()
+    override fun sessionStateChange(newState: SessionState.State) {
+        when (newState) {
+            SessionState.State.CANCELLED -> process.process.destroy()
+            SessionState.State.CANCELLED_FORCE -> process.process.destroyForcibly()
+            else -> {}
+        }
     }
 
-    private class SessionProcess(val process:Process, private val tracker: SessionActivityTracker?) {
+    init {
+        sessionState.addListener(this)
+    }
+
+    fun close() {
+        sessionState.removeListener(this)
+        sessionState.finish(process.kill())
+    }
+
+    class SessionProcess(val process:Process, private val tracker: SessionActivityTracker?) {
 
         private val output = OutputStreamWriter(process.outputStream, Charsets.UTF_8)
 
@@ -436,7 +468,6 @@ class WemiLauncherSession(
                             }
                         }
                     } finally {
-                        // Nothing will ever come from this, so empty the
                         synchronized(taskOutputsLock) {
                             taskOutputsGenerated = false
                             taskOutputs.addLast(charArrayOf())
@@ -464,7 +495,7 @@ class WemiLauncherSession(
             }
         }
 
-        fun close():Int {
+        fun kill():Int {
             StreamUtil.closeStream(output)
 
             if (!process.waitFor(10, TimeUnit.SECONDS)) {
@@ -489,9 +520,8 @@ class WemiLauncherSession(
             try {
                 // Read extra data/output in buffers
                 synchronized(taskOutputsLock) {
-                    while (true) {
-                        val extra = taskOutputs.pollFirst() ?: break
-                        tracker?.sessionOutput(String(extra), ProcessOutputTypes.STDOUT)
+                    while (taskOutputs.isNotEmpty()) {
+                        tracker?.sessionOutput(String(taskOutputs.removeFirst()), ProcessOutputTypes.STDOUT)
                     }
                 }
 
@@ -513,8 +543,9 @@ class WemiLauncherSession(
                 return if (result != null) {
                     Failable.success(result)
                 } else {
-                    // No task outputs are generated, this process is over
-                    Failable.failure(close())
+                    // No task outputs are generated, this process has died or closed output streams. Kill it!
+                    // (tracker will be notified elsewhere)
+                    Failable.failure(kill())
                 }
             } catch (e:Exception) {
                 LOG.error("Error while evaluating task '$task'", e)
