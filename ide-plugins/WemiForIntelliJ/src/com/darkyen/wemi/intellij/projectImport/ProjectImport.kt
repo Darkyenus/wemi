@@ -1,6 +1,6 @@
 package com.darkyen.wemi.intellij.projectImport
 
-import com.darkyen.wemi.intellij.SessionActivityTracker
+import com.darkyen.wemi.intellij.util.SessionActivityTracker
 import com.darkyen.wemi.intellij.WemiBuildScriptProjectName
 import com.darkyen.wemi.intellij.WemiLauncher
 import com.darkyen.wemi.intellij.WemiLauncherSession
@@ -11,12 +11,13 @@ import com.darkyen.wemi.intellij.options.ProjectImportOptions
 import com.darkyen.wemi.intellij.settings.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiProjectService
 import com.darkyen.wemi.intellij.showBalloon
-import com.darkyen.wemi.intellij.stage
+import com.darkyen.wemi.intellij.util.stage
 import com.darkyen.wemi.intellij.util.SessionState
 import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.deleteRecursively
 import com.darkyen.wemi.intellij.util.digestToHexString
 import com.darkyen.wemi.intellij.util.div
+import com.darkyen.wemi.intellij.util.stagesFor
 import com.darkyen.wemi.intellij.util.update
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.build.DefaultBuildDescriptor
@@ -155,38 +156,73 @@ fun importWemiProjectStructure(project: Project?, launcher: WemiLauncher, option
 			private val taskStack = ArrayList<String>()
 
 			override fun stageBegin(name: String) {
-				indicator.checkCanceled()
+				sessionState.checkCancelled()
 				syncViewManager?.onEvent(buildId, StartEventImpl(name, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), name))
 				stageStack.add(name)
+				indicator.text = name
 			}
 
 			override fun stageEnd() {
-				indicator.checkCanceled()
+				sessionState.checkCancelled()
 				if (stageStack.isEmpty()) {
 					LOG.error("stageEnd(), but stack is empty (task: $taskStack)", Exception())
 					return
 				}
 				val last = stageStack.removeAt(stageStack.lastIndex)
+				indicator.text = stageStack.lastOrNull() ?: ""
 				syncViewManager?.onEvent(buildId, FinishEventImpl(last, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), last, NoResult))
 			}
 
 			override fun taskBegin(name: String) {
-				indicator.checkCanceled()
+				sessionState.checkCancelled()
 				taskStack.add(name)
+				indicator.text2 = name
 				syncViewManager?.onEvent(buildId, StartEventImpl(name, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), name))
 			}
 
 			override fun taskEnd(output: String?, success:Boolean) {
-				indicator.checkCanceled()
+				sessionState.checkCancelled()
 				if (taskStack.isEmpty()) {
 					LOG.error("taskEnd(), but stack is empty (stage: $stageStack)", Exception())
 					return
 				}
 				val last = taskStack.removeAt(taskStack.lastIndex)
+				indicator.text2 = taskStack.lastOrNull() ?: ""
 				if (output != null) {
 					syncViewManager?.onEvent(buildId, OutputBuildEventImpl(last, output, success))
 				}
 				syncViewManager?.onEvent(buildId, FinishEventImpl(last, stageStack.lastOrNull() ?: buildId, System.currentTimeMillis(), last, if (success) NoResult else FailResult))
+			}
+
+			private var maxProgressStack = IntArray(10)
+			private var doneProgressStack = IntArray(10)
+
+			override fun stageProgress(done: Int, outOf: Int) {
+				// Update state
+				val progressStackIndex = stageStack.size
+				if (progressStackIndex >= maxProgressStack.size) {
+					val newSize = maxOf(maxProgressStack.size, progressStackIndex + 1)
+					maxProgressStack = maxProgressStack.copyOf(newSize)
+					doneProgressStack = doneProgressStack.copyOf(newSize)
+				}
+				val maxProgressStack = maxProgressStack
+				val doneProgressStack = doneProgressStack
+				maxProgressStack[progressStackIndex] = maxOf(outOf, 1)
+				doneProgressStack[progressStackIndex] = minOf(maxOf(done, 0), maxProgressStack[progressStackIndex])
+
+				// Compute total progress
+				var nestedFraction = 1f
+				var total = 0f
+				for (i in 0..progressStackIndex) {
+					val levelSubdivisions = 1f / maxProgressStack[i].toFloat()
+					total += (doneProgressStack[i].toFloat() * levelSubdivisions) * nestedFraction
+					nestedFraction *= levelSubdivisions
+				}
+
+				if (indicator.isIndeterminate) {
+					indicator.isIndeterminate = false
+				}
+				indicator.fraction = total.toDouble()
 			}
 		}
 
@@ -209,7 +245,7 @@ fun importWemiProjectStructure(project: Project?, launcher: WemiLauncher, option
 		var result:ProjectNode? = null
 		var error:Exception? = null
 		try {
-			indicator.checkCanceled()
+			sessionState.checkCancelled()
 			result = gatherWemiProjectData(launcher, options, importTracker, sessionState)
 			LOG.info("Wemi [${launcher.file}] project resolution completed in ${System.currentTimeMillis() - startMs} ms")
 		} catch (e:ProcessCanceledException) {
@@ -264,6 +300,8 @@ fun importWemiProjectStructure(project: Project?, launcher: WemiLauncher, option
 	return futureResult
 }
 
+private const val TOP_LEVEL_STAGE_COUNT = 8
+
 /**
  * Builds object-level representation of the external system config file contained at the given path.
  *
@@ -271,9 +309,10 @@ fun importWemiProjectStructure(project: Project?, launcher: WemiLauncher, option
  * @throws Throwable on failure
  */
 private fun gatherWemiProjectData(launcher:WemiLauncher, options: ProjectImportOptions,
-                          tracker: SessionActivityTracker, sessionState:SessionState): ProjectNode {
+                                  tracker: SessionActivityTracker, sessionState:SessionState): ProjectNode {
 	var session: WemiLauncherSession? = null
 	try {
+		tracker.stageProgress(0, TOP_LEVEL_STAGE_COUNT)
 		session = tracker.stage("Creating session") {
 			WemiLauncherSession(launcher, options, {
 				launcher.createWemiProcess(options, color = false, unicode = true,
@@ -284,6 +323,7 @@ private fun gatherWemiProjectData(launcher:WemiLauncher, options: ProjectImportO
 		}
 
 		// First request on a session will be probably waiting for build scripts to compile
+		tracker.stageProgress(1, TOP_LEVEL_STAGE_COUNT)
 		tracker.stage("Loading build scripts") {
 			val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
 			LOG.info("Wemi version is $wemiVersion")
@@ -315,6 +355,7 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
                                projectRoot: Path,
                                downloadSources:Boolean, downloadDocumentation:Boolean,
                                tracker: SessionActivityTracker): ProjectNode {
+	tracker.stageProgress(2, TOP_LEVEL_STAGE_COUNT)
 	tracker.stageBegin("Resolving project list")
 	val wemiProjects = session.stringArray(project = null, task = "#projects", includeUserConfigurations = false).let {
 		projectNames ->
@@ -364,71 +405,69 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 
 	val projectModules = HashMap<String, ModuleNode>()
 	val libraryBank = WemiLibraryDependencyBank()
-	for (project in wemiProjects.values) {
-		tracker.stage("Resolving project ${project.projectName}") {
-			val ideModuleNode = project.moduleNode(WemiModuleType.PROJECT)
-			ideProjectNode.modules.add(ideModuleNode)
-			projectModules[project.projectName] = ideModuleNode
+	tracker.stageProgress(3, TOP_LEVEL_STAGE_COUNT)
+	tracker.stagesFor("Resolving projects", wemiProjects.values, {"Resolving project ${it.projectName}"}) { project ->
+		val ideModuleNode = project.moduleNode(WemiModuleType.PROJECT)
+		ideProjectNode.modules.add(ideModuleNode)
+		projectModules[project.projectName] = ideModuleNode
 
-			// Collect dependencies
-			val compileDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "compiling", downloadDocumentation, downloadSources)
-			val runtimeDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "running", downloadDocumentation, downloadSources)
-			val testDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "testing", downloadDocumentation, downloadSources)
+		// Collect dependencies
+		val compileDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "compiling", downloadDocumentation, downloadSources)
+		val runtimeDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "running", downloadDocumentation, downloadSources)
+		val testDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "testing", downloadDocumentation, downloadSources)
 
-			for ((hash, dep) in compileDependencies) {
-				val inRuntime = runtimeDependencies.remove(hash) != null
-				val inTest = testDependencies.remove(hash) != null
+		for ((hash, dep) in compileDependencies) {
+			val inRuntime = runtimeDependencies.remove(hash) != null
+			val inTest = testDependencies.remove(hash) != null
 
-				libraryBank.projectUsesLibrary(project.projectName, dep, true, inRuntime, inTest)
-			}
+			libraryBank.projectUsesLibrary(project.projectName, dep, true, inRuntime, inTest)
+		}
 
-			for ((hash, dep) in runtimeDependencies) {
-				val inTest = testDependencies.remove(hash) != null
-				libraryBank.projectUsesLibrary(project.projectName, dep, inCompile = false, inRuntime = true, inTest = inTest)
-			}
+		for ((hash, dep) in runtimeDependencies) {
+			val inTest = testDependencies.remove(hash) != null
+			libraryBank.projectUsesLibrary(project.projectName, dep, inCompile = false, inRuntime = true, inTest = inTest)
+		}
 
-			for ((_, dep) in testDependencies) {
-				libraryBank.projectUsesLibrary(project.projectName, dep, inCompile = false, inRuntime = false, inTest = true)
-			}
+		for ((_, dep) in testDependencies) {
+			libraryBank.projectUsesLibrary(project.projectName, dep, inCompile = false, inRuntime = false, inTest = true)
 		}
 	}
 
 	// Inter-project dependencies
-	for (project in wemiProjects.values) {
-		tracker.stage("Resolving project dependencies of ${project.projectName}") {
-			// We currently only process projects and ignore configurations because there is no way to map that
-			val compiling = session.task(project.projectName, "compiling", task = "projectDependencies")
-					.data(JsonValue.ValueType.array).map { it.getString("project")!! }
-			val running = session.task(project.projectName, "running", task = "projectDependencies")
-					.data(JsonValue.ValueType.array).map { it.getString("project")!! }
-			val testing = session.task(project.projectName, "testing", task = "projectDependencies")
-					.data(JsonValue.ValueType.array).map { it.getString("project")!! }
+	tracker.stageProgress(4, TOP_LEVEL_STAGE_COUNT)
+	tracker.stagesFor("Resolving project dependencies", wemiProjects.values, {"Resolving project dependencies of ${it.projectName}"}) { project ->
+		// We currently only process projects and ignore configurations because there is no way to map that
+		val compiling = session.task(project.projectName, "compiling", task = "projectDependencies")
+				.data(JsonValue.ValueType.array).map { it.getString("project")!! }
+		val running = session.task(project.projectName, "running", task = "projectDependencies")
+				.data(JsonValue.ValueType.array).map { it.getString("project")!! }
+		val testing = session.task(project.projectName, "testing", task = "projectDependencies")
+				.data(JsonValue.ValueType.array).map { it.getString("project")!! }
 
-			val all = LinkedHashSet<String>(compiling)
-			all.addAll(running)
-			all.addAll(testing)
+		val all = LinkedHashSet<String>(compiling)
+		all.addAll(running)
+		all.addAll(testing)
 
-			for (depProjectName in all) {
-				if (depProjectName == project.projectName) {
-					continue
-				}
-				val inCompiling = compiling.contains(depProjectName)
-				val inRunning = running.contains(depProjectName)
-				val inTesting = testing.contains(depProjectName)
-
-				val scope = toDependencyScope(inCompiling, inRunning, inTesting, depProjectName)
-				val myModule = projectModules[project.projectName]!!
-				myModule.moduleDependencies.add(ModuleDependencyNode(
-						depProjectName,
-						scope,
-						scope.exported
-				))
+		for (depProjectName in all) {
+			if (depProjectName == project.projectName) {
+				continue
 			}
+			val inCompiling = compiling.contains(depProjectName)
+			val inRunning = running.contains(depProjectName)
+			val inTesting = testing.contains(depProjectName)
+
+			val scope = toDependencyScope(inCompiling, inRunning, inTesting, depProjectName)
+			val myModule = projectModules[project.projectName]!!
+			myModule.moduleDependencies.add(ModuleDependencyNode(
+					depProjectName,
+					scope,
+					scope.exported
+			))
 		}
 	}
 
-
 	// Tasks
+	tracker.stageProgress(5, TOP_LEVEL_STAGE_COUNT)
 	tracker.stage("Resolving tasks") {
 		for (task in session.jsonArray(project = null, task = "#keysWithDescription", includeUserConfigurations = false)) {
 			val taskName = task.getString("name")!!
@@ -438,7 +477,10 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 	}
 
 	// Build scripts
+	tracker.stageProgress(6, TOP_LEVEL_STAGE_COUNT)
 	tracker.stage("Resolving build script module") {
+		val BUILD_SCRIPT_MODULE_PART_COUNT = 5
+		tracker.stageProgress(0, BUILD_SCRIPT_MODULE_PART_COUNT)
 		val buildFolder = session.path(project = WemiBuildScriptProjectName, task = "projectRoot", includeUserConfigurations = false)
 
 		val classpath = session.jsonArray(project = WemiBuildScriptProjectName, task = "externalClasspath").map { it.locatedFileOrPathClasspathEntry() }
@@ -449,6 +491,7 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 		Files.createDirectories(libFolderPath)
 
 		// Module Data
+		tracker.stageProgress(1, BUILD_SCRIPT_MODULE_PART_COUNT)
 		val wemiJavaLanguageLevel = LanguageLevel.HIGHEST // Using kotlin, but just for some sensible defaults
 		val ideModuleNode = ModuleNode(
 				WemiBuildScriptProjectName, WemiModuleType.BUILD_SCRIPT,
@@ -463,7 +506,9 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 
 		// Dependencies
 		val libraryNode = LibraryNode("$WemiBuildScriptProjectName Classpath")
+
 		// Classpath
+		tracker.stageProgress(2, BUILD_SCRIPT_MODULE_PART_COUNT)
 		libraryNode.artifacts = classpath.map { artifact ->
 			var effectiveArtifact = artifact
 			val artifactName = artifact.fileName.toString()
@@ -480,7 +525,9 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 			}
 			effectiveArtifact
 		}
+
 		// Sources and docs
+		tracker.stageProgress(3, BUILD_SCRIPT_MODULE_PART_COUNT)
 		if (downloadSources) {
 			libraryNode.sources = createWemiProjectDependencies(session, WemiBuildScriptProjectName, "retrievingSources").flatMap {
 				(_, dependencies) ->
@@ -493,12 +540,15 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 				dependencies.map { it.artifact }
 			}
 		}
+
 		// Wemi sources
+		tracker.stageProgress(4, BUILD_SCRIPT_MODULE_PART_COUNT)
 		libraryNode.sources = libraryNode.sources + launcher.getClasspathSourceEntries(session.options)
 		ideModuleNode.libraryDependencies.add(LibraryDependencyNode(libraryNode, DependencyScope.COMPILE, false))
 	}
 
 	// Apply library bank to create libraries
+	tracker.stageProgress(7, TOP_LEVEL_STAGE_COUNT)
 	tracker.stage("Setting dependencies") {
 		libraryBank.apply(ideProjectNode, projectModules)
 	}
@@ -830,10 +880,10 @@ private fun artifactCriteriaPriority(dependency: LibraryDependencyNode):Int {
 /**
  * Sorts dependencies.
  * Criteria:
- * 1. Dependencies with sources first, then those with documentation, then rest
+ * 1. Dependencies with sources first, then those with a documentation, then rest
  *      (this is done because Intellij then tries to find sources/documentation in random jars
  *      that may not have them and overlooks those that do have them)
- * 2. Otherwise stable
+ * 2. Otherwise, stable
  */
 private val DependencyComparator:Comparator<LibraryDependencyNode> = Comparator { a, b ->
 	val a1 = artifactCriteriaPriority(a)

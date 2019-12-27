@@ -6,6 +6,7 @@ import com.darkyen.wemi.intellij.file.isWemiLauncher
 import com.darkyen.wemi.intellij.file.isWemiScriptSource
 import com.darkyen.wemi.intellij.options.WemiLauncherOptions
 import com.darkyen.wemi.intellij.util.Failable
+import com.darkyen.wemi.intellij.util.SessionActivityTracker
 import com.darkyen.wemi.intellij.util.SessionState
 import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.collectOutputLineAndKill
@@ -16,7 +17,6 @@ import com.esotericsoftware.jsonbeans.OutputType
 import com.intellij.execution.process.ProcessIOExecutorService
 import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.StreamUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -297,25 +297,6 @@ class WemiLauncher internal constructor(val file: Path, private val windowsShell
 
     private companion object {
         private val LOG = Logger.getInstance(WemiLauncher::class.java)
-    }
-}
-
-interface SessionActivityTracker {
-    fun stageBegin(name:String)
-    fun stageEnd()
-
-    fun taskBegin(name:String)
-    fun taskEnd(output:String?, success:Boolean)
-
-    fun sessionOutput(text:String, outputType: Key<*>)
-}
-
-inline fun <T> SessionActivityTracker.stage(name:String, action:()->T):T {
-    stageBegin(name)
-    try {
-        return action()
-    } finally {
-        stageEnd()
     }
 }
 
