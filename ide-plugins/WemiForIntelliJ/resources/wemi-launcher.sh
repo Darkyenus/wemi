@@ -1,1 +1,1 @@
-../../../src/launcher.sh
+../../../src/launcher-template.sh

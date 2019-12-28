@@ -38,8 +38,7 @@ object Keys {
     val cacheDirectory by key<Path>("Directory in which Wemi stores cache and processed data")
 
     /**
-     * By default contains all source files. To retrieve only those files that belong to one particular language,
-     * use language configuration, for example [wemi.Configurations.compilingJava].
+     * Contains all source files. Individual compilers process them based on their extension.
      * Under [wemi.Configurations.testing] contains test sources as well (in addition to normal sources).
      */
     val sources by key<FileSet?>("Source files of the project (compiled, part of internal classpath)", defaultValue = null, prettyPrinter = FILE_SET_PRETTY_PRINTER)

@@ -6,8 +6,6 @@ import com.darkyen.tproll.util.StringBuilderWriter
 import org.slf4j.LoggerFactory
 import wemi.Configurations.archiving
 import wemi.Configurations.assembling
-import wemi.Configurations.compilingJava
-import wemi.Configurations.compilingKotlin
 import wemi.Configurations.publishing
 import wemi.assembly.AssemblyOperation
 import wemi.assembly.DefaultAssemblyMapFilter
@@ -20,9 +18,11 @@ import wemi.boot.WemiRuntimeClasspath
 import wemi.boot.WemiVersion
 import wemi.collections.WMutableList
 import wemi.compile.JavaCompilerFlags
+import wemi.compile.JavaSourceFileExtensions
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
+import wemi.compile.KotlinSourceFileExtensions
 import wemi.compile.internal.MessageLocation
 import wemi.compile.internal.render
 import wemi.dependency.DEFAULT_OPTIONAL
@@ -145,11 +145,10 @@ object KeyDefaults {
         resolveDependencies(libraryDependencies, repositories, libraryDependencyProjectMapper, progressListener)
     }
 
-    private val ResolveProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
+    private val inProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
     fun EvalScope.inProjectDependencies(aggregate:Boolean?, withScope:Set<wemi.dependency.Scope> = emptySet(), operation:EvalScope.(dep:ProjectDependency)->Unit) {
-        ResolveProjectDependencies_CircularDependencyProtection.block(this.scope, failure = {
-            //TODO Show cycle
-            throw WemiException("Cyclic dependencies in projectDependencies are not allowed", showStacktrace = false)
+        inProjectDependencies_CircularDependencyProtection.block(this.scope, failure = { loop ->
+            throw WemiException("Cyclic dependencies in projectDependencies are not allowed (${loop.joinToString(" -> ")})", showStacktrace = false)
         }, action = {
             val projectDependencies = Keys.projectDependencies.get()
 
@@ -163,7 +162,14 @@ object KeyDefaults {
                 }
 
                 // Enter a different scope and perform the operation
-                using(projectDependency.project, *projectDependency.configurations) {
+                val baseConfigurations = projectDependency.configurations
+                val ownConfigurations = this@inProjectDependencies.scope.scopeConfigurations()
+                val baseConfigurationsSize = baseConfigurations.size
+                val configurations = Array(baseConfigurationsSize + ownConfigurations.size) {
+                    if (it < baseConfigurationsSize) baseConfigurations[it] else ownConfigurations[it - baseConfigurationsSize]
+                }
+
+                using(projectDependency.project, *configurations) {
                     operation(projectDependency)
                 }
             }
@@ -201,27 +207,12 @@ object KeyDefaults {
         result
     }
 
-    val InternalClasspath: Value<List<LocatedPath>> = {
-        val compiled = Keys.compile.get()
-        val resources = Keys.resources.getLocatedPaths()
-
-        val classpath = WMutableList<LocatedPath>(resources.size + 128)
-        constructLocatedFiles(compiled, classpath)
-        classpath.addAll(resources)
-
-        inProjectDependencies(true, Keys.resolvedLibraryScopes.get()) {
-            ClasspathResolution_LOG.debug("Resolving internal project dependency on {}", this)
-            classpath.addAll(Keys.internalClasspath.get())
+    fun internalClasspath(compile:Boolean): Value<List<LocatedPath>> = {
+        val classpath = WMutableList<LocatedPath>()
+        if (compile) {
+            constructLocatedFiles(Keys.compile.get(), classpath)
         }
-
-        classpath
-    }
-
-    val InternalClasspathOfAggregateProject: Value<List<LocatedPath>> = {
-        val resources = Keys.resources.getLocatedPaths()
-
-        val classpath = WMutableList<LocatedPath>(resources.size + 128)
-        classpath.addAll(resources)
+        classpath.addAll(Keys.resources.getLocatedPaths())
 
         inProjectDependencies(true, Keys.resolvedLibraryScopes.get()) {
             ClasspathResolution_LOG.debug("Resolving internal project dependency on {}", this)
@@ -316,21 +307,21 @@ object KeyDefaults {
             val output = Keys.outputClassesDirectory.get()
             output.ensureEmptyDirectory()
 
-            val javaSources = using(compilingJava) { Keys.sources.getPaths() }
+            val javaSources = Keys.sources.getPaths(*JavaSourceFileExtensions)
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
 
             // Compile Java
             if (javaSources.isNotEmpty()) {
-                val compiler = using(compilingJava) { Keys.javaCompiler.get() }
+                val compiler = Keys.javaCompiler.get()
                 val fileManager = compiler.getStandardFileManager(JavaDiagnosticListener, Locale.getDefault(), StandardCharsets.UTF_8) ?: throw WemiException("No standardFileManager")
                 val writerSb = StringBuilder()
                 val writer = StringBuilderWriter(writerSb)
-                val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
+                val compilerFlags = Keys.compilerOptions.get()
 
-                val sourcesOut = using(compilingJava) { Keys.outputSourcesDirectory.get() }
+                val sourcesOut = Keys.outputSourcesDirectory.get()
                 sourcesOut.ensureEmptyDirectory()
-                val headersOut = using(compilingJava) { Keys.outputHeadersDirectory.get() }
+                val headersOut = Keys.outputHeadersDirectory.get()
                 headersOut.ensureEmptyDirectory()
 
                 val pathSeparator = System.getProperty("path.separator", ":")
@@ -340,11 +331,11 @@ object KeyDefaults {
                 }
                 compilerFlags.use(JavaCompilerFlags.sourceVersion) {
                     compilerOptions.add("-source")
-                    compilerOptions.add(it.version)
+                    compilerOptions.add(it)
                 }
                 compilerFlags.use(JavaCompilerFlags.targetVersion) {
                     compilerOptions.add("-target")
-                    compilerOptions.add(it.version)
+                    compilerOptions.add(it)
                 }
                 compilerOptions.add("-classpath")
                 val classpathString = externalClasspath.joinToString(pathSeparator) { it.absolutePath }
@@ -379,8 +370,6 @@ object KeyDefaults {
                 if (!success) {
                     throw WemiException.CompilationException("Java compilation failed")
                 }
-
-                compilerFlags.warnAboutUnusedFlags("Java compiler")
             }
 
             output
@@ -392,15 +381,15 @@ object KeyDefaults {
             val output = Keys.outputClassesDirectory.get()
             output.ensureEmptyDirectory()
 
-            val javaSources = using(compilingJava) { Keys.sources.getLocatedPaths() }
-            val kotlinSources = using(compilingKotlin) { Keys.sources.getLocatedPaths() }
+            val compilerFlags = Keys.compilerOptions.get()
+            val javaSources = Keys.sources.getLocatedPaths(*JavaSourceFileExtensions)
+            val kotlinSources = Keys.sources.getLocatedPaths(*KotlinSourceFileExtensions)
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
 
             // Compile Kotlin
             if (kotlinSources.isNotEmpty()) {
-                val compiler = using(compilingKotlin) { Keys.kotlinCompiler.get() }
-                val compilerFlags = using(compilingKotlin) { Keys.compilerOptions.get() }
+                val compiler = Keys.kotlinCompiler.get()
 
                 //TODO Allow to configure cache folder?
                 val cacheFolder = output.resolveSibling(output.name + "-kotlin-cache")
@@ -413,21 +402,18 @@ object KeyDefaults {
                     KotlinCompiler.CompileExitStatus.COMPILATION_ERROR -> throw WemiException.CompilationException("Kotlin compilation failed")
                     else -> throw WemiException.CompilationException("Kotlin compilation failed: $compileResult")
                 }
-
-                compilerFlags.warnAboutUnusedFlags("Kotlin compiler")
             }
 
             // Compile Java
             if (javaSources.isNotEmpty()) {
-                val compiler = using(compilingJava) { Keys.javaCompiler.get() }
+                val compiler = Keys.javaCompiler.get()
                 val fileManager = compiler.getStandardFileManager(null, Locale.getDefault(), StandardCharsets.UTF_8) ?: throw WemiException("No standardFileManager")
                 val writerSb = StringBuilder()
                 val writer = StringBuilderWriter(writerSb)
-                val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
 
-                val sourcesOut = using(compilingJava) { Keys.outputSourcesDirectory.get() }
+                val sourcesOut = Keys.outputSourcesDirectory.get()
                 sourcesOut.ensureEmptyDirectory()
-                val headersOut = using(compilingJava) { Keys.outputHeadersDirectory.get() }
+                val headersOut = Keys.outputHeadersDirectory.get()
                 headersOut.ensureEmptyDirectory()
 
                 val pathSeparator = System.getProperty("path.separator", ":")
@@ -437,11 +423,11 @@ object KeyDefaults {
                 }
                 compilerFlags.use(JavaCompilerFlags.sourceVersion) {
                     compilerOptions.add("-source")
-                    compilerOptions.add(it.version)
+                    compilerOptions.add(it)
                 }
                 compilerFlags.use(JavaCompilerFlags.targetVersion) {
                     compilerOptions.add("-target")
-                    compilerOptions.add(it.version)
+                    compilerOptions.add(it)
                 }
                 compilerOptions.add("-classpath")
                 val classpathString = externalClasspath.joinToString(pathSeparator) { it.absolutePath }
@@ -480,8 +466,6 @@ object KeyDefaults {
                 if (!success) {
                     throw WemiException.CompilationException("Java compilation failed")
                 }
-
-                compilerFlags.warnAboutUnusedFlags("Java compiler")
             }
 
             output
@@ -512,7 +496,7 @@ object KeyDefaults {
         val options = Keys.runOptions.get()
         val arguments = Keys.runArguments.get()
 
-        val dry = read("dry", "Only print the command to run the program, instead of running it", BooleanValidator, doNotAsk = true) ?: false
+        val dry = read("dry", "Only print the command to run the program, instead of running it", BooleanValidator, ask = false) ?: false
         if (dry) {
             val command = wemi.run.prepareJavaProcessCommand(javaExecutable, classpathEntries, mainClass, options, arguments)
             println(command.joinToString(" "))
@@ -552,7 +536,7 @@ object KeyDefaults {
         val testParameters = wemi.test.TestParameters()
         testParameters.select.classpathRoots.add(Keys.outputClassesDirectory.get().absolutePath)
 
-        read("class", "Include classes, whose fully classified name match this regex", StringValidator, true)?.let {  classPattern ->
+        read("class", "Include classes, whose fully classified name match this regex", StringValidator, ask=false)?.let {  classPattern ->
             testParameters.filter.classNamePatterns.include(classPattern)
         }
 
@@ -667,15 +651,15 @@ object KeyDefaults {
 
                 val groupHeading = "Group"
                 val projectGroup = Keys.projectGroup.getOrElse("-")
-                val groupWidth = Math.max(groupHeading.length, projectGroup.length) + 2
+                val groupWidth = maxOf(groupHeading.length, projectGroup.length) + 2
 
                 val nameHeading = "Name"
                 val projectName = Keys.projectName.getOrElse("-")
-                val nameWidth = Math.max(nameHeading.length, projectName.length) + 2
+                val nameWidth = maxOf(nameHeading.length, projectName.length) + 2
 
                 val versionHeading = "Version"
                 val projectVersion = Keys.projectVersion.getOrElse("-")
-                val versionWidth = Math.max(versionHeading.length, projectVersion.length) + 2
+                val versionWidth = maxOf(versionHeading.length, projectVersion.length) + 2
 
                 val md = StringBuilder()
                 md.append("# No documentation available\n\n")
@@ -723,17 +707,14 @@ object KeyDefaults {
                 ?: (if (javaHome.name == "jre") javaHome.resolve("../lib/tools.jar").takeIf { it.exists() } else null)
     }
 
-    /**
-     * Return URL at which Java SE Javadoc is hosted for given [javaVersion].
-     */
+    /** Return URL at which Java SE Javadoc is hosted for given [javaVersion]. */
     private fun javadocUrl(javaVersion:Int?):String {
-        return if (javaVersion != null && javaVersion <= 5) {
-            //These versions don't have API uploaded, so fall back to 1.5
-            // (Version 5 is the first one uploaded, but under non-typical URL)
-            "https://docs.oracle.com/javase/1.5.0/docs/api/"
-        } else {
-            // Default is 10 because that is newest
-            "https://docs.oracle.com/javase/${javaVersion ?: 10}/docs/api/"
+        val version = javaVersion ?: 13 // = newest
+        return when {
+            // These versions don't have API uploaded, so fall back to 1.5 (first one that is online)
+            version <= 5 -> "https://docs.oracle.com/javase/1.5.0/docs/api/"
+            version in 6..10 -> "https://docs.oracle.com/javase/${version}/docs/api/"
+            else -> "https://docs.oracle.com/en/java/javase/${version}/docs/api/"
         }
     }
 
@@ -741,15 +722,15 @@ object KeyDefaults {
         using(archiving) {
             val options = WMutableList<String>()
 
-            val compilerFlags = using(compilingJava) { Keys.compilerOptions.get() }
+            val compilerFlags = Keys.compilerOptions.get()
             var javaVersionString:String? = null
             compilerFlags.use(JavaCompilerFlags.sourceVersion) {
                 options.add("-source")
-                options.add(it.version)
-                javaVersionString = it.version
+                options.add(it)
+                javaVersionString = it
             }
             if (javaVersionString == null) {
-                javaVersionString = compilerFlags[JavaCompilerFlags.targetVersion]?.version
+                javaVersionString = compilerFlags.getOrNull(JavaCompilerFlags.targetVersion)
             }
 
             val javaVersion = parseJavaVersion(javaVersionString)
@@ -769,7 +750,7 @@ object KeyDefaults {
     private val ARCHIVE_JAVADOC_LOG = LoggerFactory.getLogger("ArchiveJavadoc")
     val ArchiveJavadoc: Value<Path> = {
         using(archiving) {
-            val sourceFiles = using(compilingJava){ Keys.sources.getLocatedPaths() }
+            val sourceFiles = Keys.sources.getLocatedPaths(*JavaSourceFileExtensions)
 
             if (sourceFiles.isEmpty()) {
                 ARCHIVE_JAVADOC_LOG.info("No source files for Javadoc, creating dummy documentation instead")
@@ -838,8 +819,7 @@ object KeyDefaults {
     }
 
     val ArchiveDokkaOptions: Value<DokkaOptions> = {
-        val kotlinOptions = using(compilingKotlin) { Keys.compilerOptions.get() }
-        val javaOptions = using(compilingJava) { Keys.compilerOptions.get() }
+        val compilerOptions = Keys.compilerOptions.get()
 
         val options = DokkaOptions()
 
@@ -847,11 +827,11 @@ object KeyDefaults {
             options.sourceRoots.add(DokkaOptions.SourceRoot(sourceRoot.root ?: continue))
         }
 
-        options.moduleName = kotlinOptions[KotlinCompilerFlags.moduleName] ?: Keys.projectName.get()
+        options.moduleName = compilerOptions.getOrNull(KotlinCompilerFlags.moduleName) ?: Keys.projectName.get()
         val javaVersion = parseJavaVersion(
-                javaOptions[JavaCompilerFlags.sourceVersion]?.version
-                        ?: javaOptions[JavaCompilerFlags.targetVersion]?.version
-                        ?: kotlinOptions[KotlinJVMCompilerFlags.jvmTarget])
+                compilerOptions.getOrNull(JavaCompilerFlags.sourceVersion)
+                        ?: compilerOptions.getOrNull(JavaCompilerFlags.targetVersion)
+                        ?: compilerOptions.getOrNull(KotlinJVMCompilerFlags.jvmTarget))
         if (javaVersion != null) {
             options.jdkVersion = javaVersion
         }
@@ -929,7 +909,6 @@ object KeyDefaults {
                 expiresWith(outputFile)
                 outputFile
             }
-
         }
     }
 

@@ -4,7 +4,8 @@
 
 wemi_root="$(dirname "$0")"
 wemi_home="$(dirname "$0")/../.."
-wemi_launcher="${wemi_home}/src/launcher.sh"
+# It does not matter that it is a template - only version is templated, and we sidestep that
+wemi_launcher="${wemi_home}/src/launcher-template.sh"
 wemi_dist="${wemi_home}/build/cache/-distribution-archive"
 
 if [ ! -d "$wemi_dist" ]; then

@@ -191,7 +191,7 @@ fun dependency(groupNameVersionClassifierType: String,
  * - `stdlib` standard Kotlin library
  * - `reflect` reflection support library
  * - `stdlib-jdk8` standard library extension for Java 8 JVM
- * - And more, see http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.jetbrains.kotlin%22
+ * - And more, see [Maven Central](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.jetbrains.kotlin%22)
  */
 fun EvalScope.kotlinDependency(name: String): Dependency {
     return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-$name", Keys.kotlinVersion.get().string))

@@ -4,7 +4,7 @@ import wemi.dependency.ProjectDependency
 val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
     projectGroup set { WemiGroup }
     projectName set { "wemi-plugin-jvm-hotswap" }
-    projectVersion set { WemiVersion }
+    projectVersion set { using(wemi) { projectVersion.get() } }
 
     projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
     libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }

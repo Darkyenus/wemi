@@ -9,8 +9,28 @@ cd "$(dirname "$0")/.." || fail "Failed initial dir change"
 wemi_home="$(pwd)"
 log "Working from home: $wemi_home"
 
+# Wemi version tags always begin with 'v'
+last_wemi_version_tag="$(git describe --tags --match='v*' --abbrev=0)" || fail "Could not find Wemi version"
+version_commit=$(git rev-list --max-count=1 "$last_wemi_version_tag") || fail "Could not get version_commit"
+latest_commit=$(git rev-list --max-count=1 master) || fail "Could not get latest commit"
+
+last_wemi_version_major=$(echo "$last_wemi_version_tag" | sed 's/v\([0-9]*\).*/\1/')
+last_wemi_version_minor=$(echo "$last_wemi_version_tag" | sed 's/v[0-9]*\.\([0-9]*\).*/\1/')
+
+if [ "$version_commit" = "$latest_commit" ]; then
+	# We are at a release commit
+	wemi_version="${last_wemi_version_major}.${last_wemi_version_minor}"
+else
+	# We are at a SNAPSHOT commit
+	wemi_version="${last_wemi_version_major}.$((last_wemi_version_minor + 1))-SNAPSHOT"
+fi
+
+log "Wemi version: $wemi_version"
+
+export BUILT_WEMI_VERSION="$wemi_version"
+
 # Build the archive files in Wemi
-./wemi 'clean; distributionArchive'
+./wemi 'clean; test; clean; distributionArchive'
 
 # Create empty output directory
 dist_dir="${wemi_home}/build/dist"
@@ -20,7 +40,7 @@ fi
 mkdir -p "$dist_dir" || fail "mkdir build/dist"
 
 # Package launcher script
-cp "${wemi_home}/src/launcher.sh" "${wemi_home}/build/dist/wemi"
+sed "s/<<<WEMI_VERSION>>>/${wemi_version}/" < "${wemi_home}/src/launcher-template.sh" > "${wemi_home}/build/dist/wemi"
 chmod +x "${wemi_home}/build/dist/wemi"
 
 # Package the files
@@ -46,18 +66,12 @@ fi
 
 # Create build info document
 build_info_file="${wemi_home}/build/dist/build-info.txt"
-echo "Wemi Build">"$build_info_file"
+echo "Wemi $wemi_version">"$build_info_file"
 echo "Git: $(git rev-parse HEAD)">>"$build_info_file"
 echo "Date: $(date -u "+%Y-%m-%d %H:%M:%S")">>"$build_info_file"
 
 # Publish to the mirrors
-# TODO(jp): Get the version from git
-if echo "$1" | grep -q -x -e '--publish=.*'; then
-	wemi_version="${1#--publish=}"
-	if [ -z "$wemi_version" ]; then
-		fail "Specify Wemi Version"
-	fi
-
+if [ "$1" = "--publish" ]; then
 	if [ "$got_all_aux_files" != "true" ]; then
 		fail "Can't publish, some auxiliary files are missing"
 	fi

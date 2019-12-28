@@ -148,7 +148,7 @@ internal class KotlinCompilerImpl1_2_71 : KotlinCompiler {
         args.pluginClasspaths = pluginClasspath.toTypedArray()
 
         // Compile
-        var incremental = flags.useDefault(KotlinCompilerFlags.incremental, false)
+        var incremental = flags.getOrDefault(KotlinCompilerFlags.incremental)
         if (incremental && cacheFolder == null) {
             logger.warn(loggerMarker, "Disabling incremental compilation: null cache folder")
             incremental = false

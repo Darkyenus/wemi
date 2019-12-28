@@ -239,25 +239,14 @@ class EvalScope @PublishedApi internal constructor(
 
     /** Return the value bound to this wemi.key in this scope.
      * Throws exception if no value set. */
-    fun <V> Key<V>.get(): V {
-        @Suppress("UNCHECKED_CAST")
-        return getKeyValue(this, null, false, NO_INPUT) as V
-    }
-
-    /** Same as [get], but with ability to specify [input] of the task. */
-    fun <V> Key<V>.get(vararg input:Pair<String, String>): V {
+    fun <V> Key<V>.get(vararg input:Pair<String, String> = NO_INPUT): V {
         @Suppress("UNCHECKED_CAST")
         return getKeyValue(this, null, false, input) as V
     }
 
     /** Return the value bound to this wemi.key in this scope.
      * Returns [unset] if no value set. */
-    fun <V : Else, Else> Key<V>.getOrElse(unset: Else): Else {
-        return getKeyValue(this, unset, true, NO_INPUT)
-    }
-
-    /** Same as [getOrElse], but with ability to specify [input]. See [get]. */
-    fun <V : Else, Else> Key<V>.getOrElse(unset: Else, vararg input:Pair<String, String>): Else {
+    fun <V : Else, Else> Key<V>.getOrElse(unset: Else, vararg input:Pair<String, String> = NO_INPUT): Else {
         return getKeyValue(this, unset, true, input)
     }
 
@@ -287,8 +276,8 @@ class EvalScope @PublishedApi internal constructor(
      * @see get for value retrieval
      * @see expiresWhen for expiration mechanism
      * @see FileSet.matchingFiles for path list retrieval */
-    fun Key<FileSet?>.getPaths():List<Path> {
-        val fileSet = this.get() ?: return emptyList()
+    fun Key<FileSet?>.getPaths(vararg extensions:String = ALL_EXTENSIONS):List<Path> {
+        val fileSet = this.get()?.filterByExtension(*extensions) ?: return emptyList()
         val result = ArrayList<Path>(128)
         fileSet.matchingFiles(result)
         result.sortWith(PATH_COMPARATOR_WITH_TOTAL_ORDERING)
@@ -307,8 +296,8 @@ class EvalScope @PublishedApi internal constructor(
      * @see get for value retrieval
      * @see expiresWhen for expiration mechanism
      * @see FileSet.matchingFiles for path list retrieval */
-    fun Key<FileSet?>.getLocatedPaths():List<LocatedPath> {
-        val fileSet = this.get() ?: return emptyList()
+    fun Key<FileSet?>.getLocatedPaths(vararg extensions:String = ALL_EXTENSIONS):List<LocatedPath> {
+        val fileSet = this.get()?.filterByExtension(*extensions) ?: return emptyList()
         val result = ArrayList<LocatedPath>(128)
         fileSet.matchingLocatedFiles(result)
         result.sortWith(LOCATED_PATH_COMPARATOR_WITH_TOTAL_ORDERING)
@@ -351,7 +340,7 @@ class EvalScope @PublishedApi internal constructor(
     }
 
     override fun toString(): String {
-        return "EvalScope($scope/${Arrays.toString(configurationPrefix)}, input=${Arrays.toString(input)})"
+        return "EvalScope($scope/${configurationPrefix.contentToString()}, input=${input.contentToString()})"
     }
 }
 

@@ -112,10 +112,6 @@ val running
     inline get() = Configurations.running
 val assembling
     inline get() = Configurations.assembling
-val compilingJava
-    inline get() = Configurations.compilingJava
-val compilingKotlin
-    inline get() = Configurations.compilingKotlin
 val testing
     inline get() = Configurations.testing
 val archiving

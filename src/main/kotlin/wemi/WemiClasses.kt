@@ -5,20 +5,26 @@ package wemi
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import wemi.collections.WMutableList
 import wemi.collections.toMutable
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
-import wemi.util.*
+import wemi.util.Color
+import wemi.util.Format
+import wemi.util.JsonWritable
+import wemi.util.WithDescriptiveString
+import wemi.util.addAllReversed
+import wemi.util.field
+import wemi.util.format
+import wemi.util.name
+import wemi.util.writeObject
+import wemi.util.writeValue
 import java.nio.file.Path
 import java.util.*
 
 typealias InputKey = String
 typealias InputKeyDescription = String
 
-/** 
- * Key which can have value of type [V] assigned, through [Project] or [Configuration].
- */
+/** Key which can have value of type [V] assigned, through [Project] or [Configuration]. */
 class Key<V> internal constructor(
         /**
          * Name of the key. Specified by the variable name this key was declared at.
@@ -192,7 +198,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
             }
         }
 
-        Scope(name, holders, null)
+        Scope(name, null, holders, null)
     }
 
     /** Create base [Scope] in which evaluation tree for this [Project] can start. */
@@ -302,8 +308,11 @@ class Archetype internal constructor(val name: String, val parent:Archetype?) : 
  */
 class Scope internal constructor(
         private val name: String,
+        private val configuration:Configuration?,
         val bindingHolders: List<BindingHolder>,
         val scopeParent: Scope?) {
+
+    init { assert((configuration == null) == (scopeParent == null)) }
 
     private val configurationScopeCache: MutableMap<Configuration, Scope> = HashMap()
 
@@ -352,7 +361,7 @@ class Scope internal constructor(
                 addScopeHolderElementsFor(configuration, newScopeHolders, holderStack)
                 newScopeHolders.reverse()
 
-                Scope(configuration.name, newScopeHolders, this)
+                Scope(configuration.name, configuration, newScopeHolders, this)
             }
         }
     }
@@ -416,9 +425,7 @@ class Scope internal constructor(
         return createElementaryKeyBinding(key, listener)
     }
 
-    /**
-     * @return [Project] that is at the root of this [Scope]
-     */
+    /** @return [Project] that is at the root of this [Scope] */
     fun scopeProject():Project {
         // Project is always in the scope without parent
         var scope = this
@@ -432,6 +439,21 @@ class Scope internal constructor(
             }
         }
         throw IllegalStateException("No Project in Scope")
+    }
+
+    /** @return List of [Configuration]s that created this [Scope]. */
+    fun scopeConfigurations():List<Configuration> {
+        if (configuration == null) {
+            return emptyList()
+        }
+        val result = ArrayList<Configuration>()
+        var scope = this
+        while (true) {
+            result.add(scope.configuration ?: break)
+            scope = scope.scopeParent ?: break
+        }
+        result.reverse()
+        return result
     }
 
     /**
@@ -628,83 +650,17 @@ sealed class BindingHolder : WithDescriptiveString {
 
     //region CompilerFlags utility methods
     /**
-     * @see BindingHolder.plusAssign
-     * @see BindingHolder.minusAssign
-     */
-    operator fun <Type> Key<CompilerFlags>.get(flag: CompilerFlag<List<Type>>): CompilerFlagKeySetting<List<Type>> {
-        return CompilerFlagKeySetting(this, flag)
-    }
-
-    /**
-     * Modify [CompilerFlags] to set the given compiler [flag] to the given [value].
-     *
-     * @see modify
-     */
-    operator fun <Type> Key<CompilerFlags>.set(flag: CompilerFlag<Type>, value: Type) {
-        this.modify { flags: CompilerFlags ->
-            flags[flag] = value
-            flags
-        }
-    }
-
-    /**
      * Modify [CompilerFlags] to set the given compiler [flag] to the given [value]
      * that will be evaluated as if it was a key binding.
      *
      * @see modify
      */
-    operator fun <Type> Key<CompilerFlags>.set(flag: CompilerFlag<Type>, value: Value<Type>) {
+    operator fun <Type> Key<CompilerFlags>.set(flag: CompilerFlag<Type>, value: ValueModifier<Type>) {
         this.modify { flags: CompilerFlags ->
-            flags[flag] = value()
+            flags[flag] = value(flags.getOrDefault(flag))
             flags
         }
     }
-
-    /**
-     * Modify [CompilerFlags] to add given [value] to the collection
-     * assigned to the compiler flag of [CompilerFlagKeySetting].
-     *
-     * @see modify
-     */
-    operator fun <Type> CompilerFlagKeySetting<List<Type>>.plusAssign(value: Type) {
-        key.modify { flags: CompilerFlags ->
-            flags[flag].let {
-                val mutable = it?.toMutable() ?: WMutableList()
-                mutable.add(value)
-                flags[flag] = mutable
-            }
-            flags
-        }
-    }
-
-    /**
-     * Modify [CompilerFlags] to remove given [value] from the collection
-     * assigned to the compiler flag of [CompilerFlagKeySetting].
-     *
-     * @see modify
-     */
-    @Suppress("MemberVisibilityCanPrivate")
-    operator fun <Type> CompilerFlagKeySetting<List<Type>>.minusAssign(value: Type) {
-        key.modify { flags: CompilerFlags ->
-            flags[flag]?.let {
-                if (it.size == 1 && it[0] == value) {
-                    flags.unset(flag)
-                } else {
-                    val mutable = it.toMutable()
-                    mutable.remove(value)
-                    flags[flag] = mutable
-                }
-            }
-            flags
-        }
-    }
-
-    /**
-     * Boilerplate for [BindingHolder.plusAssign] and [BindingHolder.minusAssign].
-     */
-    class CompilerFlagKeySetting<Type> internal constructor(
-            internal val key: Key<CompilerFlags>,
-            internal val flag: CompilerFlag<Type>)
     //endregion
 
     /**

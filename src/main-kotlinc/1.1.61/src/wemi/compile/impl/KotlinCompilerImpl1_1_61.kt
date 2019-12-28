@@ -80,10 +80,10 @@ internal class KotlinCompilerImpl1_1_61 : KotlinCompiler {
         for (source in sources) {
             val file = source.file
             when {
-                file.isDirectory() || file.name.pathHasExtension(KotlinSourceFileExtensions) -> {
+                file.isDirectory() || file.name.pathHasExtension(KotlinSourceFileExtensions.toList()) -> {
                     sourceSet.add(file.absolutePath)
                 }
-                file.name.pathHasExtension(JavaSourceFileExtensions) -> {
+                file.name.pathHasExtension(JavaSourceFileExtensions.toList()) -> {
                     val root = source.root
                     if (root != null) {
                         sourceSet.add(root.absolutePath)// Add folder

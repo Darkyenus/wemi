@@ -118,32 +118,32 @@ enum class KotlinCompilerVersion (
 }
 
 /** Valid Kotlin source file extensions */
-val KotlinSourceFileExtensions = listOf("kt", "kts")
+val KotlinSourceFileExtensions = arrayOf("kt", "kts")
 
 /**
  * General Kotlin compiler flags.
  */
 object KotlinCompilerFlags {
-    val customFlags = CompilerFlag<List<String>>("customFlags", "Custom flags to be parsed by the Kotlin compiler CLI")
+    val customFlags = CompilerFlag<List<String>>("customFlags", "Custom flags to be parsed by the Kotlin compiler CLI", emptyList())
 
     /* Descriptions and most names taken from the Kotlin at https://github.com/JetBrains/kotlin under Apache 2 license */
 
-    val moduleName = CompilerFlag<String>("moduleName", "Kotlin module name")
+    val moduleName = CompilerFlag<String>("moduleName", "Kotlin module name", "")
 
-    val languageVersion = CompilerFlag<String>("languageVersion", "Provide source compatibility with specified language version")
-    val apiVersion = CompilerFlag<String>("apiVersion", "Allow to use declarations only from the specified version of bundled libraries")
+    val languageVersion = CompilerFlag<String>("languageVersion", "Provide source compatibility with specified language version", "")
+    val apiVersion = CompilerFlag<String>("apiVersion", "Allow to use declarations only from the specified version of bundled libraries", "")
 
-    val incremental = CompilerFlag<Boolean>("incremental", "Compile incrementally")
+    val incremental = CompilerFlag<Boolean>("incremental", "Compile incrementally", false)
 
-    val pluginOptions = CompilerFlag<List<String>>("pluginOptions", "Pass an option to a plugin")
-    val pluginClasspath = CompilerFlag<List<String>>("pluginClasspath", "Load plugins from the given classpath")
+    val pluginOptions = CompilerFlag<List<String>>("pluginOptions", "Pass an option to a plugin", emptyList())
+    val pluginClasspath = CompilerFlag<List<String>>("pluginClasspath", "Load plugins from the given classpath", emptyList())
 }
 
 /**
  * Kotlin compiler flags specific to JVM
  */
 object KotlinJVMCompilerFlags {
-    val jdkHome = CompilerFlag<String>("jdkHome", "Path to JDK home directory to include into classpath, if differs from default JAVA_HOME")
+    val jdkHome = CompilerFlag<String>("jdkHome", "Path to JDK home directory to include into classpath, if differs from default JAVA_HOME", "")
 
-    val jvmTarget = CompilerFlag<String>("jvmTarget", "Target version of the generated JVM bytecode (1.6, 1.8)")
+    val jvmTarget = CompilerFlag<String>("jvmTarget", "Target version of the generated JVM bytecode (1.6, 1.8)", "1.6")
 }

@@ -7,6 +7,7 @@ import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
+import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinCompilerVersion
 import wemi.createProject
@@ -20,6 +21,8 @@ import wemi.publish.InfoNode
 import wemi.util.FileSet
 import wemi.util.ensureEmptyDirectory
 import wemi.util.name
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 
 val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.61"),
@@ -29,7 +32,6 @@ val CompilerProjects = listOf(
 )
 
 const val WemiGroup = "com.darkyen.wemi"
-const val ThisWemiVersion = "0.11-SNAPSHOT" // as opposed to the WemiVersion, which is the version with which we build
 
 val distributionArchive by key<Path>("Create a distribution archive for Wemi")
 
@@ -37,7 +39,7 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
 
     projectGroup set { WemiGroup }
     projectName set { "wemi-core" }
-    projectVersion set { ThisWemiVersion }
+    projectVersion set { System.getenv("BUILT_WEMI_VERSION") ?: "dev-${DateTimeFormatter.ISO_INSTANT.format(Instant.now())}" }
 
     projectDependencies add { ProjectDependency(core, true) }
     projectDependencies addAll { CompilerProjects.map { ProjectDependency(it, true) } }
@@ -124,6 +126,10 @@ val core:Project by project {
     extend(compilingKotlin) {
         compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
         compilerOptions[KotlinCompilerFlags.incremental] = true
+    }
+
+    extend(compilingJava) {
+        compilerOptions[JavaCompilerFlags.customFlags] += "-Xlint:all"
     }
 
     libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }

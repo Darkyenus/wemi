@@ -23,15 +23,15 @@ fun EvalScope.read(key: String, description: String): String? = read(key, descri
  * The value is first searched for using the [key] from explicit input pairs.
  * Then, free input strings (without explicit [key]s) are considered. Both are considered from top
  * (added last) to bottom, and only if they are accepted by the [validator].
- * As a last resort, user is asked, if in interactive mode. Otherwise, the query fails.
+ * As a last resort, if interactive, user is asked. Otherwise, the query fails.
  *
- * @param key simple, non-user-readable key (case insensitive, converted to lowercase)
+ * @param key simple, non-user-readable key (case-insensitive, converted to lowercase)
  * @param description displayed to the user, if asked interactively
  * @param validator to use for validation and conversion of found string
- * @param doNotAsk if value is not already specified, do not ask the user and return null
+ * @param ask if value is not already specified, ask the user
  * @return found value or null if validator fails on all possible values
  */
-fun <V> EvalScope.read(key: String, description: String, validator: Validator<V>, doNotAsk:Boolean = false): V? {
+fun <V> EvalScope.read(key: String, description: String, validator: Validator<V>, ask:Boolean = true): V? {
     val input = this.input
 
     // Search in prepared by key
@@ -67,7 +67,7 @@ fun <V> EvalScope.read(key: String, description: String, validator: Validator<V>
         })
     }
 
-    if (doNotAsk) {
+    if (!ask) {
         return null
     }
 

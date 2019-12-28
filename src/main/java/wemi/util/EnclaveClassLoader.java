@@ -19,6 +19,7 @@ import java.util.*;
  *
  * This is useful for injecting dynamically loaded libraries which are compiled in as "provided".
  */
+@SuppressWarnings({"unchecked", "varargs", "RedundantSuppression"})
 public class EnclaveClassLoader extends URLClassLoader {
 
 	private final ClassLoader parent;

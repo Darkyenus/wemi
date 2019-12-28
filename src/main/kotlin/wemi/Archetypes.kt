@@ -7,6 +7,9 @@ import wemi.assembly.JarMergeStrategyChooser
 import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiCacheFolder
 import wemi.compile.CompilerFlags
+import wemi.compile.JavaCompilerFlags
+import wemi.compile.KotlinCompilerFlags
+import wemi.compile.KotlinJVMCompilerFlags
 import wemi.dependency.DefaultRepositories
 import wemi.dependency.LocalM2Repository
 import wemi.dependency.NoClassifier
@@ -45,7 +48,7 @@ object Archetypes {
         Keys.cacheDirectory set Static(WemiCacheFolder)
 
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
-        Keys.internalClasspath set KeyDefaults.InternalClasspath
+        Keys.internalClasspath set KeyDefaults.internalClasspath(true)
         Keys.externalClasspath set KeyDefaults.ExternalClasspath
 
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes")
@@ -109,7 +112,7 @@ object Archetypes {
 
     /** An archetype for projects that have no sources of their own, but are aggregation of their dependencies. */
     val AggregateJVMProject by archetype(::JVMBase) {
-        Keys.internalClasspath set KeyDefaults.InternalClasspathOfAggregateProject
+        Keys.internalClasspath set KeyDefaults.internalClasspath(false)
 
         Keys.test set KeyDefaults.TestOfAggregateProject
     }
@@ -125,6 +128,9 @@ object Archetypes {
             Keys.resources modify { it + FileSet(Keys.projectRoot.get() / "src/test/resources") }
         }
 
+        Keys.compilerOptions[JavaCompilerFlags.customFlags] = { it + "-g" }
+        Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = { "1.8" }
+        Keys.compilerOptions[JavaCompilerFlags.targetVersion] = { "1.8" }
         Keys.compile set KeyDefaults.CompileJava
 
         Keys.archiveJavadocOptions set KeyDefaults.ArchiveJavadocOptions
@@ -150,6 +156,14 @@ object Archetypes {
         }
 
         Keys.libraryDependencies add { kotlinDependency("stdlib") }
+
+        Keys.compilerOptions[JavaCompilerFlags.customFlags] = { it + "-g" }
+        Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = { "1.8" }
+        Keys.compilerOptions[JavaCompilerFlags.targetVersion] = { "1.8" }
+        Keys.compilerOptions[KotlinCompilerFlags.moduleName] = { Keys.projectName.get() }
+        Keys.compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = { "1.8" }
+
+        Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance(progressListener) }
         Keys.compile set KeyDefaults.CompileJavaKotlin
 
         Keys.archiveDokkaOptions set KeyDefaults.ArchiveDokkaOptions

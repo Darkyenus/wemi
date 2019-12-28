@@ -2,6 +2,7 @@
 
 package wemi
 
+import Files
 import org.slf4j.LoggerFactory
 import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingClasspathModifier
@@ -10,10 +11,22 @@ import wemi.KeyDefaults.inProjectDependencies
 import wemi.boot.WemiCacheFolder
 import wemi.collections.WMutableSet
 import wemi.collections.toMutable
-import wemi.compile.*
-import wemi.dependency.*
+import wemi.dependency.Dependency
+import wemi.dependency.JavadocClassifier
+import wemi.dependency.LocalM2Repository
+import wemi.dependency.Repository
+import wemi.dependency.ScopeCompile
+import wemi.dependency.ScopeProvided
+import wemi.dependency.ScopeRuntime
+import wemi.dependency.ScopeTest
+import wemi.dependency.SourcesClassifier
 import wemi.test.JUnitPlatformLauncher
-import wemi.util.*
+import wemi.util.copyRecursively
+import wemi.util.div
+import wemi.util.name
+import wemi.util.pathExtension
+import wemi.util.pathWithoutExtension
+import wemi.util.toPath
 
 /** All default configurations */
 object Configurations {
@@ -56,32 +69,6 @@ object Configurations {
     /** @see Keys.assembly */
     val assembling by configuration("Configuration used when assembling Jar with dependencies") {
         Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeRuntime) }
-    }
-    //endregion
-
-    //region Compiling
-    val compilingJava by configuration("Configuration layer used when compiling Java sources", compiling) {
-        Keys.sources modify {
-            it.appendPatterns(filter(*Array(JavaSourceFileExtensions.size) { i -> "**.${JavaSourceFileExtensions[i]}"}))
-        }
-
-        Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
-        Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = "1.8"
-        Keys.compilerOptions[JavaCompilerFlags.targetVersion] = "1.8"
-    }
-
-    val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
-        Keys.sources modify {
-            it.appendPatterns(filter(*Array(KotlinSourceFileExtensions.size) { i ->"**.${KotlinSourceFileExtensions[i]}"}))
-        }
-
-        Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance(progressListener) }
-        Keys.compilerOptions modify {
-            it.apply {
-                set(KotlinCompilerFlags.moduleName, Keys.projectName.get())
-            }
-        }
-        Keys.compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = "1.8"
     }
     //endregion
 

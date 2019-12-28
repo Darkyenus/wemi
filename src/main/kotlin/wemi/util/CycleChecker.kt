@@ -8,18 +8,19 @@ import kotlin.collections.ArrayList
  *
  * Basically a single-thread [kotlin.synchronized].
  */
-internal class CycleChecker<in Token> {
+internal class CycleChecker<Token> {
 
     private val tokens: MutableMap<Thread, MutableList<Token>> = Collections.synchronizedMap(HashMap())
 
-    internal fun enter(token: Token): Boolean {
+    internal fun enter(token: Token): List<Token>? {
         val thread = Thread.currentThread()
         val tokens = tokens.getOrPut(thread) { ArrayList() }
-        if (tokens.contains(token)) {
-            return false
+        val index = tokens.indexOf(token)
+        if (index < 0) {
+            tokens.add(token)
+            return null
         }
-        tokens.add(token)
-        return true
+        return tokens.subList(index, tokens.size)
     }
 
     internal fun leave() {
@@ -31,17 +32,16 @@ internal class CycleChecker<in Token> {
         }
     }
 
-    internal inline fun <Result> block(token: Token, failure: () -> Result, action: () -> Result): Result {
-        return if (enter(token)) {
+    internal inline fun <Result> block(token: Token, failure: (List<Token>) -> Result, action: () -> Result): Result {
+        val loop = enter(token)
+        return if (loop == null) {
             try {
                 action()
             } finally {
                 leave()
             }
         } else {
-            failure()
+            failure(loop)
         }
     }
-
-
 }

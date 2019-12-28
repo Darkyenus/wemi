@@ -117,13 +117,12 @@ class AssemblyOperation : Closeable {
                 val path = normalizeZipPath(entry.name)
                 loadedSources.getOrPut(path) { ArrayList() }.add(
                         AssemblySource(file.absolutePath + '?' + path, file, file.lastModified.toMillis(), own) {
-                            zip.getInputStream(entry).use { it.readBytes(entry.size.toInt()) }
+                            zip.getInputStream(entry).use { it.readBytes() }
                         })
             }
         } else {
             // Add file entry
             loadedSources.getOrPut(normalizeZipPath(locatedPath.path)) { ArrayList() }.add(AssemblySource(locatedPath.toString(), file, file.lastModified.toMillis(), own) {
-
                 Files.readAllBytes(file)
             })
         }
