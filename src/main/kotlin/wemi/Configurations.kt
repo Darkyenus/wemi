@@ -66,8 +66,8 @@ object Configurations {
         }
 
         Keys.compilerOptions[JavaCompilerFlags.customFlags] += "-g"
-        Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = JavaVersion.V1_8
-        Keys.compilerOptions[JavaCompilerFlags.targetVersion] = JavaVersion.V1_8
+        Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = "1.8"
+        Keys.compilerOptions[JavaCompilerFlags.targetVersion] = "1.8"
     }
 
     val compilingKotlin by configuration("Configuration layer used when compiling Kotlin sources", compiling) {
