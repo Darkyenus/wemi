@@ -15,10 +15,13 @@ import static wemiplugin.jvmhotswap.agent.AgentMain.log;
  */
 public class BytecodeUtil {
 
+    private static final int MAX_SUPPORTED_BYTECODE_VERSION_MAJOR = 58;
+    private static final int MAX_SUPPORTED_BYTECODE_VERSION_MINOR = 0;
+
     /**
      * @param data data of .class file
      * @return Class name, defined by the parameter class file, or null if fails to parse.
-     * Returns in internal format: com/example/MyClass$Inner (see {@link #bytecodeToNormalClassName(String)} to convert).
+     * Returns in an internal format: com/example/MyClass$Inner (see {@link #bytecodeToNormalClassName(String)} to convert).
      */
     public static String javaClassName(byte[] data) {
         try (DataInputStream cIn = new DataInputStream(new ByteArrayInputStream(data))) {
@@ -29,7 +32,7 @@ public class BytecodeUtil {
             }
             final int minor = cIn.readUnsignedShort();
             final int major = cIn.readUnsignedShort();
-            if (major > 54 || (major == 54 && minor > 0)) {
+            if (major > MAX_SUPPORTED_BYTECODE_VERSION_MAJOR || (major == MAX_SUPPORTED_BYTECODE_VERSION_MAJOR && minor > MAX_SUPPORTED_BYTECODE_VERSION_MINOR)) {
                 log("Unsupported .class version "+major+"."+minor+", name detection may fail");
             }
 
