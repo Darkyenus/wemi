@@ -3,7 +3,6 @@ package com.darkyen.wemi.intellij.projectImport
 import com.darkyen.wemi.intellij.settings.WemiModuleService
 import com.darkyen.wemi.intellij.settings.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiProjectService
-import com.darkyen.wemi.intellij.settings.getWemiModuleType
 import com.darkyen.wemi.intellij.settings.isWemiModule
 import com.darkyen.wemi.intellij.util.getWemiCompatibleSdk
 import com.darkyen.wemi.intellij.util.toClasspathUrl
@@ -46,6 +45,7 @@ import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
 import org.jetbrains.kotlin.idea.compiler.configuration.BaseKotlinCompilerSettings
 import org.jetbrains.kotlin.idea.compiler.configuration.Kotlin2JvmCompilerArgumentsHolder
 import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCommonCompilerArgumentsHolder
+import org.jetbrains.kotlin.idea.util.projectStructure.version
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -56,7 +56,7 @@ import java.nio.file.Path
  */
 class ProjectNode constructor(val name:String, val root: Path) {
 
-	var javaSourceVersion: LanguageLevel = LanguageLevel.HIGHEST
+	var javaSourceVersion: LanguageLevel = getWemiCompatibleSdk()?.version?.maxLanguageLevel ?: LanguageLevel.HIGHEST
 	var javaTargetVersion: JavaSdkVersion = JavaSdkVersion.fromLanguageLevel(javaSourceVersion)
 	var compileOutputPath:Path? = null
 
