@@ -110,7 +110,7 @@ EOF
 fi
 
 # $1: Command name
-# $?: Whether or not the command exists
+# $?: Whether the command exists
 command_exists() {
 	# Note: This is the most POSIX way to do it, but it is optional (the -v switch).
 	command -v "$1" > /dev/null 2>&1
@@ -157,7 +157,7 @@ url_encode() {
 	echo "$output_"
 }
 
-# @1 .zip archive
+# @1 `.zip` archive
 # @2 directory with entries extracted
 extract_zip() {
 	if command_exists unzip; then
@@ -167,7 +167,7 @@ extract_zip() {
 	fi
 }
 
-# @1 .tar.gz archive
+# @1 `.tar.gz` archive
 # @2 directory with entries extracted
 extract_targz() {
 	# If we have gzip, use it, if we don't then hope that tar/pax supports the -z switch
@@ -251,7 +251,7 @@ fetch_jdk() {
 	# Contains all versions of this type of JDK
 	jdk_type_dir_="${wemi_home_dir}/jdk/${jdk_version}-${jdk_implementation}-${jdk_heap_size}"
 
-	# Download, extract and test a JDK distribution according to JDK_* constants and the JDK release argument.
+	# Download, extract and test a JDK distribution according to JDK_* constants, and the JDK release argument.
 	# Returns immediately if already downloaded.
 	# $1: JDK release (not 'latest')
 	# echo: Path to the JDK home
@@ -380,7 +380,7 @@ can_use_java_from_path() {
 		java_version_="$(echo "$java_version_" | sed 's/.* version "\(.*\)".*/\1/')"
 
 		java_version_major_="$(echo "$java_version_" | sed 's/\([0-9]*\).*/\1/')"
-		# Until java 9, the java version was in minor, from 9 onwards it was in major
+		# Until java 9, the java version was in minor, from 9 onward it was in major
 		if [ "$java_version_major_" -gt 1 ]; then
 			java_version_number_="$java_version_major_"
 		else
@@ -447,24 +447,25 @@ fetch_wemi() {
 	# Contains the Wemi classpath jars
 	wemi_dist_dir_="${wemi_home_dir}/wemi/${wemi_version}"
 
+	# List of mirrors in order of preference
+	wemi_url_darkyen_="https://darkyen.com/wemi/${wemi_version}/wemi.tar.gz"
+	wemi_url_github_="https://github.com/Darkyenus/wemi/releases/download/v${wemi_version}/wemi.tar.gz"
+
 	redownload_='false'
 	if [ "${wemi_version%-SNAPSHOT}" != "${wemi_version}" ]; then
-		# Snapshot version
-		wemi_url_="https://darkyen.com/wemi/${wemi_version}/wemi.tar.gz"
+		# Snapshot, those are not uploaded to GitHub
+		wemi_url_github_=""
 		# If the snapshot directory exists and is less than 3 days old, we should download a new snapshot
 		if [ -z "$(find "$wemi_dist_dir_" -type d -name "$(basename "$wemi_dist_dir_")" -mtime -60 -print 2>/dev/null)" ]; then
 			log "Checking for a newer Wemi snapshot"
 			redownload_='true'
 		fi
-	else
-		# Normal version
-		wemi_url_="https://github.com/Darkyenus/wemi/releases/download/v${wemi_version}/wemi.tar.gz"
 	fi
 
 	if [ ! -e "$wemi_dist_dir_" ] || [ "$redownload_" = 'true' ]; then
 		wemi_dist_download_file_="${wemi_dist_dir_}.downloading"
 		log "Downloading Wemi distribution (version ${wemi_version})"
-		if ( download_to_file "$wemi_url_" "$wemi_dist_download_file_" ); then
+		if ( download_to_file "$wemi_url_darkyen_" "$wemi_dist_download_file_" ) || ( [ -n "$wemi_url_github_" ] && ( download_to_file "$wemi_url_github_" "$wemi_dist_download_file_" ) ); then
 			# Success
 			rm -rf "${wemi_dist_dir_?:EMPTY_PATH}"
 			extract_targz "$wemi_dist_download_file_" "${wemi_dist_dir_}"

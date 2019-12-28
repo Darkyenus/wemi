@@ -3,7 +3,8 @@
 # Wemi Version update
 1. Change versions in
 	- [BuildScript](../build/build.kt)
-	- [Wemi](../src/main/java/wemi/boot/Main.java)
+	- [Wemi](../src/main/kotlin/wemi/boot/Launch.kt)
+	- [Launcher](../src/launcher.sh)
 	- [IDEA plugin](../ide-plugins/WemiForIntelliJ/resources/META-INF/plugin.xml)
 2. Update changes in
     - [Changelog](../CHANGES.md)
@@ -11,8 +12,8 @@
 3. Update wemi used by Wemi, update build script
 4. Create and push commit named "Version 0.0" + version tag "v0.0"
 5. Create github release, with binary builds of IDEA plugin and wemi itself
-	1. ./wemi assembly
-	2. WemiForIntelliJ jar (must be done second so that it can bundle wemi binary through symlink)
+	1. WemiForIntelliJ jar (must be done second so that it can bundle wemi binary through symlink)
+	2. ./build/createDistributionArchive.sh --publish=<version>
 6. Create commit that changes versions to <NEXT_VERSION>-SNAPSHOT
 
 # New Kotlin Version

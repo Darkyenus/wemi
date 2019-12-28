@@ -28,5 +28,62 @@ cd "${wemi_home}/build/cache/-distribution-archive" || fail "cd to distribution 
 tar -c -v -z -f "${wemi_home}/build/dist/wemi.tar.gz" ./* || fail "tar ($?)"
 cd "$wemi_home" || fail "cd back home"
 
-log "Done"
-echo "${wemi_home}/build/dist"
+# Copy IDE plugins
+# TODO(jp): Ensure that the plugin is fresh by building it ourselves
+intellij_plugin_path="${wemi_home}/ide-plugins/WemiForIntelliJ/WemiForIntelliJ.zip"
+got_all_aux_files="true"
+if [ -f "$intellij_plugin_path" ]; then
+	if [ -z "$(find "$intellij_plugin_path" -type f -name "$(basename "$intellij_plugin_path")" -mtime -1 -print 2>/dev/null)" ]; then
+		fail "IntelliJ plugin at '$intellij_plugin_path' found, but it is too old (>1h). Delete it or rebuild it."
+	fi
+
+	log "Found IntelliJ plugin distribution, using it"
+	cp "$intellij_plugin_path" "${wemi_home}/build/dist/$(basename "$intellij_plugin_path")" || fail "cp IntelliJ plugin ($?)"
+else
+	log "Missing IntelliJ IDE plugin, skipping"
+	got_all_aux_files="false"
+fi
+
+# Create build info document
+build_info_file="${wemi_home}/build/dist/build-info.txt"
+echo "Wemi Build">"$build_info_file"
+echo "Git: $(git rev-parse HEAD)">>"$build_info_file"
+echo "Date: $(date -u "+%Y-%m-%d %H:%M:%S")">>"$build_info_file"
+
+# Publish to the mirrors
+# TODO(jp): Get the version from git
+if echo "$1" | grep -q -x -e '--publish=.*'; then
+	wemi_version="${1#--publish=}"
+	if [ -z "$wemi_version" ]; then
+		fail "Specify Wemi Version"
+	fi
+
+	if [ "$got_all_aux_files" != "true" ]; then
+		fail "Can't publish, some auxiliary files are missing"
+	fi
+
+	# Allow only reading, unless snapshot, which can be overwritten by us
+	chmod_mode="0444"
+	if [ "${wemi_version%-SNAPSHOT}" != "${wemi_version}" ]; then
+		# Snapshot
+		chmod_mode="0644"
+		sftp -b - -f "sftp://wemi@darkyen.com/wemi-versions/" <<-END_SFTP || log "Snapshot version directory already exists"
+		mkdir ./${wemi_version}
+END_SFTP
+	else
+		# Normal release
+		sftp -b - -f "sftp://wemi@darkyen.com/wemi-versions/" <<-END_SFTP || fail "Version directory must not exist"
+		mkdir ./${wemi_version}
+END_SFTP
+	fi
+
+	sftp -b - -f "sftp://wemi@darkyen.com/wemi-versions/" <<-END_SFTP || fail "Failed to upload new Wemi version"
+		put ${wemi_home}/build/dist/* ./${wemi_version}/
+		chmod ${chmod_mode} ./${wemi_version}/*
+END_SFTP
+
+	log "Done publishing Wemi version $wemi_version"
+else
+	log "Done"
+	echo "${wemi_home}/build/dist"
+fi
