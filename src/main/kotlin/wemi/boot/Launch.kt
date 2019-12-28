@@ -74,7 +74,7 @@ const val EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR = 55
 const val EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND = 56
 
 /** Version of Wemi build system */
-const val WemiVersion:String = "0.10"
+const val WemiVersion:String = "0.11-SNAPSHOT"
 
 internal var WemiRunningInInteractiveMode = false
     private set

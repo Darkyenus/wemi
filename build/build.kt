@@ -18,10 +18,8 @@ import wemi.expiresWith
 import wemi.key
 import wemi.publish.InfoNode
 import wemi.util.FileSet
-import wemi.util.LocatedPath
 import wemi.util.ensureEmptyDirectory
 import wemi.util.name
-import java.nio.file.Files
 
 val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.61"),
@@ -31,11 +29,11 @@ val CompilerProjects = listOf(
 )
 
 const val WemiGroup = "com.darkyen.wemi"
-const val ThisWemiVersion = "0.10" // as opposed to the WemiVersion, which is the version with which we build
+const val ThisWemiVersion = "0.11-SNAPSHOT" // as opposed to the WemiVersion, which is the version with which we build
 
 val distributionArchive by key<Path>("Create a distribution archive for Wemi")
 
-val wemi:Project by project(Archetypes.BlankJVMProject) {
+val wemi:Project by project(Archetypes.AggregateJVMProject) {
 
     projectGroup set { WemiGroup }
     projectName set { "wemi-core" }
@@ -67,20 +65,6 @@ val wemi:Project by project(Archetypes.BlankJVMProject) {
                 "Wonders Expeditiously, Mundane Instantly - Simple yet powerful build system - core jar",
                 "2017"
         )
-    }
-
-    // TODO(jp): Remove after upgrading to version 0.10
-    internalClasspath set {
-        val resources = Keys.resources.getLocatedPaths()
-
-        val classpath = ArrayList<LocatedPath>(resources.size + 128)
-        classpath.addAll(resources)
-
-        inProjectDependencies(true) {
-            classpath.addAll(Keys.internalClasspath.get())
-        }
-
-        classpath
     }
 
     extend(archivingSources) {
@@ -134,25 +118,16 @@ val core:Project by project {
             dependency("org.jline", "jline-reader", JLineVersion)
         ) }
 
-    // TODO(jp): Use scope directly
-    // Compile-only (provided) libraries
-    extend(compiling) {
-        libraryDependencies add {
-            /* Used ONLY in wemi.test.forked.TestLauncher */
-            dependency("org.junit.platform", "junit-platform-launcher", "1.0.2")
-        }
-    }
+    /* Used ONLY in wemi.test.forked.TestLauncher */
+    libraryDependencies add { dependency("org.junit.platform", "junit-platform-launcher", "1.0.2", scope=ScopeProvided) }
 
     extend(compilingKotlin) {
         compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
         compilerOptions[KotlinCompilerFlags.incremental] = true
     }
 
-    // TODO(jp): Use scope directly
-    extend(testing) {
-        libraryDependencies add { JUnitAPI }
-        libraryDependencies add { JUnitEngine }
-    }
+    libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
+    libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
 }
 
 fun latestKotlinDependency(name:String):Dependency {
@@ -199,16 +174,11 @@ fun createKotlinCompilerProject(version:String):Project {
             compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
         }
 
-        libraryDependencies set { emptySet() } // Disable default kotlin stdlib
-
-        // TODO(jp): Use scope directly
-        extend(compiling) {
-            projectDependencies add { ProjectDependency(core, false) }
-
-            libraryDependencies set { setOf(
-                    dependency("org.jetbrains.kotlin", "kotlin-compiler", version)
-            ) }
-        }
+        projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
+        // Disable default kotlin stdlib
+        libraryDependencies set { setOf(
+                dependency("org.jetbrains.kotlin", "kotlin-compiler", version, scope=ScopeProvided)
+        ) }
     }
 }
 
@@ -223,15 +193,10 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
 
     libraryDependencies set { emptySet() } // Disable default kotlin stdlib
 
-    // TODO(jp): Use scope directly
-    extend(compiling) {
-        projectDependencies add { ProjectDependency(core, false) }
+    projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
 
-        libraryDependencies add {
-            /* Used only in wemi.document.DokkaInterface */
-            dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", scope="provided")
-        }
-    }
+    /* Used only in wemi.document.DokkaInterface */
+    libraryDependencies add { dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", scope=ScopeProvided) }
 
     repositories set { setOf(JCenter) }
 }

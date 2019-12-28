@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.darkyen.wemi.intellij</id>
     <name>Wemi</name>
-    <version>0.10</version>
+    <version>0.11-SNAPSHOT</version>
     <vendor email="darkyenus@gmail.com" url="https://github.com/Darkyenus">Jan Polák</vendor>
 
     <description><![CDATA[
@@ -17,12 +17,9 @@
     ]]></description>
 
     <change-notes><![CDATA[
-      <h2>0.10</h2>
+      <h2>0.11</h2>
       <ul>
-        <li>Compatibility with Wemi 0.10 (to 0.6)</li>
-        <li>Major rewrite of Run configurations, should be much more reliable</li>
-        <li>Major rewrite of project importing</li>
-        <li>Bug fixes</li>
+        <li>Compatibility with Wemi 0.11 (to 0.6)</li>
       </ul>
     ]]>
     </change-notes>

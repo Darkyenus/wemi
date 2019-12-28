@@ -1,3 +1,5 @@
+# 0.11
+
 # 0.10 2019-12-28
 - New distribution scheme - launcher is now a shell script, not a fat-jar
 - It is possible to specify scope for `ProjectDependency`

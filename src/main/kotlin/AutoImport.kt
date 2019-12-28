@@ -151,9 +151,6 @@ val repositories
     inline get() = Keys.repositories
 val libraryDependencies
     inline get() = Keys.libraryDependencies
-@Deprecated("Renamed to libraryDependencyMapper, removed in 0.11", replaceWith = ReplaceWith("libraryDependencyMapper"))
-val libraryDependencyProjectMapper
-    inline get() = Keys.libraryDependencyMapper
 val libraryDependencyMapper
     inline get() = Keys.libraryDependencyMapper
 val resolvedLibraryScopes
