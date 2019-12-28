@@ -4,9 +4,8 @@ import com.darkyen.wemi.intellij.WemiLauncher
 import com.darkyen.wemi.intellij.WemiLauncherFileName
 import com.darkyen.wemi.intellij.WemiNotificationGroup
 import com.darkyen.wemi.intellij.importing.actions.InstallWemiLauncherAction
-import com.darkyen.wemi.intellij.settings.WemiModuleService
-import com.darkyen.wemi.intellij.settings.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiProjectService
+import com.darkyen.wemi.intellij.settings.isWemiModule
 import com.darkyen.wemi.intellij.showBalloon
 import com.darkyen.wemi.intellij.util.executable
 import com.darkyen.wemi.intellij.util.getWindowsShellExe
@@ -70,12 +69,7 @@ fun allWemiModules(project:Project?, wemiModules:Boolean = true):Sequence<Module
 	if (project == null) {
 		return emptySequence()
 	}
-	return ModuleManager.getInstance(project).modules.asSequence().filter { module ->
-		val moduleService = module.getService(WemiModuleService::class.java)
-		val wemiModule = moduleService != null && moduleService.wemiModuleType != WemiModuleType.NON_WEMI_MODULE
-
-		wemiModules == wemiModule
-	}
+	return ModuleManager.getInstance(project).modules.asSequence().filter { wemiModules == it.isWemiModule() }
 }
 
 fun defaultWemiRootPathFor(project:Project): Path? {

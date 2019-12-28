@@ -5,6 +5,7 @@ import com.darkyen.wemi.intellij.util.XmlSerializable
 import com.darkyen.wemi.intellij.util.enumXmlSerializer
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
+import com.intellij.openapi.module.Module
 
 /** Modules with this component belong to Wemi. */
 @Service
@@ -31,4 +32,12 @@ enum class WemiModuleType {
     /** Build script-holding module.
      * For example, it is not possible to execute tasks on these modules. */
     BUILD_SCRIPT
+}
+
+fun Module.getWemiModuleType():WemiModuleType {
+    return getService(WemiModuleService::class.java)?.wemiModuleType ?: WemiModuleType.NON_WEMI_MODULE
+}
+
+fun Module.isWemiModule():Boolean {
+    return getWemiModuleType() != WemiModuleType.NON_WEMI_MODULE
 }

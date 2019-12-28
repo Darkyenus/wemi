@@ -3,6 +3,8 @@ package com.darkyen.wemi.intellij.projectImport
 import com.darkyen.wemi.intellij.settings.WemiModuleService
 import com.darkyen.wemi.intellij.settings.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiProjectService
+import com.darkyen.wemi.intellij.settings.getWemiModuleType
+import com.darkyen.wemi.intellij.settings.isWemiModule
 import com.darkyen.wemi.intellij.util.getWemiCompatibleSdk
 import com.darkyen.wemi.intellij.util.toClasspathUrl
 import com.darkyen.wemi.intellij.util.toUrl
@@ -293,7 +295,7 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 
 	for (module in ideModulesToRemove) {
 		// Remove modules that previously belonged to Wemi
-		if (module.getService(WemiModuleService::class.java)?.wemiModuleType != null) {
+		if (module.isWemiModule()) {
 			modifiableModuleModel.disposeModule(module)
 		}
 	}

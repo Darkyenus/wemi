@@ -2,6 +2,7 @@ package com.darkyen.wemi.intellij.execution
 
 import com.darkyen.wemi.intellij.settings.WemiModuleService
 import com.darkyen.wemi.intellij.settings.WemiModuleType
+import com.darkyen.wemi.intellij.settings.isWemiModule
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.impl.RunConfigurationBeforeRunProvider
@@ -27,14 +28,11 @@ class WemiModuleBuildTaskRunner : ProjectTaskRunner() {
         for (task in tasks) {
             if (task is ModuleBuildTask) {
                 val moduleComponent = task.module.getService(WemiModuleService::class.java) ?: throw AssertionError("Module ${task.module} does not have WemiModuleComponent")
-                when (moduleComponent.wemiModuleType) {
-                    WemiModuleType.BUILD_SCRIPT -> {
-                        compileBuildScript = true
-                    }
-                    WemiModuleType.PROJECT -> {
-                        projectsToCompile.add(moduleComponent.wemiProjectName)
-                    }
-                    else -> throw AssertionError("Module ${task.module} is not a Wemi module")
+                @Suppress("UNUSED_VARIABLE")
+                val exhaust:Any = when (moduleComponent.wemiModuleType) {
+                    WemiModuleType.BUILD_SCRIPT -> compileBuildScript = true
+                    WemiModuleType.PROJECT -> projectsToCompile.add(moduleComponent.wemiProjectName)
+                    WemiModuleType.NON_WEMI_MODULE -> throw AssertionError("Module ${task.module} is not a Wemi module")
                 }
             } else {
                 throw AssertionError("WemiModuleBuildTaskRunner can't run $task")
@@ -67,9 +65,7 @@ class WemiModuleBuildTaskRunner : ProjectTaskRunner() {
 
     override fun canRun(projectTask: ProjectTask): Boolean {
         return when (projectTask) {
-            is ModuleBuildTask -> {
-                projectTask.module.getService(WemiModuleService::class.java)?.wemiModuleType != null
-            }
+            is ModuleBuildTask -> projectTask.module.isWemiModule()
             else -> false
         }
     }
