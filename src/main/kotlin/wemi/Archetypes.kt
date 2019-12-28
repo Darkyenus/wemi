@@ -66,11 +66,6 @@ object Archetypes {
      * Implements basic key implementations for JVM that don't usually change.
      */
     val JVMBase by archetype(::Base) {
-        Keys.resources set { FileSet(Keys.projectRoot.get() / "src/main/resources") }
-        extend (Configurations.testing) {
-            Keys.resources modify { it + FileSet(Keys.projectRoot.get() / "src/test/resources") }
-        }
-
         Keys.repositories set Static(DefaultRepositories)
 
         Keys.javaHome set Static(wemi.run.JavaHome)
@@ -112,25 +107,22 @@ object Archetypes {
     internal val DefaultArchetype
         get() = JavaKotlinProject
 
-    /** Archetype for projects that have no sources of their own, but are aggregation of their dependencies. */
+    /** An archetype for projects that have no sources of their own, but are aggregation of their dependencies. */
     val AggregateJVMProject by archetype(::JVMBase) {
         Keys.internalClasspath set KeyDefaults.InternalClasspathOfAggregateProject
-
-        Keys.sources set { null }
-        Keys.resources set { null }
-        extend (Configurations.testing) {
-            Keys.sources set { null }
-            Keys.resources set { null }
-        }
 
         Keys.test set KeyDefaults.TestOfAggregateProject
     }
 
-    /** Primary archetype for projects that use pure Java. */
+    /** A primary archetype for projects that use pure Java. */
     val JavaProject by archetype(::JVMBase) {
         Keys.sources set { FileSet(Keys.projectRoot.get() / "src/main/java") }
         extend (Configurations.testing) {
             Keys.sources modify { FileSet(Keys.projectRoot.get() / "src/test/java", next = it) }
+        }
+        Keys.resources set { FileSet(Keys.projectRoot.get() / "src/main/resources") }
+        extend (Configurations.testing) {
+            Keys.resources modify { it + FileSet(Keys.projectRoot.get() / "src/test/resources") }
         }
 
         Keys.compile set KeyDefaults.CompileJava
@@ -142,19 +134,19 @@ object Archetypes {
         }
     }
 
-    /**
-     * Primary archetype for projects that use Java and Kotlin.
-     */
+    /** A primary archetype for projects that use Java and Kotlin. */
     val JavaKotlinProject by archetype(::JVMBase) {
         Keys.sources set {
             val root = Keys.projectRoot.get()
             FileSet(root / "src/main/java", next = FileSet(root / "src/main/kotlin"))
         }
+        Keys.resources set { FileSet(Keys.projectRoot.get() / "src/main/resources") }
         extend (Configurations.testing) {
             Keys.sources modify {
                 val root = Keys.projectRoot.get()
                 FileSet(root / "src/test/java", next = FileSet(root / "src/test/kotlin", next = it))
             }
+            Keys.resources modify { it + FileSet(Keys.projectRoot.get() / "src/test/resources") }
         }
 
         Keys.libraryDependencies add { kotlinDependency("stdlib") }
