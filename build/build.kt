@@ -31,7 +31,7 @@ val CompilerProjects = listOf(
 )
 
 const val WemiGroup = "com.darkyen.wemi"
-const val ThisWemiVersion = "0.10-SNAPSHOT" // as opposed to the generic WemiVersion, which is the version with which we build
+const val ThisWemiVersion = "0.10" // as opposed to the WemiVersion, which is the version with which we build
 
 val distributionArchive by key<Path>("Create a distribution archive for Wemi")
 

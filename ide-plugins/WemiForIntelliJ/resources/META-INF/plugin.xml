@@ -1,11 +1,11 @@
 <idea-plugin>
     <id>com.darkyen.wemi.intellij</id>
     <name>Wemi</name>
-    <version>0.10-SNAPSHOT</version>
+    <version>0.10</version>
     <vendor email="darkyenus@gmail.com" url="https://github.com/Darkyenus">Jan Polák</vendor>
 
     <description><![CDATA[
-      Allows to use <a href="https://github.com/Darkyenus/wemi">WEMI build system</a> from the IDE.
+      Allows to use <a href="https://github.com/Darkyenus/wemi">Wemi build system</a> from the IDE.
 
       <h3>Features:</h3>
       <ul>

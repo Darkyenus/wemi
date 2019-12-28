@@ -1,4 +1,9 @@
-# 0.10
+# 0.10 2019-12-28
+- New distribution scheme - launcher is now a shell script, not a fat-jar
+- It is possible to specify scope for `ProjectDependency`
+- Rename `BlankJVMProject` to `AggregateJVMProject`
+- Rename `libraryDependencyProjectMapper` to `libraryDependencyMapper`
+- Minor improvements
 
 # 0.9 2019-07-11
 - Improve Maven dependency resolution system

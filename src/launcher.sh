@@ -39,7 +39,7 @@
 #			--print-java-exe	- Print path to java executable that would be used and exit
 #			--print-wemi-home	- Print path to directory with Wemi jars and exit
 
-readonly wemi_version='0.10-SNAPSHOT'
+readonly wemi_version='0.10'
 readonly java_min_version='8'
 
 log() { echo "$@" 1>&2; }
