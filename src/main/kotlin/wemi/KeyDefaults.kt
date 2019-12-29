@@ -4,11 +4,6 @@ package wemi
 
 import com.darkyen.tproll.util.StringBuilderWriter
 import org.slf4j.LoggerFactory
-import wemi.Configurations.archiving
-import wemi.Configurations.assembling
-import wemi.Configurations.publishing
-import wemi.Configurations.running
-import wemi.Configurations.testingLaunch
 import wemi.assembly.AssemblyOperation
 import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.DefaultRenameFunction
@@ -386,7 +381,6 @@ object KeyDefaults {
             if (kotlinSources.isNotEmpty()) {
                 val compiler = Keys.kotlinCompiler.get()
 
-                //TODO Allow to configure cache folder?
                 val cacheFolder = output.resolveSibling(output.name + "-kotlin-cache")
                 Files.createDirectories(cacheFolder)
 
@@ -539,7 +533,7 @@ object KeyDefaults {
     }
 
     val Test: Value<TestReport> = {
-        using(running, testingLaunch) {
+        using(Configurations.running, Configurations.testing) {
             val javaExecutable = Keys.javaExecutable.get()
             val directory = Keys.runDirectory.get()
             val options = Keys.runOptions.get()
@@ -575,7 +569,7 @@ object KeyDefaults {
     }
 
     val Archive: Value<Path> = {
-        using(archiving) {
+        using(Configurations.archiving) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
                 for (file in Keys.internalClasspath.get()) {
@@ -598,7 +592,7 @@ object KeyDefaults {
     }
 
     val ArchiveSources: Value<Path> = {
-        using(archiving) {
+        using(Configurations.archiving) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
                 for (file in Keys.sources.getLocatedPaths()) {
@@ -630,7 +624,7 @@ object KeyDefaults {
      * Binding for [Keys.archive] to use when archiving documentation and no documentation is available.
      */
     val ArchiveDummyDocumentation: Value<Path> = {
-        using(archiving) {
+        using(Configurations.archiving) {
             AssemblyOperation().use { assemblyOperation ->
 
                 /*
@@ -714,7 +708,7 @@ object KeyDefaults {
     }
 
     val ArchiveJavadocOptions: Value<List<String>> = {
-        using(archiving) {
+        using(Configurations.archiving) {
             val options = WMutableList<String>()
 
             val compilerFlags = Keys.compilerOptions.get()
@@ -744,7 +738,7 @@ object KeyDefaults {
 
     private val ARCHIVE_JAVADOC_LOG = LoggerFactory.getLogger("ArchiveJavadoc")
     val ArchiveJavadoc: Value<Path> = {
-        using(archiving) {
+        using(Configurations.archiving) {
             val sourceFiles = Keys.sources.getLocatedPaths(*JavaSourceFileExtensions)
 
             if (sourceFiles.isEmpty()) {
@@ -863,7 +857,7 @@ object KeyDefaults {
 
     private val ARCHIVE_DOKKA_LOG = LoggerFactory.getLogger("ArchiveDokka")
     val ArchiveDokka: Value<Path> = {
-        using(archiving) {
+        using(Configurations.archiving) {
             val options = Keys.archiveDokkaOptions.get()
 
             if (options.sourceRoots.isEmpty()) {
@@ -1073,7 +1067,7 @@ object KeyDefaults {
     }
 
     val PublishM2: Value<Path> = {
-        using(publishing) {
+        using(Configurations.publishing) {
             val repository = Keys.publishRepository.get()
             val metadata = Keys.publishMetadata.get()
             val artifacts = Keys.publishArtifacts.get()
@@ -1085,7 +1079,7 @@ object KeyDefaults {
     }
 
     val Assembly: Value<Path> = {
-        using(assembling) {
+        using(Configurations.assembling) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
                 for (file in Keys.internalClasspath.get()) {

@@ -11,10 +11,15 @@ import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.dependency.DefaultRepositories
+import wemi.dependency.Dependency
 import wemi.dependency.LocalM2Repository
 import wemi.dependency.NoClassifier
+import wemi.dependency.ScopeTest
 import wemi.publish.artifacts
 import wemi.run.javaExecutable
+import wemi.test.JUnitAPI
+import wemi.test.JUnitEngine
+import wemi.test.JUnitPlatformLauncher
 import wemi.util.FileSet
 import wemi.util.div
 import wemi.util.plus
@@ -86,12 +91,19 @@ object Archetypes {
 
         Keys.testParameters set KeyDefaults.TestParameters
         Keys.test set KeyDefaults.Test
+        extend(Configurations.testing) {
+            Keys.libraryDependencies addAll { listOf(
+                    Dependency(JUnitAPI, scope=ScopeTest),
+                    Dependency(JUnitEngine, scope=ScopeTest),
+                    Dependency(JUnitPlatformLauncher, scope=ScopeTest)
+            ) }
+        }
 
         Keys.archiveOutputFile set { Keys.buildDirectory.get() / "${Keys.projectName.get()}-${Keys.projectVersion.get()}.jar" }
 
         Keys.publishMetadata set KeyDefaults.PublishModelM2
         Keys.publishRepository set Static(LocalM2Repository)
-        Keys.publishArtifacts addAll { artifacts(NoClassifier, true, true) }
+        Keys.publishArtifacts addAll { artifacts(NoClassifier, includeSources = true, includeDocumentation = true) }
         Keys.publish set KeyDefaults.PublishM2
 
         Keys.assemblyMergeStrategy set {

@@ -126,9 +126,6 @@ val core:Project by project {
     compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
     compilerOptions[KotlinCompilerFlags.incremental] = { true }
     compilerOptions[JavaCompilerFlags.customFlags] = { it + "-Xlint:all" }
-
-    libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
-    libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
 }
 
 fun latestKotlinDependency(name:String):Dependency {

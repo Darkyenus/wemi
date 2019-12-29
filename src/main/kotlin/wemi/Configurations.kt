@@ -103,10 +103,6 @@ object Configurations {
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
         Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
     }
-
-    internal val testingLaunch by configuration("Used internally when launching tests", testing) {
-        Keys.libraryDependencies add { Dependency(JUnitPlatformLauncher, scope=ScopeTest) }
-    }
     //endregion
 
     //region IDE configurations
