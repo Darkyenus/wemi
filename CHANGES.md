@@ -1,4 +1,6 @@
-# 0.11
+# 0.12
+
+# 0.11 2019-12-29
 - JUnit dependencies are now bundled by default, you don't have to add them manually
     - They are hidden in `testing` configuration
 - Better resource handling in aggregate archetype
