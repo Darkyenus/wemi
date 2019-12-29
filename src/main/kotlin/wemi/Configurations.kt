@@ -32,8 +32,10 @@ import wemi.util.toPath
 object Configurations {
 
     //region Stage configurations
+    val stageAxis by configuration("Base for stage configurations") {}
+
     /** @see Keys.compile */
-    val compiling by configuration("Configuration used when compiling") {
+    val compiling by configuration("Configuration used when compiling", stageAxis) {
         Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeProvided) }
 
         Keys.externalClasspath modify { classpath ->
@@ -49,12 +51,12 @@ object Configurations {
     }
 
     /** @see Keys.run */
-    val running by configuration("Configuration used when running, sources are resources") {
+    val running by configuration("Configuration used when running, sources are resources", stageAxis) {
         Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeRuntime) }
     }
 
     /** @see Keys.test */
-    val testing by configuration("Used when testing") {
+    val testing by configuration("Used when testing", stageAxis) {
         Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeRuntime, ScopeProvided, ScopeTest) }
 
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
@@ -67,19 +69,17 @@ object Configurations {
     }
 
     /** @see Keys.assembly */
-    val assembling by configuration("Configuration used when assembling Jar with dependencies") {
+    val assembling by configuration("Configuration used when assembling Jar with dependencies", stageAxis) {
         Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeRuntime) }
     }
-    //endregion
 
-    //region Archiving
     /** Used by [Keys.archive] */
-    val archiving by configuration("Used when archiving") {
+    val archiving by configuration("Used when archiving", stageAxis) {
         Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
     }
 
     /** Use this configuration to obtain sources archived in [Keys.archive]. */
-    val archivingSources by configuration("Used when archiving sources") {
+    val archivingSources by configuration("Used when archiving sources", archiving) {
         Keys.archiveOutputFile modify { original ->
             val originalName = original.name
             val withoutExtension = originalName.pathWithoutExtension()
@@ -90,7 +90,7 @@ object Configurations {
     }
 
     /** Use this configuration to obtain documentation archived in [Keys.archive]. */
-    val archivingDocs by configuration("Used when archiving documentation") {
+    val archivingDocs by configuration("Used when archiving documentation", archiving) {
         Keys.archiveOutputFile modify { original ->
             val originalName = original.name
             val withoutExtension = originalName.pathWithoutExtension()
@@ -100,21 +100,21 @@ object Configurations {
         // Dummy archival
         Keys.archive set ArchiveDummyDocumentation
     }
-    //endregion
 
-    //region Publishing
-    val publishing by configuration("Used when publishing archived outputs") {}
+    val publishing by configuration("Used when publishing archived outputs", archiving) {}
     //endregion
 
     //region IDE configurations
-    val retrievingSources by configuration("Used to retrieve sources") {
+    val ideAxis by configuration("Used when called from IDE") {}
+
+    val retrievingSources by configuration("Used to retrieve sources", ideAxis) {
         val mapper = classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier)
         Keys.libraryDependencies modify { it.map(mapper).toSet() }
         Keys.libraryDependencyMapper set Static(mapper)
         Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(SourcesClassifier)
     }
 
-    val retrievingDocs by configuration("Used to retrieve documentation") {
+    val retrievingDocs by configuration("Used to retrieve documentation", ideAxis) {
         val mapper = classifierAppendingLibraryDependencyProjectMapper(JavadocClassifier)
         Keys.libraryDependencies modify { it.map(mapper).toSet() }
         Keys.libraryDependencyMapper set Static(mapper)

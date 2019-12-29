@@ -101,7 +101,6 @@ class Binding<T>(val key:Key<T>,
 @WemiDsl
 class EvalScope @PublishedApi internal constructor(
         @PublishedApi internal val scope:Scope,
-        @PublishedApi internal val configurationPrefix:Array<Configuration>,
         @PublishedApi internal val usedBindings: ArrayList<Binding<*>>,
         @PublishedApi internal val expirationTriggers: ArrayList<() -> Boolean>,
         val input:Array<out Pair<String, String>>,
@@ -118,43 +117,31 @@ class EvalScope @PublishedApi internal constructor(
 
     /** It is important that EvalScope is not used at random times, but only when it is passed as a receiver.
      * Doing that would invalidate the purpose of the EvalScope, to track the used bindings of the keys. */
-    @PublishedApi
-    internal fun ensureNotClosed() {
+    private fun ensureNotClosed() {
         if (closed) {
             throw WemiException("EvalScope is closed. This can happen when it is used outside of the action it was receiver for.")
         }
     }
 
+    @PublishedApi
+    internal fun deriveEvalScope(scope:Scope):EvalScope {
+        ensureNotClosed()
+        return EvalScope(scope, usedBindings, expirationTriggers, input, progressListener)
+    }
+
     /** Run the [action] in a scope, which is created by layering [configurations] over this [Scope]. */
     inline fun <Result> using(vararg configurations: Configuration, action: EvalScope.() -> Result): Result {
-        ensureNotClosed()
-        var scope = scope
-        for (configuration in configurations) {
-            scope = scope.scopeFor(configuration)
-        }
-        return EvalScope(scope, configurationPrefix + configurations, usedBindings, expirationTriggers, input, progressListener).use { it.action() }
+        return deriveEvalScope(scope.project.scopeFor(scope.configurations + configurations)).use { it.action() }
     }
 
-    /** Run the [action] in a scope, which is created by layering [configurations] over this [Scope]. */
-    inline fun <Result> using(configurations: Collection<Configuration>, action: EvalScope.() -> Result): Result {
-        ensureNotClosed()
-        var scope = scope
-        for (configuration in configurations) {
-            scope = scope.scopeFor(configuration)
-        }
-        return EvalScope(scope, configurationPrefix + configurations, usedBindings, expirationTriggers, input, progressListener).use { it.action() }
-    }
-
-    /** Run the [action] in a scope, which is created by layering [configuration] over this [Scope]. */
-    inline fun <Result> using(configuration: Configuration, action: EvalScope.() -> Result): Result {
-        ensureNotClosed()
-        return EvalScope(scope.scopeFor(configuration), configurationPrefix + configuration, usedBindings, expirationTriggers, input, progressListener).use { it.action() }
-    }
-
+    /** Run the [action] in a scope, which is created by replacing the project and layering the configurations on top. */
     inline fun <Result> using(project:Project, vararg configurations:Configuration, action: EvalScope.() -> Result): Result {
-        ensureNotClosed()
-        val scope = project.scopeFor(*configurations)
-        return EvalScope(scope, NO_CONFIGURATIONS, usedBindings, expirationTriggers, input, progressListener).use { it.action() }
+        return deriveEvalScope(project.scopeFor(scope.configurations + configurations)).use { it.action() }
+    }
+
+    /** Run the [action] in a scope, which is created by replacing the project with [scope]. */
+    inline fun <Result> using(scope:Scope, action: EvalScope.() -> Result): Result {
+        return deriveEvalScope(scope).use { it.action() }
     }
 
     private fun <V : Output, Output> getKeyValue(key: Key<V>, otherwise: Output, useOtherwise: Boolean, input:Array<out Pair<String, String>>): Output {
@@ -185,7 +172,7 @@ class EvalScope @PublishedApi internal constructor(
             binding.lastEvaluationExpirationTriggers.clear()
 
             val result:V =
-            EvalScope(scope, NO_CONFIGURATIONS, newDependsOn, binding.lastEvaluationExpirationTriggers, input, listener).use { evalScope ->
+            EvalScope(scope, newDependsOn, binding.lastEvaluationExpirationTriggers, input, listener).use { evalScope ->
                 val boundValue = binding.value
                 var result =
                 if (boundValue == null) {
@@ -340,7 +327,7 @@ class EvalScope @PublishedApi internal constructor(
     }
 
     override fun toString(): String {
-        return "EvalScope($scope/${configurationPrefix.contentToString()}, input=${input.contentToString()})"
+        return "EvalScope($scope, input=${input.contentToString()})"
     }
 }
 

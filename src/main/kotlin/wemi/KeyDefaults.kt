@@ -162,14 +162,7 @@ object KeyDefaults {
                 }
 
                 // Enter a different scope and perform the operation
-                val baseConfigurations = projectDependency.configurations
-                val ownConfigurations = this@inProjectDependencies.scope.scopeConfigurations()
-                val baseConfigurationsSize = baseConfigurations.size
-                val configurations = Array(baseConfigurationsSize + ownConfigurations.size) {
-                    if (it < baseConfigurationsSize) baseConfigurations[it] else ownConfigurations[it - baseConfigurationsSize]
-                }
-
-                using(projectDependency.project, *configurations) {
+                using(projectDependency.project.scopeFor(projectDependency.configurations.toList() + scope.configurations)) {
                     operation(projectDependency)
                 }
             }
@@ -225,7 +218,7 @@ object KeyDefaults {
     fun outputClassesDirectory(tag: String): Value<Path> = {
         // Using scopeProject() instead of Keys.projectName, because it has to be unique
         // Prefix - signifies that it should be deleted on clean command
-        Keys.cacheDirectory.get() / "-$tag-${scope.scopeProject().name.toSafeFileName('_')}"
+        Keys.cacheDirectory.get() / "-$tag-${scope.project.name.toSafeFileName('_')}"
     }
 
     private val KotlincLOG = LoggerFactory.getLogger("Kotlinc")
@@ -573,8 +566,8 @@ object KeyDefaults {
 
     val TestOfAggregateProject: Value<TestReport> = {
         val resultReport = TestReport()
-        inProjectDependencies(true) { depProject ->
-            resultReport.putAll(using(depProject.project, *depProject.configurations) { Keys.test.get() })
+        inProjectDependencies(true) {
+            resultReport.putAll(Keys.test.get())
         }
         resultReport
     }

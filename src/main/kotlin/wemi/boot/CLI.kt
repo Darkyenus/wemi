@@ -20,6 +20,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.TimeUnit
+import kotlin.system.exitProcess
 
 /**
  * Handles user interaction in standard (possibly interactive) mode
@@ -31,12 +32,12 @@ object CLI {
     /**
      * Terminal used by [CLI]
      */
-    private val Terminal: Terminal by lazy {
+    private val terminal: Terminal by lazy {
         val terminal = TerminalBuilder.terminal()
 
-        // Show main thread stack-trace on Ctrl-T
+        // Show the main thread stack-trace on Ctrl-T
         // NOTE: SIGINFO is supported only on some Unixes, such as OSX
-        terminal.handle(org.jline.terminal.Terminal.Signal.INFO) {
+        terminal.handle(Terminal.Signal.INFO) {
             val stackTrace = MainThread.stackTrace
             val state = MainThread.state
             val sb = StringBuilder()
@@ -52,32 +53,32 @@ object CLI {
             println()
         }
 
-        terminal.handle(org.jline.terminal.Terminal.Signal.INT) {
+        terminal.handle(Terminal.Signal.INT) {
             // This is what is done by default, but through Shutdown.exit, which does not call shutdown hooks
-            System.exit(130)
+            exitProcess(130)
         }
 
         terminal
     }
 
-    /** While [during] is executing inside of this function, forward as much signals as possible to [process].
+    /** While [during] is executing inside of this function, forward as many signals as possible to [process].
      * This is not always possible, so take this only as a hint.
-     * (Currently handles only SIGINT on a best effort basis, where it actually attempts to stop the process) */
+     * (Currently handles only SIGINT on best effort basis, where it actually attempts to stop the process) */
     fun <T>forwardSignalsTo(process:Process, during:()->T):T {
-        val previousInterrupt = Terminal.handle(org.jline.terminal.Terminal.Signal.INT) {
+        val previousInterrupt = terminal.handle(Terminal.Signal.INT) {
             process.destroy()
         }
         try {
             return during()
         } finally {
-            Terminal.handle(org.jline.terminal.Terminal.Signal.INT, previousInterrupt)
+            terminal.handle(Terminal.Signal.INT, previousInterrupt)
         }
     }
 
     internal val MessageDisplay: CliStatusDisplay? by lazy {
         if (WemiColorOutputSupported) {
             // If terminal doesn't support color, it probably doesn't support ANSI codes
-            CliStatusDisplay(Terminal)
+            CliStatusDisplay(terminal)
         } else null
     }
 
@@ -85,7 +86,7 @@ object CLI {
     private val TaskLineReader: LineReaderImpl by lazy {
         (LineReaderBuilder.builder()
                 .appName("Wemi")
-                .terminal(Terminal)
+                .terminal(terminal)
                 .parser(TaskParser)
                 .completer(TaskCompleter)
                 .history(SimpleHistory.getHistory("repl"))
@@ -100,7 +101,7 @@ object CLI {
     internal val InputLineReader: LineReaderImpl by lazy {
         (LineReaderBuilder.builder()
                 .appName("Wemi")
-                .terminal(Terminal)
+                .terminal(terminal)
                 .parser(DefaultParser().apply {
                     isEofOnEscapedNewLine = false
                     isEofOnUnclosedQuote = false
@@ -115,7 +116,7 @@ object CLI {
     internal fun createReloadBuildScriptLineReader(): LineReaderImpl {
         return (LineReaderBuilder.builder()
                 .appName("Wemi")
-                .terminal(Terminal)
+                .terminal(terminal)
                 .parser(DefaultParser().apply {
                     isEofOnEscapedNewLine = false
                     isEofOnUnclosedQuote = false
@@ -376,7 +377,7 @@ object CLI {
                 out.appendKeyResultLn(key as Key<Any?>, data)
 
 
-                // Add newline at newlinePoint if key result contains newlines (other than the last one)
+                // Add a newline at newlinePoint if key result contains newlines (other than the last one)
                 if (out.indexOf('\n', newlinePoint) != out.length - 1) {
                     out.insert(newlinePoint, '\n')
                 }
@@ -563,7 +564,7 @@ object CLI {
                     }
 
                     for (project in AllProjects.values) {
-                        for (holder in project.projectScope.bindingHolders) {
+                        for (holder in project.baseHolders) {
                             exploreForHolders(holder)
                         }
                     }
@@ -671,7 +672,7 @@ object CLI {
 
             var bindings = 0
             for ((_, project) in AllProjects) {
-                val cleared = project.projectScope.cleanCache()
+                val cleared = project.scopeCache.values.sumBy { it.cleanCache() }
                 LOG.debug("Cleared {} items from {}", cleared, project)
                 bindings += cleared
             }

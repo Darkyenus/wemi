@@ -20,6 +20,7 @@ import wemi.util.writeObject
 import wemi.util.writeValue
 import java.nio.file.Path
 import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
 
 typealias InputKey = String
 typealias InputKeyDescription = String
@@ -93,11 +94,17 @@ class Key<V> internal constructor(
     }
 }
 
+private val nextConfigDimensionID = AtomicInteger(0)
+
 /**
  * Configuration is a layer of bindings that can be added to the [Scope].
  *
  * Configuration's bound values is the sum of it's [parent]'s values and own values, where own ones override
  * parent ones, if any.
+ *
+ * A tree formed by a [Configuration].[parent] hierarchy is called a "configuration axis".
+ * In [Scope], each configuration axis can appear only once - layering in new configurations from the same
+ * axis will replace the previous configuration.
  *
  * @param name of the configuration. Specified by the variable name this configuration was declared at.
  * @param description to be displayed in the CLI as help
@@ -109,6 +116,9 @@ class Configuration internal constructor(val name: String,
                                          val description: String,
                                          val parent: Configuration?)
     : BindingHolder(), JsonWritable {
+
+    /** Top-most parent. Just a cache for easier lookup. */
+    internal val axis:Int = parent?.axis ?: nextConfigDimensionID.getAndIncrement()
 
     /** @return [name] */
     override fun toString(): String {
@@ -178,37 +188,79 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         writeValue(name, String::class.java)
     }
 
-    /**
-     * Scope for this [Project]. This is where scopes start.
-     *
-     * @see evaluate to use this
-     */
-    internal val projectScope: Scope = run {
-        val holders = ArrayList<BindingHolder>(1 + archetypes.size * 2) // approximation
-        holders.add(this)
+    internal val baseHolders:List<BindingHolder> = ArrayList<BindingHolder>().apply {
+        add(this@Project)
 
-        // Iterate through archetypes, most important first, reversed afterwards
+        // Iterate through archetypes, most important first
         var i = archetypes.lastIndex
         while (i >= 0) {
             var archetype = archetypes[i--]
 
             while (true) {
-                holders.add(archetype)
+                add(archetype)
                 archetype = archetype.parent ?: break
             }
         }
 
-        Scope(name, null, holders, null)
+        reverse()
     }
+
+    private fun filterConfigurations(configurations:List<Configuration>):List<Configuration> {
+        val result = ArrayList<Configuration>(configurations.size)
+        val usedAxes = BitSet()
+        var i = configurations.lastIndex
+        while (i > 0) {
+            val config = configurations[i]
+            if (!usedAxes[config.axis]) {
+                result.add(config)
+                usedAxes[config.axis] = true
+            }
+            i--
+        }
+        result.reverse()
+        return result
+    }
+
+    private fun addScopeHolderElementsFor(configuration:Configuration, addTo:MutableList<BindingHolder>, existingChain:List<BindingHolder>) {
+        if (configuration.parent != null) {
+            addScopeHolderElementsFor(configuration.parent, addTo, existingChain)
+        }
+
+        addTo.add(configuration)
+        for (holder in existingChain) {
+            addTo.add(holder.configurationExtensions[configuration] ?: continue)
+        }
+    }
+
+    private fun createScope(configurations:List<Configuration>):Scope {
+        val holders = ArrayList<BindingHolder>()
+        holders.addAll(baseHolders)
+
+        for (configuration in configurations) {
+            /*
+            Scope for configuration consists of flattened BindingHolders, and a given parent scope.
+            Then the configuration's parents are layered on top:
+            1. From oldest ancestor of [configuration] to [configuration]
+                1. Take it (some configuration) and add it
+                2. If any holder which already exists extends it, add it on top
+             */
+
+            val newHolders = ArrayList<BindingHolder>()
+            addScopeHolderElementsFor(configuration, newHolders, holders)
+            holders.addAll(newHolders)
+        }
+        holders.reverse()
+
+        return Scope(this, configurations, holders)
+    }
+
+    internal val scopeCache = HashMap<List<Configuration>, Scope>()
 
     /** Create base [Scope] in which evaluation tree for this [Project] can start. */
     @PublishedApi
-    internal fun scopeFor(vararg configurations:Configuration):Scope {
-        var scope = projectScope
-        for (config in configurations) {
-            scope = scope.scopeFor(config)
-        }
-        return scope
+    internal fun scopeFor(configurations:List<Configuration>):Scope {
+        val filteredConfigurations = filterConfigurations(configurations)
+        return scopeCache.getOrPut(filteredConfigurations) { createScope(filteredConfigurations) }
     }
 
     /**
@@ -223,7 +275,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
     inline fun <Result> evaluate(listener:EvaluationListener?, vararg configurations:Configuration, action:EvalScope.()->Result):Result {
         try {
             evaluateLock()
-            return EvalScope(this.scopeFor(*configurations), NO_CONFIGURATIONS, ArrayList(), ArrayList(), NO_INPUT, listener).run(action)
+            return EvalScope(this.scopeFor(configurations.toList()), ArrayList(), ArrayList(), NO_INPUT, listener).run(action)
         } finally {
             evaluateUnlock()
         }
@@ -304,15 +356,11 @@ class Archetype internal constructor(val name: String, val parent:Archetype?) : 
  * Each scope is internally formed by an ordered list of [BindingHolder]s.
  *
  * @param bindingHolders list of holders contributing to the scope's holder stack. Most significant holders first.
- * @param scopeParent of the scope, only [Project] may have null parent.
  */
 class Scope internal constructor(
-        private val name: String,
-        private val configuration:Configuration?,
-        val bindingHolders: List<BindingHolder>,
-        val scopeParent: Scope?) {
-
-    init { assert((configuration == null) == (scopeParent == null)) }
+        val project:Project,
+        val configurations:List<Configuration>,
+        internal val bindingHolders:List<BindingHolder>) {
 
     private val configurationScopeCache: MutableMap<Configuration, Scope> = HashMap()
 
@@ -320,67 +368,17 @@ class Scope internal constructor(
      * This cache contains only already at-least once evaluated bindings. */
     internal val keyBindingCache:MutableMap<Key<*>, Binding<*>> = HashMap()
 
-    @PublishedApi
-    internal fun scopeFor(configuration: Configuration): Scope {
-        val scopes = configurationScopeCache
-        synchronized(scopes) {
-            return scopes.getOrPut(configuration) {
-                /*
-                Scope for configuration consists of flattened BindingHolders, and a given parent scope.
-                Then the configuration's parents are layered on top:
-                1. From oldest ancestor of [configuration] to [configuration]
-                    1. Take it (some configuration) and add it
-                    2. If any holder which already exists extends it, add it on top
-                 */
-
-                // Most significant are last, least significant are first
-                val newScopeHolders = ArrayList<BindingHolder>()
-
-                val holderStack:List<List<BindingHolder>> = ArrayList<List<BindingHolder>>().apply {
-                    var scope = this@Scope
-                    while (true) {
-                        add(scope.bindingHolders)
-                        scope = scope.scopeParent ?: break
-                    }
-                    reverse()
-                }
-
-                fun addScopeHolderElementsFor(configuration:Configuration, addTo:MutableList<BindingHolder>, existingChain:List<List<BindingHolder>>) {
-                    if (configuration.parent != null) {
-                        addScopeHolderElementsFor(configuration.parent, addTo, existingChain)
-                    }
-
-                    addTo.add(configuration)
-                    for (holders in existingChain) {
-                        for (holder in holders) {
-                            addTo.add(holder.configurationExtensions[configuration] ?: continue)
-                        }
-                    }
-                }
-
-                addScopeHolderElementsFor(configuration, newScopeHolders, holderStack)
-                newScopeHolders.reverse()
-
-                Scope(configuration.name, configuration, newScopeHolders, this)
-            }
-        }
-    }
-
     private fun <T> createElementaryKeyBinding(key:Key<T>, listener:EvaluationListener?):Binding<T>? {
         val boundValue: Value<T>?
-        val boundValueOriginScope: Scope?
         val boundValueOriginHolder: BindingHolder?
         val allModifiersReverse = ArrayList<ValueModifier<T>>()
 
-        var scope: Scope = this
-
-        searchForBoundValue@while (true) {
+        searchForBoundValue@do {
             // Retrieve the holder
-
-            for (holder in scope.bindingHolders) {
+            for (holder in bindingHolders) {
                 val holderModifiers = holder.modifierBindings[key]
                 if (holderModifiers != null && holderModifiers.isNotEmpty()) {
-                    listener?.keyEvaluationHasModifiers(scope, holder, holderModifiers.size)
+                    listener?.keyEvaluationHasModifiers(this, holder, holderModifiers.size)
                     @Suppress("UNCHECKED_CAST")
                     allModifiersReverse.addAllReversed(holderModifiers as ArrayList<ValueModifier<T>>)
                 }
@@ -390,20 +388,19 @@ class Scope internal constructor(
                     @Suppress("UNCHECKED_CAST")
                     boundValue = boundValueCandidate as Value<T>
                     boundValueOriginHolder = holder
-                    boundValueOriginScope = scope
                     break@searchForBoundValue
                 }
             }
 
-            scope = scope.scopeParent ?: if (key.hasDefaultValue) {
+            if (key.hasDefaultValue) {
                 boundValue = null
                 boundValueOriginHolder = null
-                boundValueOriginScope = null
                 break@searchForBoundValue
             } else {
                 return null
             }
-        }
+
+        } while(@Suppress("UNREACHABLE_CODE") false)
 
         val modifiers:Array<ValueModifier<T>> =
                 if (allModifiersReverse.size == 0) {
@@ -412,7 +409,7 @@ class Scope internal constructor(
                 } else Array(allModifiersReverse.size) {
                     allModifiersReverse[allModifiersReverse.size - it - 1]
                 }
-        return Binding(key, boundValue, modifiers, boundValueOriginScope, boundValueOriginHolder)
+        return Binding(key, boundValue, modifiers, this, boundValueOriginHolder)
     }
 
     internal fun <T> getKeyBinding(key:Key<T>, listener:EvaluationListener?):Binding<T>? {
@@ -423,37 +420,6 @@ class Scope internal constructor(
         }
 
         return createElementaryKeyBinding(key, listener)
-    }
-
-    /** @return [Project] that is at the root of this [Scope] */
-    fun scopeProject():Project {
-        // Project is always in the scope without parent
-        var scope = this
-        while (true) {
-            scope = scope.scopeParent ?: break
-        }
-        for (holder in scope.bindingHolders) {
-            // Should be the last one...
-            if (holder is Project) {
-                return holder
-            }
-        }
-        throw IllegalStateException("No Project in Scope")
-    }
-
-    /** @return List of [Configuration]s that created this [Scope]. */
-    fun scopeConfigurations():List<Configuration> {
-        if (configuration == null) {
-            return emptyList()
-        }
-        val result = ArrayList<Configuration>()
-        var scope = this
-        while (true) {
-            result.add(scope.configuration ?: break)
-            scope = scope.scopeParent ?: break
-        }
-        result.reverse()
-        return result
     }
 
     /**
@@ -467,42 +433,29 @@ class Scope internal constructor(
         return sum
     }
 
-    private fun buildToString(sb: StringBuilder) {
-        scopeParent?.buildToString(sb)
-        sb.append(name)
-        if (scopeParent == null) {
-            sb.append('/')
-        } else {
-            sb.append(':')
-        }
-    }
-
-    /**
-     * @return scope in the standard syntax, i.e. project/config1:config2:
-     */
+    /** @return scope in the standard syntax, i.e. project/config1:config2 */
     override fun toString(): String {
         val sb = StringBuilder()
-        buildToString(sb)
+        sb.append(project.name)
+        for ((i, configuration) in configurations.withIndex()) {
+            sb.append(if (i == 0) '/' else ':').append(configuration.name)
+        }
         return sb.toString()
     }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
+        if (other !is Scope) return false
 
-        other as Scope
-
-        if (name != other.name) return false
-        if (bindingHolders != other.bindingHolders) return false
-        if (scopeParent != other.scopeParent) return false
+        if (project != other.project) return false
+        if (configurations != other.configurations) return false
 
         return true
     }
 
     override fun hashCode(): Int {
-        var result = name.hashCode()
-        result = 31 * result + bindingHolders.hashCode()
-        result = 31 * result + (scopeParent?.hashCode() ?: 0)
+        var result = project.hashCode()
+        result = 31 * result + configurations.hashCode()
         return result
     }
 }
@@ -583,24 +536,6 @@ sealed class BindingHolder : WithDescriptiveString {
         extension.locked = false
         extension.initializer()
         extension.locked = true
-    }
-
-    /**
-     * [extend] multiple configurations at the same time.
-     * ```
-     * extendMultiple(a, b, c, init)
-     * ```
-     * is equivalent to
-     * ```
-     * extend(a, init)
-     * extend(b, init)
-     * extend(c, init)
-     * ```
-     */
-    fun extendMultiple(vararg configurations: Configuration, initializer: ConfigurationExtension.() -> Unit) {
-        for (configuration in configurations) {
-            extend(configuration, initializer)
-        }
     }
 
     //region Modify utility methods
