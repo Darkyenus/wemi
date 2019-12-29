@@ -34,7 +34,7 @@ class DirectorySynchronizedTests {
         val processes = Array(PROCESSES) { i ->
             val command = ArrayList<String>()
             command.add("java")
-            command.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=${5005 + i}")
+            command.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=${5050 + i}")
             command.add("-cp")
             command.add(System.getProperty("java.class.path"))
             command.add(DirectorySynchronizedMain::class.java.name)

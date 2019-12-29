@@ -25,15 +25,12 @@ internal const val TEST_LAUNCHER_OUTPUT_PREFIX = "WEMI-TEST-HARNESS-OUTPUT: "
 @Json(TestReport.Serializer::class)
 class TestReport : LinkedHashMap<TestIdentifier, TestData>(), WithExitCode {
 
-    /**
-     * Returns [wemi.boot.EXIT_CODE_SUCCESS] when all tests are either successful or skipped.
-     * [wemi.boot.EXIT_CODE_TASK_FAILURE] otherwise.
-     */
+    /** Returns [wemi.boot.EXIT_CODE_SUCCESS] when no tests failed, [wemi.boot.EXIT_CODE_TASK_FAILURE] otherwise. */
     override fun processExitCode(): Int {
-        if (values.all { it.status == TestStatus.SUCCESSFUL || it.status == TestStatus.SKIPPED }) {
-            return wemi.boot.EXIT_CODE_SUCCESS
+        if (values.any { it.status == TestStatus.FAILED }) {
+            return wemi.boot.EXIT_CODE_TASK_FAILURE
         }
-        return wemi.boot.EXIT_CODE_TASK_FAILURE
+        return wemi.boot.EXIT_CODE_SUCCESS
     }
 
     internal class Serializer : JsonSerializer<TestReport> {
