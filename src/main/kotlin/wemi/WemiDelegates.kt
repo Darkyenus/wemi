@@ -158,7 +158,7 @@ class KeyDelegate<V> internal constructor(
         private val hasDefaultValue: Boolean,
         private val defaultValue: V?,
         private val inputKeys: Array<Pair<InputKey, InputKeyDescription>>,
-        private val prettyPrinter: ((V) -> CharSequence)?) : ReadOnlyProperty<Any?, Key<V>> {
+        private val prettyPrinter: PrettyPrinter<V>?) : ReadOnlyProperty<Any?, Key<V>> {
 
     private lateinit var key: Key<V>
 

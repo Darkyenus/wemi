@@ -48,7 +48,7 @@ object Keys {
     val libraryDependencies by key<Set<Dependency>>("Libraries that the project depends on", defaultValue = emptySet())
     val libraryDependencyMapper by key<(Dependency) -> Dependency>("Function applied to transitive Dependency-ies encountered while resolving. Used for example when retrieving sources.", defaultValue = { it })
     val resolvedLibraryScopes by key<Set<String>>("Allowed scopes of libraries returned by resolvedLibraryDependencies. Empty = all.", defaultValue = emptySet())
-    val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved ->
+    val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved, _ ->
         resolved.value.prettyPrint(null)
     })
     val unmanagedDependencies by key<List<LocatedPath>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = emptyList())
@@ -76,7 +76,7 @@ object Keys {
     val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code", inputKeys = arrayOf("main" to "Main class to run"))
 
     val testParameters by key<TestParameters>("Parameters for the test key. By default discovers all tests in the test sources.", inputKeys = arrayOf("class" to "Include classes, whose fully classified name match this regex"))
-    val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it.prettyPrint() })
+    val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it, _ -> it.prettyPrint() })
 
     val archiveOutputFile by key<Path>("File to which archive should be saved to")
     val archiveJavadocOptions by key<List<String>>("Options when archiving Javadoc")
@@ -92,7 +92,7 @@ object Keys {
 
     val assemblyMergeStrategy by key<MergeStrategyChooser>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
     val assemblyRenameFunction by key<RenameFunction>("Function for renaming assembled duplicate files for which merge strategy is Rename. Paths after rename must not conflict, rules are not recursive.")
-    val assemblyMapFilter by key<AssemblyMapFilter>("Function that allows to control what gets into the resulting archive on a fine grained level.", defaultValue = DefaultAssemblyMapFilter)
+    val assemblyMapFilter by key<AssemblyMapFilter>("Function that allows controlling what gets into the resulting archive on a fine-grained level.", defaultValue = DefaultAssemblyMapFilter)
     val assemblyPrependData by key<ByteArray>("Data to prepend to the jar created by assembly task", defaultValue = ByteArray(0))
     val assemblyOutputFile by key<Path>("File to which assembled jar should be saved")
     val assembly by key<Path>("Assembly the project and its dependencies into a fat jar")

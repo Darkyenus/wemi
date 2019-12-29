@@ -2,6 +2,7 @@ package wemi.util
 
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
+import wemi.PrettyPrinter
 import wemi.boot.WemiRootFolder
 import wemi.util.FileSet.Pattern
 import java.io.IOException
@@ -153,10 +154,11 @@ class FileSet(
     }
 }
 
-val FILE_SET_PRETTY_PRINTER : (FileSet?) -> CharSequence = printer@{
-    var set = it ?: return@printer format("empty file set\n", Color.White)
+val FILE_SET_PRETTY_PRINTER : PrettyPrinter<FileSet?> = printer@{ it, maxElements ->
     val sb = StringBuilder()
-    var i = 1
+    var set = it ?: return@printer sb.format(Color.White).append(" (empty file set)").format().append('\n')
+
+    var numberOffset = 0
     while (true) {
         val lineStart = sb.length
         sb.format(Color.Black, format = Format.Bold)
@@ -192,9 +194,10 @@ val FILE_SET_PRETTY_PRINTER : (FileSet?) -> CharSequence = printer@{
             sb.setCharAt(splitter, ' ')
         }
 
-        ownMatchingFiles(set) { path ->
-            sb.format(Color.White).append(i++).append(": ").format().appendPrettyValue(path).append('\n')
-        }
+        val matchingFiles = ArrayList<Path>()
+        ownMatchingFiles(set) { matchingFiles.add(it) }
+        sb.appendPrettyCollection(matchingFiles, maxElements, numberOffset)
+        numberOffset += matchingFiles.size
 
         set = set.next ?: break
     }
@@ -511,7 +514,7 @@ internal fun matches(patterns: Array<out Pattern>, defaultExcludes:Boolean, case
 }
 
 /** Like [matchingFiles], but ignoring [FileSet.next]. */
-private inline fun ownMatchingFiles(fileSet:FileSet, crossinline collect:(Path) -> Unit) {
+private fun ownMatchingFiles(fileSet:FileSet, collect:(Path) -> Unit) {
     val rootAttributes = try {
         Files.readAttributes<BasicFileAttributes>(fileSet.root, BasicFileAttributes::class.java, *NO_LINK_OPTIONS)
     } catch (e: IOException) {

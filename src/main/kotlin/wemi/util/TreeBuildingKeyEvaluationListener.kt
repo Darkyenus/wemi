@@ -17,8 +17,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean, privat
     private var evaluations = 0
 
     override fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {
-        val keyData = KeyData()
-        keyData.fromScope = fromScope
+        val keyData = KeyData(fromScope)
         keyData.heading
                 .format(foreground = Color.Black)
                 .append(fromScope)
@@ -39,18 +38,14 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean, privat
         stack.peekLast().value.features().add(feature)
     }
 
-    override fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder: BindingHolder, amount: Int) {
+    override fun keyEvaluationHasModifiers(modifierFromHolder: BindingHolder, amount: Int) {
         val keyData = stack.peekLast().value
 
         val sb = keyData.body()
         sb.append("\n")
                 .format(foreground = Color.Cyan)
-                .append("Modified at ")
+                .append("Modified by ")
                 .format()
-                .append(modifierFromScope)
-                .format(foreground = Color.Cyan)
-                .append(" by ")
-                .format(foreground = Color.Cyan, format = Format.Underline)
                 .append(modifierFromHolder)
 
         if (amount != 1) {
@@ -73,22 +68,12 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean, privat
         val node = popAndIndent()
         val keyData = node.value
         val h = keyData.heading
-        h.append(CLI.ICON_SUCCESS).format(Color.White).append(" from ").format()
-        when {
-            binding.valueOriginScope == null && binding.valueOriginHolder == null ->
-                h.append("default value")
-            binding.valueOriginScope != null && binding.valueOriginHolder != null -> {
-                h.append(binding.valueOriginScope)
-                if (binding.valueOriginScope.bindingHolders.last() !== binding.valueOriginHolder) {
-                    // Specify which holder only if it isn't nominal
-                    h.format(Color.White).append(" in ").format(format = Format.Underline).append(binding.valueOriginHolder).format()
-                }
-                evaluations++
-            }
-            else -> {
-                // This is unexpected...
-                h.append(binding.valueOriginScope).append(" - ").append(binding.valueOriginHolder)
-            }
+        h.append(CLI.ICON_SUCCESS).format(Color.White).append(" from ")
+        if (binding.valueOriginHolder == null) {
+            h.append("default value").format()
+        } else {
+            h.format().append(binding.valueOriginHolder).format()
+            evaluations++
         }
 
         keyData.features?.let { features ->
@@ -183,15 +168,13 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean, privat
         evaluations = 0
     }
 
-    private class KeyData {
+    private class KeyData(val fromScope:Scope) {
 
         val heading = StringBuilder()
 
         var body: StringBuilder? = null
 
         var features: ArrayList<String>? = null
-
-        var fromScope:Scope? = null
 
         var exception: Throwable? = null
 

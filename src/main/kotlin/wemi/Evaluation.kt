@@ -18,12 +18,10 @@ internal const val LAST_EVALUATED_NEVER = -1
 internal const val LAST_EVALUATED_FORCE_EXPIRED = -2
 
 /** Characterizes found binding of [value] and its [modifiers] for some [key]. */
-class Binding<T>(val key:Key<T>,
+class Binding<T> constructor(val key:Key<T>,
                  /** May be null when default key value is used. */
                  val value:Value<T>?,
                  val modifiers:Array<ValueModifier<T>>,
-                 /** Scope in which [value] was found. Same nullability as [value]. */
-                 val valueOriginScope:Scope?,
                  /** BindingHolder in which [value] was found. Same nullability as [value]. */
                  val valueOriginHolder:BindingHolder?) {
 
@@ -147,7 +145,7 @@ class EvalScope @PublishedApi internal constructor(
     private fun <V : Output, Output> getKeyValue(key: Key<V>, otherwise: Output, useOtherwise: Boolean, input:Array<out Pair<String, String>>): Output {
         ensureNotClosed()
         val listener = progressListener
-        listener?.keyEvaluationStarted(this.scope, key)
+        listener?.keyEvaluationStarted(scope, key)
 
         val binding = scope.getKeyBinding(key, listener)
                 ?: // Use default binding
@@ -156,9 +154,9 @@ class EvalScope @PublishedApi internal constructor(
                     return otherwise
                 } else {
                     listener?.keyEvaluationFailedByNoBinding(false, null)
-                    throw WemiException.KeyNotAssignedException(key, this@EvalScope.scope)
+                    throw WemiException.KeyNotAssignedException(key, scope)
                 }
-        // Record that we used this key to fill current binding information
+        // Record we used this key to fill current binding information
         usedBindings.add(binding)
 
         val bindingFresh = binding.isFresh(input)
@@ -382,11 +380,10 @@ interface EvaluationListener : ActivityListener {
     /**
      * Called when evaluation of key on top of the key evaluation stack will use some modifiers, if it succeeds.
      *
-     * @param modifierFromScope in which scope the modifier has been found
-     * @param modifierFromHolder in which holder inside the [modifierFromScope] the modifier has been found
+     * @param modifierFromHolder in which holder the modifier has been found
      * @param amount of modifiers added from this scope-holder
      */
-    fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder:BindingHolder, amount:Int) {}
+    fun keyEvaluationHasModifiers(modifierFromHolder: BindingHolder, amount: Int) {}
 
     /**
      * Called when evaluation of key on top of the key evaluation stack used some special feature,
@@ -443,9 +440,9 @@ interface EvaluationListener : ActivityListener {
                     second.keyEvaluationStarted(fromScope, key)
                 }
 
-                override fun keyEvaluationHasModifiers(modifierFromScope: Scope, modifierFromHolder: BindingHolder, amount: Int) {
-                    first.keyEvaluationHasModifiers(modifierFromScope, modifierFromHolder, amount)
-                    second.keyEvaluationHasModifiers(modifierFromScope, modifierFromHolder, amount)
+                override fun keyEvaluationHasModifiers(modifierFromHolder: BindingHolder, amount: Int) {
+                    first.keyEvaluationHasModifiers(modifierFromHolder, amount)
+                    second.keyEvaluationHasModifiers(modifierFromHolder, amount)
                 }
 
                 override fun keyEvaluationFeature(feature: String) {

@@ -246,16 +246,17 @@ internal fun StringBuilder.appendPrettyValue(value:Any?, maxCollectionElements:I
     return this
 }
 
-private fun StringBuilder.appendPrettyCollection(collection:Collection<*>, maxCollectionElements:Int):StringBuilder {
+internal fun StringBuilder.appendPrettyCollection(collection:Collection<*>, maxCollectionElements:Int, offset:Int = 0):StringBuilder {
     val size = collection.size
     // Don't skip if it would skip only a single element
-    val firstSkipped = if (size + 1 > maxCollectionElements) maxCollectionElements - 1 else Int.MAX_VALUE
-    val numberWidth = size.toString().length
+    val wouldSkip = size - maxCollectionElements
+    val firstSkipped = if (wouldSkip >= 2) maxCollectionElements - 1 else Int.MAX_VALUE
+    val numberWidth = (size + offset).toString().length
     for ((i, item) in collection.withIndex()) {
         if (i < firstSkipped || i >= size - 1) {
-            this.format(Color.White).appendPadded(i + 1, numberWidth, ' ').append(": ").format().appendPrettyValue(item).append('\n')
+            this.format(Color.White).appendPadded(i + 1 + offset, numberWidth, ' ').append(": ").format().appendPrettyValue(item).append('\n')
         } else if (i == firstSkipped) {
-            this.format(Color.White).append("    (").append(size - maxCollectionElements).append(" elements skipped)").format().append('\n')
+            this.format(Color.White).append("    (").append(wouldSkip).append(" elements skipped)").format().append('\n')
         }
     }
 
@@ -273,7 +274,7 @@ fun <V> StringBuilder.appendKeyResultLn(key: Key<V>, value:V, maxCollectionEleme
     if (prettyPrinter != null) {
         val printed: CharSequence? =
                 try {
-                    prettyPrinter(value)
+                    prettyPrinter(value, maxCollectionElements)
                 } catch (e: Exception) {
                     APPEND_KEY_RESULT_LOG.warn("Pretty-printer for {} failed", key, e)
                     null

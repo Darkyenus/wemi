@@ -25,6 +25,10 @@ import java.util.concurrent.atomic.AtomicInteger
 typealias InputKey = String
 typealias InputKeyDescription = String
 
+/** Generate newline-ended pretty (with ANSI formatting) representation of the object.
+ * Of the object is a collection which makes sense truncated, show only `maxElements` amount of elements. */
+typealias PrettyPrinter<V> = ((V, maxElements:Int) -> CharSequence)
+
 /** Key which can have value of type [V] assigned, through [Project] or [Configuration]. */
 class Key<V> internal constructor(
         /**
@@ -56,9 +60,9 @@ class Key<V> internal constructor(
          * Optional function that can convert the result of this key's evaluation to a more readable
          * or more informative string.
          *
-         * Called when the key is evaluated in CLI top level.
+         * Called when the key is evaluated in CLI top-level.
          */
-        internal val prettyPrinter: ((V) -> CharSequence)?) : WithDescriptiveString, JsonWritable, Comparable<Key<*>> {
+        internal val prettyPrinter: PrettyPrinter<V>?) : WithDescriptiveString, JsonWritable, Comparable<Key<*>> {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -376,7 +380,7 @@ class Scope internal constructor(
             for (holder in bindingHolders) {
                 val holderModifiers = holder.modifierBindings[key]
                 if (holderModifiers != null && holderModifiers.isNotEmpty()) {
-                    listener?.keyEvaluationHasModifiers(this, holder, holderModifiers.size)
+                    listener?.keyEvaluationHasModifiers(holder, holderModifiers.size)
                     @Suppress("UNCHECKED_CAST")
                     allModifiersReverse.addAllReversed(holderModifiers as ArrayList<ValueModifier<T>>)
                 }
@@ -407,7 +411,7 @@ class Scope internal constructor(
                 } else Array(allModifiersReverse.size) {
                     allModifiersReverse[allModifiersReverse.size - it - 1]
                 }
-        return Binding(key, boundValue, modifiers, this, boundValueOriginHolder)
+        return Binding(key, boundValue, modifiers, boundValueOriginHolder)
     }
 
     internal fun <T> getKeyBinding(key:Key<T>, listener:EvaluationListener?):Binding<T>? {
