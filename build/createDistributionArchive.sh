@@ -30,7 +30,7 @@ log "Wemi version: $wemi_version"
 export BUILT_WEMI_VERSION="$wemi_version"
 
 # Build the archive files in Wemi
-./wemi 'clean; test; clean; distributionArchive'
+./wemi 'clean; test; clean; distributionArchive' || fail "wemi ($?)"
 
 # Create empty output directory
 dist_dir="${wemi_home}/build/dist"
