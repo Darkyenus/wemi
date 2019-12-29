@@ -84,7 +84,7 @@ fun wemiDirectoryToImport(base: VirtualFile): VirtualFile? {
 
 class WemiLauncher internal constructor(val file: Path, private val windowsShellExecutable:String) {
 
-    /** Wemi launchers pre-0.10 were self contained Jars and were launched differently. */
+    /** Wemi launchers pre-0.10 were self-contained Jars and were launched differently. */
     private val versionPre010:Boolean by lazy {
         val result = try {
             ZipFile(file.toFile()).close()
@@ -122,74 +122,8 @@ class WemiLauncher internal constructor(val file: Path, private val windowsShell
         WEMI_FORKED_PROCESSES
     }
 
-    private fun pre010_createWemiProcess(
-            options: WemiLauncherOptions,
-            color:Boolean, unicode:Boolean,
-            arguments:List<String>, tasks:List<Array<String>>,
-            debugPort:Int, debugConfig: DebugScheme,
-            pty:Boolean) : Pair<Process, String> {
-        val env = HashMap<String, String>()
-        if (options.passParentEnvironmentVariables) {
-            env.putAll(EnvironmentUtil.getEnvironmentMap())
-        }
-        env["WEMI_COLOR"] = color.toString()
-        env["WEMI_UNICODE"] = unicode.toString()
-        env.putAll(options.environmentVariables)
-
-        val commandLine = ArrayList<String>()
-        if (options.javaExecutable.isNotBlank()) {
-            commandLine.add(options.javaExecutable)
-        } else {
-            commandLine.add("java")
-        }
-        commandLine.addAll(options.javaOptions)
-
-        when (debugConfig) {
-            DebugScheme.WEMI_BUILD_SCRIPTS -> {
-                commandLine.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=$debugPort")
-            }
-            DebugScheme.WEMI_FORKED_PROCESSES -> {
-                env["WEMI_RUN_DEBUG_PORT"] = debugPort.toString()
-            }
-            DebugScheme.DISABLED -> {}
-        }
-
-        commandLine.add("-jar")
-        commandLine.add(file.toAbsolutePath().toString())
-
-        commandLine.addAll(arguments)
-
-        for ((i, task) in tasks.withIndex()) {
-            commandLine.addAll(task)
-            if (i + 1 < tasks.size) {
-                commandLine.add(";")
-            }
-        }
-
-        if (pty) {
-            val builder = PtyProcessBuilder()
-            builder.setDirectory(file.toAbsolutePath().parent.toString())
-            builder.setCygwin(true)
-            builder.setEnvironment(env)
-            builder.setWindowsAnsiColorEnabled(false) // We don't emit those
-            builder.setCommand(commandLine.toTypedArray())
-            builder.setRedirectErrorStream(false)
-            builder.setConsole(true)
-            return builder.start() to commandLine.joinToString(" ")
-        } else {
-            val builder = ProcessBuilder()
-            builder.directory(file.toAbsolutePath().parent.toFile())
-            builder.environment().putAll(env)
-            builder.command(commandLine)
-            builder.redirectInput(ProcessBuilder.Redirect.PIPE)
-            builder.redirectOutput(ProcessBuilder.Redirect.PIPE)
-            builder.redirectError(ProcessBuilder.Redirect.PIPE)
-            return builder.start() to commandLine.joinToString(" ")
-        }
-    }
-
     /**
-     * @param pty whether or not a [com.pty4j.PtyProcess] should be created. This is needed for Intellij terminal, but
+     * @param pty whether a [com.pty4j.PtyProcess] should be created. This is needed for Intellij terminal, but
      *            its implementation could be buggy for some byte-sensitive operations
      */
     fun createWemiProcess(options: WemiLauncherOptions,
@@ -198,7 +132,7 @@ class WemiLauncher internal constructor(val file: Path, private val windowsShell
                                   debugPort:Int, debugConfig: DebugScheme,
                                   pty:Boolean) : Pair<Process, String> {
         if (versionPre010) {
-            return pre010_createWemiProcess(options, color, unicode, arguments, tasks, debugPort, debugConfig, pty)
+            throw UnsupportedOperationException("Wemi at $file is too old (<0.10) and is not supported")
         }
 
         val env = HashMap<String, String>()
@@ -264,27 +198,6 @@ class WemiLauncher internal constructor(val file: Path, private val windowsShell
     }
 
     fun getClasspathSourceEntries(options:WemiLauncherOptions):List<Path> {
-        if (versionPre010) {
-            try {
-                ZipFile(file.toFile()).use { zipFile ->
-                    val sourceEntry = zipFile.getEntry("source.zip")
-                    if (sourceEntry != null) {
-                        val sourcesPath = file.parent.resolve("build/cache/wemi-libs-ide/wemi-source.jar")
-
-                        // Extract sources
-                        zipFile.getInputStream(sourceEntry).use { ins ->
-                            Files.copy(ins, sourcesPath)
-                        }
-
-                        return listOf(sourcesPath.toAbsolutePath())
-                    }
-                }
-            } catch (t:Throwable) {
-                LOG.warn("Failed to retrieve Wemi sources", t)
-                return emptyList()
-            }
-        }
-
         return wemiHome(options)?.let { wemiHome ->
             try {
                 Files.list(wemiHome.resolve("sources")).collect(Collectors.toList())

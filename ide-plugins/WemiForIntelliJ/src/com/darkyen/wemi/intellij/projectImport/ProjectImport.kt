@@ -328,6 +328,9 @@ private fun gatherWemiProjectData(launcher:WemiLauncher, options: ProjectImportO
 			val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
 			LOG.info("Wemi version is $wemiVersion")
 			session.wemiVersion = Version(wemiVersion)
+			if (session.wemiVersion < Version.WEMI_0_11) {
+				LOG.warn("Wemi versions smaller than 0.11 are not supported")
+			}
 		}
 
 		val resolvedProject: ProjectNode
@@ -552,22 +555,11 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 
 private fun createWemiProjectData(session: WemiLauncherSession, projectName:String):WemiProjectData {
 	val compilerOptions = session.jsonArray(projectName, task = "compilerOptions").arrayToMap()
-	val sourceRoots: Array<Path>
-	val resourceRoots: Array<Path>
-	val sourceRootsTesting: Array<Path>
-	val resourceRootsTesting: Array<Path>
 
-	if (session.wemiVersion < Version.WEMI_0_7) {
-		sourceRoots = session.stringArray(projectName, task = "sourceRoots").map { Paths.get(it) }.toTypedArray()
-		resourceRoots = session.stringArray(projectName, task = "resourceRoots").map { Paths.get(it) }.toTypedArray()
-		sourceRootsTesting = session.stringArray(projectName, "testing", task = "sourceRoots").map { Paths.get(it) }.toTypedArray()
-		resourceRootsTesting = session.stringArray(projectName, "testing", task = "resourceRoots").map { Paths.get(it) }.toTypedArray()
-	} else {
-		sourceRoots = session.jsonArray(projectName, task = "sources", orNull = true).fileSetRoots()
-		resourceRoots = session.jsonArray(projectName, task = "resources", orNull = true).fileSetRoots()
-		sourceRootsTesting = session.jsonArray(projectName, "testing", task = "sources", orNull = true).fileSetRoots()
-		resourceRootsTesting = session.jsonArray(projectName, "testing", task = "resources", orNull = true).fileSetRoots()
-	}
+	val sourceRoots: Array<Path> = session.jsonArray(projectName, task = "sources", orNull = true).fileSetRoots()
+	val resourceRoots: Array<Path> = session.jsonArray(projectName, task = "resources", orNull = true).fileSetRoots()
+	val sourceRootsTesting: Array<Path> = session.jsonArray(projectName, "testing", task = "sources", orNull = true).fileSetRoots()
+	val resourceRootsTesting: Array<Path> = session.jsonArray(projectName, "testing", task = "resources", orNull = true).fileSetRoots()
 
 	return WemiProjectData(
 			projectName,
@@ -590,41 +582,19 @@ private fun createWemiProjectDependencies(session: WemiLauncherSession, projectN
 	}
 
 	try {
-		if (session.wemiVersion < Version.WEMI_0_8) {
-			// ResolvedDependency contained map of generic attributes, which could also contain a classifier.
-			// This was flattened in 0.8 and classifier is now a direct (optional) property.
-			// Similarly, artifact path structure has been simplified.
-			session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies?", orNull = true).get("value")?.forEach { resolvedValue ->
-				val projectId = resolvedValue.get("key")
-				val artifact = resolvedValue.get("value")?.get("data")?.find { it.getString("name") == "artifactFile" }?.get("value")?.asString()
-						?: return@forEach
+		session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies?", orNull = true).get("value")?.forEach { resolvedValue ->
+			val projectId = resolvedValue.get("key")
+			val group = projectId.getString("group")!!
+			val name = projectId.getString("name")!!
+			val version = projectId.getString("version")!!
+			val classifier = projectId.getString("classifier", "")!!
 
-				val group = projectId.getString("group")!!
-				val name = projectId.getString("name")!!
-				val version = projectId.getString("version")!!
-				val classifier = projectId.get("attributes").find { it.getString("key") == "m2-classifier" }?.get("value")?.asString()
-						?: ""
+			val artifact = resolvedValue.get("value")?.getString("artifact", null) ?: return@forEach
 
-				add("$group:$name:$version",
-						WemiLibraryDependency(
-								"$group:$name:$version${if (classifier.isBlank()) "" else "-$classifier"}",
-								Paths.get(artifact).toAbsolutePath().normalize()))
-			}
-		} else {
-			session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies?", orNull = true).get("value")?.forEach { resolvedValue ->
-				val projectId = resolvedValue.get("key")
-				val group = projectId.getString("group")!!
-				val name = projectId.getString("name")!!
-				val version = projectId.getString("version")!!
-				val classifier = projectId.getString("classifier", "")!!
-
-				val artifact = resolvedValue.get("value")?.getString("artifact", null) ?: return@forEach
-
-				add("$group:$name:$version",
-						WemiLibraryDependency(
-								"$group:$name:$version${if (classifier.isBlank()) "" else "-$classifier"}",
-								Paths.get(artifact).toAbsolutePath().normalize()))
-			}
+			add("$group:$name:$version",
+					WemiLibraryDependency(
+							"$group:$name:$version${if (classifier.isBlank()) "" else "-$classifier"}",
+							Paths.get(artifact).toAbsolutePath().normalize()))
 		}
 
 		session.jsonArray(projectName, *config, task = "unmanagedDependencies?", orNull = true).forEach {
