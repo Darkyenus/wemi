@@ -1,4 +1,12 @@
 # 0.11
+- JUnit dependencies are now bundled by default, you don't have to add them manually
+    - They are hidden in `testing` configuration
+- Better resource handling in aggregate archetype
+- `compilingJava` and `compilingKotlin` configurations are gone. Compiler flags can be set directly.
+- Configuration hierarchies now form *configuration axis* which are mutualy exclusive
+- Exit on first error when running non-interactively
+- Ability to limit amount of printed collection elements, example: `trace elements=5 compile`
+- Bug fixes
 
 # 0.10 2019-12-28
 - New distribution scheme - launcher is now a shell script, not a fat-jar
