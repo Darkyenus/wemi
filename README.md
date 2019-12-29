@@ -8,15 +8,14 @@ Key features:
 - Simple and expressive
 	- Build scripts in Kotlin allow to easily create any functionality with Wemi's DSL, usually in just a few lines of code
 	- Convention dominates default settings, but everything is easily reconfigurable
-	- Transparent internal structure without magic is easy to debug and understand
+	- Internal structure is easy to debug and understand (try `./wemi "trace run"`!)
 - No installation, simple upgrades
-	- Whole build system is in single executable (~5MB) that goes directly into the project's directory
+	- Whole build system is bootstrapped from a simple launcher script which goes directly into the project's directory
 - Fast
-	- Written with performance and your valuable time in mind
+	- Written with performance in mind
 	- Minimal use of libraries means that the code does exactly what it should be, and nothing more
-- Works
-- Out of the box supports:
-	- Java and Kotlin compiling
+- Out of the box support for:
+	- Java and Kotlin
 	- Javadoc, Dokka
 	- JUnit 5
 	- Artifact assembling (including fat-jars) and publishing
@@ -30,37 +29,30 @@ val iceCreamFactory by project {
     projectVersion set { "1.0" }
 
     libraryDependencies add { dependency("com.example", "ice-provider", "2.1.1") }
-    libraryDependencies add { dependency("com.example", "flavor-provider", "2.0.0") }
-    
-    extend(testing) {
-        libraryDependencies add { JUnitAPI }
-        libraryDependencies add { JUnitEngine }
-        libraryDependencies add { dependency("com.example", "flavor-tester", "2.0.0") }
-    }
+    libraryDependencies add { dependency("com.example", "flavor-provider", "2.0.0", scope=ScopeProvided) }
 
     mainClass set { "com.example.ice.cream.Main" }
 }
 ```
 Whole configuration is stored in key-value pairs, including tasks - there is no distinction between keys that store 
-simple static settings and those that store computations. So, for example `libraryDependencies` key binds collection
+simple static settings, and those that store computations. For example `libraryDependencies` key binds collection
 of Maven library coordinates, and `compile` key binds a code that collects settings from other keys, like library jars
 and source files, and invokes the compiler. These dependencies are easily seen with `trace` command.
 
 Key-value entries are not stored globally, but in scopes. Scope is composed of a project and one or more configurations.
-For example, in the example above, `JUnitAPI` dependency is added to the `iceCreamFactory/testing` scope, which,
-as name suggests, is used when executing unit tests.
+See documentation for more info about configurations.
 
 Keys have sensible defaults bound to them in the relevant scopes. You can also easily declare your own keys and configurations.
 
 ## Getting started
 While the project is still work in progress and far from being production ready,
-you are welcome to try it out! However remember that everything is subject to change,
+you are welcome to try it out! However, remember that everything is subject to change,
 so don't get too attached to any of the features or bugs.
 
-1. Start by downloading `wemi` launcher (= the whole build system) and IntelliJ plugin from the releases.
-If you don't use IntelliJ, don't worry, Wemi is designed to be used standalone anyway.
-2. Then put downloaded `wemi` file directly into the root of your project (see below if that seems weird).
-3. Create a build script, in `<your-project-root>/build/build.kt`, with following lines:
+1. Download the `wemi` launcher and put it into the root directory of your project
+    - If you use IntelliJ IDEA IDE, download the [plugin](https://plugins.jetbrains.com/plugin/12716-wemi/) instead.
+    Then open `Tools` and `Convert to Wemi Project` or create a new project and `Install Wemi launcher`.
+2. Create/edit a build script, in `<your-project-root>/build/build.kt`, with following lines:
 ```kotlin
 // myProject here can be whatever you want, it is the name by which Wemi will refer to your project
 val myProject by project {
@@ -80,19 +72,19 @@ val myProject by project {
 Things like `projectGroup` or `mainClass` above, are keys. Setting any of them is optional, most of them have
 sensible default values. There is more to them, check the [design documentation](docs/DESIGN.md).
 
-4. Now you have a build script that can compile and run Java and Kotlin projects. Add your sources to 
+3. Now you have a build script that can compile and run Java and Kotlin projects. Add your sources to 
 `<your-project-root>/src/main/java` and/or `<your-project-root>/src/main/kotlin`.
 Dependency on Kotlin's standard library is added by default (if you do not want that, add line 
-`libraryDependencies set { emptyList() }`, or change the project's archetype to `wemi.Archetypes.JavaProject`
+`libraryDependencies set { emptyList() }`, or change the project's archetype - `by project(wemi.Archetypes.JavaProject)` -
 if you don't want Kotlin at all).
-5. Run it! Open your shell with `bash`/`sh` support (sorry, `cmd.exe` won't do) and in your project's root directory, type `./wemi run`.
+4. Run it! Open your shell with `bash`/`sh` support (sorry, `cmd.exe` won't do) and in your project's root directory, type `./wemi run`.
 This will compile the sources, with specified libraries on classpath, and run the specified main class. 
 
 Running `./wemi` by itself will start an interactive session for your tasks. This is actually preferred,
-at least when developing, because the compile times are often much shorter.
+at least when developing, because compile times are often much shorter.
 Type `help` to see what you can do and feel free to experiment.
 
-Also check out examples in [test repositories](test%20repositories) and
+Check out examples in [test repositories](test-repositories) and
 the [design document](docs/DESIGN.md) with detailed documentation of Wemi's inner workings.
 
 ## Contributing & License
