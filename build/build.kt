@@ -17,6 +17,7 @@ import wemi.dependency.ProjectDependency
 import wemi.expiresWith
 import wemi.key
 import wemi.publish.InfoNode
+import wemi.test.JUnitPlatformLauncher
 import wemi.util.FileSet
 import wemi.util.ensureEmptyDirectory
 import wemi.util.name
@@ -120,7 +121,7 @@ val core:Project by project {
         ) }
 
     /* Used ONLY in wemi.test.forked.TestLauncher */
-    libraryDependencies add { dependency("org.junit.platform", "junit-platform-launcher", "1.0.2", scope=ScopeProvided) }
+    libraryDependencies add { Dependency(JUnitPlatformLauncher, scope=ScopeProvided) }
 
     compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
     compilerOptions[KotlinCompilerFlags.incremental] = { true }

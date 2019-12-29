@@ -15,7 +15,7 @@ import wemi.util.*
  *          internal classpath when creating artifact archive. If `false`, this dependency will have to be
  *          represented through metadata and both projects will have to be archived separately.
  */
-class ProjectDependency(val project: Project, val aggregate:Boolean, vararg val configurations: Configuration, val scope:Scope = DEFAULT_SCOPE)
+class ProjectDependency(val project: Project, val aggregate:Boolean, vararg val configurations: Configuration, val scope:DepScope = DEFAULT_SCOPE)
     : JsonWritable {
 
     override fun JsonWriter.write() {

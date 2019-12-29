@@ -64,14 +64,14 @@ val ScopeTest
     inline get() = wemi.dependency.ScopeTest
 
 fun dependency(group: String, name: String, version: String,
-               classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:wemi.dependency.Scope = DEFAULT_SCOPE,
+               classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:wemi.dependency.DepScope = DEFAULT_SCOPE,
                optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION,
                exclusions:List<DependencyExclusion> = emptyList(),
                dependencyManagement:List<Dependency> = emptyList()): Dependency =
         wemi.dependency(group, name, version, classifier, type, scope, optional, snapshotVersion, exclusions, dependencyManagement)
 
 fun dependency(groupNameVersionClassifierType: String,
-               scope:wemi.dependency.Scope = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL,
+               scope:wemi.dependency.DepScope = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL,
                exclusions:List<DependencyExclusion> = emptyList(),
                snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION,
                dependencyManagement:List<Dependency> = emptyList()): Dependency =

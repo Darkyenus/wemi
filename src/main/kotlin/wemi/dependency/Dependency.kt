@@ -18,7 +18,16 @@ typealias Classifier = String
 
 /** Artifacts scope.
  * See https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope */
-typealias Scope = String
+typealias DepScope = String
+
+/** Check whether [scope] is in [scopeSet]. Empty [scopeSet] contains all scopes.
+ * See [wemi.Keys.resolvedLibraryScopes] */
+infix fun DepScope.scopeIn(scopeSet:Set<DepScope>):Boolean {
+    if (scopeSet.isEmpty()) {
+        return true
+    }
+    return this in scopeSet
+}
 
 /** Concatenate two classifiers. */
 fun joinClassifiers(first:Classifier, second:Classifier):Classifier {
@@ -38,16 +47,16 @@ const val JavadocClassifier: Classifier = "javadoc"
 
 /** Available during compilation and runtime of both project itself and tests.
  * Available transitively. */
-const val ScopeCompile: Scope = "compile"
+const val ScopeCompile: DepScope = "compile"
 /** Available only on compilation and test classpath. */
-const val ScopeProvided: Scope = "provided"
+const val ScopeProvided: DepScope = "provided"
 /** Available for running and for testing, not for compilation. */
-const val ScopeRuntime: Scope = "runtime"
+const val ScopeRuntime: DepScope = "runtime"
 /** Available for testing only. */
-const val ScopeTest: Scope = "test"
+const val ScopeTest: DepScope = "test"
 
 internal const val DEFAULT_TYPE:String = "jar"
-internal const val DEFAULT_SCOPE:Scope = ScopeCompile
+internal const val DEFAULT_SCOPE:DepScope = ScopeCompile
 internal const val DEFAULT_OPTIONAL:Boolean = false
 internal const val DEFAULT_SNAPSHOT_VERSION:String = ""
 
@@ -230,7 +239,7 @@ class DependencyExclusion(val group: String? = null, val name: String? = null, v
  * @param exclusions to filter transitive dependencies with */
 @Json(Dependency.Serializer::class)
 class Dependency(val dependencyId: DependencyId,
-                 scope: Scope = DEFAULT_SCOPE,
+                 scope: DepScope = DEFAULT_SCOPE,
                  /** Optional transitive dependencies are skipped by default by Wemi.
                   * See https://maven.apache.org/guides/introduction/introduction-to-optional-and-excludes-dependencies.html */
                  val optional: Boolean = DEFAULT_OPTIONAL,
@@ -363,7 +372,7 @@ class ResolvedDependency private constructor(
         /** That was being resolved */
         val id: DependencyId,
         /** Scope in which the dependency was resolved. */
-        val scope:Scope,
+        val scope:DepScope,
         /** Of the [id] that were found */
         val dependencies: List<Dependency>,
         /** In which (non-cache) repository was [id] ultimately found in */

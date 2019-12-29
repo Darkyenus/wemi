@@ -26,20 +26,14 @@ import java.util.concurrent.TimeUnit
 private val LOG = LoggerFactory.getLogger("JUnitPlatform")
 private val TEST_OUTPUT_LOG = LoggerFactory.getLogger("TestOutput")
 
-/**
- * Fully qualified class name of the file that contains.
- */
+/** Fully qualified class name of the file that contains. */
 internal const val TEST_LAUNCHER_MAIN_CLASS = "wemi.test.forked.TestLauncherKt"
 
-/**
- * Currently used JUnit Platform version
- */
-const val JUnitPlatformVersion = "1.0.2"
+/** Default JUnit Platform version */
+const val JUnitPlatformVersion = "1.5.2"
 
-/**
- * Currently used JUnit Jupiter api/engine version
- */
-const val JUnitEngineVersion = "5.0.2"
+/** Default JUnit Jupiter api/engine version */
+const val JUnitEngineVersion = "5.5.2"
 
 /**
  * Dependency on JUnit 5 API
@@ -47,7 +41,7 @@ const val JUnitEngineVersion = "5.0.2"
  * To use JUnit 5 tests, add this as a testing dependency, together with [JUnitEngine].
  * Dependency is located in [MavenCentral] repository.
  *
- * @see [JUnitEngineVersion] for used version (based on Wemi version)
+ * @see [JUnitEngineVersion] for the used version (based on Wemi version)
  */
 val JUnitAPI = DependencyId("org.junit.jupiter", "junit-jupiter-api", JUnitEngineVersion)
 
@@ -57,7 +51,7 @@ val JUnitAPI = DependencyId("org.junit.jupiter", "junit-jupiter-api", JUnitEngin
  * To use JUnit 5 tests, add this as a testing dependency, together with [JUnitAPI].
  * Dependency is located in [MavenCentral] repository.
  *
- * @see [JUnitEngineVersion] for used version (based on Wemi version)
+ * @see [JUnitEngineVersion] for the used version (based on Wemi version)
  */
 val JUnitEngine = DependencyId("org.junit.jupiter", "junit-jupiter-engine", JUnitEngineVersion)
 
@@ -67,13 +61,13 @@ val JUnitEngine = DependencyId("org.junit.jupiter", "junit-jupiter-engine", JUni
  * To use JUnit 4 tests, add this as a testing dependency, together with JUnit 4.
  * Dependency is located in [MavenCentral] repository.
  */
-val JUnit4Engine = DependencyId("org.junit.vintage", "junit-vintage-engine", "4.12.2")
+val JUnit4Engine = DependencyId("org.junit.vintage", "junit-vintage-engine", JUnitEngineVersion)
 
 /**
  * DependencyId for the launcher needed to execute tests based on JUnit platform.
  * Dependency is located in [MavenCentral] repository.
  */
-internal val JUnitPlatformLauncher = DependencyId(
+val JUnitPlatformLauncher = DependencyId(
         "org.junit.platform",
         "junit-platform-launcher",
         JUnitPlatformVersion)

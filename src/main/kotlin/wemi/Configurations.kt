@@ -36,7 +36,7 @@ object Configurations {
 
     /** @see Keys.compile */
     val compiling by configuration("Configuration used when compiling", stageAxis) {
-        Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeProvided) }
+        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeProvided) }
 
         Keys.externalClasspath modify { classpath ->
             // Internal classpath of aggregate projects is not included in standard external classpath.
@@ -52,25 +52,12 @@ object Configurations {
 
     /** @see Keys.run */
     val running by configuration("Configuration used when running, sources are resources", stageAxis) {
-        Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeRuntime) }
-    }
-
-    /** @see Keys.test */
-    val testing by configuration("Used when testing", stageAxis) {
-        Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeRuntime, ScopeProvided, ScopeTest) }
-
-        Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
-        Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
-        Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
-    }
-
-    internal val testingLaunch by configuration("Used internally when launching tests", testing) {
-        Keys.libraryDependencies add { Dependency(JUnitPlatformLauncher) }
+        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
     }
 
     /** @see Keys.assembly */
     val assembling by configuration("Configuration used when assembling Jar with dependencies", stageAxis) {
-        Keys.resolvedLibraryScopes set { setOf(ScopeCompile, ScopeRuntime) }
+        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
     }
 
     /** Used by [Keys.archive] */
@@ -102,6 +89,24 @@ object Configurations {
     }
 
     val publishing by configuration("Used when publishing archived outputs", archiving) {}
+    //endregion
+
+    //region Testing
+    /** @see Keys.test */
+    val testing by configuration("Used when testing") {
+        // Testing classpath indeed contains all of these
+        // (It is needed for example when there are two dependencies, one with provided scope, another with test scope.
+        //  Combined, they have the provided scope, which therefore must be available on the test classpath.)
+        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime, ScopeProvided, ScopeTest) }
+
+        Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
+        Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
+        Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
+    }
+
+    internal val testingLaunch by configuration("Used internally when launching tests", testing) {
+        Keys.libraryDependencies add { Dependency(JUnitPlatformLauncher, scope=ScopeTest) }
+    }
     //endregion
 
     //region IDE configurations

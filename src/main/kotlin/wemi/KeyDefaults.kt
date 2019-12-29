@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory
 import wemi.Configurations.archiving
 import wemi.Configurations.assembling
 import wemi.Configurations.publishing
+import wemi.Configurations.running
+import wemi.Configurations.testingLaunch
 import wemi.assembly.AssemblyOperation
 import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.DefaultRenameFunction
@@ -39,6 +41,7 @@ import wemi.dependency.internal.publish
 import wemi.dependency.joinClassifiers
 import wemi.dependency.resolveDependencies
 import wemi.dependency.resolveDependencyArtifacts
+import wemi.dependency.scopeIn
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
@@ -146,7 +149,7 @@ object KeyDefaults {
     }
 
     private val inProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
-    fun EvalScope.inProjectDependencies(aggregate:Boolean?, withScope:Set<wemi.dependency.Scope> = emptySet(), operation:EvalScope.(dep:ProjectDependency)->Unit) {
+    fun EvalScope.inProjectDependencies(aggregate:Boolean?, withScope:Set<wemi.dependency.DepScope> = emptySet(), operation:EvalScope.(dep:ProjectDependency)->Unit) {
         inProjectDependencies_CircularDependencyProtection.block(this.scope, failure = { loop ->
             throw WemiException("Cyclic dependencies in projectDependencies are not allowed (${loop.joinToString(" -> ")})", showStacktrace = false)
         }, action = {
@@ -157,7 +160,7 @@ object KeyDefaults {
                     continue
                 }
 
-                if (withScope.isNotEmpty() && projectDependency.scope !in withScope) {
+                if (!(projectDependency.scope scopeIn withScope)) {
                     continue
                 }
 
@@ -180,10 +183,9 @@ object KeyDefaults {
 
         val scopes = Keys.resolvedLibraryScopes.get()
         for ((_, resolvedDependency) in resolved.value) {
-            if (scopes.isNotEmpty() && resolvedDependency.scope !in scopes) {
-                continue
+            if (resolvedDependency.scope scopeIn scopes) {
+                result.add(LocatedPath(resolvedDependency.artifact?.path ?: continue))
             }
-            result.add(LocatedPath(resolvedDependency.artifact?.path ?: continue))
         }
 
         inProjectDependencies(null, scopes) { projectDependency ->
@@ -537,7 +539,7 @@ object KeyDefaults {
     }
 
     val Test: Value<TestReport> = {
-        using(Configurations.testingLaunch) {
+        using(running, testingLaunch) {
             val javaExecutable = Keys.javaExecutable.get()
             val directory = Keys.runDirectory.get()
             val options = Keys.runOptions.get()
