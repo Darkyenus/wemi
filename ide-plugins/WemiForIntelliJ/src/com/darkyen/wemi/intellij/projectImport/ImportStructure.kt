@@ -187,20 +187,20 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 			// Process recognized patterns
 			when (k) {
 				// Common
-				"languageVersion" -> {
+				"kotlincLanguageVersion" -> {
 					commonSettings = settings(commonHolder, commonSettings)
 					commonSettings.languageVersion = v.asString()
 				}
-				"apiVersion" -> {
+				"kotlincApiVersion" -> {
 					commonSettings = settings(commonHolder, commonSettings)
 					commonSettings.apiVersion = v.asString()
 				}
 				// JVM
-				"jdkHome" -> {
+				"kotlincJdkHome" -> {
 					jvmSettings = settings(jvmHolder, jvmSettings)
 					jvmSettings.jdkHome = v.asString()
 				}
-				"jvmTarget" -> {
+				"kotlincJvmTarget" -> {
 					jvmSettings = settings(jvmHolder, jvmSettings)
 					jvmSettings.jvmTarget = v.asString()
 				}

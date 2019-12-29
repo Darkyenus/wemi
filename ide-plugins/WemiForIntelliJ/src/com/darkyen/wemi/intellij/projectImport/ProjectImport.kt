@@ -393,13 +393,7 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 	}
 
 	// Kotlin data
-	val kotlinCompilerData = HashMap<String, JsonValue>()
-	session.jsonArray(defaultWemiProject?.projectName ?: WemiBuildScriptProjectName, task = "compilerOptions", configurations = *arrayOf("compilingKotlin")).forEach {
-		val key = it.getString("key")!!
-		val value = it.get("value")
-		kotlinCompilerData[key] = value
-	}
-	ideProjectNode.kotlinCompilerData = kotlinCompilerData
+	ideProjectNode.kotlinCompilerData = defaultWemiProject?.compilerOptions ?: emptyMap()
 
 	tracker.stageEnd()
 
@@ -557,7 +551,7 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 }
 
 private fun createWemiProjectData(session: WemiLauncherSession, projectName:String):WemiProjectData {
-	val javacOptions = session.jsonArray(projectName, task = "compilerOptions", configurations = *arrayOf("compilingJava"))
+	val compilerOptions = session.jsonArray(projectName, task = "compilerOptions").arrayToMap()
 	val sourceRoots: Array<Path>
 	val resourceRoots: Array<Path>
 	val sourceRootsTesting: Array<Path>
@@ -575,13 +569,10 @@ private fun createWemiProjectData(session: WemiLauncherSession, projectName:Stri
 		resourceRootsTesting = session.jsonArray(projectName, "testing", task = "resources", orNull = true).fileSetRoots()
 	}
 
-	val javaSourceVersion:LanguageLevel? = LanguageLevel.parse(javacOptions.mapGet("sourceVersion")?.asString())
-	val javaTargetVersion:JavaSdkVersion? = javacOptions.mapGet("targetVersion")?.asString()?.let { JavaSdkVersion.fromVersionString(it) }
-
 	return WemiProjectData(
 			projectName,
 			session.path(projectName, task = "projectRoot"),
-			javaSourceVersion, javaTargetVersion,
+			compilerOptions,
 			session.path(projectName, task = "outputClassesDirectory"),
 			session.pathOrNull(projectName, configurations = *arrayOf("testing"), task = "outputClassesDirectory?"),
 			sourceRoots,
@@ -734,8 +725,7 @@ private class WemiLibraryDependencyBank {
 private class WemiProjectData constructor(
 		val projectName:String,
 		val rootPath:Path,
-		val javaSourceVersion:LanguageLevel?,
-		val javaTargetVersion:JavaSdkVersion?,
+		val compilerOptions:Map<String, JsonValue>,
 		val classOutput:Path,
 		val classOutputTesting: Path?,
 		sourceRoots:Array<Path>,
@@ -743,6 +733,9 @@ private class WemiProjectData constructor(
 		sourceRootsTesting:Array<Path>,
 		resourceRootsTesting:Array<Path>
 ) {
+
+	val javaSourceVersion:LanguageLevel? = LanguageLevel.parse(compilerOptions["javacSourceVersion"]?.asString())
+	val javaTargetVersion:JavaSdkVersion? = compilerOptions["javacTargetVersion"]?.asString()?.let { JavaSdkVersion.fromVersionString(it) }
 
 	val sourceRoots:Set<Path> = sourceRoots.toSet()
 	val resourceRoots:Set<Path> = resourceRoots.toSet()
@@ -800,6 +793,15 @@ private fun WemiLauncherSession.jsonArray(project:String?, vararg configurations
 			.data(JsonValue.ValueType.array, orNull)
 }
 
+private fun JsonValue.arrayToMap():Map<String, JsonValue> {
+	val result = HashMap<String, JsonValue>()
+	for (child in this) {
+		val key = child.getString("key") ?: continue
+		result[key] = child.get("value") ?: continue
+	}
+	return result
+}
+
 private fun JsonValue.locatedFileOrPathClasspathEntry(): Path {
 	return if (this.type() == JsonValue.ValueType.stringValue) {
 		return Paths.get(asString())
@@ -819,15 +821,6 @@ private fun JsonValue.fileSetRoots():Array<Path> {
 		child = child.next
 		Paths.get(root)
 	}
-}
-
-private fun JsonValue.mapGet(key:String): JsonValue? {
-	for (child in this) {
-		if (child.getString("key") == key) {
-			return child.get("value")
-		}
-	}
-	return null
 }
 
 private fun WemiLauncherSession.Companion.Result.data(type: JsonValue.ValueType? = null, orNull:Boolean = false): JsonValue {
