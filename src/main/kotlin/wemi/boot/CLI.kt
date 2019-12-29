@@ -621,13 +621,14 @@ object CLI {
 
             val tasks = task.inputs("task")
             if (tasks.isEmpty()) {
-                printWarning("trace [values=true/false] <task> - trace task invocation")
+                printWarning("trace [values=true/false] [elements=max] [times=1] <task> - trace task invocation")
             } else {
                 val sb = StringBuilder()
 
                 val printValues = BooleanValidator(task.firstInput("values", false) ?: "").use({it}, {true})
+                val maxPrintedCollectionElements = IntValidator(task.firstInput("elements", false) ?: "").use({it}, {Integer.MAX_VALUE})
                 val repeatCount = IntValidator(task.firstInput("times", false) ?: "").use({it}, {1})
-                val treePrintingListener = TreeBuildingKeyEvaluationListener(printValues)
+                val treePrintingListener = TreeBuildingKeyEvaluationListener(printValues, maxPrintedCollectionElements)
 
                 for (cycle in 1 until repeatCount) {
                     for (taskText in tasks) {
@@ -716,7 +717,7 @@ object CLI {
             println(" exit, reload, help, log <level>")
             println(" projects [filter], configurations [filter], keys [filter] - list available")
             println(" project <project> - change current project")
-            println(" trace <task> - run given task and show a hierarchy of used keys")
+            println(" trace [values=true/false] [elements=max] [times=1] <task> - run given task and show a hierarchy of used keys")
             println(" inspect <project/, configuration:, key> - show known info about subject")
             println(" clean - clean compile directories and internal cache")
             print(formatLabel("Keys: "))

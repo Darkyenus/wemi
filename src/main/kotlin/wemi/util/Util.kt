@@ -155,7 +155,6 @@ fun StringBuilder.appendByteSize(bytes: Long): StringBuilder {
     }
 
     setLength(length-1)//Truncate trailing space
-
     return this
 }
 
@@ -195,9 +194,7 @@ fun StringBuilder.appendShortByteSize(bytes: Long): StringBuilder {
     return append(remaining).append('B')
 }
 
-/**
- * Append given [character] multiple [times]
- */
+/** Append given [character] multiple [times] */
 fun StringBuilder.appendTimes(character:Char, times:Int):StringBuilder {
     if (times <= 0) {
         return this
@@ -209,9 +206,7 @@ fun StringBuilder.appendTimes(character:Char, times:Int):StringBuilder {
     return this
 }
 
-/**
- * Append given [text] centered in [width], padded by [padding]
- */
+/** Append given [text] centered in [width], padded by [padding] */
 fun StringBuilder.appendCentered(text:String, width:Int, padding:Char):StringBuilder {
     val padAmount = width - text.length
     if (padAmount <= 0) {
@@ -223,9 +218,7 @@ fun StringBuilder.appendCentered(text:String, width:Int, padding:Char):StringBui
     return appendTimes(padding, leftPad).append(text).appendTimes(padding, rightPadding)
 }
 
-/**
- * Append given [number], prefixed with [padding] to take up at least [width].
- */
+/** Append given [number], prefixed with [padding] to take up at least [width]. */
 fun StringBuilder.appendPadded(number:Int, width:Int, padding:Char):StringBuilder {
     val originalLength = length
     append(number)
@@ -237,7 +230,7 @@ fun StringBuilder.appendPadded(number:Int, width:Int, padding:Char):StringBuilde
 //endregion
 
 //region Pretty printing
-internal fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
+internal fun StringBuilder.appendPrettyValue(value:Any?, maxCollectionElements:Int = Int.MAX_VALUE):StringBuilder {
     if (value is WithDescriptiveString) {
         val valueText = value.toDescriptiveAnsiString()
         if (valueText.contains(ANSI_ESCAPE)) {
@@ -247,9 +240,25 @@ internal fun StringBuilder.appendPrettyValue(value:Any?):StringBuilder {
         }
     } else {
         this.format(Color.Blue)
-        PrettyPrinter.append(this, value)
+        PrettyPrinter.append(this, value, maxCollectionElements)
         this.format()
     }
+    return this
+}
+
+private fun StringBuilder.appendPrettyCollection(collection:Collection<*>, maxCollectionElements:Int):StringBuilder {
+    val size = collection.size
+    // Don't skip if it would skip only a single element
+    val firstSkipped = if (size + 1 > maxCollectionElements) maxCollectionElements - 1 else Int.MAX_VALUE
+    val numberWidth = size.toString().length
+    for ((i, item) in collection.withIndex()) {
+        if (i < firstSkipped || i >= size - 1) {
+            this.format(Color.White).appendPadded(i + 1, numberWidth, ' ').append(": ").format().appendPrettyValue(item).append('\n')
+        } else if (i == firstSkipped) {
+            this.format(Color.White).append("    (").append(size - maxCollectionElements).append(" elements skipped)").format().append('\n')
+        }
+    }
+
     return this
 }
 
@@ -258,7 +267,7 @@ private val APPEND_KEY_RESULT_LOG = LoggerFactory.getLogger("AppendKeyResult")
 /**
  * Append the [value] formatted like the result of the [key] and newline.
  */
-fun <V> StringBuilder.appendKeyResultLn(key: Key<V>, value:V) {
+fun <V> StringBuilder.appendKeyResultLn(key: Key<V>, value:V, maxCollectionElements:Int = Int.MAX_VALUE) {
     val prettyPrinter = key.prettyPrinter
 
     if (prettyPrinter != null) {
@@ -280,19 +289,13 @@ fun <V> StringBuilder.appendKeyResultLn(key: Key<V>, value:V) {
         null, Unit -> {
             this.append('\n')
         }
-        is Collection<*> -> {
-            for ((i, item) in value.withIndex()) {
-                this.format(Color.White).append(i+1).append(": ").format().appendPrettyValue(item).append('\n')
-            }
-        }
         is Array<*> -> {
-            for ((i, item) in value.withIndex()) {
-                this.format(Color.White).append(i+1).append(": ").format().appendPrettyValue(item).append('\n')
-            }
+            appendPrettyCollection(value.asList(), maxCollectionElements)
         }
-        else -> {
-            this.appendPrettyValue(value).append('\n')
+        is Collection<*> -> {
+            appendPrettyCollection(value, maxCollectionElements)
         }
+        else -> this.appendPrettyValue(value, maxCollectionElements).append('\n')
     }
 }
 //endregion

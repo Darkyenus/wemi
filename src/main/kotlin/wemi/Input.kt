@@ -118,11 +118,18 @@ typealias Validator<V> = (String) -> Failable<V, String>
  */
 val StringValidator: Validator<String> = { Failable.success(it) }
 
-/**
- * Integer validator, accepts decimal numbers
- */
+/** Integer validator, accepts integer numbers in decimal system and MIN/MAX for Int limits  */
 @Suppress("unused")
-val IntValidator: Validator<Int> = { Failable.failNull(it.trim().toIntOrNull(), "Integer expected") }
+val IntValidator: Validator<Int> = {
+    val trimmed = it.trim()
+    if (trimmed.equals("min", ignoreCase=true)) {
+        Failable.success(Int.MIN_VALUE)
+    } else if (trimmed.equals("max", ignoreCase=true)) {
+        Failable.success(Int.MAX_VALUE)
+    } else {
+        Failable.failNull(it.trim().toIntOrNull(), "Integer expected")
+    }
+}
 
 /**
  * Boolean validator, treats true, yes, 1 and y as true, false, no, 0 and n as false.

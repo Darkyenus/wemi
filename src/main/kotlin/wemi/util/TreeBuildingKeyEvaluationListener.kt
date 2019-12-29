@@ -10,7 +10,7 @@ import kotlin.collections.ArrayList
  * [EvaluationListener] that stores relevant information about key evaluation and then
  * produces a human readable tree report about it.
  */
-class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : EvaluationListener {
+class TreeBuildingKeyEvaluationListener(private val printValues: Boolean, private val maxPrintedCollectionElements: Int) : EvaluationListener {
 
     private val roots = ArrayList<TreeNode<KeyData>>()
     private val stack = ArrayDeque<TreeNode<KeyData>>()
@@ -113,7 +113,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean) : Eval
             val body = keyData.body()
             val originalLength = body.length
             body.append('\n') // Body convention
-            body.appendKeyResultLn(binding.key, result)
+            body.appendKeyResultLn(binding.key, result, maxPrintedCollectionElements)
             body.setLength(body.length - 1) // Strip newline appended by previous statement
 
             if (body.length == originalLength + 1) {
