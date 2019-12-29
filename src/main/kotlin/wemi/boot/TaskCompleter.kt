@@ -136,8 +136,7 @@ internal object TaskCompleter : Completer {
 
     private fun TaskParser.ParsedTaskLine.retrieveKeyForInput(inputIndex:Int):String? {
         val tokenTypes = this.tokenTypes
-        var index = Math.min(inputIndex - 1, tokenTypes.lastIndex)
-        while (index >= 0) {
+        for (index in (0 until minOf(tokenTypes.size, inputIndex)).reversed()) {
             if (tokenTypes[index] == Separator && this.words[index] == TaskParser.TASK_SEPARATOR) {
                 // There is no key?
                 return null
@@ -146,8 +145,6 @@ internal object TaskCompleter : Completer {
             if (tokenTypes[index] == Key) {
                 return this.words[index]
             }
-
-            index--
         }
         return null
     }

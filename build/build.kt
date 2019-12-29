@@ -1,5 +1,4 @@
 import wemi.Archetypes
-import wemi.Configurations.compilingKotlin
 import wemi.KeyDefaults.inProjectDependencies
 import wemi.Keys.cacheDirectory
 import wemi.assembly.AssemblyOperation
@@ -123,14 +122,9 @@ val core:Project by project {
     /* Used ONLY in wemi.test.forked.TestLauncher */
     libraryDependencies add { dependency("org.junit.platform", "junit-platform-launcher", "1.0.2", scope=ScopeProvided) }
 
-    extend(compilingKotlin) {
-        compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
-        compilerOptions[KotlinCompilerFlags.incremental] = true
-    }
-
-    extend(compilingJava) {
-        compilerOptions[JavaCompilerFlags.customFlags] += "-Xlint:all"
-    }
+    compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
+    compilerOptions[KotlinCompilerFlags.incremental] = { true }
+    compilerOptions[JavaCompilerFlags.customFlags] = { it + "-Xlint:all" }
 
     libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
     libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
@@ -176,9 +170,7 @@ fun createKotlinCompilerProject(version:String):Project {
     return createProject(projectName.toString(), path("src/main-kotlinc/$version"), Archetypes.JavaKotlinProject) {
         sources set { FileSet(projectRoot.get() / "src") }
 
-        extend(compilingKotlin) {
-            compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
-        }
+        compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
 
         projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
         // Disable default kotlin stdlib
@@ -193,9 +185,7 @@ fun createKotlinCompilerProject(version:String):Project {
 val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
     sources set { FileSet(projectRoot.get() / "src") }
 
-    extend(compilingKotlin) {
-        compilerOptions[KotlinCompilerFlags.customFlags] += "-Xskip-runtime-version-check"
-    }
+    compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
 
     libraryDependencies set { emptySet() } // Disable default kotlin stdlib
 

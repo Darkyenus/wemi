@@ -259,7 +259,7 @@ val ALL_EXTENSIONS = emptyArray<String>()
 /** Return receiver [FileSet] filtered to contain only files with any of given extensions.
  * Returns the same [FileSet] if [extension] is empty. */
 fun FileSet?.filterByExtension(vararg extension:String):FileSet? {
-    if (this == null || patterns.isEmpty()) return this
+    if (this == null || extension.isEmpty()) return this
     return this.appendPatterns(filter(*Array(extension.size) { i -> "**.${extension[i]}"}))
 }
 

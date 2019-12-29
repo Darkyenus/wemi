@@ -208,14 +208,12 @@ class Project internal constructor(val name: String, internal val projectRoot: P
     private fun filterConfigurations(configurations:List<Configuration>):List<Configuration> {
         val result = ArrayList<Configuration>(configurations.size)
         val usedAxes = BitSet()
-        var i = configurations.lastIndex
-        while (i > 0) {
+        for (i in configurations.indices.reversed()) {
             val config = configurations[i]
             if (!usedAxes[config.axis]) {
                 result.add(config)
                 usedAxes[config.axis] = true
             }
-            i--
         }
         result.reverse()
         return result
@@ -433,12 +431,12 @@ class Scope internal constructor(
         return sum
     }
 
-    /** @return scope in the standard syntax, i.e. project/config1:config2 */
+    /** @return scope in the standard syntax, i.e. project/config1:config2: */
     override fun toString(): String {
         val sb = StringBuilder()
-        sb.append(project.name)
-        for ((i, configuration) in configurations.withIndex()) {
-            sb.append(if (i == 0) '/' else ':').append(configuration.name)
+        sb.append(project.name).append('/')
+        for (configuration in configurations) {
+            sb.append(configuration.name).append(':')
         }
         return sb.toString()
     }
