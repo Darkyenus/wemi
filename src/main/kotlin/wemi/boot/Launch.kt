@@ -403,8 +403,6 @@ fun main(args: Array<String>) {
         CLI.init(WemiRootFolder)
 
         try {
-            var lastTaskResult: TaskEvaluationResult? = null
-
             val formattedErrors = parsedArgs.formattedErrors(true)
             if (formattedErrors.hasNext()) {
                 println(format("Errors in task input:", Color.Red))
@@ -413,25 +411,34 @@ fun main(args: Array<String>) {
                 } while (formattedErrors.hasNext())
             } else {
                 for (task in parsedArgs.tasks) {
-                    lastTaskResult = CLI.evaluateAndPrint(task)
+                    val lastTaskResult = CLI.evaluateAndPrint(task)
+                    if (interactive) {
+                        continue
+                    }
+
+                    when (lastTaskResult.status) {
+                        TaskEvaluationStatus.Success, TaskEvaluationStatus.Command -> {
+                            val data = lastTaskResult.data
+                            if (data is WithExitCode) {
+                                exitCode = data.processExitCode()
+                                LOG.debug("WithExitCode - using the exit code of '{}': {}", parsedArgs.tasks.last(), exitCode)
+                            } else {
+                                LOG.debug("WithExitCode - {} does not provide exit code", parsedArgs.tasks.last())
+                            }
+                        }
+                        else -> {
+                            exitCode = EXIT_CODE_TASK_ERROR
+                            LOG.debug("WithExitCode - {} evaluation failed", parsedArgs.tasks.last())
+                        }
+                    }
+                    if (exitCode != EXIT_CODE_SUCCESS) {
+                        break
+                    }
                 }
             }
 
             if (interactive) {
                 CLI.beginInteractive()
-            } else if (lastTaskResult != null) {
-                if (lastTaskResult.status == TaskEvaluationStatus.Success) {
-                    val data = lastTaskResult.data
-                    if (data is WithExitCode) {
-                        exitCode = data.processExitCode()
-                        LOG.debug("WithExitCode - using the exit code of '{}': {}", parsedArgs.tasks.last(), exitCode)
-                    } else {
-                        LOG.debug("WithExitCode - {} does not provide exit code", parsedArgs.tasks.last())
-                    }
-                } else {
-                    exitCode = EXIT_CODE_TASK_ERROR
-                    LOG.debug("WithExitCode - {} evaluation failed", parsedArgs.tasks.last())
-                }
             }
         } catch (exit:ExitWemi) {
             if (exit.reload) {
