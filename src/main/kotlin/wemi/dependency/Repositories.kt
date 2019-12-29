@@ -8,10 +8,10 @@ import java.nio.file.Paths
 /** Default local Maven repository stored in `~/.m2/repository`. Used for local releases. */
 val LocalM2Repository = Repository("local", Paths.get(System.getProperty("user.home")) / ".m2/repository/", null)
 
-/** Construct a path to the cache directory for repository named [repositoryName]. */
+/** Construct a path to the cache directory for a repository named [repositoryName]. */
 fun repositoryCachePath(repositoryName:String): Path {
-    val safePath = StringBuilder(repositoryName.length)
-    safePath.append(".m2/wemi-")
+    val safePath = StringBuilder()
+    safePath.append(".wemi/maven-cache/")
     for (c in repositoryName) {
         // https://superuser.com/questions/358855/what-characters-are-safe-in-cross-platform-file-names-for-linux-windows-and-os
         if (c in "\\/:*?\"<>|" || Character.isISOControl(c)) {
@@ -20,12 +20,9 @@ fun repositoryCachePath(repositoryName:String): Path {
             safePath.append(c)
         }
     }
-    safePath.append("-cache/")
+    safePath.append('/')
     return Paths.get(System.getProperty("user.home")) / safePath
 }
-/** Path to the default Wemi cache repository stored in `~/.m2/wemi-cache`. Used as a local cache.*/
-@Deprecated("Repository cache is now per-repository.", ReplaceWith("repositoryCachePath(name)"))
-val LocalCacheM2RepositoryPath = Paths.get(System.getProperty("user.home")) / ".m2/wemi-cache/"
 
 /** Maven Central repository at [maven.org](https://maven.org). Cached by [LocalM2Repository]. */
 val MavenCentral = Repository("central", URL("https://repo.maven.apache.org/maven2/"), snapshots = false)
