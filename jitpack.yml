@@ -5,4 +5,4 @@
 jdk:
   - oraclejdk8
 install:
-   - java -jar wemi "core/jitpack:publish ; pluginJvmHotswap/jitpack:publish"
+   - ./wemi "wemi/jitpack:publish ; pluginJvmHotswap/jitpack:publish"
