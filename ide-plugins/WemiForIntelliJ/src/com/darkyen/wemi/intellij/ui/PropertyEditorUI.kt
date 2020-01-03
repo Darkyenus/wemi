@@ -35,7 +35,6 @@ import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.UserActivityProviderComponent
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTabbedPane
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.fields.ExtendableTextComponent
@@ -62,7 +61,6 @@ import javax.swing.JPanel
 import javax.swing.JTable
 import javax.swing.KeyStroke
 import javax.swing.ListSelectionModel
-import javax.swing.ScrollPaneConstants
 import javax.swing.SwingConstants
 import javax.swing.table.AbstractTableModel
 import javax.swing.table.TableCellRenderer
@@ -253,15 +251,11 @@ class TaskListPropertyEditor(property: KMutableProperty0<List<Array<String>>>) :
 		}
 
 		createPanel()
+	}.apply {
+		minimumSize = Dimension(100, 150)
 	}
 
-	override val component: JComponent = JPanel(BorderLayout(0, 0)).apply {
-		add(JBScrollPane(table, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED).apply {
-			verticalScrollBar.unitIncrement = 1
-		}, BorderLayout.CENTER)
-		add(tableDecorator, BorderLayout.PAGE_END)
-		preferredSize = Dimension(100, 150)
-	}
+	override val component: JComponent = tableDecorator
 
 	override var componentValue: List<Array<String>>
 		get() = tableModel.tasks.filter { it.isNotEmpty() }
