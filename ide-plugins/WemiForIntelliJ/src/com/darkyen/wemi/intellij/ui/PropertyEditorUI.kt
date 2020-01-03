@@ -48,6 +48,7 @@ import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension
+import java.awt.Graphics
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.io.IOException
@@ -56,8 +57,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.regex.Pattern
 import javax.swing.BorderFactory
-import javax.swing.Box
-import javax.swing.BoxLayout
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JTable
@@ -374,33 +373,28 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 		textField
 	}
 
-	private fun panelWrap(label:String, c:JComponent, center:Boolean = false):JComponent {
-		return JPanel().apply {
-			layout = BoxLayout(this, BoxLayout.LINE_AXIS)
-			if (center) {
-				add(Box.createHorizontalGlue())
+	private fun panelWrap(label: String, c: JComponent):JComponent {
+		val table = object: Table() {
+			override fun paintComponent(g: Graphics) {
+				g.color = background
+				g.fillRect(0, 0, width, height)
+				super.paintComponent(g)
 			}
-
-			add(JBLabel(label).apply {
-				verticalAlignment = SwingConstants.CENTER
-				alignmentY = Component.CENTER_ALIGNMENT
-			})
-			c.alignmentY = Component.CENTER_ALIGNMENT
-			add(c)
-
-			if (center) {
-				add(Box.createHorizontalGlue())
-			}
-
-			background = JBUI.CurrentTheme.CustomFrameDecorations.titlePaneBackground()
-			border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
 		}
+		table.isOpaque = true
+		table.align(BaseTableLayout.CENTER)
+
+		table.addCell(JBLabel(label))
+		table.addCell(c)
+		table.background = JBUI.CurrentTheme.CustomFrameDecorations.titlePaneBackground()
+		table.border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+		return table
 	}
 
 	private val panel = object : JBTabbedPane(TOP), UserActivityProviderComponent {
 		init {
-			addTab("From PATH", panelWrap("Using Java on PATH", panel0JavaFromPath, center = true))
-			addTab("Specific version", panelWrap("Java version: ", panel1JavaFromPath, center = true))
+			addTab("From PATH", panelWrap("Using Java on PATH", panel0JavaFromPath))
+			addTab("Specific version", panelWrap("Java version: ", panel1JavaFromPath))
 			addTab("SDK", panelWrap("JRE/JDK:", panel2JavaFromSdk))
 			addTab("Custom", panelWrap("JRE/JDK/Java executable:", panel3JavaCustom))
 
