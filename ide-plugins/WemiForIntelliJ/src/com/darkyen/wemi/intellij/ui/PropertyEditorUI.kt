@@ -252,7 +252,7 @@ class TaskListPropertyEditor(property: KMutableProperty0<List<Array<String>>>) :
 
 		createPanel()
 	}.apply {
-		minimumSize = Dimension(100, 150)
+		minimumSize = Dimension(100, 80)
 	}
 
 	override val component: JComponent = tableDecorator

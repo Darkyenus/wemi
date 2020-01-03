@@ -20,6 +20,7 @@ import com.intellij.projectImport.ProjectImportBuilder
 import icons.WemiIcons
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.concurrent.CancellationException
 
 /**
  * Used when importing (unlinked?) project.
@@ -45,7 +46,7 @@ class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
     }
 
     /**
-     * Asks current builder to ensure that target external project is defined.
+     * Asks the current builder to ensure that target external project is defined.
      *
      * @param wizardContext             current wizard context
      * @throws ConfigurationException   if external project is not defined and can't be constructed
@@ -76,7 +77,11 @@ class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
         } ?: reinstallWemiLauncher(projectFileDirectory, "Failed to put Wemi launcher in the project directory", project)?.second
         ?: return
 
-        val projectNode:ProjectNode = importWemiProjectStructure(project, launcher, projectImportOptions, activateToolWindow = false, modal = true).get()
+        val projectNode:ProjectNode = try {
+            importWemiProjectStructure(project, launcher, projectImportOptions, activateToolWindow = false, modal = true).get()
+        } catch (cancelled: CancellationException) {
+            throw ConfigurationException("Cancelled")
+        }
         this.projectNode = projectNode
 
         wizardContext.projectName = projectNode.name
