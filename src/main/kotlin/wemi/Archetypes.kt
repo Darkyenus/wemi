@@ -143,6 +143,7 @@ object Archetypes {
         Keys.compilerOptions[JavaCompilerFlags.customFlags] = { it + "-g" }
         Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = { "1.8" }
         Keys.compilerOptions[JavaCompilerFlags.targetVersion] = { "1.8" }
+        Keys.compilerOptions[JavaCompilerFlags.encoding] = { "UTF-8" }
         Keys.compile set KeyDefaults.CompileJava
 
         Keys.archiveJavadocOptions set KeyDefaults.ArchiveJavadocOptions

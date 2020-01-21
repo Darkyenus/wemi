@@ -58,6 +58,7 @@ import wemi.util.constructLocatedFiles
 import wemi.util.div
 import wemi.util.ensureEmptyDirectory
 import wemi.util.exists
+import wemi.util.format
 import wemi.util.isDirectory
 import wemi.util.name
 import wemi.util.parseJavaVersion
@@ -173,7 +174,12 @@ object KeyDefaults {
 
         val resolved = Keys.resolvedLibraryDependencies.get()
         if (!resolved.complete) {
-            throw WemiException("Failed to resolve all artifacts\n${resolved.value.prettyPrint(Keys.libraryDependencies.get().map { it.dependencyId })}", showStacktrace = false)
+            val message = StringBuilder()
+            message.append("Failed to resolve all artifacts")
+                    .format() // Required, because printing it with pre-set color would bleed into the pretty-printed values
+                    .append('\n')
+                    .append(resolved.value.prettyPrint(Keys.libraryDependencies.get().map { it.dependencyId }))
+            throw WemiException(message.toString(), showStacktrace = false)
         }
 
         val scopes = Keys.resolvedLibraryScopes.get()
@@ -320,12 +326,22 @@ object KeyDefaults {
                     compilerOptions.addAll(it)
                 }
                 compilerFlags.use(JavaCompilerFlags.sourceVersion) {
-                    compilerOptions.add("-source")
-                    compilerOptions.add(it)
+                    if (it.isNotEmpty()) {
+                        compilerOptions.add("-source")
+                        compilerOptions.add(it)
+                    }
                 }
                 compilerFlags.use(JavaCompilerFlags.targetVersion) {
-                    compilerOptions.add("-target")
-                    compilerOptions.add(it)
+                    if (it.isNotEmpty()) {
+                        compilerOptions.add("-target")
+                        compilerOptions.add(it)
+                    }
+                }
+                compilerFlags.use(JavaCompilerFlags.encoding) {
+                    if (it.isNotEmpty()) {
+                        compilerOptions.add("-encoding")
+                        compilerOptions.add(it)
+                    }
                 }
                 compilerOptions.add("-classpath")
                 val classpathString = externalClasspath.joinToString(pathSeparator) { it.absolutePath }
@@ -411,12 +427,22 @@ object KeyDefaults {
                     compilerOptions.addAll(it)
                 }
                 compilerFlags.use(JavaCompilerFlags.sourceVersion) {
-                    compilerOptions.add("-source")
-                    compilerOptions.add(it)
+                    if (it.isNotEmpty()) {
+                        compilerOptions.add("-source")
+                        compilerOptions.add(it)
+                    }
                 }
                 compilerFlags.use(JavaCompilerFlags.targetVersion) {
-                    compilerOptions.add("-target")
-                    compilerOptions.add(it)
+                    if (it.isNotEmpty()) {
+                        compilerOptions.add("-target")
+                        compilerOptions.add(it)
+                    }
+                }
+                compilerFlags.use(JavaCompilerFlags.encoding) {
+                    if (it.isNotEmpty()) {
+                        compilerOptions.add("-encoding")
+                        compilerOptions.add(it)
+                    }
                 }
                 compilerOptions.add("-classpath")
                 val classpathString = externalClasspath.joinToString(pathSeparator) { it.absolutePath }

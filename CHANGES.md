@@ -1,4 +1,5 @@
 # 0.12
+- Add explicit `JavaCompilerFlag.encoding`, which defaults to UTF-8
 
 # 0.11 2019-12-29
 - JUnit dependencies are now bundled by default, you don't have to add them manually
