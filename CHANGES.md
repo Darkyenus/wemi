@@ -1,5 +1,7 @@
 # 0.12
 - Add explicit `JavaCompilerFlag.encoding`, which defaults to UTF-8
+- Fix archiving not using correct configurations
+- Prevent Javadoc from failing on soft errors. To fail the task on soft errors, add javadoc flag `-Wemi-fail-on-error`
 
 # 0.11 2019-12-29
 - JUnit dependencies are now bundled by default, you don't have to add them manually

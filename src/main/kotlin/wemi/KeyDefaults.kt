@@ -20,8 +20,7 @@ import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.KotlinSourceFileExtensions
-import wemi.compile.internal.MessageLocation
-import wemi.compile.internal.render
+import wemi.compile.internal.createJavaObjectFileDiagnosticLogger
 import wemi.dependency.DEFAULT_OPTIONAL
 import wemi.dependency.DEFAULT_SCOPE
 import wemi.dependency.DEFAULT_TYPE
@@ -66,21 +65,14 @@ import wemi.util.pathExtension
 import wemi.util.pathWithoutExtension
 import wemi.util.prettyPrint
 import wemi.util.toSafeFileName
-import java.io.BufferedReader
 import java.io.File
 import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.nio.file.LinkOption
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.time.ZonedDateTime
 import java.util.*
-import java.util.regex.Pattern
-import javax.tools.Diagnostic
-import javax.tools.DiagnosticListener
 import javax.tools.DocumentationTool
-import javax.tools.JavaFileObject
 import javax.tools.StandardLocation
 import javax.tools.ToolProvider
 import kotlin.collections.ArrayList
@@ -226,77 +218,7 @@ object KeyDefaults {
 
     private val KotlincLOG = LoggerFactory.getLogger("Kotlinc")
     private val JavacLOG = LoggerFactory.getLogger("Javac")
-    private val JavaLintExtractorPattern = Pattern.compile(": \\[([a-zA-Z-._0-9]+)\\]")
-
-    private val JavaDiagnosticListener : DiagnosticListener<JavaFileObject> = DiagnosticListener { diagnostic ->
-        val source = diagnostic.source
-        val location: MessageLocation? =
-            if (source == null) {
-                null
-            } else {
-                val lineNumber = diagnostic.lineNumber
-                var lineContent:String? = null
-                BufferedReader(diagnostic.source.openReader(true)).use {
-                    var line = 0L
-                    while (true) {
-                        val l = it.readLine() ?: break
-                        line++
-                        if (line == lineNumber) {
-                            lineContent = l
-                            break
-                        }
-                    }
-                }
-
-                MessageLocation(
-                        Paths.get(source.toUri()).toRealPath(LinkOption.NOFOLLOW_LINKS).absolutePath,
-                        lineNumber.toInt(),
-                        diagnostic.columnNumber.toInt(),
-                        lineContent,
-                        tabColumnCompensation = 8)
-            }
-
-        var lint:String? = null
-        // Try to extract lint info from the message (HACK)
-        try {
-            // If running on Java <= 1.8, use reflection.
-            // Otherwise ("java.version" will start with 9., 10., etc.) or if this fails,
-            // use different heuristics, because using reflection will cause warnings about illegal reflective access.
-            // (TODO: reconsider how to deal with this after Wemi is modularised)
-            if (System.getProperty("java.version")?.startsWith("1.") == true) {
-                // It is sadly not available through public api.
-                var jc = diagnostic
-                if (jc.javaClass.name == "com.sun.tools.javac.api.ClientCodeWrapper\$DiagnosticSourceUnwrapper") {
-                    @Suppress("UNCHECKED_CAST")
-                    jc = jc.javaClass.getDeclaredField("d").get(jc) as Diagnostic<JavaFileObject>
-                }
-                if (jc.javaClass.name == "com.sun.tools.javac.util.JCDiagnostic") {
-                    val lintCategory = jc.javaClass.getMethod("getLintCategory").invoke(jc)
-                    if (lintCategory != null) {
-                        lint = lintCategory.javaClass.getField("option").get(lintCategory) as String?
-                    }
-                } else {
-                    JavacLOG.debug("Failed to extract lint information from {}", diagnostic.javaClass)
-                }
-            }
-        } catch (ex:Exception) {
-            JavacLOG.debug("Failed to extract lint information from {}", diagnostic, ex)
-        }
-        if (lint == null) {
-            val match = JavaLintExtractorPattern.matcher(diagnostic.toString())
-            if (match.find()) {
-                lint = match.group(1)
-            }
-        }
-
-        var message = diagnostic.getMessage(Locale.getDefault())
-        if (lint != null) {
-            // Mimic default format
-            message = "[$lint] $message"
-        }
-
-        JavacLOG.render(null, diagnostic.kind.name, message, location)
-    }
+    private val JavaDiagnosticListener = createJavaObjectFileDiagnosticLogger(JavacLOG)
 
     val CompileJava: Value<Path> = {
         using(Configurations.compiling) {
@@ -618,7 +540,7 @@ object KeyDefaults {
     }
 
     val ArchiveSources: Value<Path> = {
-        using(Configurations.archiving) {
+        using(Configurations.archivingSources) {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
                 for (file in Keys.sources.getLocatedPaths()) {
@@ -650,7 +572,7 @@ object KeyDefaults {
      * Binding for [Keys.archive] to use when archiving documentation and no documentation is available.
      */
     val ArchiveDummyDocumentation: Value<Path> = {
-        using(Configurations.archiving) {
+        using(Configurations.archivingDocs) {
             AssemblyOperation().use { assemblyOperation ->
 
                 /*
@@ -734,7 +656,7 @@ object KeyDefaults {
     }
 
     val ArchiveJavadocOptions: Value<List<String>> = {
-        using(Configurations.archiving) {
+        using(Configurations.archivingDocs) {
             val options = WMutableList<String>()
 
             val compilerFlags = Keys.compilerOptions.get()
@@ -763,8 +685,15 @@ object KeyDefaults {
     }
 
     private val ARCHIVE_JAVADOC_LOG = LoggerFactory.getLogger("ArchiveJavadoc")
+    private val ARCHIVE_JAVADOC_DIAGNOSTIC_LISTENER = createJavaObjectFileDiagnosticLogger(ARCHIVE_JAVADOC_LOG)
+    private val ARCHIVE_JAVADOC_OUTPUT_READER = LineReadingWriter { line ->
+        if (line.isNotBlank()) {
+            ARCHIVE_JAVADOC_LOG.warn("> {}", line)
+        }
+    }
+
     val ArchiveJavadoc: Value<Path> = {
-        using(Configurations.archiving) {
+        using(Configurations.archivingDocs) {
             val sourceFiles = Keys.sources.getLocatedPaths(*JavaSourceFileExtensions)
 
             if (sourceFiles.isEmpty()) {
@@ -772,12 +701,8 @@ object KeyDefaults {
                 return@using ArchiveDummyDocumentation()
             }
 
-            val diagnosticListener:DiagnosticListener<JavaFileObject> = DiagnosticListener { diagnostic ->
-                ARCHIVE_JAVADOC_LOG.debug("{}", diagnostic)
-            }
-
             val documentationTool = ToolProvider.getSystemDocumentationTool()!!
-            val fileManager = documentationTool.getStandardFileManager(diagnosticListener, Locale.ROOT, Charsets.UTF_8)
+            val fileManager = documentationTool.getStandardFileManager(ARCHIVE_JAVADOC_DIAGNOSTIC_LISTENER, Locale.ROOT, Charsets.UTF_8)
             val sourceRoots = HashSet<File>()
             sourceFiles.mapNotNullTo(sourceRoots) { it.root?.toFile() }
             fileManager.setLocation(StandardLocation.SOURCE_PATH, sourceRoots)
@@ -792,21 +717,29 @@ object KeyDefaults {
                 fileManager.setLocation(DocumentationTool.Location.DOCLET_PATH, listOf(toolsJar.toFile()))
             }
 
-            val options = Keys.archiveJavadocOptions.get()
+            var failOnError = false
+            val options = Keys.archiveJavadocOptions.get().filter {
+                if (it == "-Wemi-fail-on-error") {
+                    failOnError = true
+                    false
+                } else true
+            }
 
-            val docTask = documentationTool.getTask(LineReadingWriter { line ->
-                ARCHIVE_JAVADOC_LOG.warn("{}", line)
-            }, fileManager,
-                    diagnosticListener,
-                    null,
-                    options,
-                    fileManager.getJavaFileObjectsFromFiles(sourceFiles.map { it.file.toFile() }))
+            val docTask = documentationTool.getTask(
+                    ARCHIVE_JAVADOC_OUTPUT_READER, fileManager,
+                    ARCHIVE_JAVADOC_DIAGNOSTIC_LISTENER, null,
+                    options, fileManager.getJavaFileObjectsFromFiles(sourceFiles.map { it.file.toFile() }))
 
             docTask.setLocale(Locale.ROOT)
             val result = docTask.call()
+            ARCHIVE_JAVADOC_OUTPUT_READER.close()
 
             if (!result) {
-                throw WemiException("Failed to package javadoc", showStacktrace = false)
+                if (failOnError) {
+                    throw WemiException("Failed to package javadoc", showStacktrace = false)
+                } else {
+                    ARCHIVE_JAVADOC_LOG.warn("There were errors when building Javadoc")
+                }
             }
 
             val locatedFiles = ArrayList<LocatedPath>()
@@ -883,7 +816,7 @@ object KeyDefaults {
 
     private val ARCHIVE_DOKKA_LOG = LoggerFactory.getLogger("ArchiveDokka")
     val ArchiveDokka: Value<Path> = {
-        using(Configurations.archiving) {
+        using(Configurations.archivingDocs) {
             val options = Keys.archiveDokkaOptions.get()
 
             if (options.sourceRoots.isEmpty()) {

@@ -186,20 +186,14 @@ open class LineReadingWriter(private val onLineRead: (CharSequence) -> Unit) : W
         append(str, off, off+len)
     }
 
-    /**
-     * No-op.
-     */
+    /** No-op. */
     override fun flush() {}
 
     /**
      * Flushes the pending, unfinished line.
-     * Writing further bytes into the stream after closing it leads to an undefined behavior.
+     * Object may be reused after that.
      */
     override fun close() {
-        if (outputSB.isNotEmpty()) {
-            onLineRead(outputSB)
-            outputSB.setLength(0)
-        }
         flushLine()
     }
 }

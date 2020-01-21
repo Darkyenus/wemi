@@ -3,8 +3,20 @@ package wemi.compile.internal
 import org.slf4j.Logger
 import org.slf4j.Marker
 import wemi.boot.WemiRootFolder
-import wemi.util.*
+import wemi.util.Color
+import wemi.util.Format
+import wemi.util.absolutePath
+import wemi.util.appendPathTagBegin
+import wemi.util.appendPathTagEnd
+import wemi.util.format
+import java.io.BufferedReader
+import java.nio.file.LinkOption
 import java.nio.file.Paths
+import java.util.*
+import java.util.regex.Pattern
+import javax.tools.Diagnostic
+import javax.tools.DiagnosticListener
+import javax.tools.JavaFileObject
 
 /**
  * Mirror of [org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation]
@@ -132,5 +144,80 @@ fun Logger.render(marker: Marker?,
             error(marker, "[{}]: {}", severity, result)
         }
     }
+}
+
+private val JavaLintExtractorPattern = Pattern.compile(": \\[([a-zA-Z-._0-9]+)\\]")
+
+fun createJavaObjectFileDiagnosticLogger(log:Logger):DiagnosticListener<JavaFileObject> {
+    return DiagnosticListener { diagnostic ->
+        val source = diagnostic.source
+        val location: MessageLocation? =
+                if (source == null) {
+                    null
+                } else {
+                    val lineNumber = diagnostic.lineNumber
+                    var lineContent:String? = null
+                    BufferedReader(diagnostic.source.openReader(true)).use {
+                        var line = 0L
+                        while (true) {
+                            val l = it.readLine() ?: break
+                            line++
+                            if (line == lineNumber) {
+                                lineContent = l
+                                break
+                            }
+                        }
+                    }
+
+                    MessageLocation(
+                            Paths.get(source.toUri()).toRealPath(LinkOption.NOFOLLOW_LINKS).absolutePath,
+                            lineNumber.toInt(),
+                            diagnostic.columnNumber.toInt(),
+                            lineContent,
+                            tabColumnCompensation = 8)
+                }
+
+        var lint:String? = null
+        // Try to extract lint info from the message (HACK)
+        try {
+            // If running on Java <= 1.8, use reflection.
+            // Otherwise ("java.version" will start with 9., 10., etc.) or if this fails,
+            // use different heuristics, because using reflection will cause warnings about illegal reflective access.
+            // (TODO: reconsider how to deal with this after Wemi is modularised)
+            if (System.getProperty("java.version")?.startsWith("1.") == true) {
+                // It is sadly not available through public api.
+                var jc = diagnostic
+                if (jc.javaClass.name == "com.sun.tools.javac.api.ClientCodeWrapper\$DiagnosticSourceUnwrapper") {
+                    @Suppress("UNCHECKED_CAST")
+                    jc = jc.javaClass.getDeclaredField("d").get(jc) as Diagnostic<JavaFileObject>
+                }
+                if (jc.javaClass.name == "com.sun.tools.javac.util.JCDiagnostic") {
+                    val lintCategory = jc.javaClass.getMethod("getLintCategory").invoke(jc)
+                    if (lintCategory != null) {
+                        lint = lintCategory.javaClass.getField("option").get(lintCategory) as String?
+                    }
+                } else {
+                    log.debug("Failed to extract lint information from {}", diagnostic.javaClass)
+                }
+            }
+        } catch (ex:Exception) {
+            log.debug("Failed to extract lint information from {}", diagnostic, ex)
+        }
+        if (lint == null) {
+            val match = JavaLintExtractorPattern.matcher(diagnostic.toString())
+            if (match.find()) {
+                lint = match.group(1)
+            }
+        }
+
+        var message = diagnostic.getMessage(Locale.getDefault())
+        if (lint != null) {
+            // Mimic default format
+            message = "[$lint] $message"
+        }
+
+        log.render(null, diagnostic.kind.name, message, location)
+    }
+
 }
 
