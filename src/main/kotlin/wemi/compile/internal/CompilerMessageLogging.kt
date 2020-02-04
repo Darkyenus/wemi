@@ -1,6 +1,7 @@
 package wemi.compile.internal
 
 import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.slf4j.Marker
 import wemi.boot.WemiRootFolder
 import wemi.util.Color
@@ -18,8 +19,12 @@ import javax.tools.Diagnostic
 import javax.tools.DiagnosticListener
 import javax.tools.JavaFileObject
 
+private val LOG = LoggerFactory.getLogger("CompilerMessageLogging")
+
 /**
  * Mirror of [org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation]
+ *
+ * @param path standard filesystem path to the source file or anything else if that is not possible to obtain
  */
 class MessageLocation(val path: String, val line: Int, val column: Int, val lineContent: String?, val tabColumnCompensation:Int = 1)
 
@@ -65,14 +70,17 @@ fun Logger.render(marker: Marker?,
     val result = StringBuilder()
 
     if (location != null) {
-        val locationPath = Paths.get(location.path).toAbsolutePath()
-        result.format(Color.Black)
-        result.appendPathTagBegin()
-        if (locationPath.startsWith(WemiRootFolder)) {
-            val relative = WemiRootFolder.relativize(locationPath)
-            result.append(relative.toString())
-        } else {
-            result.append(locationPath.toString())
+        result.format(Color.Black).appendPathTagBegin()
+        try {
+            val locationPath = Paths.get(location.path).toAbsolutePath()
+            if (locationPath.startsWith(WemiRootFolder)) {
+                val relative = WemiRootFolder.relativize(locationPath)
+                result.append(relative.toString())
+            } else {
+                result.append(locationPath.toString())
+            }
+        } catch (e:Exception) {
+            result.append(location.path)
         }
         if (location.line > 0) {
             result.appendPathTagEnd(':')
@@ -157,20 +165,44 @@ fun createJavaObjectFileDiagnosticLogger(log:Logger):DiagnosticListener<JavaFile
                 } else {
                     val lineNumber = diagnostic.lineNumber
                     var lineContent:String? = null
-                    BufferedReader(diagnostic.source.openReader(true)).use {
-                        var line = 0L
-                        while (true) {
-                            val l = it.readLine() ?: break
-                            line++
-                            if (line == lineNumber) {
-                                lineContent = l
-                                break
+                    try {
+                        BufferedReader(diagnostic.source.openReader(true)).use {
+                            var line = 0L
+                            while (true) {
+                                val l = it.readLine() ?: break
+                                line++
+                                if (line == lineNumber) {
+                                    lineContent = l
+                                    break
+                                }
+                            }
+                        }
+                    } catch (e:Exception) {}
+
+
+                    val absolutePath = try {
+                        var result = Paths.get(source.toUri())
+                        try {
+                            result = result.toRealPath(LinkOption.NOFOLLOW_LINKS)
+                        } catch (ignored:Exception) {}
+                        result.absolutePath
+                    } catch (e:Exception) {
+                        try {
+                            source.toUri().toString()
+                        } catch (e:Exception) {
+                            try {
+                                val result = source.toString()
+                                LOG.warn("Failed to retrieve the real path of '{}'", result, e)
+                                result
+                            } catch (e:Exception) {
+                                LOG.warn("Failed to retrieve any path information about {}", source.javaClass.name, e)
+                                "<unknown location>"
                             }
                         }
                     }
 
                     MessageLocation(
-                            Paths.get(source.toUri()).toRealPath(LinkOption.NOFOLLOW_LINKS).absolutePath,
+                            absolutePath,
                             lineNumber.toInt(),
                             diagnostic.columnNumber.toInt(),
                             lineContent,
