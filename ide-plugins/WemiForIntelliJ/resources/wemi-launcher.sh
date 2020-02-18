@@ -1,1 +1,1 @@
-../../../src/launcher-template.sh
+../../../build/dist/wemi

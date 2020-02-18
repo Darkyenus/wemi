@@ -165,7 +165,7 @@ internal var autoRunTasks:ArrayList<Task>? = ArrayList()
 fun main(args: Array<String>) {
     var cleanBuild = false
     var interactiveArg:Boolean? = null
-    var machineReadableOutput = false
+    var machineReadableOutput:MachineReadableOutputFormat? = null
     var allowBrokenBuildScripts = false
     var reloadSupported = false
     var skipAutoRun = false
@@ -210,8 +210,13 @@ fun main(args: Array<String>) {
                     exitProcess(EXIT_CODE_ARGUMENT_ERROR)
                 }
             },
-            Option(Option.NO_SHORT_NAME, "machine-readable-output", "create machine readable output, disables implicit interactivity") { _, _ ->
-                machineReadableOutput = true
+            Option(Option.NO_SHORT_NAME, "machine-readable-output", "create machine readable output, disables implicit interactivity", null, "true|json|shell|false") { arg, _ ->
+                when (arg?.toLowerCase() ?: "true") {
+                    "true", "json" -> machineReadableOutput = MachineReadableOutputFormat.JSON
+                    "shell" -> machineReadableOutput = MachineReadableOutputFormat.SHELL
+                    "false" -> machineReadableOutput = null
+                    else -> System.err.println("Invalid machine-readable-output parameter: $arg")
+                }
             },
             Option(Option.NO_SHORT_NAME, "allow-broken-build-scripts", "ignore build scripts which fail to compile and allow to run without them") { _, _ ->
                 allowBrokenBuildScripts = true
@@ -264,7 +269,7 @@ fun main(args: Array<String>) {
 
     val machineOutput: PrintStream?
 
-    if (machineReadableOutput) {
+    if (machineReadableOutput != null) {
         // Redirect logging to err
         machineOutput = PrintStream(FileOutputStream(FileDescriptor.out))
         System.setOut(System.err)
@@ -310,7 +315,7 @@ fun main(args: Array<String>) {
     val jLineLogger = java.util.logging.Logger.getLogger("org.jline")
     jLineLogger.level = java.util.logging.Level.OFF
 
-    val buildScriptInfo = prepareBuildScriptInfo(allowBrokenBuildScripts, interactive && !machineReadableOutput, cleanBuild)
+    val buildScriptInfo = prepareBuildScriptInfo(allowBrokenBuildScripts, interactive && machineReadableOutput == null, cleanBuild)
 
     if (buildScriptInfo == null || buildScriptInfo.hasErrors) {
         if (!allowBrokenBuildScripts) {
@@ -376,14 +381,14 @@ fun main(args: Array<String>) {
     }
 
     var exitCode = EXIT_CODE_SUCCESS
-    val parsedArgs = TaskParser.PartitionedLine(taskArguments, false, machineReadableOutput)
+    val parsedArgs = TaskParser.PartitionedLine(taskArguments, false, machineReadableOutput != null)
 
-    if (machineReadableOutput) {
+    if (machineReadableOutput != null) {
         parsedArgs.machineReadableCheckErrors()
 
         val out = machineOutput!!
         for (task in parsedArgs.tasks) {
-            machineReadableEvaluateAndPrint(out, task)
+            machineReadableEvaluateAndPrint(out, task, machineReadableOutput!!)
         }
 
         if (interactive) {
@@ -395,7 +400,7 @@ fun main(args: Array<String>) {
                 parsed.machineReadableCheckErrors()
 
                 for (task in parsed.tasks) {
-                    machineReadableEvaluateAndPrint(out, task)
+                    machineReadableEvaluateAndPrint(out, task, machineReadableOutput!!)
                 }
             }
         }

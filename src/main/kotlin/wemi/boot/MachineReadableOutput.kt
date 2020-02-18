@@ -12,12 +12,23 @@ import wemi.util.field
 import wemi.util.writeArray
 import wemi.util.writeObject
 import wemi.util.writeValue
+import java.io.File
 import java.io.OutputStreamWriter
 import java.io.PrintStream
+import java.io.Writer
+import java.lang.reflect.Array
+import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
 
 private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
+
+enum class MachineReadableOutputFormat {
+    /** Standard Json output. Can easily output most of the object types. */
+    JSON,
+    /** Custom formatting for easier shell integration. May not correctly handle all value types. */
+    SHELL
+}
 
 /**
  * Evaluates given task, possibly as a "machine-readable" command,
@@ -25,24 +36,24 @@ private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
  *
  * May exit process if the task evaluation fails.
  */
-fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
+fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task, format:MachineReadableOutputFormat) {
     LOG.info("> {}", task)
     if (task.isMachineReadableCommand) {
         when (task.key) {
             "version" -> {
-                machineReadablePrint(out, WemiVersion)
+                machineReadablePrint(out, WemiVersion, format)
                 return
             }
             "projects" -> {
-                machineReadablePrint(out, AllProjects.values)
+                machineReadablePrint(out, AllProjects.values, format)
                 return
             }
             "configurations" -> {
-                machineReadablePrint(out, AllConfigurations.values)
+                machineReadablePrint(out, AllConfigurations.values, format)
                 return
             }
             "keys" -> {
-                machineReadablePrint(out, AllKeys.values)
+                machineReadablePrint(out, AllKeys.values, format)
                 return
             }
             "keysWithDescription" -> {
@@ -57,17 +68,17 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
                             }
                         }
                     }
-                })
+                }, format)
                 return
             }
             "defaultProject" -> {
-                machineReadablePrint(out, findDefaultProject(Paths.get("."))?.name)
+                machineReadablePrint(out, findDefaultProject(Paths.get("."))?.name, format)
                 return
             }
         }
 
         if (task.isMachineReadableOptional) {
-            machineReadablePrint(out, null)
+            machineReadablePrint(out, null, format)
             return
         }
 
@@ -79,7 +90,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
         val (_, data, status) = task.evaluateKey(null, null)
         when (status) {
             TaskEvaluationStatus.Success -> {
-                machineReadablePrint(out, data)
+                machineReadablePrint(out, data, format)
             }
             TaskEvaluationStatus.NoProject -> {
                 val projectString = data as String?
@@ -102,7 +113,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
             }
             TaskEvaluationStatus.NotAssigned -> {
                 if (task.isMachineReadableOptional) {
-                    machineReadablePrint(out, null)
+                    machineReadablePrint(out, null, format)
                 } else {
                     val error = data as WemiException.KeyNotAssignedException
                     LOG.error("Can't evaluate {} - {}{} not set", task, error.scope.toString(), error.key.name)
@@ -129,13 +140,58 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task) {
     }
 }
 
-private fun machineReadablePrint(out: PrintStream, thing: Any?) {
+private fun Writer.shellPrint(thing:Any?) {
+    if (thing == null) {
+        write("\n")
+    } else if (thing is CharSequence || thing is Number) {
+        write(thing.toString())
+        write("\n")
+    } else if (thing.javaClass.isArray) {
+        for (i in 0 until Array.getLength(thing)) {
+            shellPrint(Array.get(thing, i))
+            write("\n")
+        }
+    } else if (thing is Iterable<*>) {
+        for (element in thing) {
+            shellPrint(element)
+        }
+    } else if (thing is Path) {
+        write(thing.toAbsolutePath().toString())
+        write("\n")
+    } else if (thing is File) {
+        write(thing.absolutePath)
+        write("\n")
+    } else if (thing is Enum<*>) {
+        write(thing.name)
+        write("\n")
+    } else if (thing is Map<*, *>) {
+        for (entry in thing.entries) {
+            shellPrint(entry.key)
+            shellPrint(entry.value)
+        }
+    } else {
+        val jsonWriter = JsonWriter(this)
+        jsonWriter.setOutputType(OutputType.minimal)
+        jsonWriter.setQuoteLongValues(false)
+        jsonWriter.writeValue(thing, null)
+        write("\n")
+    }
+}
+
+private fun machineReadablePrint(out: PrintStream, thing: Any?, format: MachineReadableOutputFormat) {
     val writer = OutputStreamWriter(out)
-    val jsonWriter = JsonWriter(writer)
-    jsonWriter.setOutputType(OutputType.json)
-    jsonWriter.setQuoteLongValues(false)
-    jsonWriter.writeValue(thing, null)
-    writer.append(0.toChar())
+    when (format) {
+        MachineReadableOutputFormat.JSON -> {
+            val jsonWriter = JsonWriter(writer)
+            jsonWriter.setOutputType(OutputType.json)
+            jsonWriter.setQuoteLongValues(false)
+            jsonWriter.writeValue(thing, null)
+            writer.append(0.toChar())
+        }
+        MachineReadableOutputFormat.SHELL -> {
+            writer.shellPrint(thing)
+        }
+    }
     writer.flush()
 }
 
