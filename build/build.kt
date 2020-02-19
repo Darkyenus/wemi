@@ -1,5 +1,6 @@
 import org.slf4j.LoggerFactory
 import wemi.Archetypes
+import wemi.BooleanValidator
 import wemi.KeyDefaults.inProjectDependencies
 import wemi.Keys.cacheDirectory
 import wemi.WemiException
@@ -20,6 +21,7 @@ import wemi.dependency.ProjectDependency
 import wemi.expiresWith
 import wemi.key
 import wemi.publish.InfoNode
+import wemi.read
 import wemi.test.JUnitPlatformLauncher
 import wemi.test.TestReport
 import wemi.test.TestStatus
@@ -78,10 +80,12 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
     }
 
     distributionArchive set {
-        val testResult: TestReport = test.get()
-        if (testResult.values.any { it.status == TestStatus.FAILED }) {
-            println(testResult.prettyPrint())
-            throw WemiException("Can't build distribution archive when the tests are failing", showStacktrace = false)
+        if (read("skipTest", "Skip test evaluation", BooleanValidator) != true) {
+            val testResult: TestReport = test.get()
+            if (testResult.values.any { it.status == TestStatus.FAILED }) {
+                println(testResult.prettyPrint())
+                throw WemiException("Can't build distribution archive when the tests are failing", showStacktrace = false)
+            }
         }
 
         val archiveContentDir = distributionArchiveContent.get()

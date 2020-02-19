@@ -674,11 +674,6 @@ object KeyDefaults {
             options.add("-link")
             options.add(javadocUrl(javaVersion))
 
-            val pathSeparator = System.getProperty("path.separator", ":")
-            options.add("-classpath")
-            val classpathString = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry }).joinToString(pathSeparator) { it.absolutePath }
-            options.add(classpathString)
-
             options
         }
     }
@@ -709,9 +704,11 @@ object KeyDefaults {
             javadocOutput.ensureEmptyDirectory()
             fileManager.setLocation(DocumentationTool.Location.DOCUMENTATION_OUTPUT, listOf(javadocOutput.toFile()))
 
+            // Setup classpath
+            fileManager.setLocation(StandardLocation.CLASS_PATH, Keys.externalClasspath.get().map { it.classpathEntry.toFile() })
+
             // Try to specify doclet path explicitly
             val toolsJar = jdkToolsJar(Keys.javaHome.get())
-
             if (toolsJar != null) {
                 fileManager.setLocation(DocumentationTool.Location.DOCLET_PATH, listOf(toolsJar.toFile()))
             }

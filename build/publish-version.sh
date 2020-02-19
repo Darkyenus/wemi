@@ -17,7 +17,8 @@ log "Wemi version: $wemi_version"
 # Build the archive files in Wemi
 log "TODO: Using hardcoded wemi_dist_dir, switch to dynamic version after 0.12 release"
 #wemi_dist_dir=$(./wemi --machine-readable-output=shell wemi/distributionArchive) || fail "wemi ($?) (archive)"
-./wemi wemi/distributionArchive
+log "TODO: Skipping tests"
+./wemi wemi/distributionArchive skipTest=true || fail "Distribution archive build failed"
 wemi_dist_dir="${wemi_home}/build/dist"
 
 # Copy IDE plugins
