@@ -3,7 +3,6 @@
 
 //@file:BuildDependency("com.darkyen.wemi", "wemi-plugin-jvm-hotswap", "cd036c9a8d")//TODO Experimental
 
-import wemi.Configurations.compilingKotlin
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
@@ -38,14 +37,10 @@ val basics by project {
     repositories add { sonatypeOss("snapshots") }
     libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.14.2-R0.1-SNAPSHOT") }
 
-    extend(compilingJava) {
-        compilerOptions[JavaCompilerFlags.customFlags] += "-Xlint:all"
-    }
+    compilerOptions[JavaCompilerFlags.customFlags] = { it + "-Xlint:all" }
 
-    extend(compilingKotlin) {
-        compilerOptions[KotlinCompilerFlags.customFlags] += "-Xno-optimize" // (example, not needed)
-        compilerOptions[KotlinCompilerFlags.incremental] = true
-    }
+    compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xno-optimize" } // (example, not needed)
+    compilerOptions[KotlinCompilerFlags.incremental] = { true }
 
     extend(running) {
         projectName set { "Greeting Simulator $startYear" }

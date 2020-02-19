@@ -11,7 +11,6 @@ import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
 import wemi.boot.CLI
 import wemi.boot.WemiBundledLibrariesExclude
-import wemi.boot.WemiRuntimeClasspath
 import wemi.boot.WemiVersion
 import wemi.collections.WMutableList
 import wemi.compile.JavaCompilerFlags
@@ -471,10 +470,10 @@ object KeyDefaults {
 
     val TestParameters: Value<TestParameters> = {
         val testParameters = wemi.test.TestParameters()
-        testParameters.select.classpathRoots.add(Keys.outputClassesDirectory.get().absolutePath)
+        testParameters.classpathRoots.add(Keys.outputClassesDirectory.get().absolutePath)
 
         read("class", "Include classes, whose fully classified name match this regex", StringValidator, ask=false)?.let {  classPattern ->
-            testParameters.filter.classNamePatterns.include(classPattern)
+            testParameters.filterClassNamePatterns.included.add(classPattern)
         }
 
         testParameters
@@ -492,11 +491,11 @@ object KeyDefaults {
             val classpathEntries = ArrayList<Path>(internalClasspath.size + externalClasspath.size + 1)
             classpathEntries.addAll(internalClasspath)
             classpathEntries.addAll(externalClasspath)
-            classpathEntries.addAll(WemiRuntimeClasspath)
+            classpathEntries.add(Magic.classpathFileOf(TEST_LAUNCHER_MAIN_CLASS)!!)
 
             val processBuilder = wemi.run.prepareJavaProcess(
                     javaExecutable, directory, classpathEntries,
-                    TEST_LAUNCHER_MAIN_CLASS, options, emptyList())
+                    TEST_LAUNCHER_MAIN_CLASS.name, options, emptyList())
 
             val testParameters = Keys.testParameters.get(*input) // Input passthrough
 

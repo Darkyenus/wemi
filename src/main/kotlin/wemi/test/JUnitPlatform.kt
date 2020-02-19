@@ -5,6 +5,7 @@ import wemi.boot.CLI
 import wemi.dependency.DependencyId
 import wemi.dependency.MavenCentral
 import wemi.test.TestStatus.*
+import wemi.test.forked.TestLauncher
 import wemi.util.Color
 import wemi.util.Format
 import wemi.util.LineReadingOutputStream
@@ -13,11 +14,13 @@ import wemi.util.appendPadded
 import wemi.util.appendTimeDuration
 import wemi.util.appendTimes
 import wemi.util.format
-import wemi.util.fromJson
 import wemi.util.printTree
 import wemi.util.readFully
-import wemi.util.writeJson
-import java.io.OutputStreamWriter
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.OutputStream
 import java.time.Instant
 import java.time.ZoneId
 import java.util.*
@@ -27,7 +30,7 @@ private val LOG = LoggerFactory.getLogger("JUnitPlatform")
 private val TEST_OUTPUT_LOG = LoggerFactory.getLogger("TestOutput")
 
 /** Fully qualified class name of the file that contains. */
-internal const val TEST_LAUNCHER_MAIN_CLASS = "wemi.test.forked.TestLauncherKt"
+internal val TEST_LAUNCHER_MAIN_CLASS = TestLauncher::class.java
 
 /** Default JUnit Platform version */
 const val JUnitPlatformVersion = "1.5.2"
@@ -86,26 +89,13 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
     LOG.debug("Starting test process")
     val process = builder.start()
 
-    OutputStreamWriter(process.outputStream, Charsets.UTF_8).use {
-        it.writeJson(testParameters, TestParameters::class.java)
+    DataOutputStream(process.outputStream).use { out ->
+        testParameters.writeTo(out)
     }
 
-    var outputJson = ""
+    val outputBytes = ByteArrayOutputStream()
 
-    val stdout = object : LineReadingOutputStream() {
-        override fun onLineRead(line: CharSequence) {
-            if (line.startsWith(TEST_LAUNCHER_OUTPUT_PREFIX)) {
-                outputJson = line.substring(TEST_LAUNCHER_OUTPUT_PREFIX.length)
-                LOG.trace("Test process returned json: {}", outputJson)
-            } else {
-                val trimmedLine = line.dropLastWhile { it.isWhitespace() }
-                if (trimmedLine.isNotEmpty()) {
-                    TEST_OUTPUT_LOG.info("{}", trimmedLine)
-                }
-            }
-        }
-    }
-    val stderr = object : LineReadingOutputStream() {
+    val stdOutErrLogger = object : LineReadingOutputStream() {
         override fun onLineRead(line: CharSequence) {
             val trimmedLine = line.dropLastWhile { it.isWhitespace() }
             if (trimmedLine.isNotEmpty()) {
@@ -113,23 +103,58 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
             }
         }
     }
+    val stdoutMessageCatcher = object : OutputStream() {
 
-    val procStdout = process.inputStream
-    val procStderr = process.errorStream
+        var state = 0
 
-    try {
+        val STATE_INITIAL = 0
+        val STATE_READING = 1
+        val STATE_DONE = 2
+
+        var magicCount = 0
+
+        override fun write(b: Int) {
+            if (state == STATE_INITIAL) {
+                if (b == TestLauncher.MAGIC_MESSAGE_START.toInt()) {
+                    magicCount++
+                    if (magicCount == TestLauncher.MAGIC_MESSAGE_DELIMITER_REPEAT) {
+                        magicCount = 0
+                        state = STATE_READING
+                    }
+                } else {
+                    magicCount = 0
+                    stdOutErrLogger.write(b)
+                }
+            } else if (state == STATE_READING) {
+                outputBytes.write(b)
+                if (b == TestLauncher.MAGIC_MESSAGE_END.toInt()) {
+                    magicCount++
+                    if (magicCount == TestLauncher.MAGIC_MESSAGE_DELIMITER_REPEAT) {
+                        magicCount = 0
+                        state = STATE_DONE
+                    }
+                } else {
+                    magicCount = 0
+                }
+            } else {
+                stdOutErrLogger.write(b)
+            }
+        }
+    }
+
+    stdOutErrLogger.use { logger ->
+        val procStdout = process.inputStream
+        val procStderr = process.errorStream
+
         while (true) {
             val exited = process.waitFor(10, TimeUnit.MILLISECONDS)
-            readFully(stdout, procStdout)
-            readFully(stderr, procStderr)
+            readFully(stdoutMessageCatcher, procStdout)
+            readFully(logger, procStderr)
 
             if (exited) {
                 break
             }
         }
-    } finally {
-        stdout.close()
-        stderr.close()
     }
 
     val status = process.exitValue()
@@ -139,12 +164,14 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
         LOG.warn("Test process ended with status {}", status)
     }
 
+    val reportBytes = outputBytes.toByteArray()
     return try {
-        val report = fromJson<TestReport>(outputJson)
+        val report = TestReport()
+        report.readFrom(DataInputStream(ByteArrayInputStream(reportBytes)))
         LOG.debug("Test process returned report: {}", report)
         report
     } catch (e: Exception) {
-        LOG.error("Malformed test report output:\n{}", outputJson, e)
+        LOG.error("Malformed test report output:\n{}", Base64.getEncoder().encodeToString(reportBytes), e)
         null
     }
 }
@@ -222,7 +249,7 @@ fun TestReport.prettyPrint(): CharSequence {
 
         // Skip reason
         val skipReason = data.skipReason
-        if (skipReason != null) {
+        if (skipReason.isNotBlank()) {
             sb.append(' ').format(Color.White).append(skipReason).format()
         }
 
@@ -233,7 +260,7 @@ fun TestReport.prettyPrint(): CharSequence {
 
         // Stack trace
         val stackTrace = data.stackTrace
-        if (stackTrace != null) {
+        if (stackTrace.isNotBlank()) {
             sb.append('\n')
             sb.append(stackTrace)
         }
