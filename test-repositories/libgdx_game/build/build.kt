@@ -70,8 +70,6 @@ val lwjgl2 by project(path("./lwjgl2/")) {
     projectDependencies add { ProjectDependency(core, true) }
 
     mainClass set {"game.Main"}
-    
-    extend(compilingJava) {
-        compilerOptions[JavaCompilerFlags.customFlags] += "-Xlint:unchecked"
-    }
+
+    compilerOptions[JavaCompilerFlags.customFlags] = { it + "-Xlint:unchecked" }
 }

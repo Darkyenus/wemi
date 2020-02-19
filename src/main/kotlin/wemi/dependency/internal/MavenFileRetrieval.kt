@@ -75,7 +75,7 @@ private val NO_ALTERNATE_REPOSITORIES = emptyArray<Repository>()
 private class CacheArtifactPath(val cacheFile: Path, val cacheFileExists: Boolean, val cacheControlMs: Long)
 
 /**
- * Retrieve file from repository, handling cache and checksums (TODO: And signatures).
+ * Retrieve file from a repository, handling cache and checksums (TODO: And signatures).
  * NOTE: Does not check whether [repository] holds snapshots and/or releases.
  * Will fail if the file is a directory.
  *
@@ -443,71 +443,13 @@ private fun <T> Request.execute(listener:ActivityListener?, responseTranslator:R
 
                     listener.activityDownloadProgress(0L, totalLength, System.nanoTime() - startNs)
 
-                    return responseTranslator.decode(response, object : InputStream() {
+                    return responseTranslator.decode(response, object : GaugedInputStream(originalIn) {
 
-                        private var totalRead = 0L
+                        override var totalRead:Long = 0L
                             set(value) {
                                 field = value
-                                if (value > totalReadHighMark) {
-                                    totalReadHighMark = value
-                                    listener.activityDownloadProgress(value, totalLength, System.nanoTime() - startNs)
-                                }
+                                listener.activityDownloadProgress(value, totalLength, System.nanoTime() - startNs)
                             }
-                        private var totalReadMark = 0L
-
-                        private var totalReadHighMark = 0L
-
-                        override fun read(): Int {
-                            val read = originalIn.read()
-                            if (read != -1) {
-                                totalRead++
-                            }
-                            return read
-                        }
-
-                        override fun read(b: ByteArray): Int {
-                            val read = super.read(b)
-                            if (read > 0) {
-                                totalRead += read
-                            }
-                            return read
-                        }
-
-                        override fun read(b: ByteArray, off: Int, len: Int): Int {
-                            val read = super.read(b, off, len)
-                            if (read > 0) {
-                                totalRead += read
-                            }
-                            return read
-                        }
-
-                        override fun skip(n: Long): Long {
-                            val skipped = originalIn.skip(n)
-                            totalRead = maxOf(0, totalRead + skipped)
-                            return skipped
-                        }
-
-                        override fun available(): Int {
-                            return originalIn.available()
-                        }
-
-                        override fun close() {
-                            originalIn.close()
-                        }
-
-                        override fun reset() {
-                            originalIn.reset()
-                            totalRead = totalReadMark
-                        }
-
-                        override fun mark(readlimit: Int) {
-                            originalIn.mark(readlimit)
-                            totalReadMark = totalRead
-                        }
-
-                        override fun markSupported(): Boolean {
-                            return originalIn.markSupported()
-                        }
                     })
                 }
 

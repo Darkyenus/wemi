@@ -197,3 +197,48 @@ open class LineReadingWriter(private val onLineRead: (CharSequence) -> Unit) : W
         flushLine()
     }
 }
+
+internal open class GaugedInputStream(private val next:InputStream) : InputStream() {
+
+    protected open var totalRead:Long = 0L
+
+    override fun read(): Int {
+        val read = next.read()
+        if (read != -1) {
+            totalRead++
+        }
+        return read
+    }
+
+    override fun read(b: ByteArray): Int {
+        val read = next.read(b)
+        if (read > 0) {
+            totalRead += read
+        }
+        return read
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val read = next.read(b, off, len)
+        if (read > 0) {
+            totalRead += read
+        }
+        return read
+    }
+
+    override fun skip(n: Long): Long {
+        val skipped = next.skip(n)
+        if (skipped > 0) {
+            totalRead += skipped
+        }
+        return skipped
+    }
+
+    override fun available(): Int {
+        return next.available()
+    }
+
+    override fun close() {
+        next.close()
+    }
+}
