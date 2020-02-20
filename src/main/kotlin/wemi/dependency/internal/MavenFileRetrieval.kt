@@ -5,6 +5,7 @@ import com.darkyen.dave.*
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
 import wemi.boot.WemiUnicodeOutputSupported
+import wemi.collections.toMutable
 import wemi.dependency.*
 import wemi.util.*
 import java.io.FileNotFoundException
@@ -69,8 +70,6 @@ private fun httpGet(url: URL, ifModifiedSince:Long = -1, useUnsafeTransport:Bool
 
     return request
 }
-
-private val NO_ALTERNATE_REPOSITORIES = emptyArray<Repository>()
 
 private class CacheArtifactPath(val cacheFile: Path, val cacheFileExists: Boolean, val cacheControlMs: Long)
 
@@ -173,7 +172,7 @@ private fun retrieveFileLocally(repository: Repository, path: String, snapshot:B
 private sealed class DownloadResult {
     object Failure:DownloadResult()
     object UseCache:DownloadResult()
-    class Success(val remoteLastModifiedTime:Long, val remoteArtifactData:ByteArray, val checksums:Array<String?>, val checksumMismatches:Int):DownloadResult()
+    class Success(val remoteLastModifiedTime:Long, val remoteArtifactData:DataWithChecksum, val checksumMismatches:Int):DownloadResult()
 }
 
 private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheControlMs: Long, snapshot: Boolean, useUnsafeTransport:Boolean, progressTracker: ActivityListener?):DownloadResult {
@@ -209,11 +208,21 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
         LOG.debug("Failed to retrieve '{}' - status code {}", repositoryArtifactUrl, response.statusCode)
         return DownloadResult.Failure
     }
-    val remoteArtifactData = response.body
+    val remoteArtifactData = DataWithChecksum(response.body)
 
     // Step 4: download and verify checksums
-    val checksums = arrayOfNulls<String>(CHECKSUMS.size) // checksum file content
-    var checksumMismatches = 0
+    val checksumMismatches = retrieveChecksums(repositoryArtifactUrl, useUnsafeTransport, progressTracker, remoteArtifactData)
+
+    return DownloadResult.Success(remoteLastModifiedTime, remoteArtifactData, checksumMismatches)
+}
+
+/**
+ * Retrieve and verify checksums for given [artifactData] which has been found at [repositoryArtifactUrl].
+ * @return amount of mismatched checksums, 0 if none, -1 if no checksums found
+ */
+private fun retrieveChecksums(repositoryArtifactUrl: URL, useUnsafeTransport: Boolean, progressTracker: ActivityListener?, artifactData: DataWithChecksum): Int {
+    var checksumsChecked = 0
+    var checksumMismatchBits = 0
     for (checksum in CHECKSUMS) {
         val checksumUrl = repositoryArtifactUrl.appendToPath(checksum.suffix)
         val checksumFileBody: String? = try {
@@ -236,31 +245,72 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
             continue
         }
 
-        val expectedChecksum = parseHashSum(checksumFileBody)
-        if (checksumFileBody == null || expectedChecksum.isEmpty()) {
+        val remoteChecksum = parseHashSum(checksumFileBody)
+        if (checksumFileBody == null || remoteChecksum.isEmpty()) {
             LOG.warn("Failed to retrieve checksum '{}': file is malformed", checksumUrl)
-            checksumMismatches++
-        }
-
-        // Compute checksum
-        val computedChecksum = checksum.checksum(remoteArtifactData)
-
-        if (hashMatches(expectedChecksum, computedChecksum, repositoryArtifactUrl.path.takeLastWhile { it != '/' })) {
-            LOG.trace("{} checksum of '{}' is valid", checksum, repositoryArtifactUrl)
-            checksums[checksum.ordinal] = checksumFileBody
         } else {
-            if (LOG.isWarnEnabled) {
-                LOG.warn("{} checksum of '{}' mismatch! Computed {}, got {}", checksum, repositoryArtifactUrl, toHexString(computedChecksum), toHexString(expectedChecksum))
+            checksumsChecked++
+            // Compute checksum
+            val artifactChecksum = artifactData.checksum(checksum)
+
+            if (hashMatches(remoteChecksum, artifactChecksum, repositoryArtifactUrl.path.takeLastWhile { it != '/' })) {
+                LOG.trace("{} checksum of '{}' is valid", checksum, repositoryArtifactUrl)
+            } else {
+                LOG.warn("{} checksum of '{}' mismatch! Computed {}, got {}", checksum, repositoryArtifactUrl, toHexString(artifactChecksum), toHexString(remoteChecksum))
+                checksumMismatchBits = checksumMismatchBits or (1 shl checksum.ordinal)
             }
-            checksumMismatches++
         }
     }
 
-    return DownloadResult.Success(remoteLastModifiedTime, remoteArtifactData, checksums, checksumMismatches)
+    if (checksumMismatchBits != 0) {
+        return checksumMismatchBits
+    }
+    if (checksumsChecked <= 0) {
+        return -1
+    }
+    return 0
+}
+
+/**
+ * Download enough data to be able to verify that if [repositoryArtifactUrl] contains any artifact, it is the same as [verifyAgainst].
+ * @return true if there is an artifact and it matches, false if there is an artifact and it does not match, null if there is no artifact
+ */
+private fun retrieveFileForVerificationOnly(repositoryArtifactUrl: URL, useUnsafeTransport:Boolean, verifyAgainst:DataWithChecksum, listener:ActivityListener?):Boolean? {
+    // Verification step 1: Download all checksums
+    val checksumMismatches = retrieveChecksums(repositoryArtifactUrl, useUnsafeTransport, listener, verifyAgainst)
+    if (checksumMismatches == 0) {
+        return true
+    } else if (checksumMismatches > 0) {
+        return false
+    }
+
+    // There were no checksum files, so we have to download the whole thing
+    val response: Response<ByteArray>
+    try {
+        response = httpGet(repositoryArtifactUrl, useUnsafeTransport = useUnsafeTransport).execute(listener, ResponseTranslator.BYTES_TRANSLATOR)
+    } catch (e: WebbException) {
+        when (e.cause) {
+            is FileNotFoundException ->
+                LOG.trace("Failed to retrieve '{}', file not found", repositoryArtifactUrl)
+            is SSLException -> {
+                LOG.warn("Failed to retrieve '{}', problem with SSL", repositoryArtifactUrl, e.cause)
+            }
+            else ->
+                LOG.debug("Failed to retrieve '{}'", repositoryArtifactUrl, e)
+        }
+        return null
+    }
+    if (!response.isSuccess) {
+        LOG.debug("Failed to retrieve '{}' for verification - status code {}", repositoryArtifactUrl, response.statusCode)
+        return null
+    }
+
+    val remoteArtifactData = response.body
+    return verifyAgainst.data.contentEquals(remoteArtifactData)
 }
 
 /** Continuation of [retrieveFileLocally]. */
-private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:Boolean, cache:CacheArtifactPath, storeArtifact:Boolean, progressTracker: ActivityListener?): ArtifactPath? {
+private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:Boolean, cache:CacheArtifactPath, progressTracker: ActivityListener?): ArtifactPath? {
     val repositoryArtifactUrl = repository.url / path
     val cacheFile = cache.cacheFile
 
@@ -296,50 +346,55 @@ private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:
     }
     downloadFileSuccess!!
 
-    if (storeArtifact) {
-        Files.createDirectories(cacheFile.parent)
-    }
+    Files.createDirectories(cacheFile.parent)
 
     // Step 5: Store downloaded checksums locally
-    if (downloadFileSuccess.checksums.all { it == null }) {
+    if (downloadFileSuccess.checksumMismatches < 0) {
         LOG.warn("No checksums found for {}, can't verify its correctness", repositoryArtifactUrl)
-    } else if (storeArtifact) {
-        for ((i, checksum) in downloadFileSuccess.checksums.withIndex()) {
-            checksum ?: continue
-            val filePath = cacheFile appendSuffix CHECKSUMS[i].suffix
-            filePath.writeText(checksum)
+    } else {
+        for (checksum in CHECKSUMS) {
+            val checksumBytes = downloadFileSuccess.remoteArtifactData.checksumOrNull(checksum) ?: continue
+            val filePath = cacheFile appendSuffix checksum.suffix
+            filePath.writeText(toHexString(checksumBytes))
         }
     }
 
     // Step 6: Store downloaded artifact
-    val remoteArtifactData: ByteArray = downloadFileSuccess.remoteArtifactData
-    if (storeArtifact) {
-        try {
-            val openOptions =
-                    if (cache.cacheFileExists) {
-                        arrayOf(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
-                    } else {
-                        arrayOf(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
-                    }
-            Files.newOutputStream(cacheFile, *openOptions).use {
-                it.write(remoteArtifactData, 0, remoteArtifactData.size)
-            }
-            LOG.debug("Artifact from {} cached successfully", repositoryArtifactUrl)
-        } catch (e: IOException) {
-            LOG.warn("Failed to save artifact from {} to cache in {}", repositoryArtifactUrl, cacheFile, e)
-            return null
+    val remoteArtifactData = downloadFileSuccess.remoteArtifactData
+    try {
+        val openOptions =
+                if (cache.cacheFileExists) {
+                    arrayOf(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
+                } else {
+                    arrayOf(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+                }
+        Files.newOutputStream(cacheFile, *openOptions).use {
+            it.write(remoteArtifactData.data)
         }
-        if (snapshot) {
-            try {
-                Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(downloadFileSuccess.remoteLastModifiedTime))
-            } catch (e: IOException) {
-                LOG.warn("Failed to change artifact's '{}' modify time, snapshot cache control may be slightly off", cacheFile, e)
-            }
+        LOG.debug("Artifact from {} cached successfully", repositoryArtifactUrl)
+    } catch (e: IOException) {
+        LOG.warn("Failed to save artifact from {} to cache in {}", repositoryArtifactUrl, cacheFile, e)
+        return null
+    }
+    if (snapshot) {
+        try {
+            Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(downloadFileSuccess.remoteLastModifiedTime))
+        } catch (e: IOException) {
+            LOG.warn("Failed to change artifact's '{}' modify time, snapshot cache control may be slightly off", cacheFile, e)
         }
     }
 
     // Done
-    return ArtifactPath(cacheFile, remoteArtifactData, repository, repositoryArtifactUrl, false)
+    return ArtifactPath(cacheFile, null, repository, repositoryArtifactUrl, false).apply {
+        this.dataWithChecksum = remoteArtifactData
+    }
+}
+
+/** Variant of [retrieveFileRemotely] for verification that [repository] contains the same artifact as provided. */
+private fun verifyArtifactMatches(repository: Repository, path: String, verifyAgainst:DataWithChecksum, listener:ActivityListener?): Boolean? {
+    val repositoryArtifactUrl = repository.url / path
+    LOG.debug("Retrieving file '{}' for verification from {}", path, repository)
+    return retrieveFileForVerificationOnly(repositoryArtifactUrl, repository.useUnsafeTransport, verifyAgainst, listener)
 }
 
 private fun Repository.canResolve(snapshot:Boolean):Boolean {
@@ -350,18 +405,16 @@ internal class ArtifactPathWithAlternateRepositories(
         /** The artifact retrieved. */
         val artifactPath:ArtifactPath,
         /** Repositories in which the artifact was also found. */
-        val alternateRepositories:Array<Repository>,
+        val alternateRepositories:SortedRepositories,
         /** Repositories in which the artifact could also be found, but weren't checked yet. */
-        val possibleAlternateRepositories:Array<Repository>
+        val possibleAlternateRepositories:SortedRepositories
 )
 
 internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?, cachePath:(Repository) -> String = {path}):ArtifactPathWithAlternateRepositories? {
     val localFailures = arrayOfNulls<CacheArtifactPath>(repositories.size)
     for ((i, repository) in repositories.withIndex()) {
         retrieveFileLocally(repository, path, snapshot, cachePath(repository)).use<Unit>({
-            val alternateRepositories =
-                    if (i + 1 == repositories.size) NO_ALTERNATE_REPOSITORIES else Array(repositories.size - i - 1) { copyIndex -> repositories[i + 1 + copyIndex] }
-            return ArtifactPathWithAlternateRepositories(it, NO_ALTERNATE_REPOSITORIES, alternateRepositories)
+            return ArtifactPathWithAlternateRepositories(it, emptyList(), repositories.drop(i + 1))
         }, {
             localFailures[i] = it
         })
@@ -369,24 +422,30 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
 
     var result:ArtifactPath? = null
     var resultRepository:Repository? = null
-    var alternateRepositories:Array<Repository> = NO_ALTERNATE_REPOSITORIES
+    var alternateRepositories:SortedRepositories = emptyList()
+    var possibleAlternateRepositories:SortedRepositories = emptyList()
 
     for ((i, cacheArtifactPath) in localFailures.withIndex()) {
         if (cacheArtifactPath == null)
             continue
 
         val repository = repositories[i]
-        val success = retrieveFileRemotely(repository, path, snapshot,
-                cacheArtifactPath, result == null, progressTracker) ?: continue
+
         if (result == null) {
-            result = success
+            result = retrieveFileRemotely(repository, path, snapshot, cacheArtifactPath, progressTracker) ?: continue
             resultRepository = repository
+
+            if (repository.authoritative) {
+                possibleAlternateRepositories = repositories.drop(i + 1)
+                break
+            }
         } else {
-            val resultData = result.data
-            val successData = success.data
-            if (resultData != null && successData != null && resultData.contentEquals(successData)) {
+            val valid = verifyArtifactMatches(repository, path, result.dataWithChecksum!!, progressTracker) ?: continue
+            if (valid) {
                 // At two different locations, but same content, this could be fine
-                alternateRepositories += repository
+                val mut = alternateRepositories.toMutable()
+                mut.add(repository)
+                alternateRepositories = mut
             } else {
                 // This is a problem! (https://blog.autsoft.hu/a-confusing-dependency/)
                 LOG.warn("File {} has been found at both {} (used) and {} (ignored), with different content! Please verify the dependency, as it may have been compromised.", path, resultRepository, repository)
@@ -394,7 +453,7 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
         }
     }
 
-    return result?.let { ArtifactPathWithAlternateRepositories(it, alternateRepositories, NO_ALTERNATE_REPOSITORIES) }
+    return result?.let { ArtifactPathWithAlternateRepositories(it, alternateRepositories, possibleAlternateRepositories) }
 }
 
 private fun uriToActivityName(uri:String):String {

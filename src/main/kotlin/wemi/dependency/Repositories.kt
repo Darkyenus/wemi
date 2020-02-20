@@ -25,7 +25,7 @@ fun repositoryCachePath(repositoryName:String): Path {
 }
 
 /** Maven Central repository at [maven.org](https://maven.org). Cached by [LocalM2Repository]. */
-val MavenCentral = Repository("central", URL("https://repo.maven.apache.org/maven2/"), snapshots = false)
+val MavenCentral = Repository("central", URL("https://repo.maven.apache.org/maven2/"), snapshots = false, authoritative = true)
 
 /** [Bintray JCenter repository](https://bintray.com/bintray/jcenter). Cached by [LocalM2Repository]. */
 val JCenter = Repository("jcenter", URL("https://jcenter.bintray.com/"), snapshots = false)

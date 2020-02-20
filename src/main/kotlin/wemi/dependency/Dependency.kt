@@ -329,19 +329,25 @@ class ArtifactPath(val path:Path, data:ByteArray?,
                    /** Whether or not was this artifact retrieved from cache */
                    val fromCache:Boolean) {
 
-    /** When null, but [path] exists, getter will attempt to load it and store the result for later queries. */
-    var data: ByteArray? = data
+    internal var dataWithChecksum: DataWithChecksum? = data?.let { DataWithChecksum(it) }
         get() {
             if (field == null) {
                 try {
-                    field = Files.readAllBytes(path)
+                    field = DataWithChecksum(Files.readAllBytes(path))
                 } catch (e: IOException) {
                     ARTIFACT_PATH_LOG.warn("Failed to load data from '{}' which was supposed to be there", path, e)
                 }
             }
-
             return field
         }
+
+    /** When null, but [path] exists, getter will attempt to load it and store the result for later queries. */
+    var data: ByteArray?
+        get() = dataWithChecksum?.data
+        set(value) {
+            dataWithChecksum = value?.let { DataWithChecksum(it) }
+        }
+
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

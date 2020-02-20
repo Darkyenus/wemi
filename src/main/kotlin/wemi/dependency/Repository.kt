@@ -49,25 +49,33 @@ class Repository(
          * a slow network drive, external drive which may not be present, etc. */
         val local:Boolean = url.isLocal(),
         /** When downloading non-local artifacts, ignore transport safety problems, such as expired https certificates. */
-        val useUnsafeTransport:Boolean = false) {
+        val useUnsafeTransport:Boolean = false,
+        /** Artifacts are first searched for in authoritative repositories and when an artifact is found there,
+         * there is no suspicion that it is a [malicious "squatter" artifact](https://blog.autsoft.hu/a-confusing-dependency/).
+         * If the artifact is not found in any of authoritative repositories, ALL non-authoritative repositories are searched in,
+         * at the same time, to prevent squatter attacks. */
+        val authoritative:Boolean = local) {
 
     /** Same as default constructor, but takes [path] instead of [url]. Useful for local repositories. */
     constructor(name: String, path: Path, cache: Path? = null, releases: Boolean = true, snapshots: Boolean = true,
-                snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = true)
-            : this(name=name, url=path.toUri().toURL(), cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local)
+                snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = true,
+                useUnsafeTransport: Boolean = false, authoritative:Boolean = local)
+            : this(name=name, url=path.toUri().toURL(), cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local, useUnsafeTransport=useUnsafeTransport, authoritative = authoritative)
 
     /** Same as default constructor, but takes [url] as a [String] instead of [URL]. */
     constructor(name: String, url: String, cache: Path? = null, releases: Boolean = true, snapshots: Boolean = true,
-                snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = url.startsWith("file:", ignoreCase = true))
-            : this(name=name, url=URL(url), cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local)
+                snapshotUpdateDelaySeconds: Long = SnapshotCheckDaily, tolerateChecksumMismatch: Boolean = false, local:Boolean = url.startsWith("file:", ignoreCase = true),
+                useUnsafeTransport: Boolean = false, authoritative:Boolean = local)
+            : this(name=name, url=URL(url), cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local, useUnsafeTransport=useUnsafeTransport, authoritative = authoritative)
 
     fun copy(name:String = this.name, url:URL = this.url, cache:Path? = this.cache,
              releases:Boolean = this.releases, snapshots:Boolean = this.snapshots,
              snapshotUpdateDelaySeconds:Long = this.snapshotUpdateDelaySeconds,
              tolerateChecksumMismatch: Boolean = this.tolerateChecksumMismatch,
              local:Boolean = this.local,
-             useUnsafeTransport: Boolean = this.useUnsafeTransport):Repository {
-        return Repository(name=name, url=url, cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local, useUnsafeTransport=useUnsafeTransport)
+             useUnsafeTransport: Boolean = this.useUnsafeTransport,
+             authoritative:Boolean = this.authoritative):Repository {
+        return Repository(name=name, url=url, cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local, useUnsafeTransport=useUnsafeTransport, authoritative = authoritative)
     }
 
     /** Repository acting as a cache for this repository, if [local]` == false`, otherwise not used.
@@ -164,3 +172,23 @@ enum class Checksum(val suffix: String, private val algo: String) {
 }
 
 internal val CHECKSUMS = Checksum.values()
+
+/** [ByteArray] [data] wrapped with (lazily computed) checksums of that data. */
+internal class DataWithChecksum(val data:ByteArray) {
+    private val checksums = arrayOfNulls<ByteArray>(CHECKSUMS.size)
+
+    fun checksum(type:Checksum):ByteArray {
+        return synchronized(checksums) {
+            var checksum = checksums[type.ordinal]
+            if (checksum == null) {
+                checksum = type.checksum(data)
+                checksums[type.ordinal] = checksum
+            }
+            checksum
+        }
+    }
+
+    fun checksumOrNull(type:Checksum):ByteArray? {
+        return checksums[type.ordinal]
+    }
+}

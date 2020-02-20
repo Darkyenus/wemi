@@ -121,15 +121,18 @@ internal typealias CompatibleSortedRepositories = SortedRepositories
 
 /** Compares repositories so that local repositories are first. */
 private val REPOSITORY_COMPARATOR = Comparator<Repository> { o1, o2 ->
-    val cache1 = o1.cache
-    val cache2 = o2.cache
-    // Locals go first (cache == null <-> local)
-    if (cache1 == null && cache2 != null) {
-        -1
-    } else if (cache1 != null && cache2 == null) {
-         1
-    } else {
-        // Arbitrary sorting by name to get full ordering
-        o1.name.compareTo(o2.name)
+    // Local goes first
+    val local = o2.local.compareTo(o1.local)
+    if (local != 0) {
+        return@Comparator local
     }
+
+    // Authoritative goes first
+    val authoritative = o2.authoritative.compareTo(o1.authoritative)
+    if (authoritative != 0) {
+        return@Comparator authoritative
+    }
+
+    // Arbitrary sorting by name to get full ordering
+    o1.name.compareTo(o2.name)
 }

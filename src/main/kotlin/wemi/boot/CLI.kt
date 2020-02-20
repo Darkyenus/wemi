@@ -324,8 +324,8 @@ object CLI {
                     messageBuilder.append(message)
 
                     if (bytes < totalBytes && bytesPerSec > 0) {
-                        val remainingSeconds = totalBytes / bytesPerSec
-                        if (remainingSeconds > 1.0 && remainingSeconds <= TimeUnit.DAYS.toSeconds(1)) {
+                        val remainingSeconds = (totalBytes - bytes) / bytesPerSec
+                        if (remainingSeconds > 5.0 && remainingSeconds <= TimeUnit.DAYS.toSeconds(1)) {
                             message.setLength(0)
                             message.append(" (ETA ").appendShortTimeDuration((remainingSeconds * 1000.0).toLong()).append(')')
                             messageBuilder.style(STATUS_TIME_STYLE).append(message)
