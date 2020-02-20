@@ -29,6 +29,7 @@ import wemi.dependency.JCenter
 import wemi.dependency.MavenCentral
 import wemi.dependency.NoClassifier
 import wemi.dependency.ProjectDependency
+import wemi.dependency.Repository
 import wemi.dependency.ResolvedDependency
 import wemi.dependency.internal.publish
 import wemi.dependency.joinClassifiers
@@ -127,6 +128,9 @@ object KeyDefaults {
         }
     }
 
+    val MakeAllRepositoriesAuthoritative:ValueModifier<Set<Repository>> = { repositories ->
+        repositories.mapTo(HashSet()) { if (!it.authoritative) it.copy(authoritative = true) else it }
+    }
 
     val ResolvedLibraryDependencies: Value<Partial<Map<DependencyId, ResolvedDependency>>> =  {
         val repositories = Keys.repositories.get()

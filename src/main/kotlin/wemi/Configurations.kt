@@ -113,6 +113,7 @@ object Configurations {
         Keys.libraryDependencies modify { it.map(mapper).toSet() }
         Keys.libraryDependencyMapper set Static(mapper)
         Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(SourcesClassifier)
+        Keys.repositories modify KeyDefaults.MakeAllRepositoriesAuthoritative
     }
 
     val retrievingDocs by configuration("Used to retrieve documentation", ideAxis) {
@@ -120,6 +121,7 @@ object Configurations {
         Keys.libraryDependencies modify { it.map(mapper).toSet() }
         Keys.libraryDependencyMapper set Static(mapper)
         Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(JavadocClassifier)
+        Keys.repositories modify KeyDefaults.MakeAllRepositoriesAuthoritative
     }
     //endregion
 
