@@ -89,15 +89,9 @@ fun Appendable.appendShortTimeDuration(ms: Long): Appendable {
     val DAY = HOUR * 24
 
     var remaining = ms
-    var first = true
 
     val days = remaining / DAY
     if (days > 0L) {
-        if (first) {
-            first = false
-        } else {
-            append(' ')
-        }
         if (days == 1L) {
             return append("1 day")
         } else {
@@ -108,11 +102,6 @@ fun Appendable.appendShortTimeDuration(ms: Long): Appendable {
     remaining %= DAY
     val hours = remaining / HOUR
     if (hours > 0) {
-        if (first) {
-            first = false
-        } else {
-            append(' ')
-        }
         if (hours == 1L) {
             return append("1 hour")
         } else {
@@ -123,11 +112,6 @@ fun Appendable.appendShortTimeDuration(ms: Long): Appendable {
     remaining %= HOUR
     val minutes = remaining / MINUTE
     if (minutes > 0) {
-        if (first) {
-            first = false
-        } else {
-            append(' ')
-        }
         if (minutes == 1L) {
             return append("1 minute")
         } else {
@@ -138,11 +122,6 @@ fun Appendable.appendShortTimeDuration(ms: Long): Appendable {
     remaining %= MINUTE
     val seconds = remaining / SECOND
     if (seconds > 0) {
-        if (first) {
-            first = false
-        } else {
-            append(' ')
-        }
         if (seconds == 1L) {
             return append("1 second")
         } else {
@@ -150,9 +129,6 @@ fun Appendable.appendShortTimeDuration(ms: Long): Appendable {
         }
     }
 
-    if (!first) {
-        append(' ')
-    }
     remaining %= SECOND
     return append(remaining).append(" ms")
 }
