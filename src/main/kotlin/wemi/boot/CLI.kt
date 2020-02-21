@@ -1,25 +1,48 @@
 package wemi.boot
 
 import com.darkyen.tproll.TPLogger
-import org.jline.reader.*
+import org.jline.reader.Candidate
+import org.jline.reader.EndOfFileException
+import org.jline.reader.LineReader
+import org.jline.reader.LineReaderBuilder
+import org.jline.reader.UserInterruptException
 import org.jline.reader.impl.DefaultParser
 import org.jline.reader.impl.LineReaderImpl
 import org.jline.terminal.Terminal
 import org.jline.terminal.TerminalBuilder
-import org.jline.utils.AttributedStringBuilder
-import org.jline.utils.AttributedStyle
 import org.slf4j.LoggerFactory
-import wemi.*
-import wemi.Binding
-import wemi.util.*
-import wemi.util.CliStatusDisplay.Companion.withStatus
+import wemi.AllConfigurations
+import wemi.AllKeys
+import wemi.AllProjects
+import wemi.BindingHolder
+import wemi.BooleanValidator
+import wemi.EvaluationListener
 import wemi.EvaluationListener.Companion.plus
+import wemi.IntValidator
+import wemi.Key
+import wemi.Project
+import wemi.WemiException
+import wemi.WemiKotlinVersion
+import wemi.util.CliStatusDisplay
+import wemi.util.CliStatusDisplay.Companion.withStatus
+import wemi.util.Color
+import wemi.util.Format
+import wemi.util.MatchUtils
+import wemi.util.SimpleHistory
+import wemi.util.TreeBuildingKeyEvaluationListener
+import wemi.util.WithDescriptiveString
+import wemi.util.appendKeyResultLn
+import wemi.util.appendTimeDuration
+import wemi.util.deleteRecursively
+import wemi.util.findCaseInsensitive
+import wemi.util.format
+import wemi.util.isDirectory
+import wemi.util.name
 import java.io.IOException
 import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
-import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 /**
@@ -222,128 +245,7 @@ object CLI {
         }
     }
 
-    private val KeyEvaluationStatusListener = object : EvaluationListener {
-
-        private val STATUS_PREFIX = if (WemiUnicodeOutputSupported) "• " else "# "
-        private val STATUS_INFIX = if (WemiUnicodeOutputSupported) " ‣ " else " > "
-        private val STATUS_ELLIPSIS = if (WemiUnicodeOutputSupported) "…" else "..."
-        private val STATUS_META_STYLE = AttributedStyle.BOLD.foreground(AttributedStyle.GREEN)
-        private val STATUS_CONTENT_STYLE = AttributedStyle.DEFAULT.underline()
-        private val STATUS_CONTENT_ACTIVITY_STYLE = AttributedStyle.DEFAULT.underline().foreground(AttributedStyle.WHITE)
-        private val STATUS_SIZE_STYLE = AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE)
-        private val STATUS_TIME_STYLE = AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN)
-
-        private val messageBuilder = AttributedStringBuilder()
-        private val stack = ArrayList<Int>()
-        private val importantPrefix:Int
-
-        init {
-            messageBuilder.style(STATUS_META_STYLE)
-            messageBuilder.append(STATUS_PREFIX)
-            importantPrefix = messageBuilder.length
-        }
-
-        override fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {
-            stack.add(messageBuilder.length)
-            if (stack.size > 1) {
-                messageBuilder.style(STATUS_META_STYLE)
-                messageBuilder.append(STATUS_INFIX)
-            }
-            messageBuilder.style(STATUS_CONTENT_STYLE)
-            messageBuilder.append(key.name)
-            update()
-        }
-
-        private fun pop() {
-            if (stack.size > 0) {
-                messageBuilder.setLength(stack.removeAt(stack.size - 1))
-                update()
-            }
-        }
-
-        private fun update() {
-            MessageDisplay?.setMessage(messageBuilder.toAttributedString(), importantPrefix)
-        }
-
-        override fun <V> keyEvaluationSucceeded(binding: Binding<V>, result: V) {
-            pop()
-        }
-
-        override fun keyEvaluationFailedByNoBinding(withAlternative: Boolean, alternativeResult: Any?) {
-            pop()
-        }
-
-        override fun keyEvaluationFailedByError(exception: Throwable, fromKey: Boolean) {
-            pop()
-        }
-
-        override fun beginActivity(activity: String) {
-            stack.add(messageBuilder.length)
-            if (stack.size > 1) {
-                messageBuilder.style(STATUS_META_STYLE)
-                messageBuilder.append(STATUS_INFIX)
-            }
-            messageBuilder.style(STATUS_CONTENT_ACTIVITY_STYLE)
-            val maxLength = 64
-            if (activity.length > maxLength) {
-                messageBuilder.append(STATUS_ELLIPSIS).append(activity, maxOf(activity.length - maxLength - STATUS_ELLIPSIS.length, 0), activity.length)
-            } else {
-                messageBuilder.append(activity)
-            }
-            update()
-            nextActivityProgress = 0L
-        }
-
-        private val activityProgressBytes_sb = StringBuilder()
-
-        private var nextActivityProgress = 0L
-
-        override fun activityDownloadProgress(bytes: Long, totalBytes: Long, durationNs:Long) {
-            val now = System.currentTimeMillis()
-            if (nextActivityProgress > now) {
-                // Do not update too often
-                return
-            }
-            nextActivityProgress = now + 100 //ms
-
-            val originalMessageLength = messageBuilder.length
-            try {
-                val message = activityProgressBytes_sb
-                message.setLength(0)
-                message.append(' ').appendShortByteSize(bytes)
-                if (totalBytes > 0 && bytes <= totalBytes) {
-                    message.append('/').appendShortByteSize(totalBytes)
-                }
-                messageBuilder.style(STATUS_SIZE_STYLE).append(message)
-
-                val durationSec = durationNs / 1000000000.0
-                if (bytes > 0 && durationSec >= 1) {
-                    val bytesPerSec = bytes.toDouble() / durationSec
-                    message.setLength(0)
-                    message.append(" at ").appendShortByteSize(bytesPerSec.toLong()).append("/s")
-                    messageBuilder.append(message)
-
-                    if (bytes < totalBytes && bytesPerSec > 0) {
-                        val remainingSeconds = (totalBytes - bytes) / bytesPerSec
-                        if (remainingSeconds > 5.0 && remainingSeconds <= TimeUnit.DAYS.toSeconds(1)) {
-                            message.setLength(0)
-                            message.append(" (ETA ").appendShortTimeDuration((remainingSeconds * 1000.0).toLong()).append(')')
-                            messageBuilder.style(STATUS_TIME_STYLE).append(message)
-                        }
-                    }
-                }
-
-                update()
-            } finally {
-                messageBuilder.setLength(originalMessageLength)
-            }
-        }
-
-        override fun endActivity() {
-            pop()
-            nextActivityProgress = 0L
-        }
-    }
+    private val KeyEvaluationStatusListener = MessageDisplay?.let { KeyEvaluationStatusListenerRenderer(it).listener }
 
     /**
      * Evaluates the key or command and prints human readable, formatted output.
@@ -427,7 +329,8 @@ object CLI {
 
         if (duration > 100) {
             val sb = StringBuilder()
-            sb.format(Color.Cyan).append("\tin ").appendTimeDuration(duration).format()
+            sb.format(Color.Cyan).append("\tin ").appendTimeDuration(duration)
+            sb.format()
             println(sb)
         }
 

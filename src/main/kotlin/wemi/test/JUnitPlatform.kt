@@ -255,7 +255,8 @@ fun TestReport.prettyPrint(): CharSequence {
 
         // Timing
         if (data.duration > 0L) {
-            sb.append(' ').format(Color.Cyan).appendTimeDuration(data.duration).format()
+            sb.append(' ').format(Color.Cyan).appendTimeDuration(data.duration)
+            sb.format()
         }
 
         // Stack trace

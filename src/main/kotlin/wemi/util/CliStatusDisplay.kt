@@ -5,7 +5,7 @@ import org.jline.terminal.Terminal
 import org.jline.utils.*
 
 /**
- * Implements a status bar with arbitrary message for CLI output.
+ * Implements a status bar with an arbitrary message for CLI output.
  * All output must be streamed through this class and will be written into the [terminal].
  */
 internal class CliStatusDisplay(private val terminal: Terminal) : LineReadingOutputStream() {
@@ -46,7 +46,7 @@ internal class CliStatusDisplay(private val terminal: Terminal) : LineReadingOut
 
     /**
      * @param message to be shown, when enabled (if enabled, the change will be presented immediately)
-     * @param importantPrefix how much characters from the start should not be ellipsized
+     * @param importantPrefix how many characters from the start should not be ellipsized
      */
     @Synchronized
     fun setMessage(message:AttributedString, importantPrefix:Int) {

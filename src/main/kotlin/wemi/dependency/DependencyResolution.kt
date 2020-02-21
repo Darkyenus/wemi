@@ -61,7 +61,9 @@ private class LoggingDownloadTracker : ActivityListener, ForkedActivityListener 
         downloadStatus.lastLogAtDurationNs = durationNs
 
         val sb = StringBuilder()
-        sb.appendShortByteSize(bytes).append('/')
+        if (bytes > 0) {
+            sb.appendShortByteSize(bytes).append('/')
+        }
         if (totalBytes > 0 && bytes < totalBytes) {
             sb.appendShortByteSize(totalBytes)
         } else {

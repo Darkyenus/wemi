@@ -5,16 +5,37 @@ import org.slf4j.LoggerFactory
 import wemi.Key
 import wemi.boot.CLI
 import wemi.boot.WemiColorOutputSupported
-import wemi.dependency.*
+import wemi.dependency.DEFAULT_TYPE
+import wemi.dependency.DependencyId
+import wemi.dependency.NoClassifier
+import wemi.dependency.ResolvedDependency
 import java.util.*
 
 //region StringBuilder enhancements
+fun Appendable.append(integer:Int):Appendable {
+    if (this is StringBuilder) {
+        this.append(integer)
+    } else {
+        this.append(integer.toString())
+    }
+    return this
+}
+
+fun Appendable.append(long:Long):Appendable {
+    if (this is StringBuilder) {
+        this.append(long)
+    } else {
+        this.append(long.toString())
+    }
+    return this
+}
+
 /**
  * Format given [ms] duration as a human readable duration string.
  *
  * Example output: "1 day 5 minutes 33 seconds 0 ms"
  */
-fun StringBuilder.appendTimeDuration(ms: Long): StringBuilder {
+fun Appendable.appendTimeDuration(ms: Long): Appendable {
     val SECOND = 1000
     val MINUTE = SECOND * 60
     val HOUR = MINUTE * 60
@@ -61,7 +82,7 @@ fun StringBuilder.appendTimeDuration(ms: Long): StringBuilder {
 }
 
 /** Like [appendTimeDuration], but only shows most significant unit. */
-fun StringBuilder.appendShortTimeDuration(ms: Long): StringBuilder {
+fun Appendable.appendShortTimeDuration(ms: Long): Appendable {
     val SECOND = 1000
     val MINUTE = SECOND * 60
     val HOUR = MINUTE * 60
@@ -110,7 +131,7 @@ fun StringBuilder.appendShortTimeDuration(ms: Long): StringBuilder {
  *
  * Example output: "1 TB 5 GB"
  */
-fun StringBuilder.appendByteSize(bytes: Long): StringBuilder {
+fun Appendable.appendByteSize(bytes: Long): Appendable {
     val KILO = 1000L
     val MEGA = 1000_000L
     val GIGA = 1000_000_000L
@@ -129,37 +150,60 @@ fun StringBuilder.appendByteSize(bytes: Long): StringBuilder {
 
     val R = 2
     var relevant = R
+    var first = true
 
     if ((tera > 0L || relevant < R) && relevant > 0) {
-        append(tera).append(" TB ")
+        if (first) {
+            first = false
+        } else {
+            append(' ')
+        }
+        append(tera).append(" TB")
         relevant--
     }
 
     if ((giga > 0L || relevant < R) && relevant > 0) {
-        append(giga).append(" GB ")
+        if (first) {
+            first = false
+        } else {
+            append(' ')
+        }
+        append(giga).append(" GB")
         relevant--
     }
 
     if ((mega > 0L || relevant < R) && relevant > 0) {
-        append(mega).append(" MB ")
+        if (first) {
+            first = false
+        } else {
+            append(' ')
+        }
+        append(mega).append(" MB")
         relevant--
     }
 
     if ((kilo > 0L || relevant < R) && relevant > 0) {
-        append(kilo).append(" kB ")
+        if (first) {
+            first = false
+        } else {
+            append(' ')
+        }
+        append(kilo).append(" kB")
         relevant--
     }
 
     if (relevant > 0) {
-        append(remaining).append(" B ")
+        if (!first) {
+            append(' ')
+        }
+        append(remaining).append(" B")
     }
 
-    setLength(length-1)//Truncate trailing space
     return this
 }
 
 /** Like [appendByteSize], but only most significant unit and no spaces. */
-fun StringBuilder.appendShortByteSize(bytes: Long): StringBuilder {
+fun Appendable.appendShortByteSize(bytes: Long): Appendable {
     val KILO = 1000L
     val MEGA = 1000_000L
     val GIGA = 1000_000_000L
@@ -195,11 +239,13 @@ fun StringBuilder.appendShortByteSize(bytes: Long): StringBuilder {
 }
 
 /** Append given [character] multiple [times] */
-fun StringBuilder.appendTimes(character:Char, times:Int):StringBuilder {
+fun Appendable.appendTimes(character:Char, times:Int):Appendable {
     if (times <= 0) {
         return this
     }
-    ensureCapacity(times)
+    if (this is StringBuilder) {
+        ensureCapacity(times)
+    }
     for (i in 0 until times) {
         append(character)
     }
@@ -207,7 +253,7 @@ fun StringBuilder.appendTimes(character:Char, times:Int):StringBuilder {
 }
 
 /** Append given [text] centered in [width], padded by [padding] */
-fun StringBuilder.appendCentered(text:String, width:Int, padding:Char):StringBuilder {
+fun Appendable.appendCentered(text:String, width:Int, padding:Char):Appendable {
     val padAmount = width - text.length
     if (padAmount <= 0) {
         return append(text)

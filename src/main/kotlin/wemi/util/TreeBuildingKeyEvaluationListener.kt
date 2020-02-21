@@ -191,7 +191,12 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean, privat
             }
 
             if (ownMs >= 1) {
-                heading.append(' ').format(Color.Cyan).appendTimeDuration(ownMs).format()
+                heading.apply {
+                    append(' ')
+                    format(Color.Cyan)
+                    appendTimeDuration(ownMs)
+                    format()
+                }
             }
         }
 
