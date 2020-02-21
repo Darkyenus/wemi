@@ -343,7 +343,7 @@ private fun verifyChecksums(checksums: List<ParsedChecksumFile?>, repositoryArti
 }
 
 /**
- * Download enough data to be able to verify that if [repositoryArtifactUrl] contains any artifact, it is the same as [verifyAgainst].
+ * Download enough data to be able to verify that if [path] in [repository] contains any artifact, it is the same as [verifyAgainst].
  * @return true if there is an artifact and it matches, false if there is an artifact and it does not match, null if there is no artifact
  */
 private fun retrieveFileForVerificationOnly(repository:Repository, path:String, verifyAgainst:DataWithChecksum, listener:ActivityListener?):Boolean? {
@@ -478,12 +478,40 @@ internal class ArtifactPathWithAlternateRepositories(
         val possibleAlternateRepositories:SortedRepositories
 )
 
-internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?, cachePath:(Repository) -> String = {path}):ArtifactPathWithAlternateRepositories? {
+private data class FileRetrievalMutexToken(val cacheHome:Path?, val path:String)
+private val fileRetrievalMutex_lockedTokens = HashSet<FileRetrievalMutexToken>()
+
+/** Run [action] when no other thread is currently using the [path] in given [repositories]. */
+private fun <T> fileRetrievalMutex(path:String, repositories: List<Repository>, action:()->T):T {
+    val tokens = repositories.map { FileRetrievalMutexToken(it.directoryPath(), path) }
+
+    // Lock the mutex
+    val lockedTokens = fileRetrievalMutex_lockedTokens
+    synchronized(lockedTokens) {
+        while (tokens.any { it in lockedTokens }) {
+            @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+            (lockedTokens as Object).wait()
+        }
+
+        lockedTokens.addAll(tokens)
+    }
+    try {
+        return action()
+    } finally {
+        synchronized(lockedTokens) {
+            lockedTokens.removeAll(tokens)
+        }
+    }
+}
+
+/** Retrieve the [path] (which may be a [snapshot]) from [repositories].
+ * Thread safe, but make sure that [progressTracker] is thread safe as well when forking. */
+internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?, cachePath:(Repository) -> String = {path}):ArtifactPathWithAlternateRepositories? = fileRetrievalMutex(path, repositories) {
     // Check all local repositories and caches
     val localFailures = arrayOfNulls<CacheArtifactPath>(repositories.size)
     for ((i, repository) in repositories.withIndex()) {
         retrieveFileLocally(repository, path, snapshot, cachePath(repository)).use<Unit>({
-            return ArtifactPathWithAlternateRepositories(it, emptyList(), repositories.drop(i + 1))
+            return@fileRetrievalMutex ArtifactPathWithAlternateRepositories(it, emptyList(), repositories.drop(i + 1))
         }, {
             localFailures[i] = it
         })
@@ -534,10 +562,10 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
             }
         }
 
-        return ArtifactPathWithAlternateRepositories(result, alternateRepositories, possibleAlternateRepositories)
+        return@fileRetrievalMutex ArtifactPathWithAlternateRepositories(result, alternateRepositories, possibleAlternateRepositories)
     }
 
-    return null
+    return@fileRetrievalMutex null
 }
 
 private fun uriToActivityName(uri:String):String {

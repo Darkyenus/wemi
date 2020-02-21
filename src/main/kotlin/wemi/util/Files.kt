@@ -73,7 +73,7 @@ operator fun URL.div(path: CharSequence): URL {
     newFile.pathAppend(path, 0, pathEnd)
 
     var hadQuery = false
-    if (!query.isEmpty()) {
+    if (query.isNotEmpty()) {
         newFile.append('?').append(query)
         hadQuery = true
     }
