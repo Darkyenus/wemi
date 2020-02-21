@@ -119,18 +119,18 @@ internal typealias SortedRepositories = List<Repository>
 /** Like [SortedRepositories], but contains only valid repositories for given snapshot state. */
 internal typealias CompatibleSortedRepositories = SortedRepositories
 
-/** Compares repositories so that local repositories are first. */
+/** Compares repositories so that authoritative and then local repositories are first. */
 private val REPOSITORY_COMPARATOR = Comparator<Repository> { o1, o2 ->
-    // Local goes first
-    val local = o2.local.compareTo(o1.local)
-    if (local != 0) {
-        return@Comparator local
-    }
-
     // Authoritative goes first
     val authoritative = o2.authoritative.compareTo(o1.authoritative)
     if (authoritative != 0) {
         return@Comparator authoritative
+    }
+
+    // then: Local goes first
+    val local = o2.local.compareTo(o1.local)
+    if (local != 0) {
+        return@Comparator local
     }
 
     // Arbitrary sorting by name to get full ordering

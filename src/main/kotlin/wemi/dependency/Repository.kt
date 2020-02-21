@@ -99,6 +99,9 @@ class Repository(
         if (local && !url.isLocal()) {
             throw WemiException("Repository with url '$url' cannot be considered local")
         }
+        if (local && !authoritative) {
+            throw WemiException("A local repository (at '$url') cannot be considered non-authoritative")
+        }
     }
 
     /** Path to the directory root, if on this filesystem. Should be [directorySynchronized] to, if writing. */

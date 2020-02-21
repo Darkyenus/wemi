@@ -17,7 +17,7 @@ fun toHexString(data: ByteArray): String {
     return String(chars)
 }
 
-fun toHexString(checksums:List<Pair<ByteArray, String>>):CharSequence {
+fun toHexString(checksums:ParsedChecksumFile):CharSequence {
     val sb = StringBuilder(128)
     sb.append('[')
     var first = true
@@ -73,13 +73,15 @@ fun fromHexString(data: CharSequence): ByteArray? {
     }
 }
 
+typealias ParsedChecksumFile = List<Pair<ByteArray, String>>
+
 /**
- * Parse file created by program from `sha1sum` family, such as `md5sum` or `sha256sum`.
+ * Parse a file created by a program from `sha1sum` family, such as `md5sum` or `sha256sum`.
  *
  * @param content of the sum file
  * @return list of file entries, with read hashes (may be null if invalid) and file names
  */
-fun parseHashSum(content:CharSequence?):List<Pair<ByteArray, String>> {
+fun parseHashSum(content:CharSequence?):ParsedChecksumFile {
     content ?: return emptyList()
 
     val result = ArrayList<Pair<ByteArray, String>>()
@@ -183,17 +185,17 @@ fun parseHashSum(content:CharSequence?):List<Pair<ByteArray, String>> {
     return result
 }
 
-fun hashMatches(hashFileContent:List<Pair<ByteArray?, String>>, expectedHash:ByteArray, fileName:String?):Boolean {
+fun hashMatches(hashFileContent:ParsedChecksumFile, expectedHash:ByteArray, fileName:String?):Boolean {
     when {
         hashFileContent.isEmpty() -> return false
-        hashFileContent.size == 1 -> return Arrays.equals(hashFileContent[0].first, expectedHash)
+        hashFileContent.size == 1 -> return hashFileContent[0].first.contentEquals(expectedHash)
         else -> {
             val found = hashFileContent.find { it.second == fileName }?.first
             if (found != null) {
                 return Arrays.equals(found, expectedHash)
             }
             // Consider matching if at least one matches
-            return hashFileContent.any { Arrays.equals(it.first, expectedHash) }
+            return hashFileContent.any { it.first.contentEquals(expectedHash) }
         }
     }
 }
