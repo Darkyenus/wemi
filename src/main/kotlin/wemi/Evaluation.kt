@@ -351,21 +351,15 @@ interface ActivityListener {
      * @param durationNs how long in nanoseconds did it took to process this far */
     fun activityDownloadProgress(bytes:Long, totalBytes:Long, durationNs:Long) {}
 
-    /** End activity started by [beginActivity]. */
+    /** End activity started by [beginActivity] or by [beginParallelActivity] of the parent listener. */
     fun endActivity() {}
 
     /** Begin a new activity stack, which may proceed independently of other activities.
-     * The parallel's activity [ForkedActivityListener.endParallelActivity] must be called before the end of this
+     * The parallel's activity [endActivity] must be called before the end of this
      * [ActivityListener]'s current activity ends, but independently of any nested activities.
-     * [beginParallelActivity] and [ForkedActivityListener.endParallelActivity] are NOT thread safe.
+     * [beginParallelActivity] and [endActivity] are NOT thread safe.
      * @return thread safe alternative parallel listener or null if this feature is not supported. */
-    fun beginParallelActivity(activity:String):ForkedActivityListener? = null
-}
-
-/** Returned by [ActivityListener.beginParallelActivity]. */
-interface ForkedActivityListener : ActivityListener {
-    /** End this activity. Calling any other methods of this object after this one is illegal. */
-    fun endParallelActivity()
+    fun beginParallelActivity(activity:String): ActivityListener? = null
 }
 
 /**
@@ -493,7 +487,7 @@ interface EvaluationListener : ActivityListener {
                     second.endActivity()
                 }
 
-                override fun beginParallelActivity(activity: String): ForkedActivityListener? {
+                override fun beginParallelActivity(activity: String): ActivityListener? {
                     return splitBeginParallelActivity(activity, first, second)
                 }
             }
@@ -501,7 +495,7 @@ interface EvaluationListener : ActivityListener {
     }
 }
 
-private fun splitBeginParallelActivity(activity:String, first:ActivityListener, second:ActivityListener):ForkedActivityListener? {
+private fun splitBeginParallelActivity(activity:String, first:ActivityListener, second:ActivityListener):ActivityListener? {
     val firstFork = first.beginParallelActivity(activity)
     val secondFork = second.beginParallelActivity(activity)
     if (firstFork == null) {
@@ -514,8 +508,8 @@ private fun splitBeginParallelActivity(activity:String, first:ActivityListener, 
 }
 
 private class SplitForkedActivityListener(
-        private val firstFork:ForkedActivityListener,
-        private val secondFork:ForkedActivityListener) : ForkedActivityListener {
+        private val firstFork:ActivityListener,
+        private val secondFork:ActivityListener) : ActivityListener {
 
     override fun beginActivity(activity: String) {
         firstFork.beginActivity(activity)
@@ -532,12 +526,7 @@ private class SplitForkedActivityListener(
         secondFork.endActivity()
     }
 
-    override fun beginParallelActivity(activity: String): ForkedActivityListener? {
+    override fun beginParallelActivity(activity: String): ActivityListener? {
         return splitBeginParallelActivity(activity, firstFork, secondFork)
-    }
-
-    override fun endParallelActivity() {
-        firstFork.endParallelActivity()
-        secondFork.endParallelActivity()
     }
 }

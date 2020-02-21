@@ -89,38 +89,70 @@ fun Appendable.appendShortTimeDuration(ms: Long): Appendable {
     val DAY = HOUR * 24
 
     var remaining = ms
+    var first = true
 
     val days = remaining / DAY
-    if (days == 1L) {
-        return append("1 day")
-    } else if (days > 1L) {
-        return append(days).append(" days")
+    if (days > 0L) {
+        if (first) {
+            first = false
+        } else {
+            append(' ')
+        }
+        if (days == 1L) {
+            return append("1 day")
+        } else {
+            return append(days).append(" days")
+        }
     }
 
     remaining %= DAY
     val hours = remaining / HOUR
-    if (hours == 1L) {
-        return append("1 hour ")
-    } else if (hours > 1L) {
-        return append(hours).append(" hours ")
+    if (hours > 0) {
+        if (first) {
+            first = false
+        } else {
+            append(' ')
+        }
+        if (hours == 1L) {
+            return append("1 hour")
+        } else {
+            return append(hours).append(" hours")
+        }
     }
 
     remaining %= HOUR
     val minutes = remaining / MINUTE
-    if (minutes == 1L) {
-        return append("1 minute ")
-    } else if (minutes > 1L) {
-        return append(minutes).append(" minutes ")
+    if (minutes > 0) {
+        if (first) {
+            first = false
+        } else {
+            append(' ')
+        }
+        if (minutes == 1L) {
+            return append("1 minute")
+        } else {
+            return append(minutes).append(" minutes")
+        }
     }
 
     remaining %= MINUTE
     val seconds = remaining / SECOND
-    if (seconds == 1L) {
-        return append("1 second ")
-    } else if (seconds > 1L) {
-        return append(seconds).append(" seconds ")
+    if (seconds > 0) {
+        if (first) {
+            first = false
+        } else {
+            append(' ')
+        }
+        if (seconds == 1L) {
+            return append("1 second")
+        } else {
+            return append(seconds).append(" seconds")
+        }
     }
 
+    if (!first) {
+        append(' ')
+    }
     remaining %= SECOND
     return append(remaining).append(" ms")
 }

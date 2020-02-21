@@ -215,7 +215,7 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
                             try {
                                 retrieveChecksums(repositoryArtifactUrl, useUnsafeTransport, prefetchProgressTracker)
                             } finally {
-                                prefetchProgressTracker?.endParallelActivity()
+                                prefetchProgressTracker?.endActivity()
                             }
                         })
                     }
@@ -294,7 +294,7 @@ private fun retrieveChecksums(repositoryArtifactUrl: URL, useUnsafeTransport: Bo
 
                     parseHashSum(checksumFileBody)
                 } finally {
-                    taskProgressTracker?.endParallelActivity()
+                    taskProgressTracker?.endActivity()
                 }
             })
         }.map { it.get() }
@@ -543,7 +543,7 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
                     try {
                         retrieveFileForVerificationOnly(localFailure.repository, path, result.dataWithChecksum!!, progressTracker)
                     } finally {
-                        trackerFork?.endParallelActivity()
+                        trackerFork?.endActivity()
                     }
                 })
             }

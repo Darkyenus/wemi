@@ -14,5 +14,6 @@ fi
 
 export WEMI_DIST="$wemi_dist"
 export WEMI_ROOT="$wemi_root"
+export WEMI_JAVA_OPTS="-ea"
 
 exec "$wemi_launcher" "$@"

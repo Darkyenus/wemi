@@ -2,7 +2,6 @@ package wemi.dependency
 
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
-import wemi.ForkedActivityListener
 import wemi.util.Partial
 import wemi.util.appendShortByteSize
 import wemi.util.directorySynchronized
@@ -32,7 +31,7 @@ fun Map<DependencyId, ResolvedDependency>.artifacts(): List<Path> {
     return mapNotNull { it.value.artifact?.path }
 }
 
-private class LoggingDownloadTracker : ActivityListener, ForkedActivityListener {
+private class LoggingDownloadTracker : ActivityListener {
 
     private val activityStack = ArrayList<String>()
     private var downloadStatuses = ArrayList<DownloadStatus?>()
@@ -77,11 +76,7 @@ private class LoggingDownloadTracker : ActivityListener, ForkedActivityListener 
         downloadStatuses.removeAt(downloadStatuses.lastIndex)
     }
 
-    override fun endParallelActivity() {
-        endActivity()
-    }
-
-    override fun beginParallelActivity(activity: String): ForkedActivityListener? {
+    override fun beginParallelActivity(activity: String): ActivityListener? {
         val fork = LoggingDownloadTracker()
         fork.beginActivity(activity)
         return fork

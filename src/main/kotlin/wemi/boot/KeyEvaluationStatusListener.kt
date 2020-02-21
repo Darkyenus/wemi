@@ -2,9 +2,9 @@ package wemi.boot
 
 import org.jline.utils.AttributedStringBuilder
 import org.jline.utils.AttributedStyle
+import wemi.ActivityListener
 import wemi.Binding
 import wemi.EvaluationListener
-import wemi.ForkedActivityListener
 import wemi.Key
 import wemi.Scope
 import wemi.util.CliStatusDisplay
@@ -73,7 +73,7 @@ private class StackLevel {
 		}
 	}
 
-	fun beginParallelActivity(activity: String, renderer:KeyEvaluationStatusListenerRenderer): ForkedActivityListener {
+	fun beginParallelActivity(activity: String, renderer:KeyEvaluationStatusListenerRenderer): ActivityListener {
 		val parallelActivities = parallelActivities
 		val listener = KeyEvaluationStatusListener(renderer, parallelActivities)
 		synchronized(parallelActivities) {
@@ -110,7 +110,7 @@ internal class KeyEvaluationStatusListenerRenderer(private val display: CliStatu
 internal class KeyEvaluationStatusListener(
 		private val renderer:KeyEvaluationStatusListenerRenderer,
 		private val parallelActivityContainer:ArrayList<KeyEvaluationStatusListener>?)
-	: EvaluationListener, ForkedActivityListener {
+	: EvaluationListener {
 
 	private val stackLevels = Array(16) { StackLevel() }
 	private var stackLevel = 0
@@ -119,8 +119,11 @@ internal class KeyEvaluationStatusListener(
 		parallelActivityContainer?.let { parallelActivityContainer ->
 			synchronized(parallelActivityContainer) {
 				val index = parallelActivityContainer.indexOf(this)
-				parallelActivityContainer[index] = parallelActivityContainer[0]
-				parallelActivityContainer[0] = this
+				// Do not redraw if it will not be visible anyway.
+				// NOTE: Not perfect, disregards parent listeners.
+				if (index != 0) {
+					return
+				}
 			}
 		}
 		renderer.redraw()
@@ -154,7 +157,10 @@ internal class KeyEvaluationStatusListener(
 					mb.append(' ').append(level.extra)
 				}
 				val parallelActivities = level.parallelActivities
-				synchronized(parallelActivities) { parallelActivities.firstOrNull() }?.let { firstParallel ->
+				synchronized(parallelActivities) {
+					assert(parallelActivities.all { it.stackLevel > 0 })
+					parallelActivities.firstOrNull()
+				}?.let { firstParallel ->
 					mb.style(STATUS_META_STYLE)
 					mb.append(STATUS_INFIX_PARALLEL)
 					firstParallel.drawListener(mb)
@@ -168,10 +174,12 @@ internal class KeyEvaluationStatusListener(
 		redraw()
 	}
 
-	private fun pop() {
+	private fun pop(redraw:Boolean = true) {
 		if (stackLevel > 0) {
 			stackLevel--
-			redraw()
+			if (redraw) {
+				redraw()
+			}
 		}
 	}
 
@@ -200,18 +208,20 @@ internal class KeyEvaluationStatusListener(
 	}
 
 	override fun endActivity() {
-		pop()
-	}
+		pop(redraw = false)
 
-	override fun beginParallelActivity(activity: String): ForkedActivityListener? {
-		return stackLevels.getOrNull(stackLevel - 1)?.beginParallelActivity(activity, renderer)
-	}
-
-	override fun endParallelActivity() {
-		parallelActivityContainer?.let { parallelActivityContainer ->
+		val parallelActivityContainer = parallelActivityContainer
+		if (stackLevel <= 0 && parallelActivityContainer != null) {
 			synchronized(parallelActivityContainer) {
-				parallelActivityContainer.remove(this)
+				val removed = parallelActivityContainer.remove(this)
+				assert(removed)
 			}
 		}
+
+		redraw()
+	}
+
+	override fun beginParallelActivity(activity: String): ActivityListener? {
+		return stackLevels.getOrNull(stackLevel - 1)?.beginParallelActivity(activity, renderer)
 	}
 }
