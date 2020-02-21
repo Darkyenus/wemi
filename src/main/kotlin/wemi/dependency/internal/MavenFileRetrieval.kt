@@ -500,6 +500,8 @@ private fun <T> fileRetrievalMutex(path:String, repositories: List<Repository>, 
     } finally {
         synchronized(lockedTokens) {
             lockedTokens.removeAll(tokens)
+            @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+            (lockedTokens as Object).notifyAll()
         }
     }
 }

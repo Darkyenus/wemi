@@ -66,8 +66,8 @@ val evaluationTest by project(archetypes = *arrayOf(keyExtensionArchetype)) {
         assertThat(using(adding){ numberKey.get() }, equalTo(4))
         assertThat(using(subtracting){ numberKey.get() }, equalTo(-2))
         assertThat(using(multiplying, adding){ numberKey.get() }, equalTo(6))
-        assertThat(using(multiplying, adding, adding){ numberKey.get() }, equalTo(9))
-        assertThat(using(multiplying, multiplying){ numberKey.get() }, equalTo(9))
+        assertThat(using(multiplying, adding, adding){ numberKey.get() }, equalTo(6))
+        assertThat(using(multiplying, multiplying){ numberKey.get() }, equalTo(3))
         assertThat(using(multiplying, subtracting){ numberKey.get() }, equalTo(0))
         assertThat(using(subtracting, multiplying){ numberKey.get() }, equalTo(-6))
     }
@@ -94,9 +94,7 @@ val evaluationTest by project(archetypes = *arrayOf(keyExtensionArchetype)) {
 val compileErrors by project(path("errors")) {
     sources set { FileSet(projectRoot.get() / "src") }
 
-    extend(compilingJava) {
-        compilerOptions[wemi.compile.JavaCompilerFlags.customFlags] += "-Xlint:all"
-    }
+    compilerOptions[wemi.compile.JavaCompilerFlags.customFlags] = { it + "-Xlint:all" }
 }
 
 val CacheRepository = (wemi.boot.WemiCacheFolder / "-test-cache-repository").let {
@@ -577,6 +575,11 @@ val artifactInMultipleRepositories_2 by configuration("") {
 
 val dependency_resolution by project() {
     val longRunning = true
+
+    extend(testing) {
+        // Remove automatically added JUnit stuff
+        libraryDependencies modify { it.filter { dep -> !dep.dependencyId.group.startsWith("org.junit") }.toSet() }
+    }
 
     // Test dependency resolution by resolving against changing repository 3 different libraries
     /*

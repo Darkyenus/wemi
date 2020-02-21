@@ -44,6 +44,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
+import java.util.concurrent.ExecutorCompletionService
+import java.util.concurrent.ForkJoinPool
 import kotlin.collections.HashMap
 
 private val LOG = LoggerFactory.getLogger("Maven2")
@@ -93,108 +95,121 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
         return Partial(emptyMap(), false)
     }
 
-    val resolved = LinkedHashMap<DependencyId, ResolvedDependency>()
+    val resolved = HashMap<DependencyId, RawResolvedDependency>()
+    val resolvedScope = HashMap<DependencyId, String>()
     val resolvedPartials = HashMap<DependencyManagementKey, DependencyId>()
-    var nextDependencies = dependencies
     var noError = true
 
-    do {
-        val nextNextDependencies = ArrayList<Dependency>()
+    val executor = ExecutorCompletionService<Runnable>(ForkJoinPool(10))
+    var submittedDependencies = 0
 
-        for (dep in nextDependencies) {
-            val depId = dep.dependencyId
-            val partialId = DependencyManagementKey(depId.group, depId.name, depId.classifier, depId.type)
+    fun submitDependency(dep:Dependency) {
+        val depId = dep.dependencyId
+        val partialId = DependencyManagementKey(depId.group, depId.name, depId.classifier, depId.type)
 
-            // Check if we haven't resolved this dependency (or its different version) previously
-            val resolvedPreviouslyPartialId = resolvedPartials[partialId]
-            val resolvedPreviously = resolved[resolvedPreviouslyPartialId ?: depId]
-            if (resolvedPreviously != null) {
-                if (resolvedPreviouslyPartialId == null) {
-                    LOG.debug("{} already resolved, skipping", dep)
-                } else {
-                    LOG.debug("{} already resolved by {}, skipping", dep, resolvedPreviouslyPartialId)
-                }
-
-                // We did already resolve it, its scope may need adjusting.
-                val newScope = resolveScopes(resolvedPreviously.scope, dep.scope)
-                if (newScope != resolvedPreviously.scope) {
-                    resolved[resolvedPreviouslyPartialId ?: depId] = resolvedPreviously.copy(scope = newScope)
-                }
-                continue
+        // Check if we haven't resolved this dependency (or its different version) previously
+        val resolvedPreviouslyPartialId = resolvedPartials[partialId]
+        val resolvedPreviouslyScope = resolvedScope[resolvedPreviouslyPartialId ?: depId]
+        if (resolvedPreviouslyScope != null) {
+            if (resolvedPreviouslyPartialId == null) {
+                LOG.debug("{} already resolved, skipping", dep)
+            } else {
+                LOG.debug("{} already resolved by {}, skipping", dep, resolvedPreviouslyPartialId)
             }
 
-            progressTracker?.beginActivity(dep.dependencyId.toString())
-            try {
-                val resolvedDep = resolveInM2Repository(depId, dep.dependencyManagement, repositories, dep.scope, progressTracker)
-                resolved[depId] = resolvedDep
-                resolvedPartials[partialId] = depId
-
-                if (resolvedDep.hasError) {
-                    noError = false
-                    continue
-                }
-
-                nextNextDependencies.ensureCapacity(resolvedDep.dependencies.size)
-                for (transitiveDependency in resolvedDep.dependencies) {
-                    if (transitiveDependency.optional) {
-                        LOG.debug("Excluded optional {} (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
-                        continue
-                    }
-
-                    val exclusionRule = dep.exclusions.find { it.excludes(transitiveDependency.dependencyId) }
-                    if (exclusionRule != null) {
-                        LOG.debug("Excluded {} with rule {} (dependency of {})", transitiveDependency.dependencyId, exclusionRule, dep.dependencyId)
-                        continue
-                    }
-
-                    // Resolve scope
-                    // (See the table at https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope)
-                    val resolvedToScope:String? = when (transitiveDependency.scope) {
-                        "compile" -> when (dep.scope) {
-                            "compile" -> "compile"
-                            "provided" -> "provided"
-                            "runtime" -> "runtime"
-                            "test" -> "test"
-                            else -> null
-                        }
-                        "runtime" -> when (dep.scope) {
-                            "compile" -> "runtime"
-                            "provided" -> "provided"
-                            "runtime" -> "runtime"
-                            "test" -> "test"
-                            else -> null
-                        }
-                        else -> null
-                    }
-
-                    if (resolvedToScope == null) {
-                        LOG.debug("Excluded {} due to transitive scope change (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
-                        continue
-                    }
-
-                    val transitivelyAdjusted = if (transitiveDependency.scope == resolvedToScope && dep.exclusions.isEmpty()) {
-                        transitiveDependency
-                    } else {
-                        if (transitiveDependency.scope != resolvedToScope) {
-                            LOG.debug("Changing the scope of {} to {}", transitiveDependency, resolvedToScope)
-                        }
-                        Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, dep.exclusions + transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
-                    }
-
-                    val mapped = mapper(transitivelyAdjusted)
-                    if (mapped != transitivelyAdjusted) {
-                        LOG.debug("{} mapped to {}", transitivelyAdjusted, mapped)
-                    }
-
-                    nextNextDependencies.add(mapped)
-                }
-            } finally {
-                progressTracker?.endActivity()
+            // We did already resolve it, its scope may need adjusting.
+            val newScope = resolveScopes(resolvedPreviouslyScope, dep.scope)
+            if (newScope != resolvedPreviouslyScope) {
+                resolvedScope[resolvedPreviouslyPartialId ?: depId] = newScope
             }
+            return
         }
 
-        nextDependencies = nextNextDependencies
-    } while (nextDependencies.isNotEmpty())
+        resolvedPartials[partialId] = depId
+        resolvedScope[depId] = dep.scope
+
+        val dependencyProgressTracker = progressTracker?.beginParallelActivity(dep.dependencyId.toString())
+        submittedDependencies++
+        executor.submit {
+            val resolvedDep = resolveInM2Repository(depId, dep.dependencyManagement, repositories, dependencyProgressTracker)
+            return@submit Runnable {
+                try {
+                    resolved[depId] = resolvedDep
+
+                    if (resolvedDep.hasError) {
+                        noError = false
+                        return@Runnable
+                    }
+
+                    for (transitiveDependency in resolvedDep.dependencies) {
+                        if (transitiveDependency.optional) {
+                            LOG.debug("Excluded optional {} (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                            continue
+                        }
+
+                        val exclusionRule = dep.exclusions.find { it.excludes(transitiveDependency.dependencyId) }
+                        if (exclusionRule != null) {
+                            LOG.debug("Excluded {} with rule {} (dependency of {})", transitiveDependency.dependencyId, exclusionRule, dep.dependencyId)
+                            continue
+                        }
+
+                        // Resolve scope
+                        // (See the table at https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope)
+                        val resolvedToScope:String? = when (transitiveDependency.scope) {
+                            "compile" -> when (dep.scope) {
+                                "compile" -> "compile"
+                                "provided" -> "provided"
+                                "runtime" -> "runtime"
+                                "test" -> "test"
+                                else -> null
+                            }
+                            "runtime" -> when (dep.scope) {
+                                "compile" -> "runtime"
+                                "provided" -> "provided"
+                                "runtime" -> "runtime"
+                                "test" -> "test"
+                                else -> null
+                            }
+                            else -> null
+                        }
+
+                        if (resolvedToScope == null) {
+                            LOG.debug("Excluded {} due to transitive scope change (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                            continue
+                        }
+
+                        val transitivelyAdjusted = if (transitiveDependency.scope == resolvedToScope && dep.exclusions.isEmpty()) {
+                            transitiveDependency
+                        } else {
+                            if (transitiveDependency.scope != resolvedToScope) {
+                                LOG.debug("Changing the scope of {} to {}", transitiveDependency, resolvedToScope)
+                            }
+                            Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, dep.exclusions + transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
+                        }
+
+                        val mapped = mapper(transitivelyAdjusted)
+                        if (mapped != transitivelyAdjusted) {
+                            LOG.debug("{} mapped to {}", transitivelyAdjusted, mapped)
+                        }
+
+                        submitDependency(mapped)
+                    }
+                } finally {
+                    dependencyProgressTracker?.endActivity()
+                }
+            }
+        }
+    }
+
+    for (dependency in dependencies) {
+        submitDependency(dependency)
+    }
+
+    while (submittedDependencies > 0) {
+        val task = executor.take()
+        submittedDependencies--
+        task.get().run()
+    }
 
     if (LOG.isInfoEnabled) {
         val stack = ArrayList<DependencyId>()
@@ -204,7 +219,11 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
         }
     }
 
-    return Partial(resolved, noError)
+    val resolvedComplete = resolved.mapValues { (k, v) ->
+        v.complete(resolvedScope[k]!!)
+    }
+
+    return Partial(resolvedComplete, noError)
 }
 
 /** Returns the scope of an artifact, which is required by two different scopes. */
@@ -230,7 +249,7 @@ private fun resolveScopes(nearest:String, furthest:String):String {
 }
 
 /** Recursive depth-first-search of resolved dependencies to find and report circular dependencies. */
-private fun reportCyclicDependencies(resolved:Map<DependencyId, ResolvedDependency>, stack:ArrayList<DependencyId>, root:DependencyId) {
+private fun reportCyclicDependencies(resolved:Map<DependencyId, RawResolvedDependency>, stack:ArrayList<DependencyId>, root:DependencyId) {
     val loopIndex = stack.indexOf(root)
     if (loopIndex != -1) {
         // Cyclic dependency detected
@@ -273,13 +292,38 @@ private val TYPE_TO_EXTENSION_MAPPING:Map<String, String> = mapOf(
         "javadoc" to "jar"
 )
 
+/** Same as [ResolvedDependency], but without some fields which are filled in later, such as [ResolvedDependency.scope]. */
+private class RawResolvedDependency private constructor(
+        val id: DependencyId, val dependencies: List<Dependency>,
+        val resolvedFrom: Repository?, val log: CharSequence?, val artifact:ArtifactPath?) {
+
+    /** Error constructor */
+    constructor(id:DependencyId, log:CharSequence, resolvedFrom:Repository? = null)
+            : this(id, emptyList(), resolvedFrom, log, null)
+
+    /** Success constructor */
+    constructor(id:DependencyId, dependencies:List<Dependency>, resolvedFrom:Repository, artifact:ArtifactPath)
+            :this(id, dependencies, resolvedFrom, null, artifact)
+
+    /** `true` if this dependency failed to resolve (partially or completely), for any reason */
+    val hasError: Boolean
+        get() = log != null
+
+    fun complete(scope: String): ResolvedDependency {
+        return if (hasError) {
+            ResolvedDependency(id, log!!, resolvedFrom)
+        } else {
+            ResolvedDependency(id, scope, dependencies, resolvedFrom!!, artifact!!)
+        }
+    }
+}
+
 /** Attempt to resolve [dependencyId] in [repositories] */
 private fun resolveInM2Repository(
         dependencyId: DependencyId,
         transitiveDependencyManagement:List<Dependency>,
         repositories: SortedRepositories,
-        resultScope:String,
-        progressTracker: ActivityListener?): ResolvedDependency {
+        progressTracker: ActivityListener?): RawResolvedDependency {
     val snapshot = dependencyId.isSnapshot
     val compatibleRepositories:CompatibleSortedRepositories = repositories.filter { repository ->
         if (if (snapshot) repository.snapshots else repository.releases) {
@@ -298,7 +342,7 @@ private fun resolveInM2Repository(
         val repository = retrievedPom.path.artifactPath.repository
 
         if (resolvedDependencyId.type.equals("pom", ignoreCase = true)) {
-            return ResolvedDependency(resolvedDependencyId, resultScope, emptyList(), repository, retrievedPom.path.artifactPath)
+            return RawResolvedDependency(resolvedDependencyId, emptyList(), repository, retrievedPom.path.artifactPath)
         }
 
         val resolvedPom = resolveRawPom(retrievedPom.path.artifactPath, transitiveDependencyManagement, usedRepositories, progressTracker).fold {
@@ -307,7 +351,7 @@ private fun resolveInM2Repository(
 
         val pom = resolvedPom.use({ it }, { log ->
             LOG.debug("Failed to resolve POM for {} from {}: {}", resolvedDependencyId, repository, log)
-            return ResolvedDependency(resolvedDependencyId, log, repository)
+            return RawResolvedDependency(resolvedDependencyId, log, repository)
         })
 
         val extension = TYPE_TO_EXTENSION_MAPPING.getOrDefault(resolvedDependencyId.type, resolvedDependencyId.type)
@@ -323,7 +367,7 @@ private fun resolveInM2Repository(
                 usedRepositories = retrievedPom.path.possibleAlternateRepositories.toList()
             } else {
                 LOG.warn("Failed to retrieve file at '{}' in {}", filePath, compatibleRepositories)
-                return ResolvedDependency(resolvedDependencyId, "Failed to retrieve file")
+                return RawResolvedDependency(resolvedDependencyId, "Failed to retrieve file")
             }
         } else {
             if (retrieved.alternateRepositories.isNotEmpty()) {
@@ -337,7 +381,7 @@ private fun resolveInM2Repository(
             // can always be lazily loaded and the size of all dependencies can be quite big.
             val retrievedArtifact = retrieved.artifactPath
             retrievedArtifact.data = null
-            return ResolvedDependency(resolvedDependencyId, resultScope, pom.dependencies, repository, retrievedArtifact)
+            return RawResolvedDependency(resolvedDependencyId, pom.dependencies, repository, retrievedArtifact)
         }
     }
 }
@@ -370,7 +414,7 @@ private fun resolveRawPom(pomArtifact:ArtifactPath, transitiveDependencyManageme
         }
 
         LOG.trace("Retrieving parent pom of '{}' by coordinates '{}', in same repository", pomUrl, parentPomId)
-        val resolvedPom = resolveInM2Repository(parentPomId, transitiveDependencyManagement, repositories, "", progressTracker)
+        val resolvedPom = resolveInM2Repository(parentPomId, transitiveDependencyManagement, repositories, progressTracker)
         val artifact = resolvedPom.artifact
 
         var parent: RawPom? = null
@@ -399,7 +443,7 @@ private class RetrievedPom(
 
 /** Retrieve raw pom file for given [dependencyId] in [repositories].
  * If [snapshot] and it is unique snapshot, it resolves maven-metadata.xml and returns the pom for the newest version. */
-private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSortedRepositories, snapshot:Boolean, progressTracker: ActivityListener?):Failable<RetrievedPom, ResolvedDependency> {
+private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSortedRepositories, snapshot:Boolean, progressTracker: ActivityListener?):Failable<RetrievedPom, RawResolvedDependency> {
     LOG.trace("Retrieving pom for {} at '{}'", dependencyId, repositories)
     // Handles normal poms and old non-unique snapshot poms
     retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion),
@@ -446,7 +490,7 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
         }
 
         if (freshestRepositoryVersion == null) {
-            return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve snapshot metadata"))
+            return Failable.failure(RawResolvedDependency(dependencyId, "Failed to resolve snapshot metadata"))
         }
 
         LOG.debug("Resolving {} in {} with snapshot version {}", dependencyId, freshestRepositories, freshestRepositoryVersion)
@@ -460,10 +504,10 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
             return Failable.success(RetrievedPom(dependencyId.copy(snapshotVersion = freshestRepositoryVersion), newRetrievedPom))
         }
 
-        return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve pom xml for deduced snapshot version \"$freshestRepositoryVersion\" in $freshestRepositories"))
+        return Failable.failure(RawResolvedDependency(dependencyId, "Failed to resolve pom xml for deduced snapshot version \"$freshestRepositoryVersion\" in $freshestRepositories"))
     }
 
-    return Failable.failure(ResolvedDependency(dependencyId, "Failed to resolve pom xml"))
+    return Failable.failure(RawResolvedDependency(dependencyId, "Failed to resolve pom xml"))
 }
 
 private fun pomPath(group:String, name:String, version:String, snapshotVersion:String):String {
@@ -713,7 +757,7 @@ private fun flattedDependencyManagementImports(dependencyManagement:List<Depende
 
         LOG.trace("Resolving dependencyManagement import {} in '{}'", dep, pomUrl)
 
-        val resolvedPom = resolveInM2Repository(dep, dependency.dependencyManagement, repositories, "", progressTracker)
+        val resolvedPom = resolveInM2Repository(dep, dependency.dependencyManagement, repositories, progressTracker)
         if (resolvedPom.hasError) {
             LOG.warn("dependencyManagement import in {} of {} failed: failed to retrieve pom - {}", pomUrl, dep, resolvedPom)
             return Failable.failure(resolvedPom.log?.toString() ?: "failed to retrieve")

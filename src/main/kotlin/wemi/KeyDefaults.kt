@@ -168,7 +168,7 @@ object KeyDefaults {
         val result = WMutableList<LocatedPath>()
 
         val resolved = Keys.resolvedLibraryDependencies.get()
-        if (!resolved.complete) {
+        if (!resolved.complete) { // TODO(jp): Do not check if complete yet, allow incomplete dependency resolution if the errors are in un-needed dependencies (due to scope)
             val message = StringBuilder()
             message.append("Failed to resolve all artifacts")
                     .format() // Required, because printing it with pre-set color would bleed into the pretty-printed values
