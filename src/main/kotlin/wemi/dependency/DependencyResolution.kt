@@ -2,6 +2,7 @@ package wemi.dependency
 
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
+import wemi.ForkedActivityListener
 import wemi.util.Partial
 import wemi.util.appendShortByteSize
 import wemi.util.directorySynchronized
@@ -31,7 +32,7 @@ fun Map<DependencyId, ResolvedDependency>.artifacts(): List<Path> {
     return mapNotNull { it.value.artifact?.path }
 }
 
-private object LoggingDownloadTracker : ActivityListener {
+private class LoggingDownloadTracker : ActivityListener, ForkedActivityListener {
 
     private val activityStack = ArrayList<String>()
     private var downloadStatuses = ArrayList<DownloadStatus?>()
@@ -74,11 +75,23 @@ private object LoggingDownloadTracker : ActivityListener {
         downloadStatuses.removeAt(downloadStatuses.lastIndex)
     }
 
+    override fun endParallelActivity() {
+        endActivity()
+    }
+
+    override fun beginParallelActivity(activity: String): ForkedActivityListener? {
+        val fork = LoggingDownloadTracker()
+        fork.beginActivity(activity)
+        return fork
+    }
+
     private class DownloadStatus {
         var lastLogAtDurationNs:Long = Long.MIN_VALUE
         var lastDownloadBytes:Long = 0
     }
 }
+
+private val RootLoggingDownloadTracker = LoggingDownloadTracker()
 
 /**
  * Resolve [dependencies] for their artifacts, including transitive.
@@ -107,7 +120,7 @@ fun resolveDependencies(dependencies: Collection<Dependency>,
         // On wait
         LOG.info("Waiting for lock on {}", dir)
     }) {
-        wemi.dependency.internal.resolveArtifacts(dependencies, sorted, mapper, progressListener ?: LoggingDownloadTracker)
+        wemi.dependency.internal.resolveArtifacts(dependencies, sorted, mapper, progressListener ?: RootLoggingDownloadTracker)
     }
 }
 

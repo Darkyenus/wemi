@@ -357,6 +357,7 @@ interface ActivityListener {
     /** Begin a new activity stack, which may proceed independently of other activities.
      * The parallel's activity [ForkedActivityListener.endParallelActivity] must be called before the end of this
      * [ActivityListener]'s current activity ends, but independently of any nested activities.
+     * [beginParallelActivity] and [ForkedActivityListener.endParallelActivity] are NOT thread safe.
      * @return thread safe alternative parallel listener or null if this feature is not supported. */
     fun beginParallelActivity(activity:String):ForkedActivityListener? = null
 }
@@ -491,7 +492,52 @@ interface EvaluationListener : ActivityListener {
                     first.endActivity()
                     second.endActivity()
                 }
+
+                override fun beginParallelActivity(activity: String): ForkedActivityListener? {
+                    return splitBeginParallelActivity(activity, first, second)
+                }
             }
         }
+    }
+}
+
+private fun splitBeginParallelActivity(activity:String, first:ActivityListener, second:ActivityListener):ForkedActivityListener? {
+    val firstFork = first.beginParallelActivity(activity)
+    val secondFork = second.beginParallelActivity(activity)
+    if (firstFork == null) {
+        return secondFork
+    } else if (secondFork == null) {
+        return firstFork
+    } else {
+        return SplitForkedActivityListener(firstFork, secondFork)
+    }
+}
+
+private class SplitForkedActivityListener(
+        private val firstFork:ForkedActivityListener,
+        private val secondFork:ForkedActivityListener) : ForkedActivityListener {
+
+    override fun beginActivity(activity: String) {
+        firstFork.beginActivity(activity)
+        secondFork.beginActivity(activity)
+    }
+
+    override fun activityDownloadProgress(bytes: Long, totalBytes: Long, durationNs: Long) {
+        firstFork.activityDownloadProgress(bytes, totalBytes, durationNs)
+        secondFork.activityDownloadProgress(bytes, totalBytes, durationNs)
+    }
+
+    override fun endActivity() {
+        firstFork.endActivity()
+        secondFork.endActivity()
+    }
+
+    override fun beginParallelActivity(activity: String): ForkedActivityListener? {
+        return splitBeginParallelActivity(activity, firstFork, secondFork)
+    }
+
+    override fun endParallelActivity() {
+        firstFork.endParallelActivity()
+        secondFork.endParallelActivity()
     }
 }
