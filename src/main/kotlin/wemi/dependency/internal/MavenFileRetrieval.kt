@@ -1,13 +1,31 @@
 package wemi.dependency.internal
 
 import WemiVersion
-import com.darkyen.dave.*
+import com.darkyen.dave.Request
+import com.darkyen.dave.Response
+import com.darkyen.dave.ResponseTranslator
+import com.darkyen.dave.Webb
+import com.darkyen.dave.WebbException
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
 import wemi.boot.WemiUnicodeOutputSupported
 import wemi.collections.toMutable
-import wemi.dependency.*
-import wemi.util.*
+import wemi.dependency.ArtifactPath
+import wemi.dependency.CHECKSUMS
+import wemi.dependency.CompatibleSortedRepositories
+import wemi.dependency.DataWithChecksum
+import wemi.dependency.Repository
+import wemi.dependency.SortedRepositories
+import wemi.util.Failable
+import wemi.util.GaugedInputStream
+import wemi.util.appendSuffix
+import wemi.util.appendToPath
+import wemi.util.div
+import wemi.util.hashMatches
+import wemi.util.parseHashSum
+import wemi.util.toHexString
+import wemi.util.toPath
+import wemi.util.writeText
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
@@ -18,8 +36,12 @@ import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import java.security.cert.X509Certificate
+import java.util.concurrent.Callable
+import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit
-import javax.net.ssl.*
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLException
+import javax.net.ssl.X509TrustManager
 
 
 private val LOG = LoggerFactory.getLogger("MavenFileRetrieval")
@@ -221,54 +243,75 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
  * @return amount of mismatched checksums, 0 if none, -1 if no checksums found
  */
 private fun retrieveChecksums(repositoryArtifactUrl: URL, useUnsafeTransport: Boolean, progressTracker: ActivityListener?, artifactData: DataWithChecksum): Int {
-    var checksumsChecked = 0
-    var checksumMismatchBits = 0
-    for (checksum in CHECKSUMS) {
-        val checksumUrl = repositoryArtifactUrl.appendToPath(checksum.suffix)
-        val checksumFileBody: String? = try {
-            val checksumResponse = httpGet(checksumUrl, useUnsafeTransport = useUnsafeTransport).execute(progressTracker, ResponseTranslator.STRING_TRANSLATOR)
-            if (!checksumResponse.isSuccess) {
-                LOG.debug("Failed to retrieve checksum '{}' (code: {})", checksumUrl, checksumResponse.statusCode)
-                continue
-            }
-            checksumResponse.body
-        } catch (e: WebbException) {
-            when (e.cause) {
-                is FileNotFoundException ->
-                    LOG.trace("Failed to retrieve checksum '{}', file not found", repositoryArtifactUrl)
-                is SSLException -> {
-                    LOG.warn("Failed to retrieve checksum '{}', problem with SSL", repositoryArtifactUrl, e.cause)
+    progressTracker?.beginActivity("Retrieving checksums")
+    try {
+        val tasks = CHECKSUMS.map { checksum ->
+            val taskProgressTracker = progressTracker?.beginParallelActivity("$checksum")
+            ForkJoinPool.commonPool().submit(Callable {
+                try {
+                    val checksumUrl = repositoryArtifactUrl.appendToPath(checksum.suffix)
+                    val checksumFileBody: String? = try {
+                        val checksumResponse = httpGet(checksumUrl, useUnsafeTransport = useUnsafeTransport).execute(taskProgressTracker, ResponseTranslator.STRING_TRANSLATOR)
+                        if (!checksumResponse.isSuccess) {
+                            LOG.debug("Failed to retrieve checksum '{}' (code: {})", checksumUrl, checksumResponse.statusCode)
+                            return@Callable null
+                        }
+                        checksumResponse.body
+                    } catch (e: WebbException) {
+                        when (e.cause) {
+                            is FileNotFoundException ->
+                                LOG.trace("Failed to retrieve checksum '{}', file not found", repositoryArtifactUrl)
+                            is SSLException -> {
+                                LOG.warn("Failed to retrieve checksum '{}', problem with SSL", repositoryArtifactUrl, e.cause)
+                            }
+                            else ->
+                                LOG.debug("Failed to retrieve checksum '{}'", repositoryArtifactUrl, e)
+                        }
+                        return@Callable null
+                    }
+
+                    val remoteChecksum = parseHashSum(checksumFileBody)
+                    if (checksumFileBody == null || remoteChecksum.isEmpty()) {
+                        LOG.warn("Failed to retrieve checksum '{}': file is malformed", checksumUrl)
+                        return@Callable null
+                    } else {
+                        // Compute checksum
+                        val artifactChecksum = artifactData.checksum(checksum)
+
+                        if (hashMatches(remoteChecksum, artifactChecksum, repositoryArtifactUrl.path.takeLastWhile { it != '/' })) {
+                            LOG.trace("{} checksum of '{}' is valid", checksum, repositoryArtifactUrl)
+                            return@Callable true
+                        } else {
+                            LOG.warn("{} checksum of '{}' mismatch! Computed {}, got {}", checksum, repositoryArtifactUrl, toHexString(artifactChecksum), toHexString(remoteChecksum))
+                            return@Callable false
+                        }
+                    }
+                } finally {
+                    taskProgressTracker?.endParallelActivity()
                 }
-                else ->
-                    LOG.debug("Failed to retrieve checksum '{}'", repositoryArtifactUrl, e)
-            }
-            continue
+            })
         }
 
-        val remoteChecksum = parseHashSum(checksumFileBody)
-        if (checksumFileBody == null || remoteChecksum.isEmpty()) {
-            LOG.warn("Failed to retrieve checksum '{}': file is malformed", checksumUrl)
-        } else {
+        var checksumsChecked = 0
+        var checksumMismatchBits = 0
+        for (checksum in CHECKSUMS) {
+            val result = tasks[checksum.ordinal].get() ?: continue
             checksumsChecked++
-            // Compute checksum
-            val artifactChecksum = artifactData.checksum(checksum)
-
-            if (hashMatches(remoteChecksum, artifactChecksum, repositoryArtifactUrl.path.takeLastWhile { it != '/' })) {
-                LOG.trace("{} checksum of '{}' is valid", checksum, repositoryArtifactUrl)
-            } else {
-                LOG.warn("{} checksum of '{}' mismatch! Computed {}, got {}", checksum, repositoryArtifactUrl, toHexString(artifactChecksum), toHexString(remoteChecksum))
+            if (!result) {
                 checksumMismatchBits = checksumMismatchBits or (1 shl checksum.ordinal)
             }
         }
-    }
 
-    if (checksumMismatchBits != 0) {
-        return checksumMismatchBits
+        if (checksumMismatchBits != 0) {
+            return checksumMismatchBits
+        }
+        if (checksumsChecked <= 0) {
+            return -1
+        }
+        return 0
+    } finally {
+        progressTracker?.endActivity()
     }
-    if (checksumsChecked <= 0) {
-        return -1
-    }
-    return 0
 }
 
 /**

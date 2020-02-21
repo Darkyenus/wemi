@@ -353,6 +353,18 @@ interface ActivityListener {
 
     /** End activity started by [beginActivity]. */
     fun endActivity() {}
+
+    /** Begin a new activity stack, which may proceed independently of other activities.
+     * The parallel's activity [ForkedActivityListener.endParallelActivity] must be called before the end of this
+     * [ActivityListener]'s current activity ends, but independently of any nested activities.
+     * @return thread safe alternative parallel listener or null if this feature is not supported. */
+    fun beginParallelActivity(activity:String):ForkedActivityListener? = null
+}
+
+/** Returned by [ActivityListener.beginParallelActivity]. */
+interface ForkedActivityListener : ActivityListener {
+    /** End this activity. Calling any other methods of this object after this one is illegal. */
+    fun endParallelActivity()
 }
 
 /**
