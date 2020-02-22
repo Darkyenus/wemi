@@ -242,11 +242,18 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
         return DownloadResult.Failure(e.message ?: e.toString())
     }
 
-    if (snapshot && response.statusCode == 304 /* Not modified */) {
+    val statusCode = response.statusCode
+    if (snapshot && statusCode == 304 /* Not modified */) {
         return DownloadResult.UseCache
     } else if (!response.isSuccess) {
-        LOG.debug("Failed to retrieve '{}' - status code {}", repositoryArtifactUrl, response.statusCode)
-        return DownloadResult.Failure("HTTP ${response.statusCode}")
+        LOG.debug("Failed to retrieve '{}' - status code {}", repositoryArtifactUrl, statusCode)
+        if (statusCode == 404) {
+            return DownloadResult.Failure("File does not exist - check the coordinates for typos and ensure that you have added the corresponding repository (HTTP 404)")
+        } else if (statusCode/100 == 5) {
+            return DownloadResult.Failure("Repository server error - check that you have added the right repository or try again later (HTTP $statusCode)")
+        } else {
+            return DownloadResult.Failure("HTTP $statusCode")
+        }
     }
     val remoteArtifactData = DataWithChecksum(response.body)
 
