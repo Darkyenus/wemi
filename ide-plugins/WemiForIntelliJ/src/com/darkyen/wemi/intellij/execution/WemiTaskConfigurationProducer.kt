@@ -1,10 +1,13 @@
 package com.darkyen.wemi.intellij.execution
 
+import com.darkyen.wemi.intellij.settings.WemiModuleService
+import com.darkyen.wemi.intellij.settings.WemiModuleType
 import com.intellij.execution.JavaExecutionUtil
 import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.actions.LazyRunConfigurationProducer
 import com.intellij.execution.application.ApplicationConfigurationType
 import com.intellij.execution.configurations.ConfigurationFactory
+import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.util.Ref
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.idea.run.KotlinRunConfigurationProducer
@@ -20,12 +23,26 @@ class WemiTaskConfigurationProducer : LazyRunConfigurationProducer<WemiTaskConfi
 	}
 
 	override fun isConfigurationFromContext(configuration: WemiTaskConfiguration, context: ConfigurationContext): Boolean {
-		val mainClass = getMainClassName(context.psiLocation ?: return false) ?: return false
-		return configuration.options.tasks == buildRunMainTaskForClassName(mainClass)
+		val psiElement = context.psiLocation ?: return false
+		val mainClass = getMainClassName(psiElement) ?: return false
+		val moduleName = getWemiModuleName(psiElement)
+		return configuration.options.tasks == buildRunMainTaskForClassName(moduleName, mainClass)
 	}
 
-	private fun buildRunMainTaskForClassName(className:String):List<Array<String>> {
-		return listOf(arrayOf("runMain", className))
+	private fun buildRunMainTaskForClassName(moduleName:String?, className:String):List<Array<String>> {
+		if (moduleName == null) {
+			return listOf(arrayOf("runMain", className))
+		} else {
+			return listOf(arrayOf("$moduleName/runMain", className))
+		}
+	}
+
+	private fun getWemiModuleName(from:PsiElement):String? {
+		val moduleService = ModuleUtilCore.findModuleForPsiElement(from)?.getService(WemiModuleService::class.java) ?: return null
+		if (moduleService.wemiModuleType == WemiModuleType.PROJECT) {
+			return moduleService.wemiProjectName
+		}
+		return null
 	}
 
 	private fun getMainClassName(from:PsiElement):String? {
@@ -43,8 +60,10 @@ class WemiTaskConfigurationProducer : LazyRunConfigurationProducer<WemiTaskConfi
 	}
 
 	override fun setupConfigurationFromContext(configuration: WemiTaskConfiguration, context: ConfigurationContext, sourceElement: Ref<PsiElement>): Boolean {
-		val mainClass = getMainClassName(sourceElement.get() ?: return false) ?: return false
-		configuration.options.tasks = buildRunMainTaskForClassName(mainClass)
+		val psiElement = sourceElement.get() ?: return false
+		val mainClass = getMainClassName(psiElement) ?: return false
+		val moduleName = getWemiModuleName(psiElement)
+		configuration.options.tasks = buildRunMainTaskForClassName(moduleName, mainClass)
 		configuration.useSuggestedName()
 		return true
 	}
