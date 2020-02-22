@@ -208,17 +208,20 @@ internal class KeyEvaluationStatusListener(
 	}
 
 	override fun endActivity() {
-		pop(redraw = false)
-
 		val parallelActivityContainer = parallelActivityContainer
-		if (stackLevel <= 0 && parallelActivityContainer != null) {
+
+		if (parallelActivityContainer == null) {
+			pop()
+		} else {
 			synchronized(parallelActivityContainer) {
-				val removed = parallelActivityContainer.remove(this)
-				assert(removed)
+				pop(redraw = false)
+				if (stackLevel <= 0) {
+					val removed = parallelActivityContainer.remove(this)
+					assert(removed)
+				}
+				redraw()
 			}
 		}
-
-		redraw()
 	}
 
 	override fun beginParallelActivity(activity: String): ActivityListener? {
