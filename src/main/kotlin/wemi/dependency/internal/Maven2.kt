@@ -1071,7 +1071,7 @@ private class RawPom(
         }
     }
 
-    private fun getProperty(key:String, warnIfNotSet:Boolean):String? {
+    private fun getProperty(key:String, warn:Boolean):String? {
         var explicitValuePom = this@RawPom
         var explicitValue: String?
         do {
@@ -1088,10 +1088,18 @@ private class RawPom(
         if (key.startsWith(envPrefix)) {
             val env = System.getenv(key.substring(envPrefix.length))
             return if (env == null) {
-                LOG.warn("Unreliable Pom resolution: property '{}' not resolved", key)
+                if (warn) {
+                    LOG.warn("Unreliable Pom resolution: property '{}' not resolved", key)
+                } else {
+                    LOG.debug("Unreliable Pom resolution: property '{}' not resolved", key)
+                }
                 null
             } else {
-                LOG.warn("Unreliable Pom resolution: property '{}' resolved to '{}'", key, env)
+                if (warn) {
+                    LOG.warn("Unreliable Pom resolution: property '{}' resolved to '{}'", key, env)
+                } else {
+                    LOG.debug("Unreliable Pom resolution: property '{}' resolved to '{}'", key, env)
+                }
                 env
             }
         }
@@ -1113,17 +1121,21 @@ private class RawPom(
         }
 
         if (key.startsWith("settings.")) {
-            LOG.warn("Unreliable Pom resolution: property '{}' not resolved - settings.* properties are not supported", key)
+            if (warn) {
+                LOG.warn("Unreliable Pom resolution: property '{}' not resolved - settings.* properties are not supported", key)
+            } else {
+                LOG.debug("Unreliable Pom resolution: property '{}' not resolved - settings.* properties are not supported", key)
+            }
             return null
         }
 
         val systemProperty = System.getProperty(key)
         if (systemProperty != null) {
-            LOG.warn("Unreliable Pom resolution: property '{}' resolved to system property '{}'", key, systemProperty)
+            LOG.debug("Unreliable Pom resolution: property '{}' resolved to system property '{}'", key, systemProperty)
             return systemProperty.trim()
         }
 
-        if (warnIfNotSet) {
+        if (warn) {
             LOG.warn("Unreliable Pom resolution: property '{}' not resolved", key)
         }
 
