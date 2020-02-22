@@ -108,6 +108,7 @@ private class CacheArtifactPath(val repository:Repository, val cacheFile: Path, 
  * @param repository to retrieve from. It's [Repository.cache] will be checked too.
  * @param path to the file in a repository
  * @param snapshot resolve as if this file was a snapshot file? (i.e. may change on the remote)
+ * @return [Failable]'s [CacheArtifactPath] may be `null` if the repository is local and does not contain the file
  */
 private fun retrieveFileLocally(repository: Repository, path: String, snapshot:Boolean, cachePath:String = path): Failable<ArtifactPath, CacheArtifactPath?> {
     /*
@@ -143,16 +144,16 @@ private fun retrieveFileLocally(repository: Repository, path: String, snapshot:B
         try {
             val attributes = Files.readAttributes<BasicFileAttributes>(localFile, BasicFileAttributes::class.java)
             if (attributes.isDirectory) {
-                LOG.warn("Local artifact is a directory: {}", localFile)
+                LOG.warn("A local artifact is a directory: {}", localFile)
                 return Failable.failure(null)
             }
             LOG.debug("Using local artifact: {}", localFile)
             return Failable.success(ArtifactPath(localFile, null, repository, repositoryArtifactUrl,false))
         } catch (fileDoesNotExist: java.nio.file.NoSuchFileException) {
-            LOG.trace("Local artifact does not exist: {}", localFile)
+            LOG.trace("A local artifact does not exist: {}", localFile)
             return Failable.failure(null)
         } catch (ioProblem: IOException) {
-            LOG.debug("Failed to retrieve local artifact: {}", localFile, ioProblem)
+            LOG.warn("Failed to retrieve a local artifact: {}", localFile, ioProblem)
             return Failable.failure(null)
         }
 
@@ -574,7 +575,7 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
         return@fileRetrievalMutex Failable.success(ArtifactPathWithAlternateRepositories(result, alternateRepositories, possibleAlternateRepositories))
     }
 
-    return@fileRetrievalMutex failure!!.reFail()
+    return@fileRetrievalMutex failure?.reFail() ?: Failable.failure("No suitable repositories to search in")
 }
 
 private fun uriToActivityName(uri:String):String {
