@@ -194,7 +194,7 @@ private fun retrieveFileLocally(repository: Repository, path: String, snapshot:B
 }
 
 private sealed class DownloadResult {
-    object Failure:DownloadResult()
+    class Failure(val reason:String):DownloadResult()
     object UseCache:DownloadResult()
     class Success(val remoteLastModifiedTime:Long, val remoteArtifactData:DataWithChecksum, val checksumMismatches:Int):DownloadResult()
 }
@@ -238,14 +238,14 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
             else ->
                 LOG.debug("Failed to retrieve '{}'", repositoryArtifactUrl, e)
         }
-        return DownloadResult.Failure
+        return DownloadResult.Failure(e.message ?: e.toString())
     }
 
     if (snapshot && response.statusCode == 304 /* Not modified */) {
         return DownloadResult.UseCache
     } else if (!response.isSuccess) {
         LOG.debug("Failed to retrieve '{}' - status code {}", repositoryArtifactUrl, response.statusCode)
-        return DownloadResult.Failure
+        return DownloadResult.Failure("HTTP ${response.statusCode}")
     }
     val remoteArtifactData = DataWithChecksum(response.body)
 
@@ -385,7 +385,7 @@ private fun retrieveFileForVerificationOnly(repository:Repository, path:String, 
 }
 
 /** Continuation of [retrieveFileLocally]. */
-private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:Boolean, cache:CacheArtifactPath, progressTracker: ActivityListener?): ArtifactPath? {
+private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:Boolean, cache:CacheArtifactPath, progressTracker: ActivityListener?): Failable<ArtifactPath, String> {
     val repositoryArtifactUrl = repository.url / path
     val cacheFile = cache.cacheFile
 
@@ -398,10 +398,10 @@ private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:
     for (downloadTry in 1 .. retries) {
         val downloadFileResult = retrieveFileDownloadAndVerify(repositoryArtifactUrl, cache.cacheControlMs, snapshot, repository.useUnsafeTransport, progressTracker)
         when (downloadFileResult) {
-            DownloadResult.Failure -> return null
+            is DownloadResult.Failure -> return Failable.failure("Failed to download file: ${downloadFileResult.reason}")
             DownloadResult.UseCache -> {
                 LOG.trace("Using local artifact cache (snapshot not modified): {}", cacheFile)
-                return ArtifactPath(cacheFile, null, repository, repositoryArtifactUrl, true)
+                return Failable.success(ArtifactPath(cacheFile, null, repository, repositoryArtifactUrl, true))
             }
             is DownloadResult.Success -> {
                 val mismatches = downloadFileResult.checksumMismatches
@@ -412,7 +412,7 @@ private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:
                         LOG.warn("Settling on download with {} mismatched checksum(s)", mismatches)
                     } else {
                         LOG.warn("Download failed due to {} mismatched checksum(s)", mismatches)
-                        return null
+                        return Failable.failure("Checksum mismatch")
                     }
                 }
                 downloadFileSuccess = downloadFileResult
@@ -449,7 +449,7 @@ private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:
         LOG.debug("Artifact from {} cached successfully", repositoryArtifactUrl)
     } catch (e: IOException) {
         LOG.warn("Failed to save artifact from {} to cache in {}", repositoryArtifactUrl, cacheFile, e)
-        return null
+        return Failable.failure("Failed to save to cache: ${e.message}")
     }
     if (snapshot) {
         try {
@@ -460,9 +460,9 @@ private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:
     }
 
     // Done
-    return ArtifactPath(cacheFile, null, repository, repositoryArtifactUrl, false).apply {
+    return Failable.success(ArtifactPath(cacheFile, null, repository, repositoryArtifactUrl, false).apply {
         this.dataWithChecksum = remoteArtifactData
-    }
+    })
 }
 
 private fun Repository.canResolve(snapshot:Boolean):Boolean {
@@ -508,24 +508,31 @@ private fun <T> fileRetrievalMutex(path:String, repositories: List<Repository>, 
 
 /** Retrieve the [path] (which may be a [snapshot]) from [repositories].
  * Thread safe, but make sure that [progressTracker] is thread safe as well when forking. */
-internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?, cachePath:(Repository) -> String = {path}):ArtifactPathWithAlternateRepositories? = fileRetrievalMutex(path, repositories) {
+internal fun retrieveFile(path:String, snapshot:Boolean, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?, cachePath:(Repository) -> String = {path}):Failable<ArtifactPathWithAlternateRepositories, String> = fileRetrievalMutex(path, repositories) {
     // Check all local repositories and caches
     val localFailures = arrayOfNulls<CacheArtifactPath>(repositories.size)
     for ((i, repository) in repositories.withIndex()) {
         retrieveFileLocally(repository, path, snapshot, cachePath(repository)).use<Unit>({
-            return@fileRetrievalMutex ArtifactPathWithAlternateRepositories(it, emptyList(), repositories.drop(i + 1))
+            return@fileRetrievalMutex Failable.success(ArtifactPathWithAlternateRepositories(it, emptyList(), repositories.drop(i + 1)))
         }, {
             localFailures[i] = it
         })
     }
 
     // Find (first) result
+    var failure:Failable<Any?, String>? = null
     for ((i, cacheArtifactPath) in localFailures.withIndex()) {
         if (cacheArtifactPath == null)
             continue
 
         val repository = repositories[i]
-        val result = retrieveFileRemotely(repository, path, snapshot, cacheArtifactPath, progressTracker) ?: continue
+        val resultFailable = retrieveFileRemotely(repository, path, snapshot, cacheArtifactPath, progressTracker)
+        val result = if (resultFailable.successful) {
+            resultFailable.value
+        } else {
+            failure = resultFailable
+            null
+        } ?: continue
 
         var alternateRepositories:SortedRepositories = emptyList()
         var possibleAlternateRepositories:SortedRepositories = emptyList()
@@ -564,10 +571,10 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
             }
         }
 
-        return@fileRetrievalMutex ArtifactPathWithAlternateRepositories(result, alternateRepositories, possibleAlternateRepositories)
+        return@fileRetrievalMutex Failable.success(ArtifactPathWithAlternateRepositories(result, alternateRepositories, possibleAlternateRepositories))
     }
 
-    return@fileRetrievalMutex null
+    return@fileRetrievalMutex failure!!.reFail()
 }
 
 private fun uriToActivityName(uri:String):String {

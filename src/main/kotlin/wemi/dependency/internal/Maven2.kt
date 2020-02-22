@@ -360,16 +360,8 @@ private fun resolveInM2Repository(
         val artifactRepositories = ArrayList<Repository>(1 + retrievedPom.path.alternateRepositories.size)
         artifactRepositories.add(repository)
         retrievedPom.path.alternateRepositories.forEach { artifactRepositories.add(it) }
-        val retrieved = retrieveFile(filePath, snapshot, artifactRepositories, progressTracker = progressTracker)
 
-        if (retrieved == null) {
-            if (retrievedPom.path.possibleAlternateRepositories.isNotEmpty()) {
-                usedRepositories = retrievedPom.path.possibleAlternateRepositories.toList()
-            } else {
-                LOG.warn("Failed to retrieve file at '{}' in {}", filePath, compatibleRepositories)
-                return RawResolvedDependency(resolvedDependencyId, "Failed to retrieve file")
-            }
-        } else {
+        retrieveFile(filePath, snapshot, artifactRepositories, progressTracker = progressTracker).use<Unit>({ retrieved ->
             if (retrieved.alternateRepositories.isNotEmpty()) {
                 LOG.info("{} has been also found in these repositories: {}", dependencyId, retrieved.alternateRepositories)
             }
@@ -382,7 +374,14 @@ private fun resolveInM2Repository(
             val retrievedArtifact = retrieved.artifactPath
             retrievedArtifact.data = null
             return RawResolvedDependency(resolvedDependencyId, pom.dependencies, repository, retrievedArtifact)
-        }
+        }, { failure ->
+            if (retrievedPom.path.possibleAlternateRepositories.isNotEmpty()) {
+                usedRepositories = retrievedPom.path.possibleAlternateRepositories.toList()
+            } else {
+                LOG.warn("Failed to retrieve file at '{}' in {}", filePath, compatibleRepositories)
+                return RawResolvedDependency(resolvedDependencyId, failure)
+            }
+        })
     }
 }
 
@@ -446,9 +445,9 @@ private class RetrievedPom(
 private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSortedRepositories, snapshot:Boolean, progressTracker: ActivityListener?):Failable<RetrievedPom, RawResolvedDependency> {
     LOG.trace("Retrieving pom for {} at '{}'", dependencyId, repositories)
     // Handles normal poms and old non-unique snapshot poms
-    retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion),
-            snapshot, repositories, progressTracker)?.let {
-        return Failable.success(RetrievedPom(dependencyId, it))
+    val basePom = retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, dependencyId.snapshotVersion), snapshot, repositories, progressTracker)
+    basePom.success { pom ->
+        return Failable.success(RetrievedPom(dependencyId, pom))
     }
 
     // Handle unique snapshots with maven-metadata.xml file
@@ -458,9 +457,19 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
         val staleRepositories = ArrayList<Repository>()
         val freshestRepositories = ArrayList<Repository>()
         var freshestRepositoryVersion:String? = null
+
+        val failures = StringBuilder()
         for (repository in repositories) {
-            val mavenMetadataFile = retrieveFile(mavenMetadataPath, true,
-                    listOf(repository), progressTracker) { repo -> mavenMetadataPath(dependencyId, repo) } ?: continue
+            val mavenMetadataFileFailable = retrieveFile(mavenMetadataPath, true,
+                    listOf(repository), progressTracker) { repo -> mavenMetadataPath(dependencyId, repo) }
+            val mavenMetadataFile = mavenMetadataFileFailable.use({ it }, { failure ->
+                if (failures.isNotEmpty()) {
+                    failures.append(' ')
+                }
+                failures.append("${repository.name}: $failure")
+                null
+            }) ?: continue
+
             val metadataBuilder = MavenMetadataBuildingXMLHandler.buildFrom(mavenMetadataFile.artifactPath)
             val snapshotVersion = metadataBuilder.use({ metadata ->
                 val timestamp = metadata.versioningSnapshotTimestamp
@@ -490,7 +499,7 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
         }
 
         if (freshestRepositoryVersion == null) {
-            return Failable.failure(RawResolvedDependency(dependencyId, "Failed to resolve snapshot metadata"))
+            return Failable.failure(RawResolvedDependency(dependencyId, "Failed to resolve snapshot metadata: $failures"))
         }
 
         LOG.debug("Resolving {} in {} with snapshot version {}", dependencyId, freshestRepositories, freshestRepositoryVersion)
@@ -500,14 +509,14 @@ private fun retrievePom(dependencyId: DependencyId, repositories: CompatibleSort
 
         val newRetrievedPom = retrieveFile(pomPath(dependencyId.group, dependencyId.name, dependencyId.version, freshestRepositoryVersion), snapshot, freshestRepositories, progressTracker)
 
-        if (newRetrievedPom != null) {
-            return Failable.success(RetrievedPom(dependencyId.copy(snapshotVersion = freshestRepositoryVersion), newRetrievedPom))
-        }
-
-        return Failable.failure(RawResolvedDependency(dependencyId, "Failed to resolve pom xml for deduced snapshot version \"$freshestRepositoryVersion\" in $freshestRepositories"))
+        newRetrievedPom.use<Unit>({ pom ->
+            return Failable.success(RetrievedPom(dependencyId.copy(snapshotVersion = freshestRepositoryVersion), pom))
+        }, { failMessage ->
+            return Failable.failure(RawResolvedDependency(dependencyId, "Failed to resolve pom xml for deduced snapshot version \"$freshestRepositoryVersion\" in $freshestRepositories: $failMessage"))
+        })
     }
 
-    return Failable.failure(RawResolvedDependency(dependencyId, "Failed to resolve pom xml"))
+    return Failable.failure(RawResolvedDependency(dependencyId, "Failed to resolve pom xml: ${basePom.failure}"))
 }
 
 private fun pomPath(group:String, name:String, version:String, snapshotVersion:String):String {
