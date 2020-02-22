@@ -809,7 +809,120 @@ private class RawPom(
     val dependencies = ArrayList<RawPomDependency>()
     val dependencyManagement = ArrayList<RawPomDependency>()
 
+    val profiles = ArrayList<PomProfile>()
+
+    private fun checkActivationJdk(jdk:String):Boolean {
+        val currentVersion = System.getProperty("java.version")
+        if (currentVersion.startsWith(jdk)) {
+            return true
+        }
+
+        return currentVersion in parseMavenVersionRange(jdk)
+    }
+
+    private fun checkActivationOsName(osName:String):Boolean {
+        return OS_NAME.equals(osName, ignoreCase = true)
+    }
+    private fun checkActivationOsFamily(osFamily:String):Boolean {
+        return OS_FAMILY.equals(osFamily, ignoreCase = true)
+    }
+    private fun checkActivationOsArch(osArch:String):Boolean {
+        return OS_ARCH.equals(osArch, ignoreCase = true)
+    }
+    private fun checkActivationOsVersion(osVersion:String):Boolean {
+        return OS_VERSION.equals(osVersion, ignoreCase = true)
+    }
+
+    private fun checkProfileActivation(profile:PomProfile):Boolean {
+        // All present activators must be true, but if there are no activators, the profile is not active
+        var matches = 0
+        var mismatches = 0
+
+        fun check(value:String?, function:(String) -> Boolean) {
+            if (value == null) {
+                return
+            }
+            val match = if (value.startsWith('!')) {
+                !function(value.substring(1))
+            } else {
+                function(value)
+            }
+            if (match) {
+                matches++
+            } else {
+                mismatches++
+            }
+        }
+
+        check(profile.activationJdk, ::checkActivationJdk)
+        check(profile.activationOsName, ::checkActivationOsName)
+        check(profile.activationOsFamily, ::checkActivationOsFamily)
+        check(profile.activationOsArch, ::checkActivationOsArch)
+        check(profile.activationOsVersion, ::checkActivationOsVersion)
+
+        // Check properties
+        for ((key, value) in profile.activationProperties) {
+            var successMatch = true
+            val normalizedKey = if (key.startsWith('!')) {
+                successMatch = false
+                key.substring(1)
+            } else {
+                key
+            }
+
+            val baseValue = getProperty(normalizedKey, false)
+            val match = if (value == null) {
+                baseValue != null
+            } else (baseValue != null) && baseValue.equals(value, ignoreCase = true)
+
+            if (match == successMatch) {
+                matches++
+            } else {
+                mismatches++
+            }
+        }
+
+        return mismatches == 0 && matches > 0
+    }
+
+    private fun applyProfiles() {
+        val allProfiles = ArrayList<PomProfile>(profiles)
+        var parent = parent
+        while (parent != null) {
+            allProfiles.addAll(parent.profiles)
+            parent = parent.parent
+        }
+
+        // First collect profiles that are activated explicitly
+        val activeProfiles = ArrayList<PomProfile>()
+        for (profile in allProfiles) {
+            if (checkProfileActivation(profile)) {
+                LOG.trace("{} - profile {} activated", url, profile.id)
+                activeProfiles.add(profile)
+            }
+        }
+
+        // If there are no explicitly activated profiles, use those activated by default
+        if (activeProfiles.isEmpty()) {
+            for (profile in allProfiles) {
+                if (profile.activeByDefault) {
+                    LOG.trace("{} - profile {} activated (by default)", url, profile.id)
+                    activeProfiles.add(profile)
+                }
+            }
+        }
+
+        for (profile in activeProfiles) {
+            // Apply the profile
+            this.dependencies.addAll(profile.dependencies)
+            this.dependencyManagement.addAll(profile.dependencyManagement)
+            this.properties.putAll(profile.properties)
+        }
+    }
+
     fun resolve(transitiveDependencyManagement: List<Dependency>, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?): Failable<Pom, String> {
+        applyProfiles()
+
         val resolvedGroupId = get { groupId }?.translate()
         val resolvedArtifactId = artifactId?.translate()
         val resolvedVersion = get { version }?.translate()
@@ -958,12 +1071,7 @@ private class RawPom(
         }
     }
 
-    private fun String.translate(): String {
-        if (!startsWith("\${", ignoreCase = false) || !endsWith('}', ignoreCase = false)) {
-            return this.trim()
-        }
-
-        val key = substring(2, length - 1)
+    private fun getProperty(key:String, warnIfNotSet:Boolean):String? {
         var explicitValuePom = this@RawPom
         var explicitValue: String?
         do {
@@ -981,7 +1089,7 @@ private class RawPom(
             val env = System.getenv(key.substring(envPrefix.length))
             return if (env == null) {
                 LOG.warn("Unreliable Pom resolution: property '{}' not resolved", key)
-                this.trim()
+                null
             } else {
                 LOG.warn("Unreliable Pom resolution: property '{}' resolved to '{}'", key, env)
                 env
@@ -997,7 +1105,7 @@ private class RawPom(
                 "project.packaging" -> packaging
                 else -> {
                     LOG.warn("Unreliable Pom resolution: property '{}' not resolved - this project.* property is not supported", key)
-                    return this.trim()
+                    return null
                 }
             }
             LOG.trace("Pom resolution: property '{}' resolved to '{}'", key, project)
@@ -1006,7 +1114,7 @@ private class RawPom(
 
         if (key.startsWith("settings.")) {
             LOG.warn("Unreliable Pom resolution: property '{}' not resolved - settings.* properties are not supported", key)
-            return this.trim()
+            return null
         }
 
         val systemProperty = System.getProperty(key)
@@ -1015,13 +1123,41 @@ private class RawPom(
             return systemProperty.trim()
         }
 
-        LOG.warn("Unreliable Pom resolution: property '{}' not resolved", key)
-        return this.trim()
+        if (warnIfNotSet) {
+            LOG.warn("Unreliable Pom resolution: property '{}' not resolved", key)
+        }
+
+        return null
+    }
+
+    private fun String.translate(): String {
+        if (!startsWith("\${", ignoreCase = false) || !endsWith('}', ignoreCase = false)) {
+            return this.trim()
+        }
+
+        val key = substring(2, length - 1)
+        return getProperty(key, true) ?: this.trim()
     }
 
     private companion object {
         private val LOG = LoggerFactory.getLogger(RawPom::class.java)
     }
+}
+
+private class PomProfile {
+    var id = ""
+    var activeByDefault = false
+
+    var activationJdk:String? = null
+    var activationOsName:String? = null
+    var activationOsFamily:String? = null
+    var activationOsArch:String? = null
+    var activationOsVersion:String? = null
+    val activationProperties = ArrayList<Pair<String, String?>>()
+
+    val properties = HashMap<String, String>()
+    val dependencies = ArrayList<RawPom.RawPomDependency>()
+    val dependencyManagement = ArrayList<RawPom.RawPomDependency>()
 }
 
 private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, pom.url) {
@@ -1043,6 +1179,10 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
 
     private var lastDependencyExclusionGroupId:String? = null
     private var lastDependencyExclusionArtifactId:String? = null
+
+    private var lastProfile:PomProfile = PomProfile()
+    private var lastProfilePropertyName:String? = null
+    private var lastProfilePropertyValue:String? = null
 
     override fun doElement() {
         // Version
@@ -1080,22 +1220,22 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
         }
 
         // Dependencies (normal and dependencyManagement)
-        else if (atElement(DependencyGroupId) || atElement(DependencyManagementGroupId)) {
+        else if (atElement(DependencyGroupId) || atElement(DependencyManagementGroupId) || atElement(ProfileDependencyGroupId) || atElement(ProfileDependencyManagementGroupId)) {
             lastDependencyGroupId = characters()
-        } else if (atElement(DependencyArtifactId) || atElement(DependencyManagementArtifactId)) {
+        } else if (atElement(DependencyArtifactId) || atElement(DependencyManagementArtifactId) || atElement(ProfileDependencyArtifactId) || atElement(ProfileDependencyManagementArtifactId)) {
             lastDependencyArtifactId = characters()
-        } else if (atElement(DependencyVersion) || atElement(DependencyManagementVersion)) {
+        } else if (atElement(DependencyVersion) || atElement(DependencyManagementVersion) || atElement(ProfileDependencyVersion) || atElement(ProfileDependencyManagementVersion)) {
             lastDependencyVersion = characters()
-        } else if (atElement(DependencyClassifier) || atElement(DependencyManagementClassifier)) {
+        } else if (atElement(DependencyClassifier) || atElement(DependencyManagementClassifier) || atElement(ProfileDependencyClassifier) || atElement(ProfileDependencyManagementClassifier)) {
             lastDependencyClassifier = characters()
-        } else if (atElement(DependencyOptional) || atElement(DependencyManagementOptional)) {
+        } else if (atElement(DependencyOptional) || atElement(DependencyManagementOptional) || atElement(ProfileDependencyOptional) || atElement(ProfileDependencyManagementOptional)) {
             lastDependencyOptional = characters()
-        } else if (atElement(DependencyScope) || atElement(DependencyManagementScope)) {
+        } else if (atElement(DependencyScope) || atElement(DependencyManagementScope) || atElement(ProfileDependencyScope) || atElement(ProfileDependencyManagementScope)) {
             lastDependencyScope = characters()
-        } else if (atElement(DependencyType) || atElement(DependencyManagementType)) {
+        } else if (atElement(DependencyType) || atElement(DependencyManagementType) || atElement(ProfileDependencyType) || atElement(ProfileDependencyManagementType)) {
             lastDependencyType = characters()
-        } else if (atElement(Dependency)) {
-            pom.dependencies.add(RawPom.RawPomDependency(
+        } else if (atElement(Dependency) || atElement(DependencyManagementDependency) || atElement(ProfileDependency) || atElement(ProfileDependencyManagementDependency)) {
+            val dependency = RawPom.RawPomDependency(
                     lastDependencyGroupId,
                     lastDependencyArtifactId,
                     lastDependencyVersion,
@@ -1104,7 +1244,7 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
                     lastDependencyScope,
                     lastDependencyOptional,
                     lastDependencyExclusions
-            ))
+            )
 
             lastDependencyGroupId = null
             lastDependencyArtifactId = null
@@ -1115,35 +1255,24 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
             lastDependencyOptional = null
 
             lastDependencyExclusions = ArrayList()
-        } else if (atElement(DependencyManagementDependency)) {
-            pom.dependencyManagement.add(RawPom.RawPomDependency(
-                    lastDependencyGroupId,
-                    lastDependencyArtifactId,
-                    lastDependencyVersion,
-                    lastDependencyClassifier,
-                    lastDependencyType,
-                    lastDependencyScope,
-                    lastDependencyOptional,
-                    lastDependencyExclusions
-            ))
 
-            lastDependencyGroupId = null
-            lastDependencyArtifactId = null
-            lastDependencyVersion = null
-            lastDependencyClassifier = null
-            lastDependencyType = null
-            lastDependencyScope = null
-            lastDependencyOptional = null
-
-            lastDependencyExclusions = ArrayList()
+            if (atElement(Dependency)) {
+                pom.dependencies.add(dependency)
+            } else if (atElement(DependencyManagementDependency)) {
+                pom.dependencyManagement.add(dependency)
+            } else if (atElement(ProfileDependency)) {
+                lastProfile.dependencies.add(dependency)
+            } else /*if (atElement(ProfileDependencyManagementDependency))*/ {
+                lastProfile.dependencyManagement.add(dependency)
+            }
         }
 
         // Dependency (management) exclusions
-        else if (atElement(DependencyExclusionGroupId) || atElement(DependencyManagementExclusionGroupId)) {
+        else if (atElement(DependencyExclusionGroupId) || atElement(DependencyManagementExclusionGroupId) || atElement(ProfileDependencyExclusionGroupId) || atElement(ProfileDependencyManagementExclusionGroupId)) {
             lastDependencyExclusionGroupId = characters()
-        } else if (atElement(DependencyExclusionArtifactId) || atElement(DependencyManagementExclusionArtifactId)) {
+        } else if (atElement(DependencyExclusionArtifactId) || atElement(DependencyManagementExclusionArtifactId) || atElement(ProfileDependencyExclusionArtifactId) || atElement(ProfileDependencyManagementExclusionArtifactId)) {
             lastDependencyExclusionArtifactId = characters()
-        } else if (atElement(DependencyExclusion) || atElement(DependencyManagementExclusion)) {
+        } else if (atElement(DependencyExclusion) || atElement(DependencyManagementExclusion) || atElement(ProfileDependencyExclusion) || atElement(ProfileDependencyManagementExclusion)) {
             if (lastDependencyExclusionArtifactId == null || lastDependencyExclusionGroupId == null) {
                 LOG.warn("Incomplete exclusion: {}:{} in {}", lastDependencyExclusionArtifactId, lastDependencyGroupId)
             } else {
@@ -1165,6 +1294,13 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
             pom.properties[propertyName] = propertyContent
         }
 
+        else if (atElement(ProfileProperty, 1)) {
+            val propertyName = elementStack.last()
+            val propertyContent = characters()
+
+            lastProfile.properties[propertyName] = propertyContent
+        }
+
         // Repositories
         /*else if (atElement(RepoReleases)) {
 
@@ -1182,6 +1318,39 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
             //TODO Add support
             LOG.debug("Pom at {} uses custom repositories, which are not supported yet", pom.url)
         }
+
+        // Profiles
+        // https://maven.apache.org/guides/introduction/introduction-to-profiles.html
+        // https://books.sonatype.com/mvnref-book/reference/profiles.html
+        else if (atElement(Profile)) {
+            pom.profiles.add(lastProfile)
+            lastProfile = PomProfile()
+        } else if (atElement(ProfileId)) {
+            lastProfile.id = characters()
+        } else if (atElement(ProfileActivationActiveByDefault)) {
+            lastProfile.activeByDefault = characters().equals("true", ignoreCase = true)
+        } else if (atElement(ProfileActivationJDK)) {
+            lastProfile.activationJdk = characters()
+        } else if (atElement(ProfileActivationOsName)) {
+            lastProfile.activationOsName = characters()
+        } else if (atElement(ProfileActivationOsFamily)) {
+            lastProfile.activationOsFamily = characters()
+        } else if (atElement(ProfileActivationOsArch)) {
+            lastProfile.activationOsArch = characters()
+        } else if (atElement(ProfileActivationOsVersion)) {
+            lastProfile.activationOsVersion = characters()
+        } else if (atElement(ProfileActivationProperty)) {
+            val propertyName = lastProfilePropertyName
+            if (propertyName != null) {
+                lastProfile.activationProperties.add(propertyName to lastProfilePropertyValue)
+            }
+            lastProfilePropertyName = null
+            lastProfilePropertyValue = null
+        } else if (atElement(ProfileActivationPropertyName)) {
+            lastProfilePropertyName = characters()
+        } else if (atElement(ProfileActivationPropertyValue)) {
+            lastProfilePropertyValue = characters()
+        }// TODO(jp): Support for repositories in profiles
     }
 
     companion object {
@@ -1210,6 +1379,10 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
         val DependencyScope = arrayOf("project", "dependencies", "dependency", "scope")
         val DependencyType = arrayOf("project", "dependencies", "dependency", "type")
 
+        val DependencyExclusion = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion")
+        val DependencyExclusionGroupId = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion", "groupId")
+        val DependencyExclusionArtifactId = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion", "artifactId")
+
         val DependencyManagementDependency = arrayOf("project", "dependencyManagement", "dependencies", "dependency")
         val DependencyManagementGroupId = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "groupId")
         val DependencyManagementArtifactId = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "artifactId")
@@ -1218,10 +1391,6 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
         val DependencyManagementOptional = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "optional")
         val DependencyManagementScope = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "scope")
         val DependencyManagementType = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "type")
-
-        val DependencyExclusion = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion")
-        val DependencyExclusionGroupId = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion", "groupId")
-        val DependencyExclusionArtifactId = arrayOf("project", "dependencies", "dependency", "exclusions", "exclusion", "artifactId")
 
         val DependencyManagementExclusion = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "exclusions", "exclusion")
         val DependencyManagementExclusionGroupId = arrayOf("project", "dependencyManagement", "dependencies", "dependency", "exclusions", "exclusion", "groupId")
@@ -1237,6 +1406,63 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
         val RepoName = arrayOf("project", "repositories", "repository", "name")
         val RepoUrl = arrayOf("project", "repositories", "repository", "url")
         val RepoLayout = arrayOf("project", "repositories", "repository", "layout")
+
+        val Profile = arrayOf("project", "profiles", "profile")
+        val ProfileId = arrayOf("project", "profiles", "profile", "id")
+        val ProfileActivationActiveByDefault = arrayOf("project", "profiles", "profile", "activation", "activeByDefault")
+        val ProfileActivationJDK = arrayOf("project", "profiles", "profile", "activation", "jdk")
+        val ProfileActivationOsName = arrayOf("project", "profiles", "profile", "activation", "os", "name")
+        val ProfileActivationOsFamily = arrayOf("project", "profiles", "profile", "activation", "os", "family")
+        val ProfileActivationOsArch = arrayOf("project", "profiles", "profile", "activation", "os", "arch")
+        val ProfileActivationOsVersion = arrayOf("project", "profiles", "profile", "activation", "os", "version")
+        val ProfileActivationProperty = arrayOf("project", "profiles", "profile", "activation", "property")
+        val ProfileActivationPropertyName = arrayOf("project", "profiles", "profile", "activation", "property", "name")
+        val ProfileActivationPropertyValue = arrayOf("project", "profiles", "profile", "activation", "property", "value")
+
+        val ProfileRepo = Repo.inProfile()
+        val ProfileRepoReleases = RepoReleases.inProfile()
+        val ProfileRepoSnapshots = RepoSnapshots.inProfile()
+        val ProfileRepoId = RepoId.inProfile()
+        val ProfileRepoName = RepoName.inProfile()
+        val ProfileRepoUrl = RepoUrl.inProfile()
+        val ProfileRepoLayout = RepoLayout.inProfile()
+
+        val ProfileDependency = Dependency.inProfile()
+        val ProfileDependencyGroupId = DependencyGroupId.inProfile()
+        val ProfileDependencyArtifactId = DependencyArtifactId.inProfile()
+        val ProfileDependencyVersion = DependencyVersion.inProfile()
+        val ProfileDependencyClassifier = DependencyClassifier.inProfile()
+        val ProfileDependencyOptional = DependencyOptional.inProfile()
+        val ProfileDependencyScope = DependencyScope.inProfile()
+        val ProfileDependencyType = DependencyType.inProfile()
+
+        val ProfileDependencyExclusion = DependencyExclusion.inProfile()
+        val ProfileDependencyExclusionGroupId = DependencyExclusionGroupId.inProfile()
+        val ProfileDependencyExclusionArtifactId = DependencyExclusionArtifactId.inProfile()
+
+        val ProfileDependencyManagementDependency = DependencyManagementDependency.inProfile()
+        val ProfileDependencyManagementGroupId = DependencyManagementGroupId.inProfile()
+        val ProfileDependencyManagementArtifactId = DependencyManagementArtifactId.inProfile()
+        val ProfileDependencyManagementVersion = DependencyManagementVersion.inProfile()
+        val ProfileDependencyManagementClassifier = DependencyManagementClassifier.inProfile()
+        val ProfileDependencyManagementOptional = DependencyManagementOptional.inProfile()
+        val ProfileDependencyManagementScope = DependencyManagementScope.inProfile()
+        val ProfileDependencyManagementType = DependencyManagementType.inProfile()
+        val ProfileDependencyManagementExclusion = DependencyManagementExclusion.inProfile()
+        val ProfileDependencyManagementExclusionGroupId = DependencyManagementExclusionGroupId.inProfile()
+        val ProfileDependencyManagementExclusionArtifactId = DependencyManagementExclusionArtifactId.inProfile()
+
+        val ProfileProperty = Property.inProfile()
+
+        @Suppress("UNCHECKED_CAST")
+        private fun Array<String>.inProfile():Array<String> {
+            val inProfile = arrayOfNulls<String>(this.size + 2)
+            inProfile[0] = "project"
+            inProfile[1] = "profiles"
+            inProfile[2] = "profile"
+            System.arraycopy(this, 1, inProfile, 3, this.size - 1)
+            return inProfile as Array<String>
+        }
     }
 }
 

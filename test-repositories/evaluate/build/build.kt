@@ -530,6 +530,18 @@ val problematic_3 by configuration("") {
     }
 }
 
+val problematic_4 by configuration("") {
+    setTestCacheRepository("problematic_4")
+
+    repositories add { JCenter }
+    // Uses pom profile (in dependencies)
+    libraryDependencies set { setOf(dependency("org.jetbrains.kotlinx", "kotlinx-html-jvm", "0.6.12")) }
+
+    checkResolution set {
+        assertClasspathContainsFiles("annotations-13.0.jar", "kotlin-stdlib-1.2.71.jar", "kotlinx-html-jvm-0.6.12.jar", "kotlin-stdlib-common-1.2.71.jar")
+    }
+}
+
 val unsafeRepositoryDownload by configuration("") {
     repositories set { setOf(MavenCentral, Repository("jitpack", java.net.URL("https://jitpack.io/"), useUnsafeTransport = true)) }
 
@@ -621,6 +633,7 @@ val dependency_resolution by project() {
         autoRun(checkResolution, problematic_1)
         autoRun(checkResolution, problematic_2)
         autoRun(checkResolution, problematic_3)
+        autoRun(checkResolution, problematic_4)
     }
 
     if (longRunning) {
