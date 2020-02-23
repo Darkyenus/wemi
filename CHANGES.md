@@ -1,4 +1,15 @@
 # 0.12
+- Add support for Kotlin 1.3.61
+- Add `system` function, for easy system command invocation
+- Greatly improved and sped-up dependency resolution process, up to 33% faster than previous version
+    - Downloading of multiple dependencies is now parallelized
+    - Much better error messages
+    - Added support for Maven's POM `<profile>`s
+- Fix testing harness classes often conflicting with user libraries
+- Add `--machine-readable=shell` mode, for better shell scripting integration
+- Improve `javac` logging reliability 
+- Cache downloaded dependencies in `~/.wemi`, instead of `~/.m2`
+- Do not consider aborted tests as failures
 - Add explicit `JavaCompilerFlag.encoding`, which defaults to UTF-8
 - Fix archiving not using correct configurations
 - Prevent Javadoc from failing on soft errors. To fail the task on soft errors, add javadoc flag `-Wemi-fail-on-error`
