@@ -115,20 +115,6 @@ internal class KeyEvaluationStatusListener(
 	private val stackLevels = Array(16) { StackLevel() }
 	private var stackLevel = 0
 
-	private fun redraw() {
-		parallelActivityContainer?.let { parallelActivityContainer ->
-			synchronized(parallelActivityContainer) {
-				val index = parallelActivityContainer.indexOf(this)
-				// Do not redraw if it will not be visible anyway.
-				// NOTE: Not perfect, disregards parent listeners.
-				if (index != 0) {
-					return
-				}
-			}
-		}
-		renderer.redraw()
-	}
-
 	fun drawListener(mb: AttributedStringBuilder) {
 		// Redraw
 		val stackLevelCount = minOf(stackLevel, stackLevels.size)
@@ -171,14 +157,14 @@ internal class KeyEvaluationStatusListener(
 
 	override fun keyEvaluationStarted(fromScope: Scope, key: Key<*>) {
 		stackLevels.getOrNull(stackLevel++)?.resetToKey(key)
-		redraw()
+		renderer.redraw()
 	}
 
 	private fun pop(redraw:Boolean = true) {
 		if (stackLevel > 0) {
 			stackLevel--
 			if (redraw) {
-				redraw()
+				renderer.redraw()
 			}
 		}
 	}
@@ -197,14 +183,14 @@ internal class KeyEvaluationStatusListener(
 
 	override fun beginActivity(activity: String) {
 		stackLevels.getOrNull(stackLevel++)?.resetToActivity(activity)
-		redraw()
+		renderer.redraw()
 	}
 
 	private val activityProgressBytes_sb = StringBuilder()
 
 	override fun activityDownloadProgress(bytes: Long, totalBytes: Long, durationNs:Long) {
 		stackLevels.getOrNull(stackLevel - 1)?.setExtraToDownloadProgress(bytes, totalBytes, durationNs)
-		redraw()
+		renderer.redraw()
 	}
 
 	override fun endActivity() {
@@ -219,8 +205,8 @@ internal class KeyEvaluationStatusListener(
 					val removed = parallelActivityContainer.remove(this)
 					assert(removed)
 				}
-				redraw()
 			}
+			renderer.redraw()
 		}
 	}
 
