@@ -57,7 +57,13 @@ fun system(vararg command: String,
 		null
 	}
 
-	if (CLI.forwardSignalsTo(process) { !process.waitFor(timeoutMs, TimeUnit.MILLISECONDS) }) {
+	if (!CLI.forwardSignalsTo(process) {
+				if (timeoutMs == Long.MAX_VALUE) {
+					process.waitFor(); true
+				} else {
+					process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+				}
+			}) {
 		LOG.error("Process $process ($commandString) timed out")
 		process.destroyForcibly()
 		val resultString = try {

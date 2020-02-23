@@ -1,7 +1,7 @@
 ![WEMI Build System](docs/logo_doc.svg)  
 *Wonders Expeditiously, Mundane Instantly*
 
-[![Jitpack badge](https://jitpack.io/v/Darkyenus/wemi.svg)](https://jitpack.io/#Darkyenus/wemi) [![Join the chat at https://gitter.im/wemi-build/community](https://badges.gitter.im/wemi-build/community.svg)](https://gitter.im/wemi-build/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Jitpack badge](https://jitpack.io/v/com.darkyen/wemi.svg)](https://jitpack.io/#com.darkyen/wemi) [![Join the chat at https://gitter.im/wemi-build/community](https://badges.gitter.im/wemi-build/community.svg)](https://gitter.im/wemi-build/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Build system aimed at those, who don't want to be limited nor slowed down by their tools.
 Key features:

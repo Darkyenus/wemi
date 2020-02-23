@@ -140,21 +140,23 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task, format:Machine
     }
 }
 
-private fun Writer.shellPrint(thing:Any?) {
+private fun Writer.shellPrint(thing:Any?, printStack:ArrayList<Any>) {
     if (thing == null) {
         write("\n")
+    } else if (thing.javaClass.isArray) {
+        if (printStack.contains(thing)) {
+            write("<self-reference>\n")
+        } else {
+            printStack.add(thing)
+            for (i in 0 until Array.getLength(thing)) {
+                shellPrint(Array.get(thing, i), printStack)
+                write("\n")
+            }
+            printStack.removeAt(printStack.lastIndex)
+        }
     } else if (thing is CharSequence || thing is Number) {
         write(thing.toString())
         write("\n")
-    } else if (thing.javaClass.isArray) {
-        for (i in 0 until Array.getLength(thing)) {
-            shellPrint(Array.get(thing, i))
-            write("\n")
-        }
-    } else if (thing is Iterable<*>) {
-        for (element in thing) {
-            shellPrint(element)
-        }
     } else if (thing is Path) {
         write(thing.toAbsolutePath().toString())
         write("\n")
@@ -165,9 +167,25 @@ private fun Writer.shellPrint(thing:Any?) {
         write(thing.name)
         write("\n")
     } else if (thing is Map<*, *>) {
-        for (entry in thing.entries) {
-            shellPrint(entry.key)
-            shellPrint(entry.value)
+        if (printStack.contains(thing)) {
+            write("<self-reference>\n")
+        } else {
+            printStack.add(thing)
+            for (entry in thing.entries) {
+                shellPrint(entry.key, printStack)
+                shellPrint(entry.value, printStack)
+            }
+            printStack.removeAt(printStack.lastIndex)
+        }
+    } else if (thing is Iterable<*>) {
+        if (printStack.contains(thing)) {
+            write("<self-reference>\n")
+        } else {
+            printStack.add(thing)
+            for (element in thing) {
+                shellPrint(element, printStack)
+            }
+            printStack.removeAt(printStack.lastIndex)
         }
     } else {
         val jsonWriter = JsonWriter(this)
@@ -189,7 +207,7 @@ private fun machineReadablePrint(out: PrintStream, thing: Any?, format: MachineR
             writer.append(0.toChar())
         }
         MachineReadableOutputFormat.SHELL -> {
-            writer.shellPrint(thing)
+            writer.shellPrint(thing, ArrayList())
         }
     }
     writer.flush()

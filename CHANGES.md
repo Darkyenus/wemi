@@ -1,4 +1,6 @@
 # 0.13
+- Fix `system` crashing on infinite timeout
+- Fix `--machine-readable=shell` stack overflow on `Path` printing and make it robust against self-referential collections
 
 # 0.12 2020-02-23
 - Add support for Kotlin 1.3.61

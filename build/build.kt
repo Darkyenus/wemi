@@ -22,6 +22,7 @@ import wemi.expiresWith
 import wemi.key
 import wemi.publish.InfoNode
 import wemi.read
+import wemi.run.system
 import wemi.test.JUnitPlatformLauncher
 import wemi.test.TestReport
 import wemi.test.TestStatus
@@ -36,8 +37,6 @@ import wemi.util.writeText
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoField
-import java.util.concurrent.Semaphore
-import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
 val CompilerProjects = listOf(
@@ -108,13 +107,13 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
         launcherScriptPath.executable = true
 
         // Pack tar archive
-        system("tar", "-c", "-v", "-z", "-f", (distFolder / "wemi.tar.gz").absolutePath, *Files.list(archiveContentDir).map { it.fileName }.filter { !it.startsWith(".") }.map { "./$it" }.toArray { Array(it) { "" } }, workingDirectory = archiveContentDir, collectOutput = false) { code -> throw WemiException("tar($code)") }
+        system("tar", "-c", "-v", "-z", "-f", (distFolder / "wemi.tar.gz").absolutePath, *Files.list(archiveContentDir).map { it.fileName }.filter { !it.startsWith(".") }.map { "./$it" }.toArray { Array(it) { "" } }, workingDirectory = archiveContentDir, timeoutMs = 60_000, collectOutput = false) { code, _ -> throw WemiException("tar($code)") }
 
         // Create build info document
         val buildInfo = distFolder / "build-info.txt"
         buildInfo.writeText(StringBuilder().apply {
             append("Wemi ").append(wemiVersion).append('\n')
-            append("Git: ").append(system("git", "rev-parse", "HEAD")).append('\n')
+            append("Git: ").append(system("git", "rev-parse", "HEAD", timeoutMs = 60_000)).append('\n')
             append("Date: ").append(DateTimeFormatter.ISO_INSTANT.format(Instant.now().with(ChronoField.NANO_OF_SECOND, 0L))).append('\n')
         })
 
@@ -258,59 +257,10 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
 
 private val SYSTEM_LOG = LoggerFactory.getLogger("system")
 
-fun system(vararg command:String, workingDirectory:Path = WemiRootFolder, timeoutMs:Long = 60_000L, collectOutput:Boolean = true, onFail:(code:Int?) -> Unit = {}):String? {
-    val process = ProcessBuilder(*command).run {
-        directory(workingDirectory.toFile())
-        redirectError(ProcessBuilder.Redirect.INHERIT)
-        redirectInput(ProcessBuilder.Redirect.INHERIT)
-        if (collectOutput) {
-            redirectOutput(ProcessBuilder.Redirect.PIPE)
-        } else {
-            redirectOutput(ProcessBuilder.Redirect.INHERIT)
-        }
-        start()
-    }
-
-    val commandString = command.joinToString(" ")
-
-    var result = ""
-    val semaphore = Semaphore(0)
-
-    if (collectOutput) {
-        val readerThread = Thread({
-            try {
-                result = process.inputStream.reader(Charsets.UTF_8).readText()
-            } finally {
-                semaphore.release()
-            }
-        }, "Reader for $commandString")
-        readerThread.isDaemon = true
-        readerThread.start()
-    } else {
-        semaphore.release()
-    }
-
-    if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
-        SYSTEM_LOG.error("Process $process ($commandString) timed out")
-        process.destroyForcibly()
-        onFail(null)
-        return null
-    }
-
-    semaphore.tryAcquire(5000, TimeUnit.MILLISECONDS)
-    val exitValue = process.exitValue()
-    if (exitValue == 0) {
-        return result.trimEnd()
-    } else {
-        onFail(exitValue)
-        return null
-    }
-}
-
 fun versionAccordingToGit():String? {
-    val lastWemiVersionTag = system("git", "describe", "--tags", "--match=v*", "--abbrev=0") { SYSTEM_LOG.warn("Could not find Wemi version") } ?: return null
-    val lastVersionCommit = system("git", "rev-list", "--max-count=1", lastWemiVersionTag) { SYSTEM_LOG.warn("Could not get version_commit") } ?: return null
-    val latestCommit = system("git", "rev-list", "--max-count=1", "master") { SYSTEM_LOG.warn("Could not get the latest commit") } ?: return null
+    val lastWemiVersionTag = system("git", "describe", "--tags", "--match=v*", "--abbrev=0", timeoutMs = 60_000) { code, _ -> SYSTEM_LOG.warn("Could not find Wemi version ({})", code); null } ?: return null
+    val lastVersionCommit = system("git", "rev-list", "--max-count=1", lastWemiVersionTag, timeoutMs = 60_000) { code, _ -> SYSTEM_LOG.warn("Could not get version_commit ({})", code); null } ?: return null
+    val latestCommit = system("git", "rev-list", "--max-count=1", "master", timeoutMs = 60_000) { code, _ -> SYSTEM_LOG.warn("Could not get the latest commit ({})", code); null } ?: return null
 
     val matcher = Pattern.compile("v([0-9]+)\\.([0-9]+).*").matcher(lastWemiVersionTag)
     if (!matcher.matches()) {

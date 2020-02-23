@@ -9,16 +9,13 @@ cd "$(dirname "$0")/.." || fail "Failed initial dir change"
 wemi_home="$(pwd)"
 log "Working from home: $wemi_home"
 
-#wemi_version=$(./wemi --machine-readable-output=shell wemi/projectVersion) || fail "wemi ($?) (version)"
-log "TODO: Using hardcoded version, switch to dynamic version after 0.12 release"
-wemi_version="0.12"
+wemi_version=$(./wemi --machine-readable-output=shell wemi/projectVersion) || fail "wemi ($?) (version)"
 log "Wemi version: $wemi_version"
 
 # Build the archive files in Wemi
-log "TODO: Using hardcoded wemi_dist_dir, switch to dynamic version after 0.12 release"
+log "TODO: Using hardcoded wemi_dist_dir, switch to dynamic version after 0.13 release"
 #wemi_dist_dir=$(./wemi --machine-readable-output=shell wemi/distributionArchive) || fail "wemi ($?) (archive)"
-log "TODO: Skipping tests"
-./wemi wemi/distributionArchive skipTest=true || fail "Distribution archive build failed"
+./wemi wemi/distributionArchive || fail "Distribution archive build failed"
 wemi_dist_dir="${wemi_home}/build/dist"
 
 # Copy IDE plugins

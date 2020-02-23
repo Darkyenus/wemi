@@ -39,7 +39,7 @@
 #			--print-java-exe	- Print path to java executable that would be used and exit
 #			--print-wemi-home	- Print path to directory with Wemi jars and exit
 
-readonly wemi_version='0.11'
+readonly wemi_version='0.12'
 readonly java_min_version='8'
 
 log() { echo "$@" 1>&2; }
@@ -124,7 +124,7 @@ download_to_file() {
 	if command_exists curl; then
 		curl -C - --fail --retry 3 --location --output "$2" --url "$1" || fail "Failed to fetch $1 to $2 (curl returned $?)"
 	elif command_exists wget; then
-		wget --tries=3 --continue --compression=auto --show-progress --output-document="$2" "$1" || fail "Failed to fetch $1 to $2 (wget returned $?)"
+		wget --tries=3 --continue --show-progress --output-document="$2" "$1" || fail "Failed to fetch $1 to $2 (wget returned $?)"
 	else
 		fail_unsatisfied "curl or wget"
 	fi
@@ -136,7 +136,7 @@ download_to_output() {
 	if command_exists curl; then
 		curl --fail --retry 3 --location --silent --show-error --url "$1" || fail "Failed to fetch $1 (curl returned $?)"
 	elif command_exists wget; then
-		wget --tries=3 --quiet --compression=auto --output-document=- "$1" || fail "Failed to fetch $1 (wget returned $?)"
+		wget --tries=3 --quiet --output-document=- "$1" || fail "Failed to fetch $1 (wget returned $?)"
 	else
 		fail_unsatisfied "curl or wget"
 	fi
@@ -455,8 +455,8 @@ fetch_wemi() {
 	if [ "${wemi_version%-SNAPSHOT}" != "${wemi_version}" ]; then
 		# Snapshot, those are not uploaded to GitHub
 		wemi_url_github_=""
-		# If the snapshot directory exists and is less than 3 days old, we should download a new snapshot
-		if [ -z "$(find "$wemi_dist_dir_" -type d -name "$(basename "$wemi_dist_dir_")" -mtime -60 -print 2>/dev/null)" ]; then
+		# If the snapshot directory exists and is less than 1 hour old, we should download a new snapshot
+		if [ -z "$(find "$wemi_dist_dir_" -type d -name "$(basename "$wemi_dist_dir_")" -mtime -1 -print 2>/dev/null)" ]; then
 			log "Checking for a newer Wemi snapshot"
 			redownload_='true'
 		fi
