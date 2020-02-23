@@ -84,12 +84,24 @@ object CLI {
         terminal
     }
 
-    /** While [during] is executing inside of this function, forward as many signals as possible to [process].
+    /** Call [during] and while it is executing, forward process signals to [process].
      * This is not always possible, so take this only as a hint.
      * (Currently handles only SIGINT on best effort basis, where it actually attempts to stop the process) */
-    fun <T>forwardSignalsTo(process:Process, during:()->T):T {
+    fun <T> forwardSignalsTo(process: Process, during: () -> T): T {
         val previousInterrupt = terminal.handle(Terminal.Signal.INT) {
             process.destroy()
+        }
+        try {
+            return during()
+        } finally {
+            terminal.handle(Terminal.Signal.INT, previousInterrupt)
+        }
+    }
+
+    /** Call [during] and while it is executing, call [interrupted] on SIGINT. */
+    fun <T> catchInterruptsWhile(interrupted: () -> Unit, during: () -> T): T {
+        val previousInterrupt = terminal.handle(Terminal.Signal.INT) {
+            interrupted()
         }
         try {
             return during()

@@ -89,79 +89,81 @@ internal fun handleProcessForTesting(builder: ProcessBuilder, testParameters: Te
     LOG.debug("Starting test process")
     val process = builder.start()
 
-    DataOutputStream(process.outputStream).use { out ->
-        testParameters.writeTo(out)
-    }
-
     val outputBytes = ByteArrayOutputStream()
 
-    val stdOutErrLogger = object : LineReadingOutputStream() {
-        override fun onLineRead(line: CharSequence) {
-            val trimmedLine = line.dropLastWhile { it.isWhitespace() }
-            if (trimmedLine.isNotEmpty()) {
-                TEST_OUTPUT_LOG.info("{}", trimmedLine)
+    CLI.forwardSignalsTo(process) {
+        DataOutputStream(process.outputStream).use { out ->
+            testParameters.writeTo(out)
+        }
+
+        val stdOutErrLogger = object : LineReadingOutputStream() {
+            override fun onLineRead(line: CharSequence) {
+                val trimmedLine = line.dropLastWhile { it.isWhitespace() }
+                if (trimmedLine.isNotEmpty()) {
+                    TEST_OUTPUT_LOG.info("{}", trimmedLine)
+                }
             }
         }
-    }
-    val stdoutMessageCatcher = object : OutputStream() {
+        val stdoutMessageCatcher = object : OutputStream() {
 
-        var state = 0
+            var state = 0
 
-        val STATE_INITIAL = 0
-        val STATE_READING = 1
-        val STATE_DONE = 2
+            val STATE_INITIAL = 0
+            val STATE_READING = 1
+            val STATE_DONE = 2
 
-        var magicCount = 0
+            var magicCount = 0
 
-        override fun write(b: Int) {
-            if (state == STATE_INITIAL) {
-                if (b == TestLauncher.MAGIC_MESSAGE_START.toInt()) {
-                    magicCount++
-                    if (magicCount == TestLauncher.MAGIC_MESSAGE_DELIMITER_REPEAT) {
+            override fun write(b: Int) {
+                if (state == STATE_INITIAL) {
+                    if (b == TestLauncher.MAGIC_MESSAGE_START.toInt()) {
+                        magicCount++
+                        if (magicCount == TestLauncher.MAGIC_MESSAGE_DELIMITER_REPEAT) {
+                            magicCount = 0
+                            state = STATE_READING
+                        }
+                    } else {
                         magicCount = 0
-                        state = STATE_READING
+                        stdOutErrLogger.write(b)
+                    }
+                } else if (state == STATE_READING) {
+                    outputBytes.write(b)
+                    if (b == TestLauncher.MAGIC_MESSAGE_END.toInt()) {
+                        magicCount++
+                        if (magicCount == TestLauncher.MAGIC_MESSAGE_DELIMITER_REPEAT) {
+                            magicCount = 0
+                            state = STATE_DONE
+                        }
+                    } else {
+                        magicCount = 0
                     }
                 } else {
-                    magicCount = 0
                     stdOutErrLogger.write(b)
                 }
-            } else if (state == STATE_READING) {
-                outputBytes.write(b)
-                if (b == TestLauncher.MAGIC_MESSAGE_END.toInt()) {
-                    magicCount++
-                    if (magicCount == TestLauncher.MAGIC_MESSAGE_DELIMITER_REPEAT) {
-                        magicCount = 0
-                        state = STATE_DONE
-                    }
-                } else {
-                    magicCount = 0
+            }
+        }
+
+        stdOutErrLogger.use { logger ->
+            val procStdout = process.inputStream
+            val procStderr = process.errorStream
+
+            while (true) {
+                val exited = process.waitFor(10, TimeUnit.MILLISECONDS)
+                readFully(stdoutMessageCatcher, procStdout)
+                readFully(logger, procStderr)
+
+                if (exited) {
+                    break
                 }
-            } else {
-                stdOutErrLogger.write(b)
             }
         }
-    }
 
-    stdOutErrLogger.use { logger ->
-        val procStdout = process.inputStream
-        val procStderr = process.errorStream
-
-        while (true) {
-            val exited = process.waitFor(10, TimeUnit.MILLISECONDS)
-            readFully(stdoutMessageCatcher, procStdout)
-            readFully(logger, procStderr)
-
-            if (exited) {
-                break
-            }
+        val status = process.exitValue()
+        if (status == 0) {
+            LOG.debug("Test process ended with status 0")
+        } else {
+            LOG.warn("Test process ended with status {}", status)
         }
-    }
-
-    val status = process.exitValue()
-    if (status == 0) {
-        LOG.debug("Test process ended with status 0")
-    } else {
-        LOG.warn("Test process ended with status {}", status)
     }
 
     val reportBytes = outputBytes.toByteArray()
