@@ -44,7 +44,8 @@ val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.61"),
         createKotlinCompilerProject("1.2.71"),
         createKotlinCompilerProject("1.3.20"),
-        createKotlinCompilerProject("1.3.41")
+        createKotlinCompilerProject("1.3.41"),
+        createKotlinCompilerProject("1.3.61")
 )
 
 const val WemiGroup = "com.darkyen.wemi"

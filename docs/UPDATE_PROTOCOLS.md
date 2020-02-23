@@ -18,8 +18,6 @@
 1. Add it to [CompilerProjects in build script](../build/build.kt)
 2. Create relevant [plugin interface project](../src/main-kotlinc)
 3. Add it to [KotlinCompilerVersion enum](../src/main/kotlin/wemi/compile/KotlinCompiler.kt)
-4. Consider bumping up the [WemiKotlinVersion used for build scripts](../src/main/kotlin/wemi/Wemi.kt).
-This propagates to `kotlinVersion` key, used to compile user projects.
 
 # New Java Version
 - Check [BytecodeUtil](../plugins/jvm-hotswap/src/main/java/wemiplugin/jvmhotswap/agent/BytecodeUtil.java)
