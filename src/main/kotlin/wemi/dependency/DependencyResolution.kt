@@ -60,15 +60,27 @@ private class LoggingDownloadTracker : ActivityListener {
         downloadStatus.lastLogAtDurationNs = durationNs
 
         val sb = StringBuilder()
+        sb.append(" (")
         if (bytes > 0) {
-            sb.appendShortByteSize(bytes).append('/')
+            sb.appendShortByteSize(bytes)
         }
         if (totalBytes > 0 && bytes < totalBytes) {
+            if (bytes > 0) {
+                sb.append('/')
+            }
             sb.appendShortByteSize(totalBytes)
-        } else {
-            sb.append("???")
         }
-        LOG.info("Downloading {} ({})", activityStack.last(), sb)
+        sb.append(')')
+        if (sb.length == " ()".length) {
+            sb.setLength(0)
+        }
+
+        if (totalBytes > 0 && totalBytes < 1000) {
+            // Log small files at lower level to reduce clutter, especially from checksum files
+            LOG.debug("Downloading {}{}", activityStack.last(), sb)
+        } else {
+            LOG.info("Downloading {}{}", activityStack.last(), sb)
+        }
     }
 
     override fun endActivity() {
