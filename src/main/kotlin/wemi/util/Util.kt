@@ -648,17 +648,19 @@ fun ResolvedDependencies.prettyPrint(includeSkipped:Boolean = false): CharSequen
     return printTree(roots) { result ->
         val dependencyId = this.dependencyId
 
-        result.format(format = Format.Bold)
-                .append(dependencyId.group).append(':')
-                .append(dependencyId.name).append(':')
-                .append(dependencyId.version).format()
+        result.format(format = Format.Bold).append(dependencyId.group)
+                .format(Color.White).append(':')
+                .format(Color.Black, format = Format.Bold).append(dependencyId.name)
+                .format(Color.White).append(':')
+                .format(format = Format.Bold).append(dependencyId.version)
 
         if (dependencyId.classifier != NoClassifier) {
-            result.append(":").append(dependencyId.classifier)
+            result.format(Color.White).append(':').format().append(dependencyId.classifier)
         }
         if (dependencyId.type != DEFAULT_TYPE) {
-            result.append(":").append(dependencyId.type)
+            result.format(Color.White).append(' ').append(dependencyId.type)
         }
+        result.format()
 
         if (status == STATUS_ALREADY_SEEN) {
             result.append(' ').append(CLI.ICON_SEE_ABOVE)
