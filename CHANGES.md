@@ -1,4 +1,6 @@
-# 0.12
+# 0.13
+
+# 0.12 2020-02-23
 - Add support for Kotlin 1.3.61
 - Add `system` function, for easy system command invocation
 - Greatly improved and sped-up dependency resolution process, up to 33% faster than previous version

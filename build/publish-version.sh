@@ -11,7 +11,7 @@ log "Working from home: $wemi_home"
 
 #wemi_version=$(./wemi --machine-readable-output=shell wemi/projectVersion) || fail "wemi ($?) (version)"
 log "TODO: Using hardcoded version, switch to dynamic version after 0.12 release"
-wemi_version="0.12-SNAPSHOT"
+wemi_version="0.12"
 log "Wemi version: $wemi_version"
 
 # Build the archive files in Wemi
