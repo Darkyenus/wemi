@@ -102,6 +102,10 @@ private class LoggingDownloadTracker : ActivityListener {
 
 private val RootLoggingDownloadTracker = LoggingDownloadTracker()
 
+/** [Map] of all resolved dependencies, with added info about the dependency resolution [roots].  */
+class ResolvedDependencies(dependencies:Map<DependencyId, ResolvedDependency>,
+                           val roots:List<DependencyId>) : Map<DependencyId, ResolvedDependency> by dependencies
+
 /**
  * Resolve [dependencies] for their artifacts, including transitive.
  * Resolution is done using [repositories] and their cache.
@@ -114,7 +118,7 @@ private val RootLoggingDownloadTracker = LoggingDownloadTracker()
 fun resolveDependencies(dependencies: Collection<Dependency>,
                         repositories: Collection<Repository>,
                         mapper: ((Dependency) -> Dependency) = { it },
-                        progressListener: ActivityListener? = null): Partial<Map<DependencyId, ResolvedDependency>> {
+                        progressListener: ActivityListener? = null): Partial<ResolvedDependencies> {
     // Sort repositories
     val sorted = ArrayList(repositories)
     sorted.sortWith(REPOSITORY_COMPARATOR)
@@ -125,12 +129,14 @@ fun resolveDependencies(dependencies: Collection<Dependency>,
         directoriesToLock.add(repository.cache ?: continue)
     }
 
-    return directorySynchronized(directoriesToLock, { dir ->
+    val result = directorySynchronized(directoriesToLock, { dir ->
         // On wait
         LOG.info("Waiting for lock on {}", dir)
     }) {
         wemi.dependency.internal.resolveArtifacts(dependencies, sorted, mapper, progressListener ?: RootLoggingDownloadTracker)
     }
+
+    return result.map { ResolvedDependencies(it, dependencies.map { dep -> dep.dependencyId }) }
 }
 
 // -------------------------------- Internal ------------------------------

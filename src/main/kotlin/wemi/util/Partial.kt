@@ -14,6 +14,10 @@ class Partial<out T>(val value: T, val complete: Boolean) : JsonWritable {
     operator fun component1() = value
     operator fun component2() = complete
 
+    inline fun <N> map(map:(T) -> N):Partial<N> {
+        return Partial(map(value), complete)
+    }
+
     override fun JsonWriter.write() {
         writeObject {
             field("complete", complete)

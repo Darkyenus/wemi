@@ -8,7 +8,7 @@ import wemi.boot.WemiColorOutputSupported
 import wemi.dependency.DEFAULT_TYPE
 import wemi.dependency.DependencyId
 import wemi.dependency.NoClassifier
-import wemi.dependency.ResolvedDependency
+import wemi.dependency.ResolvedDependencies
 import java.util.*
 
 //region StringBuilder enhancements
@@ -545,7 +545,7 @@ class TreeNode<T>(val value: T) : ArrayList<TreeNode<T>>() {
  * Returns a pretty-printed string in which the system is displayed as a tree of dependencies.
  * Uses full range of unicode characters for clarity.
  */
-fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<DependencyId>?, includeSkipped:Boolean = false): CharSequence {
+fun ResolvedDependencies.prettyPrint(includeSkipped:Boolean = false): CharSequence {
     /*
     ╤ org.foo:proj:1.0 ✅
     │ ╘ com.bar:pr:2.0 ❌⛔️
@@ -621,7 +621,7 @@ fun Map<DependencyId, ResolvedDependency>.prettyPrint(explicitRoots: Collection<
     val roots = ArrayList<TreeNode<NodeData>>()
 
     // Lift explicit roots
-    explicitRoots?.forEach { root ->
+    for (root in this.roots) {
         val liftedNode = liftNode(root)
         // Check for nodes that are in explicitRoots but were never resolved to begin with
         if (liftedNode.value.status == STATUS_ALREADY_SEEN && !this.containsKey(liftedNode.value.dependencyId)) {

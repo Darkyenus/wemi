@@ -48,8 +48,8 @@ object Keys {
     val libraryDependencies by key<Set<Dependency>>("Libraries that the project depends on", defaultValue = emptySet())
     val libraryDependencyMapper by key<(Dependency) -> Dependency>("Function applied to transitive Dependency-ies encountered while resolving. Used for example when retrieving sources.", defaultValue = { it })
     val resolvedLibraryScopes by key<Set<DepScope>>("Allowed scopes of libraries returned by resolvedLibraryDependencies. Empty = all.", defaultValue = emptySet())
-    val resolvedLibraryDependencies by key<Partial<Map<DependencyId, ResolvedDependency>>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved, _ ->
-        resolved.value.prettyPrint(null)
+    val resolvedLibraryDependencies by key<Partial<ResolvedDependencies>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved, _ ->
+        resolved.value.prettyPrint()
     })
     val unmanagedDependencies by key<List<LocatedPath>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = emptyList())
     val projectDependencies by key<Set<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = emptySet())

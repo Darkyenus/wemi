@@ -276,8 +276,7 @@ class BuildScriptInfo internal constructor(
         }
 
         if (!resolvedComplete) {
-            LOG.warn("Failed to resolve all build script dependencies\n{}",
-                    resolved.prettyPrint(dependencies.map { it.dependencyId }))
+            LOG.warn("Failed to resolve all build script dependencies\n{}", resolved.prettyPrint())
             return false
         }
 

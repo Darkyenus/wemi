@@ -30,7 +30,7 @@ import wemi.dependency.MavenCentral
 import wemi.dependency.NoClassifier
 import wemi.dependency.ProjectDependency
 import wemi.dependency.Repository
-import wemi.dependency.ResolvedDependency
+import wemi.dependency.ResolvedDependencies
 import wemi.dependency.internal.publish
 import wemi.dependency.joinClassifiers
 import wemi.dependency.resolveDependencies
@@ -132,7 +132,7 @@ object KeyDefaults {
         repositories.mapTo(HashSet()) { if (!it.authoritative) it.copy(authoritative = true) else it }
     }
 
-    val ResolvedLibraryDependencies: Value<Partial<Map<DependencyId, ResolvedDependency>>> =  {
+    val ResolvedLibraryDependencies: Value<Partial<ResolvedDependencies>> =  {
         val repositories = Keys.repositories.get()
         val libraryDependencies = Keys.libraryDependencies.get()
         val libraryDependencyProjectMapper = Keys.libraryDependencyMapper.get()
@@ -173,7 +173,7 @@ object KeyDefaults {
             message.append("Failed to resolve all artifacts")
                     .format() // Required, because printing it with pre-set color would bleed into the pretty-printed values
                     .append('\n')
-                    .append(resolved.value.prettyPrint(Keys.libraryDependencies.get().map { it.dependencyId }))
+                    .append(resolved.value.prettyPrint())
             throw WemiException(message.toString(), showStacktrace = false)
         }
 
