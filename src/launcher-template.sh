@@ -455,8 +455,8 @@ fetch_wemi() {
 	if [ "${wemi_version%-SNAPSHOT}" != "${wemi_version}" ]; then
 		# Snapshot, those are not uploaded to GitHub
 		wemi_url_github_=""
-		# If the snapshot directory exists and is less than 3 days old, we should download a new snapshot
-		if [ -z "$(find "$wemi_dist_dir_" -type d -name "$(basename "$wemi_dist_dir_")" -mtime -60 -print 2>/dev/null)" ]; then
+		# If the snapshot directory exists and is less than 1 hour old, we should download a new snapshot
+		if [ -z "$(find "$wemi_dist_dir_" -type d -name "$(basename "$wemi_dist_dir_")" -mtime -1 -print 2>/dev/null)" ]; then
 			log "Checking for a newer Wemi snapshot"
 			redownload_='true'
 		fi
