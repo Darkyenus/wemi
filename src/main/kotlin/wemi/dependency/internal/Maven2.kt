@@ -923,10 +923,10 @@ private class RawPom(
     fun resolve(transitiveDependencyManagement: List<Dependency>, repositories: CompatibleSortedRepositories, progressTracker: ActivityListener?): Failable<Pom, String> {
         applyProfiles()
 
-        val resolvedGroupId = get { groupId }?.translate()
-        val resolvedArtifactId = artifactId?.translate()
-        val resolvedVersion = get { version }?.translate()
-        val resolvedPackaging = packaging.translate()
+        val resolvedGroupId = get { groupId }?.translate(true)
+        val resolvedArtifactId = artifactId?.translate(true)
+        val resolvedVersion = get { version }?.translate(true)
+        val resolvedPackaging = packaging.translate(true)
 
         val translatedDependencies = ArrayList<TranslatedRawPomDependency>()
         val ownDependencyManagement = ArrayList<Dependency>()
@@ -934,15 +934,20 @@ private class RawPom(
         var pomIsParent = false
         while (true) {
             if (pomIsParent) {
-                val packaging = pom.packaging.translate()
+                val packaging = pom.packaging.translate(true)
                 if (!packaging.equals("pom", ignoreCase = true)) {
                     LOG.warn("Parent of '{}' in {} has parent with invalid packaging {} (expected 'pom')", this, pom.url, packaging)
                 }
             }
-            pom.dependencies.mapTo(translatedDependencies) { it.translate() }
+            pom.dependencies.mapTo(translatedDependencies) { it.translate(true) }
             // Child dependencyManagement takes precedence over parent. No deduplication is done, but child is added (and thus) checked first.
             pom.dependencyManagement.mapTo(ownDependencyManagement) {
-                it.translate().resolveAsDependencyManagement()
+                // Do not warn about missing properties in dependency management,
+                // as the system can handle it and some dependencies seem to use it?
+                // Eg. in org.jboss.xnio:xnio-all:3.3.8.Final property version.org.wildfly.common is used in dependencyManagement,
+                // but it is not defined anywhere. This just leads to a lot of warnings for nothing.
+                // If it is an error, it will fail somewhere down the line.
+                it.translate(false).resolveAsDependencyManagement()
             }
             pom = pom.parent ?: break
             pomIsParent = true
@@ -1038,22 +1043,22 @@ private class RawPom(
         }
     }
 
-    private fun RawPomDependency.translate():TranslatedRawPomDependency {
+    private fun RawPomDependency.translate(warn:Boolean):TranslatedRawPomDependency {
         return TranslatedRawPomDependency(
-                group?.translate(),
-                name?.translate(),
-                version?.translate(),
-                classifier?.translate()?.toLowerCase().let { if (it == null || it.isEmpty()) NoClassifier else it },
-                type?.translate()?.toLowerCase().let { if (it == null || it.isEmpty()) DEFAULT_TYPE else it },
-                scope?.translate()?.toLowerCase(),
-                optional?.translate()?.toLowerCase()?.equals("true", ignoreCase = true),
+                group?.translate(warn),
+                name?.translate(warn),
+                version?.translate(warn),
+                classifier?.translate(warn)?.toLowerCase().let { if (it == null || it.isEmpty()) NoClassifier else it },
+                type?.translate(warn)?.toLowerCase().let { if (it == null || it.isEmpty()) DEFAULT_TYPE else it },
+                scope?.translate(warn)?.toLowerCase(),
+                optional?.translate(warn)?.toLowerCase()?.equals("true", ignoreCase = true),
                 exclusions.map { exclusion ->
                     DependencyExclusion(
-                            exclusion.group?.translate(),
-                            exclusion.name?.translate(),
-                            exclusion.version?.translate(),
-                            exclusion.classifier?.translate()?.toLowerCase(),
-                            exclusion.type?.translate()?.toLowerCase())
+                            exclusion.group?.translate(warn),
+                            exclusion.name?.translate(warn),
+                            exclusion.version?.translate(warn),
+                            exclusion.classifier?.translate(warn)?.toLowerCase(),
+                            exclusion.type?.translate(warn)?.toLowerCase())
                 })
     }
 
@@ -1142,13 +1147,13 @@ private class RawPom(
         return null
     }
 
-    private fun String.translate(): String {
+    private fun String.translate(warn:Boolean): String {
         if (!startsWith("\${", ignoreCase = false) || !endsWith('}', ignoreCase = false)) {
             return this.trim()
         }
 
         val key = substring(2, length - 1)
-        return getProperty(key, true) ?: this.trim()
+        return getProperty(key, warn) ?: this.trim()
     }
 
     private companion object {
