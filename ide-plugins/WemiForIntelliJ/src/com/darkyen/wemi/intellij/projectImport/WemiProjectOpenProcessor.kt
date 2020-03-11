@@ -5,7 +5,6 @@ import com.darkyen.wemi.intellij.wemiDirectoryToImport
 import com.intellij.CommonBundle
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.highlighter.ProjectFileType
-import com.intellij.ide.impl.NewProjectUtil
 import com.intellij.ide.impl.ProjectUtil
 import com.intellij.ide.util.projectWizard.WizardContext
 import com.intellij.openapi.application.ApplicationManager
@@ -92,7 +91,7 @@ class WemiProjectOpenProcessor : ProjectOpenProcessor() {
 			ProjectManagerEx.getInstanceEx().newProject(wizardContext.projectName, pathToOpen, true, false)
 		}) ?: return null
 		if (!forceOpenInNewFrame) {
-			NewProjectUtil.closePreviousProject(projectToClose)
+			closePreviousProject(projectToClose)
 		}
 		ProjectUtil.updateLastProjectLocation(pathToOpen)
 		ProjectManagerEx.getInstanceEx().openProject(projectToOpen)
@@ -106,5 +105,18 @@ class WemiProjectOpenProcessor : ProjectOpenProcessor() {
 		projectToOpen.isInitialized
 
 		return projectToOpen
+	}
+
+	private fun closePreviousProject(projectToClose:Project?) {
+		// TODO(jp): Replace with ProjectUtil.closePreviousProject(projectToClose) after it becomes available
+
+		val openProjects = ProjectUtil.getOpenProjects()
+		if (openProjects.isNotEmpty()) {
+			val exitCode = ProjectUtil.confirmOpenNewProject(true)
+			if (exitCode == 1) {
+				val project = projectToClose ?: openProjects[openProjects.size - 1]
+				ProjectManagerEx.getInstanceEx().closeAndDispose(project)
+			}
+		}
 	}
 }
