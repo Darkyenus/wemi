@@ -588,6 +588,7 @@ val artifactInMultipleRepositories_2 by configuration("") {
 val dependency_resolution by project() {
     val longRunning = true
 
+    // TODO(jp): Remove after upgrading to 0.13 (#28)
     extend(testing) {
         // Remove automatically added JUnit stuff
         libraryDependencies modify { it.filter { dep -> !dep.dependencyId.group.startsWith("org.junit") }.toSet() }
