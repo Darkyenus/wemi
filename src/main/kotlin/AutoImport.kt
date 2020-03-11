@@ -1,5 +1,6 @@
 @file:Suppress("NOTHING_TO_INLINE", "unused")
 
+import wemi.Archetypes.DefaultArchetypes
 import wemi.boot.Task
 import wemi.boot.WemiRootFolder
 import wemi.boot.autoRunTasks
@@ -44,8 +45,8 @@ val WemiVersion
     get() = wemi.boot.WemiVersion
 
 // Core Functions
-inline fun project(vararg archetypes: Archetype = arrayOf(Archetypes.DefaultArchetype), noinline initializer: Project.() -> Unit) = wemi.project(path("."), archetypes = *archetypes, initializer = initializer)
-inline fun project(projectRoot: Path? = path("."), vararg archetypes: Archetype = arrayOf(Archetypes.DefaultArchetype), noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, *archetypes, initializer = initializer)
+inline fun project(vararg archetypes: Archetype = DefaultArchetypes, noinline initializer: Project.() -> Unit) = wemi.project(path("."), archetypes = *archetypes, initializer = initializer)
+inline fun project(projectRoot: Path? = path("."), vararg archetypes: Archetype = DefaultArchetypes, noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, *archetypes, initializer = initializer)
 
 // Helper functions
 inline fun EvalScope.kotlinDependency(name: String) = _kotlinDependency(name)

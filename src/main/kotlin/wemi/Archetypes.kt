@@ -89,16 +89,6 @@ object Archetypes {
         Keys.run set KeyDefaults.Run
         Keys.runMain set KeyDefaults.RunMain
 
-        Keys.testParameters set KeyDefaults.TestParameters
-        Keys.test set KeyDefaults.Test
-        extend(Configurations.testing) {
-            Keys.libraryDependencies addAll { listOf(
-                    Dependency(JUnitAPI, scope=ScopeTest),
-                    Dependency(JUnitEngine, scope=ScopeTest),
-                    Dependency(JUnitPlatformLauncher, scope=ScopeTest)
-            ) }
-        }
-
         Keys.archiveOutputFile set { Keys.buildDirectory.get() / "${Keys.projectName.get()}-${Keys.projectVersion.get()}.jar" }
 
         Keys.publishMetadata set KeyDefaults.PublishModelM2
@@ -119,8 +109,8 @@ object Archetypes {
     //region Primary Archetypes
 
     @PublishedApi
-    internal val DefaultArchetype
-        get() = JavaKotlinProject
+    internal val DefaultArchetypes
+        get() = arrayOf(JavaKotlinProject, JUnitProject)
 
     /** An archetype for projects that have no sources of their own, but are aggregation of their dependencies. */
     val AggregateJVMProject by archetype(::JVMBase) {
@@ -184,6 +174,24 @@ object Archetypes {
 
         extend(Configurations.archivingDocs) {
             Keys.archive set KeyDefaults.ArchiveDokka
+        }
+    }
+
+    //endregion
+
+    //region Layer archetypes
+
+    /** An archetype layer adding support for JUnit testing.
+     * Intended to be used with other [JVMBase]-based archetype. */
+    val JUnitProject by archetype {
+        Keys.testParameters set KeyDefaults.TestParameters
+        Keys.test set KeyDefaults.Test
+        extend(Configurations.testing) {
+            Keys.libraryDependencies addAll { listOf(
+                    Dependency(JUnitAPI, scope=ScopeTest),
+                    Dependency(JUnitEngine, scope=ScopeTest),
+                    Dependency(JUnitPlatformLauncher, scope=ScopeTest)
+            ) }
         }
     }
 

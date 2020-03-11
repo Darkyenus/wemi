@@ -98,7 +98,7 @@ fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRoo
     }
 
     if (archetypes.isEmpty()) {
-        LOG.warn("Project {} is being created without any archetype. Such project won't have any functionality.", name)
+        LOG.warn("Project {} is being created without any archetype. Such project won't have any built-in functionality.", name)
     } else {
         var baseArchetypeCount = 0
         for (a in archetypes) {
