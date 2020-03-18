@@ -9,6 +9,7 @@ import wemi.compile.KotlinJVMCompilerFlags
 import wemi.documentation.DokkaOptions.SourceLinkMapItem
 import wemi.dependency.*
 import wemi.*
+import wemi.generation.*
 import com.esotericsoftware.jsonbeans.JsonValue
 
 val basics by project {
@@ -53,6 +54,20 @@ val basics by project {
     // JUnit 4
     //libraryDependencies add { dependency("junit:junit:4.12") }
     //libraryDependencies add { Dependency(JUnit4Engine, scope=ScopeTest) }
+
+    generateSources { root ->
+        val version = projectVersion.get()
+        println("Version: $version")
+
+        generateJavaConstantsFile(root, "basics.Version", mapOf(
+                "VERSION" to Constant.StringConstant(version, "The project version"),
+                "BUILD_TIME" to Constant.LongConstant(System.currentTimeMillis())
+        ))
+
+        generateKotlinConstantsFile(root, "basics.RandomNumber", mapOf(
+                "RANDOM_NUMBER" to Constant.IntConstant(4, "Chosen by a fair dice roll")
+        ))
+    }
 
     mainClass set { "basics.GreeterMainKt" }
 
