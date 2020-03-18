@@ -61,11 +61,13 @@ val basics by project {
 
         generateJavaConstantsFile(root, "basics.Version", mapOf(
                 "VERSION" to Constant.StringConstant(version, "The project version"),
-                "BUILD_TIME" to Constant.LongConstant(System.currentTimeMillis())
+                "BUILD_TIME" to Constant.LongConstant(System.currentTimeMillis()),
+                "A_RATHER_COMPLICATED_STRING" to Constant.StringConstant("ěščřžýáíé\n\n\u1234\u5678  👾 \"truly complex", "This is a test of the constant system.\nIt even has newlines, /* and nested comments! */\r\nThis could prove to be complicated.")
         ))
 
         generateKotlinConstantsFile(root, "basics.RandomNumber", mapOf(
-                "RANDOM_NUMBER" to Constant.IntConstant(4, "Chosen by a fair dice roll")
+                "RANDOM_NUMBER" to Constant.IntConstant(4, "Chosen by a fair dice roll"),
+                "A_RATHER_COMPLICATED_STRING" to Constant.StringConstant("ěščřžýáíé\n\n\u1234\u5678  👾 \"truly complex", "This is a test of the constant system.\nIt even has newlines, /* and nested comments! */\r\nThis could prove to be complicated.")
         ))
     }
 

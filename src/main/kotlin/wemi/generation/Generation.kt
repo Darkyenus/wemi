@@ -28,8 +28,8 @@ private val LOG = LoggerFactory.getLogger("Generation")
  * On each invocation of [wemi.Keys.sources], the directory is emptied and [generate] should generate necessary files.
  */
 inline fun BindingHolder.generateSources(name:String = "", crossinline generate:EvalScope.(Path)->Unit) {
-	val rootName = if (name.isBlank()) Arrays.hashCode(Thread.currentThread().stackTrace).toString() else name
-	val sourceDir = WemiCacheFolder / "generated-sources-$rootName"
+	val rootName = if (name.isBlank()) "%08x".format(Arrays.hashCode(Thread.currentThread().stackTrace).toLong() and 0xFFFF_FFFFL) else name
+	val sourceDir = WemiCacheFolder / "-generated-sources-$rootName"
 	Keys.sources modify {
 		sourceDir.ensureEmptyDirectory()
 		generate(sourceDir)
@@ -84,7 +84,7 @@ fun isValidIdentifierName(name:String):Boolean {
 
 /** Process [comment] so that it can safely appear in a multi-line comment in Java or Kotlin */
 private fun escapeComment(comment:String):String {
-	return comment.replace("*/", "* /").replace("/*", "* /")
+	return comment.replace("*/", "* /").replace("/*", "/ *")
 }
 
 /**
@@ -177,7 +177,7 @@ fun generateJavaConstantsFile(root: Path, name:String, constants:Map<String, Con
 							'"' -> writer.append("\\\"")
 							'\\' -> writer.append("\\\\")
 							else -> {
-								if (c.isHighSurrogate() || c.isLowSurrogate() || c.isISOControl() || !c.isDefined()) {
+								if (c.isISOControl() || !c.isDefined()) {
 									writer.append("\\u").append("%04x".format(c.toInt()))
 								} else {
 									writer.append(c)
@@ -285,7 +285,7 @@ fun generateKotlinConstantsFile(root: Path, name:String, constants:Map<String, C
 							'"' -> writer.append("\\\"")
 							'\\' -> writer.append("\\\\")
 							else -> {
-								if (c.isHighSurrogate() || c.isLowSurrogate() || c.isISOControl() || !c.isDefined()) {
+								if (c.isISOControl() || !c.isDefined()) {
 									writer.append("\\u").append("%04x".format(c.toInt()))
 								} else {
 									writer.append(c)
