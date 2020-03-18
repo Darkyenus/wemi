@@ -1,4 +1,5 @@
 # 0.13
+- Add utility functions for source file and classpath generation, see the `wemi.generation` package
 - Fix `system` crashing on infinite timeout
 - Fix `--machine-readable=shell` stack overflow on `Path` printing and make it robust against self-referential collections
 
