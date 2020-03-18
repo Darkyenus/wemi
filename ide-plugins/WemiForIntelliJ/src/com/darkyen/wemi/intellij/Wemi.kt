@@ -46,6 +46,7 @@ const val WemiBuildScriptProjectName = "wemi-build"
 const val WemiLauncherFileName = "wemi"
 
 const val WemiBuildDirectoryName = "build"
+const val WemiCacheDirectoryName = "cache"
 
 /** Given any Wemi related file, return the root of the Wemi project. */
 fun wemiDirectoryToImport(base: VirtualFile): VirtualFile? {

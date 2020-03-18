@@ -77,8 +77,8 @@ class ModuleNode constructor(
 		val javaTargetVersion:JavaSdkVersion?) {
 
 	class SourceResource {
-		var sourceRoots:Set<Path> = emptySet()
-		var resourceRoots:Set<Path> = emptySet()
+		var sourceRoots:List<Path> = emptyList()
+		var resourceRoots:List<Path> = emptyList()
 
 		fun isEmpty():Boolean = sourceRoots.isEmpty() && resourceRoots.isEmpty()
 	}

@@ -1,7 +1,9 @@
 package com.darkyen.wemi.intellij.projectImport
 
+import com.darkyen.wemi.intellij.WemiBuildDirectoryName
 import com.darkyen.wemi.intellij.util.SessionActivityTracker
 import com.darkyen.wemi.intellij.WemiBuildScriptProjectName
+import com.darkyen.wemi.intellij.WemiCacheDirectoryName
 import com.darkyen.wemi.intellij.WemiLauncher
 import com.darkyen.wemi.intellij.WemiLauncherSession
 import com.darkyen.wemi.intellij.WemiNotificationGroup
@@ -404,7 +406,7 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 	val libraryBank = WemiLibraryDependencyBank()
 	tracker.stageProgress(3, TOP_LEVEL_STAGE_COUNT)
 	tracker.stagesFor("Resolving projects", wemiProjects.values, {"Resolving project ${it.projectName}"}) { project ->
-		val ideModuleNode = project.moduleNode(WemiModuleType.PROJECT)
+		val ideModuleNode = project.moduleNode(projectRoot, WemiModuleType.PROJECT)
 		ideProjectNode.modules.add(ideModuleNode)
 		projectModules[project.projectName] = ideModuleNode
 
@@ -497,7 +499,7 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 				wemiJavaLanguageLevel, JavaSdkVersion.fromLanguageLevel(wemiJavaLanguageLevel)
 				)
 		ideProjectNode.modules.add(ideModuleNode)
-		ideModuleNode.roots.sourceRoots = setOf(buildFolder)
+		ideModuleNode.roots.sourceRoots = listOf(buildFolder)
 		ideModuleNode.excludedRoots = setOf(buildFolder / "cache", buildFolder / "logs", buildFolder / "artifacts")
 
 
@@ -712,14 +714,28 @@ private class WemiProjectData constructor(
 	val sourceRootsTesting:Set<Path> = sourceRootsTesting.toMutableSet().apply { removeAll(sourceRoots) }
 	val resourceRootsTesting:Set<Path> = resourceRootsTesting.toMutableSet().apply { removeAll(resourceRoots) }
 
-	fun moduleNode(type:WemiModuleType): ModuleNode {
+	fun moduleNode(wemiRootPath:Path, type:WemiModuleType): ModuleNode {
+		val wemiCachePath = (wemiRootPath / "$WemiBuildDirectoryName/$WemiCacheDirectoryName").toAbsolutePath()
+
 		return ModuleNode(projectName, type, rootPath,
 				classOutput, classOutputTesting,
 				javaSourceVersion, javaTargetVersion).also { node ->
+
+			val (generatedSourceRoots, sourceRoots) = sourceRoots.partition { it.toAbsolutePath().startsWith(wemiCachePath) }
 			node.roots.sourceRoots = sourceRoots
+			node.generatedRoots.sourceRoots = generatedSourceRoots
+
+			val (generatedResourceRoots, resourceRoots) = resourceRoots.partition { it.toAbsolutePath().startsWith(wemiCachePath) }
 			node.roots.resourceRoots = resourceRoots
+			node.generatedRoots.resourceRoots = generatedResourceRoots
+
+			val (generatedSourceRootsTesting, sourceRootsTesting) = sourceRootsTesting.partition { it.toAbsolutePath().startsWith(wemiCachePath) }
 			node.testRoots.sourceRoots = sourceRootsTesting
+			node.generatedTestRoots.sourceRoots = generatedSourceRootsTesting
+
+			val (generatedResourceRootsTesting, resourceRootsTesting) = resourceRootsTesting.partition { it.toAbsolutePath().startsWith(wemiCachePath) }
 			node.testRoots.resourceRoots = resourceRootsTesting
+			node.generatedTestRoots.resourceRoots = generatedResourceRootsTesting
 		}
 	}
 }
