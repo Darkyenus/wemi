@@ -1,7 +1,7 @@
 package basics
 
 /**
- * [java.util.Random] instance. Used from [hello.Greeter]!
+ * [java.util.Random] instance. Used from [basics.Greeter]!
  */
 val Random = java.util.Random()
 
@@ -11,8 +11,8 @@ val Random = java.util.Random()
 fun main(args: Array<String>) {
     println("Hello from compiled Wemi file!")
 
-    println("Kotlin version is ${kotlin.KotlinVersion.CURRENT}, Greeter version is ${basics.Version.VERSION}, built at ${basics.Version.BUILD_TIME}")
-    println("The random number for today is: ${basics.RANDOM_NUMBER}")
+    println("Kotlin version is ${KotlinVersion.CURRENT}, Greeter version is ${Version.VERSION}, built at ${Version.BUILD_TIME}")
+    println("The random number for today is: $RANDOM_NUMBER")
     println("Is the generated file generated? Answer is: ${generated.Generated.REALLY_GENERATED}")
 
     val greeter = Greeter("Hello {}!", "Hi {}", "{}, welcome!", "Ahoy, {}!")

@@ -322,15 +322,16 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 			}
 
 			for (libraryDependency in module.libraryDependencies) {
-				val projectLevelLibrary = libraryModel.getLibraryByName(libraryDependency.onLibrary.libraryName)
+				val libraryName = libraryDependency.onLibrary.libraryName
+				val projectLevelLibrary = libraryModel.getLibraryByName(libraryName)
 				if (projectLevelLibrary != null) {
 					val orderEntry = rootModel.addLibraryEntry(projectLevelLibrary)
 					orderEntry.scope = libraryDependency.scope
 					orderEntry.isExported = libraryDependency.isExported
 				} else {
 					// Dependency (Order) is added implicitly - module automatically depends on all of its module-level libraries
-					val moduleLevelLibrary = rootModel.moduleLibraryTable.getLibraryByName(libraryDependency.onLibrary.libraryName)
-							?: rootModel.moduleLibraryTable.createLibrary(libraryDependency.onLibrary.libraryName)
+					val moduleLevelLibrary = rootModel.moduleLibraryTable.getLibraryByName(libraryName)
+							?: rootModel.moduleLibraryTable.createLibrary(libraryName)
 					fillLibrary(moduleLevelLibrary, libraryDependency.onLibrary)
 				}
 			}

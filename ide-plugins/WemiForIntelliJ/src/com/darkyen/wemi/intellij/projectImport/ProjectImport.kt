@@ -1,7 +1,6 @@
 package com.darkyen.wemi.intellij.projectImport
 
 import com.darkyen.wemi.intellij.WemiBuildDirectoryName
-import com.darkyen.wemi.intellij.util.SessionActivityTracker
 import com.darkyen.wemi.intellij.WemiBuildScriptProjectName
 import com.darkyen.wemi.intellij.WemiCacheDirectoryName
 import com.darkyen.wemi.intellij.WemiLauncher
@@ -13,12 +12,14 @@ import com.darkyen.wemi.intellij.options.ProjectImportOptions
 import com.darkyen.wemi.intellij.settings.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiProjectService
 import com.darkyen.wemi.intellij.showBalloon
-import com.darkyen.wemi.intellij.util.stage
+import com.darkyen.wemi.intellij.util.SessionActivityTracker
 import com.darkyen.wemi.intellij.util.SessionState
 import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.deleteRecursively
 import com.darkyen.wemi.intellij.util.digestToHexString
 import com.darkyen.wemi.intellij.util.div
+import com.darkyen.wemi.intellij.util.name
+import com.darkyen.wemi.intellij.util.stage
 import com.darkyen.wemi.intellij.util.stagesFor
 import com.darkyen.wemi.intellij.util.update
 import com.esotericsoftware.jsonbeans.JsonValue
@@ -576,10 +577,10 @@ private fun createWemiProjectData(session: WemiLauncherSession, projectName:Stri
 	)
 }
 
-private fun createWemiProjectDependencies(session: WemiLauncherSession, projectName: String, vararg config: String): Map<String, List<WemiLibraryDependency>> {
-	val dependencies = LinkedHashMap<String, MutableList<WemiLibraryDependency>>()
+private fun createWemiProjectDependencies(session: WemiLauncherSession, projectName: String, vararg config: String): Map<String, List<WemiDependency>> {
+	val dependencies = LinkedHashMap<String, MutableList<WemiDependency>>()
 
-	fun add(id:String, dep:WemiLibraryDependency) {
+	fun add(id:String, dep:WemiDependency) {
 		dependencies.getOrPut(id) { mutableListOf() }.add(dep)
 	}
 
@@ -594,7 +595,7 @@ private fun createWemiProjectDependencies(session: WemiLauncherSession, projectN
 			val artifact = resolvedValue.get("value")?.getString("artifact", null) ?: return@forEach
 
 			add("$group:$name:$version",
-					WemiLibraryDependency(
+					WemiDependency.Library(
 							"$group:$name:$version${if (classifier.isBlank()) "" else "-$classifier"}",
 							Paths.get(artifact).toAbsolutePath().normalize()))
 		}
@@ -602,7 +603,13 @@ private fun createWemiProjectDependencies(session: WemiLauncherSession, projectN
 		session.jsonArray(projectName, *config, task = "unmanagedDependencies?", orNull = true).forEach {
 			val file = it.locatedFileOrPathClasspathEntry()
 
-			add(file.toString(), WemiLibraryDependency(file.fileName.toString(), file))
+			add(file.toString(), WemiDependency.JarOrFolder(file))
+		}
+
+		// Collect generated dependencies
+		val generated = session.jsonArray(projectName, *config, task="generatedClasspath?", orNull = true).mapNotNull { it?.locatedFileOrPathClasspathEntry() }
+		for (path in generated) {
+			add(path.toString(), WemiDependency.JarOrFolder(path))
 		}
 	} catch (e: InvalidTaskResultException) {
 		LOG.warn("Failed to resolve dependencies for ${config.joinToString("") { "$it:" }}$projectName", e)
@@ -618,7 +625,7 @@ private fun createWemiProjectCombinedDependencies(session: WemiLauncherSession, 
 
 	val combined = HashMap<String, WemiLibraryCombinedDependency>()
 	for ((artifactId, artifactDependency) in artifacts) {
-		val dep = WemiLibraryCombinedDependency(artifactDependency.joinToString(", ") { it.name },
+		val dep = WemiLibraryCombinedDependency(artifactDependency.mapNotNull { (it as? WemiDependency.Library)?.name }.joinToString(", ").takeUnless { it.isBlank() } ?: artifactDependency.joinToString(", ") { it.artifact.name },
 				artifactDependency.map { it.artifact },
 				sources[artifactId]?.map { it.artifact } ?: emptyList(),
 				docs[artifactId]?.map { it.artifact } ?: emptyList()
@@ -629,7 +636,10 @@ private fun createWemiProjectCombinedDependencies(session: WemiLauncherSession, 
 	return combined
 }
 
-private class WemiLibraryDependency(val name:String, val artifact: Path)
+private sealed class WemiDependency(val artifact: Path) {
+	class Library(val name:String, artifact: Path): WemiDependency(artifact)
+	class JarOrFolder(artifact: Path): WemiDependency(artifact)
+}
 
 private class WemiLibraryCombinedDependency(val name:String,
                                             artifactFiles:List<Path>,
