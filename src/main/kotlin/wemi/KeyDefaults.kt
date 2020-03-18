@@ -201,6 +201,7 @@ object KeyDefaults {
     fun internalClasspath(compile:Boolean): Value<List<LocatedPath>> = {
         val classpath = WMutableList<LocatedPath>()
         if (compile) {
+            classpath.addAll(Keys.generatedClasspath.get())
             constructLocatedFiles(Keys.compile.get(), classpath)
         }
         classpath.addAll(Keys.resources.getLocatedPaths())
@@ -231,6 +232,7 @@ object KeyDefaults {
             val javaSources = Keys.sources.getPaths(*JavaSourceFileExtensions)
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
+            externalClasspath.addAll(Keys.generatedClasspath.get().map { it.classpathEntry })
 
             // Compile Java
             if (javaSources.isNotEmpty()) {
@@ -317,6 +319,7 @@ object KeyDefaults {
             val kotlinSources = Keys.sources.getLocatedPaths(*KotlinSourceFileExtensions)
 
             val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
+            externalClasspath.addAll(Keys.generatedClasspath.get().map { it.classpathEntry })
 
             // Compile Kotlin
             if (kotlinSources.isNotEmpty()) {

@@ -1,6 +1,7 @@
 package wemi.generation
 
 import Files
+import LocatedPath
 import div
 import org.slf4j.LoggerFactory
 import wemi.BindingHolder
@@ -8,9 +9,14 @@ import wemi.EvalScope
 import wemi.WemiException
 import wemi.boot.WemiCacheFolder
 import wemi.boot.WemiVersion
+import wemi.collections.toMutable
 import wemi.util.FileSet
+import wemi.util.constructLocatedFiles
 import wemi.util.ensureEmptyDirectory
 import wemi.util.forCodePoints
+import wemi.util.isHidden
+import wemi.util.name
+import wemi.util.pathHasExtension
 import wemi.util.plus
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -24,16 +30,47 @@ import java.util.*
 private val LOG = LoggerFactory.getLogger("Generation")
 
 /**
- * Create a new root source directory for generated sources and add it to [wemi.Keys.sources].
+ * Create a new source directory ([root]) for generated sources and add it to [wemi.Keys.sources].
  * On each invocation of [wemi.Keys.sources], the directory is emptied and [generate] should generate necessary files.
  */
-inline fun BindingHolder.generateSources(name:String = "", crossinline generate:EvalScope.(Path)->Unit) {
+inline fun BindingHolder.generateSources(name:String = "", crossinline generate:EvalScope.(root:Path)->Unit) {
 	val rootName = if (name.isBlank()) "%08x".format(Arrays.hashCode(Thread.currentThread().stackTrace).toLong() and 0xFFFF_FFFFL) else name
 	val sourceDir = WemiCacheFolder / "-generated-sources-$rootName"
 	Keys.sources modify {
 		sourceDir.ensureEmptyDirectory()
 		generate(sourceDir)
 		it + FileSet(sourceDir)
+	}
+}
+
+/**
+ * Create a new internal classpath directory ([root]) for generated classpath entries and add it to [wemi.Keys.generatedClasspath].
+ * On each invocation of [wemi.Keys.generatedClasspath], the directory is emptied and [generate] should generate necessary files.
+ *
+ * Jar files in the [root] directory will be automatically added directly.
+ */
+inline fun BindingHolder.generateClasspath(name:String = "", crossinline generate:EvalScope.(root:Path)->Unit) {
+	val rootName = if (name.isBlank()) "%08x".format(Arrays.hashCode(Thread.currentThread().stackTrace).toLong() and 0xFFFF_FFFFL) else name
+	val cpDir = WemiCacheFolder / "-generated-classpath-$rootName"
+	Keys.generatedClasspath modify {
+		cpDir.ensureEmptyDirectory()
+		generate(cpDir)
+		val classpath = it.toMutable()
+		var hasNonJars = false
+		for (path in Files.list(cpDir)) {
+			if (path.isHidden()) {
+				continue
+			}
+			if (path.name.pathHasExtension("jar")) {
+				classpath.add(LocatedPath(path))
+			} else {
+				hasNonJars = true
+			}
+		}
+		if (hasNonJars) {
+			constructLocatedFiles(cpDir, classpath) { f -> !f.name.pathHasExtension("jar") }
+		}
+		classpath
 	}
 }
 

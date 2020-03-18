@@ -54,6 +54,9 @@ object Keys {
     val unmanagedDependencies by key<List<LocatedPath>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = emptyList())
     val projectDependencies by key<Set<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = emptySet())
 
+    /** @see wemi.generation.generateClasspath */
+    val generatedClasspath by key<List<LocatedPath>>("Eventually of internalClasspath, but generated before compilation", defaultValue = emptyList())
+
     val externalClasspath by key<List<LocatedPath>>("Classpath, externally obtained elements from external sources, i.e. library dependencies, external classpath of all project dependencies and internal classpath of non-aggregate project dependencies", defaultValue = emptyList())
     val internalClasspath by key<List<LocatedPath>>("Classpath, internally created elements, i.e. compiled sources and resources, including those of aggregate project dependencies", defaultValue = emptyList())
 
