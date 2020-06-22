@@ -16,6 +16,7 @@ import wemi.dependency.CompatibleSortedRepositories
 import wemi.dependency.DataWithChecksum
 import wemi.dependency.Repository
 import wemi.dependency.SortedRepositories
+import wemi.submit
 import wemi.util.Failable
 import wemi.util.GaugedInputStream
 import wemi.util.ParsedChecksumFile
@@ -37,7 +38,6 @@ import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import java.security.cert.X509Certificate
-import java.util.concurrent.Callable
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
@@ -202,72 +202,69 @@ private sealed class DownloadResult {
 
 private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheControlMs: Long, snapshot: Boolean, useUnsafeTransport:Boolean, progressTracker: ActivityListener?):DownloadResult {
     var checksumPrefetch: Future<List<ParsedChecksumFile?>>? = null
-
-    val response: Response<ByteArray>
-    // Falls back to current time if headers are invalid/missing, as we don't have any better metric
-    var remoteLastModifiedTime = System.currentTimeMillis()
     try {
-        response = httpGet(repositoryArtifactUrl, cacheControlMs, useUnsafeTransport = useUnsafeTransport)
-                .execute(progressTracker, ResponseTranslator.BYTES_TRANSLATOR.onResponse { responseStart ->
-                    if (responseStart.isSuccess) {
-                        // We got response, and it is likely that we will need checksums, start fetching them now
-                        val prefetchProgressTracker = progressTracker?.beginParallelActivity("Checksum pre-fetch")
-                        checksumPrefetch = ForkJoinPool.commonPool().submit(Callable {
-                            try {
-                                retrieveChecksums(repositoryArtifactUrl, useUnsafeTransport, prefetchProgressTracker)
-                            } finally {
-                                prefetchProgressTracker?.endActivity()
-                            }
-                        })
-                    }
-                })
 
-        val lastModified = response.lastModified
-        val date = response.date
-        if (lastModified > 0) {
-            remoteLastModifiedTime = lastModified
-        } else if (date > 0) {
-            remoteLastModifiedTime = date
-        }
-    } catch (e: WebbException) {
-        when (e.cause) {
-            is FileNotFoundException ->
-                LOG.trace("Failed to retrieve '{}', file not found", repositoryArtifactUrl)
-            is SSLException -> {
-                LOG.warn("Failed to retrieve '{}', problem with SSL", repositoryArtifactUrl, e.cause)
+        val response: Response<ByteArray>
+        // Falls back to current time if headers are invalid/missing, as we don't have any better metric
+        var remoteLastModifiedTime = System.currentTimeMillis()
+        try {
+            response = httpGet(repositoryArtifactUrl, cacheControlMs, useUnsafeTransport = useUnsafeTransport)
+                    .execute(progressTracker, ResponseTranslator.BYTES_TRANSLATOR.onResponse { responseStart ->
+                        if (responseStart.isSuccess) {
+                            // We got response, and it is likely that we will need checksums, start fetching them now
+                            checksumPrefetch = ForkJoinPool.commonPool().submit({ tracker -> retrieveChecksums(repositoryArtifactUrl, useUnsafeTransport, tracker) }, progressTracker, "Checksum pre-fetch")
+                        }
+                    })
+
+            val lastModified = response.lastModified
+            val date = response.date
+            if (lastModified > 0) {
+                remoteLastModifiedTime = lastModified
+            } else if (date > 0) {
+                remoteLastModifiedTime = date
             }
-            else ->
-                LOG.debug("Failed to retrieve '{}'", repositoryArtifactUrl, e)
+        } catch (e: WebbException) {
+            when (e.cause) {
+                is FileNotFoundException ->
+                    LOG.trace("Failed to retrieve '{}', file not found", repositoryArtifactUrl)
+                is SSLException -> {
+                    LOG.warn("Failed to retrieve '{}', problem with SSL", repositoryArtifactUrl, e.cause)
+                }
+                else ->
+                    LOG.debug("Failed to retrieve '{}'", repositoryArtifactUrl, e)
+            }
+            return DownloadResult.Failure(e.message ?: e.toString())
         }
-        return DownloadResult.Failure(e.message ?: e.toString())
-    }
 
-    val statusCode = response.statusCode
-    if (snapshot && statusCode == 304 /* Not modified */) {
-        return DownloadResult.UseCache
-    } else if (!response.isSuccess) {
-        LOG.debug("Failed to retrieve '{}' - status code {}", repositoryArtifactUrl, statusCode)
-        if (statusCode == 404) {
-            return DownloadResult.Failure("File does not exist - check the coordinates for typos and ensure that you have added the corresponding repository (HTTP 404)")
-        } else if (statusCode/100 == 5) {
-            return DownloadResult.Failure("Repository server error - check that you have added the right repository or try again later (HTTP $statusCode)")
-        } else {
-            return DownloadResult.Failure("HTTP $statusCode")
+        val statusCode = response.statusCode
+        if (snapshot && statusCode == 304 /* Not modified */) {
+            return DownloadResult.UseCache
+        } else if (!response.isSuccess) {
+            LOG.debug("Failed to retrieve '{}' - status code {}", repositoryArtifactUrl, statusCode)
+            if (statusCode == 404) {
+                return DownloadResult.Failure("File does not exist - check the coordinates for typos and ensure that you have added the corresponding repository (HTTP 404)")
+            } else if (statusCode / 100 == 5) {
+                return DownloadResult.Failure("Repository server error - check that you have added the right repository or try again later (HTTP $statusCode)")
+            } else {
+                return DownloadResult.Failure("HTTP $statusCode")
+            }
         }
-    }
-    val remoteArtifactData = DataWithChecksum(response.body)
+        val remoteArtifactData = DataWithChecksum(response.body)
 
-    // Step 4: download and verify checksums
-    val checksums = checksumPrefetch.let { checksumPrefetch_ ->
-        if (checksumPrefetch_ != null) {
-            checksumPrefetch_.get()
-        } else {
-            retrieveChecksums(repositoryArtifactUrl, useUnsafeTransport, progressTracker)
+        // Step 4: download and verify checksums
+        val checksums = checksumPrefetch.let { checksumPrefetch_ ->
+            if (checksumPrefetch_ != null) {
+                checksumPrefetch_.get()
+            } else {
+                retrieveChecksums(repositoryArtifactUrl, useUnsafeTransport, progressTracker)
+            }
         }
-    }
-    val checksumMismatches = verifyChecksums(checksums, repositoryArtifactUrl, remoteArtifactData, progressTracker)
+        val checksumMismatches = verifyChecksums(checksums, repositoryArtifactUrl, remoteArtifactData, progressTracker)
 
-    return DownloadResult.Success(remoteLastModifiedTime, remoteArtifactData, checksumMismatches)
+        return DownloadResult.Success(remoteLastModifiedTime, remoteArtifactData, checksumMismatches)
+    } finally {
+        checksumPrefetch?.cancel(true)
+    }
 }
 
 /** Retrieve checksums for given artifact that has been found at [repositoryArtifactUrl].
@@ -276,35 +273,30 @@ private fun retrieveChecksums(repositoryArtifactUrl: URL, useUnsafeTransport: Bo
     progressTracker?.beginActivity("Retrieving checksums")
     try {
         return CHECKSUMS.map { checksum ->
-            val taskProgressTracker = progressTracker?.beginParallelActivity("$checksum")
-            ForkJoinPool.commonPool().submit(Callable {
-                try {
-                    val checksumUrl = repositoryArtifactUrl.appendToPath(checksum.suffix)
-                    val checksumFileBody: String? = try {
-                        val checksumResponse = httpGet(checksumUrl, useUnsafeTransport = useUnsafeTransport).execute(taskProgressTracker, ResponseTranslator.STRING_TRANSLATOR)
-                        if (!checksumResponse.isSuccess) {
-                            LOG.debug("Failed to retrieve checksum '{}' (code: {})", checksumUrl, checksumResponse.statusCode)
-                            return@Callable null
-                        }
-                        checksumResponse.body
-                    } catch (e: WebbException) {
-                        when (e.cause) {
-                            is FileNotFoundException ->
-                                LOG.trace("Failed to retrieve checksum '{}', file not found", repositoryArtifactUrl)
-                            is SSLException -> {
-                                LOG.warn("Failed to retrieve checksum '{}', problem with SSL", repositoryArtifactUrl, e.cause)
-                            }
-                            else ->
-                                LOG.debug("Failed to retrieve checksum '{}'", repositoryArtifactUrl, e)
-                        }
-                        return@Callable null
+            ForkJoinPool.commonPool().submit({ taskProgressTracker ->
+                val checksumUrl = repositoryArtifactUrl.appendToPath(checksum.suffix)
+                val checksumFileBody: String? = try {
+                    val checksumResponse = httpGet(checksumUrl, useUnsafeTransport = useUnsafeTransport).execute(taskProgressTracker, ResponseTranslator.STRING_TRANSLATOR)
+                    if (!checksumResponse.isSuccess) {
+                        LOG.debug("Failed to retrieve checksum '{}' (code: {})", checksumUrl, checksumResponse.statusCode)
+                        return@submit null
                     }
-
-                    parseHashSum(checksumFileBody)
-                } finally {
-                    taskProgressTracker?.endActivity()
+                    checksumResponse.body
+                } catch (e: WebbException) {
+                    when (e.cause) {
+                        is FileNotFoundException ->
+                            LOG.trace("Failed to retrieve checksum '{}', file not found", repositoryArtifactUrl)
+                        is SSLException -> {
+                            LOG.warn("Failed to retrieve checksum '{}', problem with SSL", repositoryArtifactUrl, e.cause)
+                        }
+                        else ->
+                            LOG.debug("Failed to retrieve checksum '{}'", repositoryArtifactUrl, e)
+                    }
+                    return@submit null
                 }
-            })
+
+                parseHashSum(checksumFileBody)
+            }, progressTracker, "$checksum")
         }.map { it.get() }
     } finally {
         progressTracker?.endActivity()
@@ -553,14 +545,9 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
             // Create parallel tasks
             val tasks = Array(localFailures.size - i - 1) {
                 val localFailure = localFailures[i + it + 1] ?: return@Array null
-                val trackerFork = progressTracker?.beginParallelActivity("Verifying uniqueness of $path from $repository against ${localFailure.repository}")
-                ForkJoinPool.commonPool().submit(Callable {
-                    try {
-                        retrieveFileForVerificationOnly(localFailure.repository, path, result.dataWithChecksum!!, progressTracker)
-                    } finally {
-                        trackerFork?.endActivity()
-                    }
-                })
+                ForkJoinPool.commonPool().submit({ trackerFork ->
+                    retrieveFileForVerificationOnly(localFailure.repository, path, result.dataWithChecksum!!, trackerFork)
+                }, progressTracker, "Verifying uniqueness of $path from $repository against ${localFailure.repository}")
             }
 
             // Collect their results

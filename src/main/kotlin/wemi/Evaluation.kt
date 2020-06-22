@@ -1,9 +1,22 @@
 package wemi
 
-import wemi.util.*
+import wemi.util.ALL_EXTENSIONS
+import wemi.util.FileSet
+import wemi.util.LOCATED_PATH_COMPARATOR_WITH_TOTAL_ORDERING
+import wemi.util.LocatedPath
+import wemi.util.PATH_COMPARATOR_WITH_TOTAL_ORDERING
+import wemi.util.filterByExtension
+import wemi.util.lastModifiedMillis
+import wemi.util.matchingFiles
+import wemi.util.matchingLocatedFiles
 import java.io.Closeable
 import java.nio.file.Path
 import java.util.*
+import java.util.concurrent.Callable
+import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /** Each external key invocation will increase this value (=tick).
  * Bindings are evaluated only once per tick, regardless of their expiry. */
@@ -360,6 +373,66 @@ interface ActivityListener {
      * [beginParallelActivity] and [endActivity] are NOT thread safe.
      * @return thread safe alternative parallel listener or null if this feature is not supported. */
     fun beginParallelActivity(activity:String): ActivityListener? = null
+}
+
+/** Submit a [task] onto the [ForkJoinPool] and wrap it into a parallel activity ([ActivityListener.beginParallelActivity]).
+ * The returned future MUST be manipulated only on the thread which submitted it
+ * and the result MUST be obtained (interrupted or timed-out get does not count) or the future MUST be cancelled. */
+fun <T> ForkJoinPool.submit(task: (listener:ActivityListener?) -> T, listener:ActivityListener?, parallelActivityName:String): Future<T> {
+    var activity = listener?.beginParallelActivity(parallelActivityName)
+    val starterThread = Thread.currentThread()
+    val future = submit(Callable { return@Callable task(activity) })
+    return object : Future<T> {
+
+        fun finish() {
+            assert(Thread.currentThread() == starterThread)
+            activity?.endActivity()
+            activity = null
+        }
+
+        override fun isDone(): Boolean = future.isDone
+
+        override fun get(): T {
+            var finish = true
+            try {
+                return future.get()
+            } catch (t: InterruptedException) {
+                finish = false
+                throw t
+            } finally {
+                if (finish) {
+                    finish()
+                }
+            }
+        }
+
+        override fun get(timeout: Long, unit: TimeUnit): T {
+            var finish = true
+            try {
+                return future.get(timeout, unit)
+            } catch (t: TimeoutException) {
+                finish = false
+                throw t
+            } catch (t: InterruptedException) {
+                finish = false
+                throw t
+            } finally {
+                if (finish) {
+                    finish()
+                }
+            }
+        }
+
+        override fun cancel(mayInterruptIfRunning: Boolean): Boolean {
+            try {
+                return future.cancel(mayInterruptIfRunning)
+            } finally {
+                finish()
+            }
+        }
+
+        override fun isCancelled(): Boolean = future.isCancelled
+    }
 }
 
 /**

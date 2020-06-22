@@ -129,6 +129,28 @@ fun EvalScope.assertClasspathContainsFiles(vararg items:String) {
     }
 }
 
+fun EvalScope.assertClasspathContainsAlsoFiles(vararg items:String) {
+    classpathAssertions++
+    val got = externalClasspath.get().map { it.file.name }.toSet()
+    for (item in items) {
+        if (item !in got) {
+            classpathAssertionsFailed++
+            assertThat("$item is not in $got", false)
+        }
+    }
+}
+
+fun EvalScope.assertClasspathDoesNotContainFiles(vararg items:String) {
+    classpathAssertions++
+    val got = externalClasspath.get().map { it.file.name }.toSet()
+    for (item in items) {
+        if (item in got) {
+            classpathAssertionsFailed++
+            assertThat("$item is in $got", false)
+        }
+    }
+}
+
 val GROUP = "grp"
 val UNIQUE_CACHE_DATE = "20190101"
 
@@ -542,6 +564,20 @@ val problematic_4 by configuration("") {
     }
 }
 
+val problematic_5 by configuration("") {
+    setTestCacheRepository("problematic_5")
+
+    repositories add { JCenter }
+    repositories add { Jitpack }
+    // Ultimately depends on both lwjgl-3.2.1.jar and lwjgl-3.2.3.jar, but only former should appear
+    libraryDependencies set { setOf(dependency("com.darkyen", "ResourcePacker", "2.5")) }
+
+    checkResolution set {
+        assertClasspathContainsAlsoFiles("lwjgl-3.2.1.jar") // This one is first, though they are on the same level
+        assertClasspathDoesNotContainFiles("lwjgl-3.2.3.jar")
+    }
+}
+
 val unsafeRepositoryDownload by configuration("") {
     repositories set { setOf(MavenCentral, Repository("jitpack", java.net.URL("https://jitpack.io/"), useUnsafeTransport = true)) }
 
@@ -635,6 +671,7 @@ val dependency_resolution by project() {
         autoRun(checkResolution, problematic_2)
         autoRun(checkResolution, problematic_3)
         autoRun(checkResolution, problematic_4)
+        autoRun(checkResolution, problematic_5)
     }
 
     if (longRunning) {

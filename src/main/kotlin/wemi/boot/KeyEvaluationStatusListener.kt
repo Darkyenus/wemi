@@ -144,7 +144,7 @@ internal class KeyEvaluationStatusListener(
 				}
 				val parallelActivities = level.parallelActivities
 				synchronized(parallelActivities) {
-					assert(parallelActivities.all { it.stackLevel > 0 })
+					assert(parallelActivities.all { it.stackLevel > 0 }) // TODO(jp): This failed at some point!!!
 					parallelActivities.firstOrNull()
 				}?.let { firstParallel ->
 					mb.style(STATUS_META_STYLE)

@@ -27,6 +27,7 @@ import wemi.dependency.ResolvedDependency
 import wemi.dependency.SortedRepositories
 import wemi.dependency.internal.PomBuildingXMLHandler.Companion.SupportedModelVersion
 import wemi.publish.InfoNode
+import wemi.submit
 import wemi.util.Color
 import wemi.util.Failable
 import wemi.util.Partial
@@ -44,8 +45,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
-import java.util.concurrent.ExecutorCompletionService
 import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.Future
 import kotlin.collections.HashMap
 
 private val LOG = LoggerFactory.getLogger("Maven2")
@@ -73,7 +74,27 @@ New maven resolution strategy:
 7. When all metadata is read, start downloading dependencies themselves
  */
 
-private class DependencyManagementKey(val groupId:String, val name:String, val classifier:String, val type:String)
+private class DependencyManagementKey(val groupId:String, val name:String, val classifier:String, val type:String) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is DependencyManagementKey) return false
+
+        if (groupId != other.groupId) return false
+        if (name != other.name) return false
+        if (classifier != other.classifier) return false
+        if (type != other.type) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = groupId.hashCode()
+        result = 31 * result + name.hashCode()
+        result = 31 * result + classifier.hashCode()
+        result = 31 * result + type.hashCode()
+        return result
+    }
+}
 
 /**
  * Resolves artifacts for [dependencies] and their transitive dependencies.
@@ -98,12 +119,16 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
     val resolved = HashMap<DependencyId, RawResolvedDependency>()
     val resolvedScope = HashMap<DependencyId, String>()
     val resolvedPartials = HashMap<DependencyManagementKey, DependencyId>()
-    var noError = true
 
-    val executor = ExecutorCompletionService<Runnable>(ForkJoinPool(10))
-    var submittedDependencies = 0
+    val pool = ForkJoinPool(10)
 
-    fun submitDependency(dep:Dependency) {
+    class Resolved(val dependency:Dependency, val resolvedDependency:RawResolvedDependency) {
+        operator fun component1() = dependency
+        operator fun component2() = resolvedDependency
+    }
+
+    fun submitDependency(dep:Dependency): Future<Resolved>? {
+        LOG.trace("submitDependency({})", dep)
         val depId = dep.dependencyId
         val partialId = DependencyManagementKey(depId.group, depId.name, depId.classifier, depId.type)
 
@@ -122,94 +147,91 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
             if (newScope != resolvedPreviouslyScope) {
                 resolvedScope[resolvedPreviouslyPartialId ?: depId] = newScope
             }
-            return
+            return null
         }
 
         resolvedPartials[partialId] = depId
         resolvedScope[depId] = dep.scope
 
-        val dependencyProgressTracker = progressTracker?.beginParallelActivity(dep.dependencyId.toString())
-        submittedDependencies++
-        executor.submit {
-            val resolvedDep = resolveInM2Repository(depId, dep.dependencyManagement, repositories, dependencyProgressTracker)
-            return@submit Runnable {
-                try {
-                    resolved[depId] = resolvedDep
+        return pool.submit({ tracker ->
+            val resolvedDep = resolveInM2Repository(depId, dep.dependencyManagement, repositories, tracker)
+            Resolved(dep, resolvedDep)
+        }, progressTracker, dep.dependencyId.toString())
+    }
 
-                    if (resolvedDep.hasError) {
-                        noError = false
-                        return@Runnable
-                    }
+    var noError = true
+    var level = dependencies.mapNotNull(::submitDependency)
 
-                    for (transitiveDependency in resolvedDep.dependencies) {
-                        if (transitiveDependency.optional) {
-                            LOG.debug("Excluded optional {} (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
-                            continue
-                        }
+    while (level.isNotEmpty()) {
+        val nextLevel = ArrayList<Future<Resolved>>()
+        for (future in level) {
+            val (dep, resolvedDep) = future.get()
 
-                        val exclusionRule = dep.exclusions.find { it.excludes(transitiveDependency.dependencyId) }
-                        if (exclusionRule != null) {
-                            LOG.debug("Excluded {} with rule {} (dependency of {})", transitiveDependency.dependencyId, exclusionRule, dep.dependencyId)
-                            continue
-                        }
+            resolved[dep.dependencyId] = resolvedDep
 
-                        // Resolve scope
-                        // (See the table at https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope)
-                        val resolvedToScope:String? = when (transitiveDependency.scope) {
-                            "compile" -> when (dep.scope) {
-                                "compile" -> "compile"
-                                "provided" -> "provided"
-                                "runtime" -> "runtime"
-                                "test" -> "test"
-                                else -> null
-                            }
-                            "runtime" -> when (dep.scope) {
-                                "compile" -> "runtime"
-                                "provided" -> "provided"
-                                "runtime" -> "runtime"
-                                "test" -> "test"
-                                else -> null
-                            }
-                            else -> null
-                        }
+            if (resolvedDep.hasError) {
+                noError = false
+                continue
+            }
 
-                        if (resolvedToScope == null) {
-                            LOG.debug("Excluded {} due to transitive scope change (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
-                            continue
-                        }
-
-                        val transitivelyAdjusted = if (transitiveDependency.scope == resolvedToScope && dep.exclusions.isEmpty()) {
-                            transitiveDependency
-                        } else {
-                            if (transitiveDependency.scope != resolvedToScope) {
-                                LOG.debug("Changing the scope of {} to {}", transitiveDependency, resolvedToScope)
-                            }
-                            Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, dep.exclusions + transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
-                        }
-
-                        val mapped = mapper(transitivelyAdjusted)
-                        if (mapped != transitivelyAdjusted) {
-                            LOG.debug("{} mapped to {}", transitivelyAdjusted, mapped)
-                        }
-
-                        submitDependency(mapped)
-                    }
-                } finally {
-                    dependencyProgressTracker?.endActivity()
+            for (transitiveDependency in resolvedDep.dependencies) {
+                if (transitiveDependency.optional) {
+                    LOG.debug("Excluded optional {} (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                    continue
                 }
+
+                val exclusionRule = dep.exclusions.find { it.excludes(transitiveDependency.dependencyId) }
+                if (exclusionRule != null) {
+                    LOG.debug("Excluded {} with rule {} (dependency of {})", transitiveDependency.dependencyId, exclusionRule, dep.dependencyId)
+                    continue
+                }
+
+                // Resolve scope
+                // (See the table at https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope)
+                val resolvedToScope:String? = when (transitiveDependency.scope) {
+                    "compile" -> when (dep.scope) {
+                        "compile" -> "compile"
+                        "provided" -> "provided"
+                        "runtime" -> "runtime"
+                        "test" -> "test"
+                        else -> null
+                    }
+                    "runtime" -> when (dep.scope) {
+                        "compile" -> "runtime"
+                        "provided" -> "provided"
+                        "runtime" -> "runtime"
+                        "test" -> "test"
+                        else -> null
+                    }
+                    else -> null
+                }
+
+                if (resolvedToScope == null) {
+                    LOG.debug("Excluded {} due to transitive scope change (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                    continue
+                }
+
+                val transitivelyAdjusted = if (transitiveDependency.scope == resolvedToScope && dep.exclusions.isEmpty()) {
+                    transitiveDependency
+                } else {
+                    if (transitiveDependency.scope != resolvedToScope) {
+                        LOG.debug("Changing the scope of {} to {}", transitiveDependency, resolvedToScope)
+                    }
+                    Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, dep.exclusions + transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
+                }
+
+                val mapped = mapper(transitivelyAdjusted)
+                if (mapped != transitivelyAdjusted) {
+                    LOG.debug("{} mapped to {}", transitivelyAdjusted, mapped)
+                }
+
+                submitDependency(mapped)?.let { nextLevel.add(it) }
             }
         }
+        level = nextLevel
     }
 
-    for (dependency in dependencies) {
-        submitDependency(dependency)
-    }
-
-    while (submittedDependencies > 0) {
-        val task = executor.take()
-        submittedDependencies--
-        task.get().run()
-    }
+    pool.shutdown()
 
     if (LOG.isInfoEnabled) {
         val stack = ArrayList<DependencyId>()
@@ -886,7 +908,7 @@ private class RawPom(
     }
 
     private fun applyProfiles() {
-        val allProfiles = ArrayList<PomProfile>(profiles)
+        val allProfiles = ArrayList(profiles)
         var parent = parent
         while (parent != null) {
             allProfiles.addAll(parent.profiles)
