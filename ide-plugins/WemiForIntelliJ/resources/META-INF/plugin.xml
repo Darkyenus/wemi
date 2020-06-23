@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.darkyen.wemi.intellij</id>
     <name>Wemi</name>
-    <version>0.13-SNAPSHOT</version>
+    <version>0.13</version>
     <vendor email="darkyenus@gmail.com" url="https://github.com/Darkyenus">Jan Polák</vendor>
 
     <description><![CDATA[
@@ -19,6 +19,7 @@
     <change-notes><![CDATA[
       <ul>
         <li>Compatibility with Wemi 0.13 (down to 0.11)</li>
+        <li>Bug fixes and IDE compatibility improvements</li>
       </ul>
     ]]>
     </change-notes>

@@ -1,7 +1,9 @@
-# 0.13
+# 0.13 2020-06-23
 - Add utility functions for source file and classpath generation, see the `wemi.generation` package
 - Fix `system` crashing on infinite timeout
 - Fix `--machine-readable=shell` stack overflow on `Path` printing and make it robust against self-referential collections
+- Improve symlink handling in launcher (fixes issues on Windows, in particular)
+- Fix non-deterministic dependency resolution when a dependency was present multiple times with different versions
 
 # 0.12 2020-02-23
 - Add support for Kotlin 1.3.61
