@@ -517,7 +517,10 @@ object KeyDefaults {
     val TestOfAggregateProject: Value<TestReport> = {
         val resultReport = TestReport()
         inProjectDependencies(true) {
-            resultReport.putAll(Keys.test.get())
+            val report = Keys.test.getOrElse(null)
+            if (report != null) {
+                resultReport.putAll(report)
+            }
         }
         resultReport
     }
