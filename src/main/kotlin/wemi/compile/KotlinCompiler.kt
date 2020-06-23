@@ -81,6 +81,11 @@ enum class KotlinCompilerVersion (
             "wemi.compile.impl.KotlinCompilerImpl1_3_61",
             listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.3.61"), exclusions = WemiBundledLibrariesExclude))
     ),
+    Version1_3_72(
+            "1.3.72",
+            "wemi.compile.impl.KotlinCompilerImpl1_3_72",
+            listOf(Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-compiler", "1.3.72"), exclusions = WemiBundledLibrariesExclude))
+    ),
     ;
 
     private var compilerCache:KotlinCompiler? = null
