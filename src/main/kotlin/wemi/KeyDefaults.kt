@@ -165,7 +165,7 @@ object KeyDefaults {
 
     private val ClasspathResolution_LOG = LoggerFactory.getLogger("ClasspathResolution")
     val ExternalClasspath: Value<List<LocatedPath>> = {
-        val result = WMutableList<LocatedPath>()
+        val result = LinkedHashSet<LocatedPath>()
 
         val resolved = Keys.resolvedLibraryDependencies.get()
         if (!resolved.complete) { // TODO(jp): Do not check if complete yet, allow incomplete dependency resolution if the errors are in un-needed dependencies (due to scope)
@@ -195,11 +195,11 @@ object KeyDefaults {
         val unmanaged = Keys.unmanagedDependencies.get()
         result.addAll(unmanaged)
 
-        result
+        WMutableList(result)
     }
 
     fun internalClasspath(compile:Boolean): Value<List<LocatedPath>> = {
-        val classpath = WMutableList<LocatedPath>()
+        val classpath = LinkedHashSet<LocatedPath>()
         if (compile) {
             classpath.addAll(Keys.generatedClasspath.get())
             constructLocatedFiles(Keys.compile.get(), classpath)
@@ -211,7 +211,7 @@ object KeyDefaults {
             classpath.addAll(Keys.internalClasspath.get())
         }
 
-        classpath
+        WMutableList(classpath)
     }
 
     fun outputClassesDirectory(tag: String): Value<Path> = {

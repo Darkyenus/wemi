@@ -7,7 +7,7 @@ class WMutableSet<T> : LinkedHashSet<T> {
     constructor(initialCapacity: Int, loadFactor: Float) : super(initialCapacity, loadFactor)
     constructor(initialCapacity: Int) : super(initialCapacity)
     constructor() : super()
-    constructor(c: Collection<T>?) : super(c)
+    constructor(c: Collection<T>) : super(c)
 }
 
 /**
@@ -16,7 +16,7 @@ class WMutableSet<T> : LinkedHashSet<T> {
 class WMutableList<T> : ArrayList<T> {
     constructor(initialCapacity: Int) : super(initialCapacity)
     constructor() : super()
-    constructor(c: Collection<T>?) : super(c)
+    constructor(c: Collection<T>) : super(c)
 }
 
 /**
