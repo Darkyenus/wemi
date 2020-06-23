@@ -115,7 +115,7 @@ class WemiProjectOpenProcessor : ProjectOpenProcessor() {
 			val exitCode = ProjectUtil.confirmOpenNewProject(true)
 			if (exitCode == 1) {
 				val project = projectToClose ?: openProjects[openProjects.size - 1]
-				ProjectManagerEx.getInstanceEx().closeAndDispose(project)
+				ProjectUtil.closeAndDispose(project)
 			}
 		}
 	}

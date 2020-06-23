@@ -43,7 +43,6 @@ class WemiProgramRunner : AsyncProgramRunner<RunnerSettings>() {
 
 		if (state.debugPort <= 0) {
 			val result = state.execute(environment.executor, this)
-			onProcessStarted(environment.runnerSettings, result)
 			return resolvedPromise(RunContentBuilder(result, environment).showRunContent(environment.contentToReuse))
 		} else {
 			val connection = RemoteConnection(true, "localhost", state.debugPort.toString(),
@@ -51,8 +50,6 @@ class WemiProgramRunner : AsyncProgramRunner<RunnerSettings>() {
 			val debugEnvironment: DebugEnvironment = DefaultDebugEnvironment(environment, state, connection, Long.MAX_VALUE)
 			val debuggerSession = DebuggerManagerEx.getInstanceEx(environment.project).attachVirtualMachine(debugEnvironment) ?: return resolvedPromise(null)
 			val executionResult = debuggerSession.process.executionResult
-
-			onProcessStarted(environment.runnerSettings, executionResult)
 
 			return resolvedPromise(XDebuggerManager.getInstance(environment.project).startSession(environment, object : XDebugProcessStarter() {
 				override fun start(session: XDebugSession): XDebugProcess {

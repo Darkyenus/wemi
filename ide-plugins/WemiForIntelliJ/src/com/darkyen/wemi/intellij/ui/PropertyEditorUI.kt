@@ -335,7 +335,7 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 
 	private val panel1JavaFromPath = JBIntSpinner(MAX_JAVA_VERSION_FOR_WEMI_HINT, MIN_JAVA_VERSION_FOR_WEMI, Integer.MAX_VALUE, 1)
 	// NOTE: Other editors use JrePathEditor here, but I don't understand its API
-	private val panel2JavaFromSdk = JdkComboBox(ProjectSdksModel().apply {
+	private val panel2JavaFromSdk = JdkComboBox(ProjectSdksModel().apply {// Deprecated: Change after the min API level becomes 201.1610
 		for (sdk in possibleJavaSdkList) {
 			addSdk(sdk)
 		}

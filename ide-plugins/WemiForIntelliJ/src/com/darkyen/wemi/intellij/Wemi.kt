@@ -270,18 +270,21 @@ class WemiLauncherSession(
                             "Pretty print failed:\n$e"
                         }
                         success = true
-                        Result(ResultStatus.SUCCESS, json)
+                        Result(json)
                     } catch (e: JsonException) {
                         LOG.error("Failed to parse json", e)
                         val taskDataString = String(taskDataCharArray)
                         LOG.info("Broken json:\n$taskDataString")
                         jsonResult = taskDataString
-                        Result(ResultStatus.CORRUPTED_RESPONSE_FORMAT, null)
+                        Result(ResultStatus.CORRUPTED_RESPONSE_FORMAT)
                     }
                 }, { errorCode ->
-                    val status = statusForNumber(errorCode)
+                    var status = statusForNumber(errorCode)
+                    if (status == ResultStatus.SUCCESS) {
+                        status = ResultStatus.SUCCESSFUL_FAILURE
+                    }
                     jsonResult = status.name
-                    Result(status, null)
+                    Result(status)
                 })
             } catch (e:Exception) {
                 if (jsonResult == null) {
@@ -329,11 +332,13 @@ class WemiLauncherSession(
                             val outputWriter = CharArrayWriter(2048)
 
                             fun flushOutputWriter() {
-                                synchronized(taskOutputsLock) {
-                                    taskOutputs.addLast(outputWriter.toCharArray())
-                                    taskOutputsLock.notify()
+                                if (outputWriter.size() > 0) {
+                                    synchronized(taskOutputsLock) {
+                                        taskOutputs.addLast(outputWriter.toCharArray())
+                                        taskOutputsLock.notify()
+                                    }
+                                    outputWriter.reset()
                                 }
-                                outputWriter.reset()
                             }
 
                             val buffer = CharArray(1024)
@@ -435,7 +440,7 @@ class WemiLauncherSession(
                     }
                 }
 
-                return if (result != null) {
+                return if (result != null && result.isNotEmpty()) {
                     Failable.success(result)
                 } else {
                     // No task outputs are generated, this process has died or closed output streams. Kill it!
@@ -452,20 +457,33 @@ class WemiLauncherSession(
     companion object {
         private val LOG = Logger.getInstance(WemiLauncherSession::class.java)
 
-        data class Result (val status:ResultStatus, val data:JsonValue?)
+        class Result private constructor (val status:ResultStatus, val data:JsonValue?) {
+            constructor(status:ResultStatus) : this(status, null) {
+                assert(status != ResultStatus.SUCCESS)
+            }
 
-        enum class ResultStatus(val number:Int) {
-            SUCCESS(0),
-            UNKNOWN_ERROR(1),
-            ARGUMENT_ERROR(2),
-            BUILD_SCRIPT_COMPILATION_ERROR(3),
-            MACHINE_OUTPUT_THROWN_EXCEPTION_ERROR(4),
-            MACHINE_OUTPUT_NO_PROJECT_ERROR(5),
-            MACHINE_OUTPUT_NO_CONFIGURATION_ERROR(6),
-            MACHINE_OUTPUT_NO_KEY_ERROR(7),
-            MACHINE_OUTPUT_KEY_NOT_SET_ERROR(8),
+            constructor(data:JsonValue) : this(ResultStatus.SUCCESS, data)
+        }
 
-            CORRUPTED_RESPONSE_FORMAT(-1)
+        enum class ResultStatus(val number:Int, val convertsToNull:Boolean) {
+            SUCCESS(0, false),
+            OTHER_ERROR(1, false),
+            ARGUMENT_ERROR(2, false),
+            BUILD_SCRIPT_COMPILATION_ERROR(3, true),
+            TASK_ERROR(4, true),
+            TASK_FAILURE(5, true),
+            RELOAD(6, false),
+
+            MACHINE_OUTPUT_THROWN_EXCEPTION_ERROR(51, true),
+            MACHINE_OUTPUT_NO_PROJECT_ERROR(52, false),
+            MACHINE_OUTPUT_NO_CONFIGURATION_ERROR(53, true),
+            MACHINE_OUTPUT_NO_KEY_ERROR(54, true),
+            MACHINE_OUTPUT_KEY_NOT_SET_ERROR(55, true),
+            MACHINE_OUTPUT_INVALID_COMMAND(56, true),
+
+            CORRUPTED_RESPONSE_FORMAT(-1, false),
+            UNKNOWN_ERROR(-2, false),
+            SUCCESSFUL_FAILURE(-3, false),
         }
 
         fun statusForNumber(number: Int):ResultStatus {

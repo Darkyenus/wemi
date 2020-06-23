@@ -23,6 +23,7 @@ import com.darkyen.wemi.intellij.util.stage
 import com.darkyen.wemi.intellij.util.stagesFor
 import com.darkyen.wemi.intellij.util.update
 import com.esotericsoftware.jsonbeans.JsonValue
+import com.intellij.build.BuildContentManager
 import com.intellij.build.DefaultBuildDescriptor
 import com.intellij.build.SyncViewManager
 import com.intellij.build.events.EventResult
@@ -45,7 +46,6 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.TransactionGuard
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.PerformInBackgroundOption
@@ -58,7 +58,7 @@ import com.intellij.openapi.projectRoots.JavaSdkVersion
 import com.intellij.openapi.roots.DependencyScope
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.wm.ToolWindowId
+import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.pom.java.LanguageLevel
 import com.intellij.util.IncorrectOperationException
@@ -79,11 +79,11 @@ fun importWemiProject(project:Project, initial:Boolean) {
 		val future = importWemiProjectStructure(project, launcher, options, initial, false)
 		future.addConsumer(EdtExecutorService.getInstance(), object : ResultConsumer<ProjectNode> {
 			override fun onSuccess(value: ProjectNode) {
-				TransactionGuard.submitTransaction(project, Runnable {
+				ApplicationManager.getApplication().invokeLater({
 					WriteAction.run<Nothing> {
 						importProjectStructureToIDE(value, project, importProjectName = initial)
 					}
-				})
+				}, ModalityState.NON_MODAL)
 			}
 
 			override fun onFailure(t: Throwable) {}
@@ -241,7 +241,17 @@ fun importWemiProjectStructure(project: Project?, launcher: WemiLauncher, option
 						}))
 		if (activateToolWindow && project != null && syncViewManager != null) {
 			ApplicationManager.getApplication().invokeLater({
-				ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.BUILD)?.show(null)
+				var window : ToolWindow? = null
+				try {// TODO(jp): Remove this after min version level is at 201
+					// Available since 201
+					window = project.getService(BuildContentManager::class.java).getOrCreateToolWindow()
+				} catch (e:LinkageError) {
+					try {
+						// Deprecated since 201
+						window = ToolWindowManager.getInstance(project).getToolWindow("Build" /*ToolWindowId.BUILD to silence deprecation warning */)
+					} catch (e:LinkageError) {}
+				}
+				window?.show(null)
 			}, ModalityState.NON_MODAL)
 		}
 
@@ -820,10 +830,15 @@ private fun JsonValue.fileSetRoots():Array<Path> {
 }
 
 private fun WemiLauncherSession.Companion.Result.data(type: JsonValue.ValueType? = null, orNull:Boolean = false): JsonValue {
-	if (this.data == null || this.status != WemiLauncherSession.Companion.ResultStatus.SUCCESS) {
+	if (this.data == null) {
+		if (orNull && this.status.convertsToNull) {
+			LOG.debug("Failed to retrieve data of type $type - task request failed ($this) - converted to null")
+			return JsonValue(JsonValue.ValueType.nullValue)
+		}
 		LOG.warn("Failed to retrieve data of type $type - task request failed ($this)")
 		throw InvalidTaskResultException(this, type)
 	}
+
 	val valueType = this.data.type()
 	val typeIsValid = type == null || (valueType == type) || (orNull && valueType == JsonValue.ValueType.nullValue)
 	if (!typeIsValid) {

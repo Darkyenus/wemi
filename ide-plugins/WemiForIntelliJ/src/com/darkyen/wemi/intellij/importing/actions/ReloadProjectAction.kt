@@ -7,7 +7,8 @@ import com.darkyen.wemi.intellij.projectImport.importWemiProject
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.application.TransactionGuard
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import icons.WemiIcons
 import org.jetbrains.kotlin.idea.refactoring.psiElement
@@ -40,11 +41,10 @@ class ReloadProjectAction : AnAction("Reload Wemi Project",
             e.presentation.isEnabledAndVisible = false
             return
         }
-        
-        TransactionGuard.getInstance().submitTransactionAndWait {
-            FileDocumentManager.getInstance().saveAllDocuments()
-        }
 
-        importWemiProject(project, initial = false)
+        ApplicationManager.getApplication().invokeLater({
+            FileDocumentManager.getInstance().saveAllDocuments()
+            importWemiProject(project, initial = false)
+        }, ModalityState.NON_MODAL)
     }
 }
