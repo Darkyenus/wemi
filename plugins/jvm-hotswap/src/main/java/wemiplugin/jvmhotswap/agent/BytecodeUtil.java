@@ -15,7 +15,12 @@ import static wemiplugin.jvmhotswap.agent.AgentMain.log;
  */
 public class BytecodeUtil {
 
-    private static final int MAX_SUPPORTED_BYTECODE_VERSION_MAJOR = 58;
+    /*
+    Checking for changes:
+    https://docs.oracle.com/javase/specs/ -> Virtual machine specs -> Chapter 4
+     */
+
+    private static final int MAX_SUPPORTED_BYTECODE_VERSION_MAJOR = 58; // Java 14
     private static final int MAX_SUPPORTED_BYTECODE_VERSION_MINOR = 0;
 
     /**

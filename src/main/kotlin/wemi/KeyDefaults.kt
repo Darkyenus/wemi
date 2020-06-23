@@ -652,7 +652,7 @@ object KeyDefaults {
 
     /** Return URL at which Java SE Javadoc is hosted for given [javaVersion]. */
     private fun javadocUrl(javaVersion:Int?):String {
-        val version = javaVersion ?: 13 // = newest
+        val version = javaVersion ?: 14 // = newest
         return when {
             // These versions don't have API uploaded, so fall back to 1.5 (first one that is online)
             version <= 5 -> "https://docs.oracle.com/javase/1.5.0/docs/api/"
