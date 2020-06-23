@@ -145,7 +145,7 @@ class AssemblyOperation : Closeable {
         var hasError = false
 
         // Renaming has to be done later, because it is not yet known which paths are clean for renaming
-        val sourcesToBeRenamed = LinkedHashMap<String, ArrayList<AssemblySource>>()
+        val sourcesToBeRenamed = LinkedHashMap<String, Pair<ArrayList<AssemblySource>, Boolean /* allow dupe */>>()
 
         for ((path, dataList) in loadedSources) {
             if (dataList.size == 1) {
@@ -297,41 +297,47 @@ class AssemblyOperation : Closeable {
                     assemblySources[path] = dataList[0]
                 }
                 MergeStrategy.Rename -> {
-                    sourcesToBeRenamed[path] = dataList
+                    sourcesToBeRenamed[path] = dataList to false
+                }
+                MergeStrategy.RenameDeduplicate -> {
+                    sourcesToBeRenamed[path] = dataList to true
                 }
             }
         }
 
         // Resolve those that should be renamed
-        if (sourcesToBeRenamed.isNotEmpty()) {
-            for ((path, dataList) in sourcesToBeRenamed) {
-                if (LOG.isDebugEnabled) {
-                    LOG.debug("Renaming {} items at {}", dataList.size, path)
-                }
-                var debugIndex = 1
+        for ((path, pair) in sourcesToBeRenamed) {
+            val (dataList, allowDupe) = pair
+            if (LOG.isDebugEnabled) {
+                LOG.debug("Renaming {} items at {}", dataList.size, path)
+            }
+            var debugIndex = 1
 
-                for (source in dataList) {
-                    val renamedPath = normalizeZipPath(renameFunction(source, path) ?: "")
-                    if (renamedPath.isEmpty()) {
-                        if (LOG.isDebugEnabled) {
-                            LOG.debug("\t{}) discarding {}", debugIndex, source)
-                        }
-                    } else {
-                        val alreadyPresent = assemblySources[renamedPath]
+            for (source in dataList) {
+                val renamedPath = normalizeZipPath(renameFunction(source, path) ?: "")
+                if (renamedPath.isEmpty()) {
+                    if (LOG.isDebugEnabled) {
+                        LOG.debug("\t{}) discarding {}", debugIndex, source)
+                    }
+                } else {
+                    val alreadyPresent = assemblySources[renamedPath]
 
-                        if (alreadyPresent != null) {
+                    if (alreadyPresent != null) {
+                        if (allowDupe && alreadyPresent.data.contentEquals(source.data)) {
+                            LOG.debug("\t({}) moving {} to {} and skipping, because a duplicate is already there from {}", debugIndex, source, renamedPath, alreadyPresent)
+                        } else {
                             LOG.error("Can't rename {} at {} to {}, this path is already occupied by {}", source, path, renamedPath, alreadyPresent)
                             hasError = true
-                        } else {
-                            if (LOG.isDebugEnabled) {
-                                LOG.debug("\t({}) moving {} to {}", debugIndex, source, renamedPath)
-                            }
-
-                            assemblySources[renamedPath] = source
                         }
+                    } else {
+                        if (LOG.isDebugEnabled) {
+                            LOG.debug("\t({}) moving {} to {}", debugIndex, source, renamedPath)
+                        }
+
+                        assemblySources[renamedPath] = source
                     }
-                    debugIndex += 1
                 }
+                debugIndex += 1
             }
         }
 

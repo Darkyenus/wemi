@@ -24,5 +24,7 @@ enum class MergeStrategy {
     /** Only one value is expected, take the copy only if all other copies hold equal data */
     Deduplicate,
     /** Move the file to different path, specified by [wemi.Keys.assemblyRenameFunction] */
-    Rename
+    Rename,
+    /** Like [Rename], but multiple files with equal content are allowed */
+    RenameDeduplicate
 }
