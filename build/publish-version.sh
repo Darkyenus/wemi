@@ -13,10 +13,7 @@ wemi_version=$(./wemi --machine-readable-output=shell wemi/projectVersion) || fa
 log "Wemi version: $wemi_version"
 
 # Build the archive files in Wemi
-log "TODO: Using hardcoded wemi_dist_dir, switch to dynamic version after 0.13 release"
-#wemi_dist_dir=$(./wemi --machine-readable-output=shell wemi/distributionArchive) || fail "wemi ($?) (archive)"
-./wemi wemi/distributionArchive || fail "Distribution archive build failed"
-wemi_dist_dir="${wemi_home}/build/dist"
+wemi_dist_dir=$(./wemi --machine-readable-output=shell wemi/distributionArchive) || fail "wemi ($?) (archive)"
 
 # Copy IDE plugins
 intellij_plugin_path="${wemi_home}/ide-plugins/WemiForIntelliJ/WemiForIntelliJ.zip"

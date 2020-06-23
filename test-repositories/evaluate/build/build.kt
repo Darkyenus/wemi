@@ -621,14 +621,8 @@ val artifactInMultipleRepositories_2 by configuration("") {
     }
 }
 
-val dependency_resolution by project() {
+val dependency_resolution by project(Archetypes.JavaProject) {
     val longRunning = true
-
-    // TODO(jp): Remove after upgrading to 0.13 (#28)
-    extend(testing) {
-        // Remove automatically added JUnit stuff
-        libraryDependencies modify { it.filter { dep -> !dep.dependencyId.group.startsWith("org.junit") }.toSet() }
-    }
 
     // Test dependency resolution by resolving against changing repository 3 different libraries
     /*

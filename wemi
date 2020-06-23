@@ -2,7 +2,7 @@
 # Wemi Launcher - https://github.com/Darkyenus/wemi
 # Target platform: Reasonably POSIX compliant systems (https://pubs.opengroup.org/onlinepubs/009695399/)
 
-# Copyright 2019 Jan Polák
+# Copyright 2019-20 Jan Polák
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the "Software"), to deal in the Software without restriction, including without limitation
@@ -24,6 +24,7 @@
 #			WEMI_DIST - path of a directory which contains .jar files needed to launch Wemi (useful for custom builds)
 #			WEMI_JAVA_OPTS - options passed to 'java' command used to launch Wemi
 #			WEMI_ROOT - root directory of the project, do not use unless you know what you are doing
+#			WEMI_USE_SYMLINKS (true|false) - override for symlink support detection (true by default, false on Windows)
 #		Environment variables for automatic JDK download, values must be understood by https://api.adoptopenjdk.net/
 #			WEMI_JDK_OS - name of this operating system, needed only if detection fails
 #			WEMI_JDK_ARCH - architecture of this machine, needed only if detection fails
@@ -39,7 +40,7 @@
 #			--print-java-exe	- Print path to java executable that would be used and exit
 #			--print-wemi-home	- Print path to directory with Wemi jars and exit
 
-readonly wemi_version='0.12'
+readonly wemi_version='0.13'
 readonly java_min_version='8'
 
 log() { echo "$@" 1>&2; }
@@ -57,7 +58,7 @@ while true; do
 		# Parse --debug, --debug-suspend, --debug=<port> and --debug-suspend=<port> flags, which are mutually exclusive and
 		# must be the first flag to appear.
 		echo "$1" | grep -q -e 'suspend' && suspend_='y'
-		port_="$(echo "$1" | sed 's/[^0-9]*\([0-9]*\)[^0-9]*/\1/')"
+		port_="$(echo "$1" | sed 's/[^0-9]*\([0-9]*\)[^0-9]*/\1/')" || fail "Failed to parse debug port ($?)"
 		WEMI_JAVA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=${suspend_},address=${port_:-5005} ${WEMI_JAVA_OPTS}"
 	elif [ "$1" = '--print-java-exe' ]; then
 		print_java_exe=true
@@ -95,7 +96,7 @@ done
 readonly wemi_home_dir=${WEMI_HOME:-"${HOME}/.wemi"}
 if [ ! -e "$wemi_home_dir" ]; then
 	log "Creating '$wemi_home_dir' as a cache for Wemi related files"
-	mkdir -p "$wemi_home_dir" || fail "Wemi cache directory creation failed (mkdir returned $?)"
+	mkdir -p "$wemi_home_dir" || fail "Wemi cache directory creation failed ($?)"
 	cat <<EOF >"$wemi_home_dir/readme.txt"
 This directory is used by Wemi to store downloaded Wemi versions and JDKs.
 Feel free do delete this directory to completely remove Wemi from your system.
@@ -120,11 +121,11 @@ command_exists() {
 # $1: URL
 # $2: file
 download_to_file() {
-	mkdir -p "$(dirname "$2")"
+	mkdir -p "$(dirname "$2")" || log "Failed to ensure that parent directory for download exists ($?)"
 	if command_exists curl; then
-		curl -C - --fail --retry 3 --location --output "$2" --url "$1" || fail "Failed to fetch $1 to $2 (curl returned $?)"
+		curl -C - --fail --retry 3 --location --output "$2" --url "$1" || fail "Failed to fetch $1 to $2 (curl: $?)"
 	elif command_exists wget; then
-		wget --tries=3 --continue --show-progress --output-document="$2" "$1" || fail "Failed to fetch $1 to $2 (wget returned $?)"
+		wget --tries=3 --continue --show-progress --output-document="$2" "$1" || fail "Failed to fetch $1 to $2 (wget: $?)"
 	else
 		fail_unsatisfied "curl or wget"
 	fi
@@ -134,9 +135,9 @@ download_to_file() {
 # $1: URL
 download_to_output() {
 	if command_exists curl; then
-		curl --fail --retry 3 --location --silent --show-error --url "$1" || fail "Failed to fetch $1 (curl returned $?)"
+		curl --fail --retry 3 --location --silent --show-error --url "$1" || fail "Failed to fetch $1 (curl: $?)"
 	elif command_exists wget; then
-		wget --tries=3 --quiet --output-document=- "$1" || fail "Failed to fetch $1 (wget returned $?)"
+		wget --tries=3 --quiet --output-document=- "$1" || fail "Failed to fetch $1 (wget: $?)"
 	else
 		fail_unsatisfied "curl or wget"
 	fi
@@ -161,7 +162,7 @@ url_encode() {
 # @2 directory with entries extracted
 extract_zip() {
 	if command_exists unzip; then
-		unzip "$1" -d "$2" 1>/dev/null || fail "Failed to unzip '$1' (unzip returned $?)"
+		unzip "$1" -d "$2" 1>/dev/null || fail "Failed to unzip '$1' (unzip: $?)"
 	else
 		fail_unsatisfied "unzip"
 	fi
@@ -176,13 +177,13 @@ extract_targz() {
 		if command_exists tar; then
 			# shellcheck disable=SC2015
 			mkdir "$2" 1>&2 &&
-			gzip -d -c < "$1" | tar -x -C "$2" 1>/dev/null || fail "Failed to extract '$1' (gzip|tar returned $?)"
+			gzip -d -c < "$1" | tar -x -C "$2" 1>/dev/null || fail "Failed to extract '$1' (gzip|tar: $?)"
 		elif command_exists pax; then
 			# pax has two pecularities:
 			# 1. It always extracts (relative) to the current working directory
 			# 2. It permits absolute paths in archives and WILL extract to an absolute path
 			# Both can be fixed by prefixing the paths by the target directory manually.
-			gzip -d -c < "$1" | pax -r -s "#^#${2}/#" 1>/dev/null || fail "Failed to extract '$1' (gzip|pax returned $?)"
+			gzip -d -c < "$1" | pax -r -s "#^#${2}/#" 1>/dev/null || fail "Failed to extract '$1' (gzip|pax: $?)"
 		else
 			fail_unsatisfied "tar or pax"
 		fi
@@ -190,9 +191,9 @@ extract_targz() {
 		if command_exists tar; then
 			# shellcheck disable=SC2015
 			mkdir "$2" &&
-			tar -x -z -C "$2" -f "$1" 1>/dev/null || fail "Failed to extract '$1' (tar returned $?)"
+			tar -x -z -C "$2" -f "$1" 1>/dev/null || fail "Failed to extract '$1' (tar: $?)"
 		elif command_exists pax; then
-			pax -r -z -s "#^#${2}/#" -f "$1" 1>/dev/null || fail "Failed to extract '$1' (pax returned $?)"
+			pax -r -z -s "#^#${2}/#" -f "$1" 1>/dev/null || fail "Failed to extract '$1' (pax: $?)"
 		else
 			fail_unsatisfied "tar or pax"
 		fi
@@ -206,7 +207,7 @@ detect_os() {
 			os_=$(uname)
 			# shellcheck disable=SC2039
 			os_=${os_:-${OSTYPE}}
-			os_=$(echo "$os_" | tr '[:upper:]' '[:lower:]') # to lowercase
+			os_=$(echo "$os_" | tr '[:upper:]' '[:lower:]') || fail "Failed to lowercase OS name ($?)" # to lowercase
 
 			case "$os_" in
 				*linux*) echo 'linux' ;;
@@ -244,8 +245,15 @@ readonly jdk_version="openjdk${java_version}"
 readonly jdk_implementation="${WEMI_JDK_IMPLEMENTATION:-hotspot}"
 readonly jdk_heap_size="${WEMI_JDK_HEAP_SIZE:-normal}"
 readonly jdk_release="${WEMI_JDK_RELEASE:-latest}"
-readonly jdk_os="$(detect_os)"
-readonly jdk_arch="$(detect_arch)"
+readonly jdk_os="$(detect_os)" || fail "Failed to detect OS, specify it manually"
+readonly jdk_arch="$(detect_arch)" || fail "Failed to detect architecture, specify it manually"
+
+if [ "$WEMI_USE_SYMLINKS" = "false" ] || { [ "$(detect_os)" = "windows" ] && [ ! "$WEMI_USE_SYMLINKS" = "true" ]; }; then
+	readonly use_symlinks="false"
+else
+	readonly use_symlinks="true"
+fi
+
 
 fetch_jdk() {
 	# Contains all versions of this type of JDK
@@ -268,7 +276,7 @@ fetch_jdk() {
 
 		# Using the adoptopenjdk builds
 		log "Downloading ${jdk_version}(${jdk_implementation}) for ${jdk_os} (${jdk_arch}): ${1}"
-		jdk_url_="https://api.adoptopenjdk.net/v2/binary/releases/${jdk_version}?openjdk_impl=${jdk_implementation}&os=${jdk_os}&arch=${jdk_arch}&release=$(url_encode "$1")&type=jdk&heap_size=${jdk_heap_size}"
+		jdk_url_="https://api.adoptopenjdk.net/v2/binary/releases/${jdk_version}?openjdk_impl=${jdk_implementation}&os=${jdk_os}&arch=${jdk_arch}&release=$(url_encode "$1")&type=jdk&heap_size=${jdk_heap_size}" || fail "Failed to build download URL ($?)"
 		download_to_file "$jdk_url_" "$jdk_dir_download_" 1>&2
 		# Now we need to decompress it
 		# Windows binaries are packaged as zip, others as tar.gz.
@@ -298,13 +306,13 @@ fetch_jdk() {
 			fail "Downloaded JDK does not contain 'java' executable at the expected location (${downloaded_java_})"
 		fi
 
-		"$downloaded_java_" -version 2>/dev/null 1>&2 || fail "Downloaded JDK 'java' executable does not work (returned $?)"
+		"$downloaded_java_" -version 2>/dev/null 1>&2 || fail "Downloaded JDK 'java' executable does not work ($?)"
 
 		# Move home into the valid directory
-		mv "$jdk_dir_decompressed_home_" "$jdk_dir_" 1>&2 || fail "Failed to move downloaded JDK into a correct destination (mv returned $?)"
+		mv "$jdk_dir_decompressed_home_" "$jdk_dir_" 1>&2 || fail "Failed to move downloaded JDK into a correct destination ($?)"
 
 		# Delete original archive
-		rm "$jdk_dir_download_" 1>&2 || log "warning: Failed to delete downloaded file ${jdk_dir_download_} (rm returned $?)"
+		rm "$jdk_dir_download_" 1>&2 || log "warning: Failed to delete downloaded file ${jdk_dir_download_} ($?)"
 
 		# Delete downloaded directory
 		rm -rf "${jdk_dir_decompressed_?:EMPTY_PATH}" 1>&2 || log "Failed to delete leftover downloaded files (rm returned $?)"
@@ -316,9 +324,40 @@ fetch_jdk() {
 	fetch_latest_jdk_release() {
 		latest_info_url_="https://api.adoptopenjdk.net/v2/info/releases/${jdk_version}?openjdk_impl=${jdk_implementation}&os=${jdk_os}&arch=${jdk_arch}&release=latest&type=jdk&heap_size=${jdk_heap_size}"
 		# Get the json, remove all linebreaks and spaces (for easier processing)
-		latest_info_json_="$(download_to_output "$latest_info_url_" | tr -d '\n ')"
+		latest_info_json_="$(download_to_output "$latest_info_url_" | tr -d '\n ')" || fail "Failed to download latest JDK release info"
 		# Delete everything except for the release name. Since the format is very simple, this should work, even if it is an abomination
-		echo "$latest_info_json_" | sed 's/.*"release_name":"\([^"][^"]*\)".*/\1/'
+		echo "$latest_info_json_" | sed 's/.*"release_name":"\([^"][^"]*\)".*/\1/' || fail "Failed to extract latest JDK release info from JSON ($?)"
+	}
+
+	read_link() {
+		# $1 - path to check
+		# return: 0 if link is valid, 1 if it is broken or does not exist
+		# output: the path at which the destination is (may be $1 if it is a valid symlink)
+		if [ -d "$1" ]; then
+			# Directory or a valid symlink to a directory
+			echo "$1"
+			return 0
+		elif [ -f "$1" ]; then
+			# File
+			link_path_="$(cat "$1")" || return 1
+			if [ -d "$link_path_" ]; then
+				echo "$link_path_"
+				return 0
+			fi
+		fi
+		return 1
+	}
+
+	verify_link() {
+		# $1 - path to check
+		# return: 0 if link is valid or the file does not exist at all, 1 if it is broken
+		# Checks for symlinks and "manual links" (files which contain path)
+
+		if [ ! -e "$1" ] && [ ! -L "$1" ]; then
+			# File does not exist at all (and it isn't a broken symlink)
+			return 0
+		fi
+		read_link "$1" > /dev/null
 	}
 
 	fetch_latest_jdk() {
@@ -326,8 +365,10 @@ fetch_jdk() {
 		# If it isn't, download and use the newest release.
 		latest_dir_="${jdk_type_dir_}/latest"
 
-		if [ -e "$latest_dir_" ] && [ ! -L "$latest_dir_" ]; then
-			fail "'${latest_dir_}' should be a symlink, but isn't"
+		# When using symlinks, latest_dir_ is a symlink to latest release directory
+		# When not using symlinks, latest_dir_ is a plain file that contains the name of release directory
+		if ! verify_link "$latest_dir_"; then
+			fail "'${latest_dir_}' should be a symlink or a plain file, but isn't"
 		fi
 
 		# If the 'latest' exists and is less than 60 days old, no need to refresh it
@@ -337,10 +378,18 @@ fetch_jdk() {
 			if latest_release_="$(fetch_latest_jdk_release)"; then
 				if latest_release_dir_="$(fetch_jdk_version "$latest_release_")"; then
 					# Everything was successful, remove old symlink a create a new one
+
 					if [ -L "$latest_dir_" ]; then
-						unlink "$latest_dir_" || log "Failed to unlink previous 'latest' symlink (unlink returned $?)"
+						unlink "$latest_dir_" || log "Failed to unlink previous 'latest' symlink ($?)"
+					elif [ -e "$latest_dir_" ]; then
+						rm "$latest_dir_" || log "Failed to delete previous 'latest' file ($?)"
 					fi
-					ln -s "$latest_release_dir_" "$latest_dir_" || log "Failed to link ${latest_dir_} to ${latest_release_dir_}"
+
+					if [ "$use_symlinks" = "true" ]; then
+						ln -s "$latest_release_dir_" "$latest_dir_" || log "Failed to link ${latest_dir_} to ${latest_release_dir_} ($?)"
+					else
+						echo "$latest_release_dir_" > "$latest_dir_" || log "Failed to record ${latest_dir_} to ${latest_release_dir_} ($?)"
+					fi
 				else
 					log "Failed to fetch latest JDK release (${latest_release_})"
 				fi
@@ -349,7 +398,7 @@ fetch_jdk() {
 			fi
 		fi
 
-		echo "$latest_dir_"
+		read_link "$latest_dir_" || fail "JDK fetch failed, created link file is not valid"
 	}
 
 	if [ "$jdk_release" = 'latest' ]; then
@@ -365,29 +414,29 @@ can_use_java_from_path() {
 	fi
 
 	if [ "$java_version_forced" = 'true' ] && ! command_exists javac; then
-		log "Not using java on PATH, bacause javac is not on PATH and explicit version has been specified"
+		log "Not using java on PATH, because javac is not on PATH and explicit version has been specified"
 		return 1
 	fi
 
 	if ! java_version_="$(java -version 2>&1 | head -n 1)"; then
-		log "Failed to get verion of java on PATH, using downloaded openjdk"
+		log "Failed to get version of java on PATH, using downloaded openjdk"
 		return 1
 	fi
 
 	if echo "$java_version_" | grep -q -x -e '.* version ".*".*'; then
 		# Matching standard versioning (java version "1.8.0", openjdk version "11.0.3" 2019-10-15, openjdk version "9", etc.)
 		# https://www.oracle.com/technetwork/java/javase/versioning-naming-139433.html
-		java_version_="$(echo "$java_version_" | sed 's/.* version "\(.*\)".*/\1/')"
+		java_version_="$(echo "$java_version_" | sed 's/.* version "\(.*\)".*/\1/')" || fail "Failed to parse Java version ($?)"
 
-		java_version_major_="$(echo "$java_version_" | sed 's/\([0-9]*\).*/\1/')"
+		java_version_major_="$(echo "$java_version_" | sed 's/\([0-9]*\).*/\1/')" || fail "Failed to parse Java version minor ($?)"
 		# Until java 9, the java version was in minor, from 9 onward it was in major
 		if [ "$java_version_major_" -gt 1 ]; then
 			java_version_number_="$java_version_major_"
 		else
-			java_version_number_="$(echo "$java_version_" | sed 's/[0-9]*\.\([0-9]*\).*/\1/')"
+			java_version_number_="$(echo "$java_version_" | sed 's/[0-9]*\.\([0-9]*\).*/\1/')" || fail "Failed to parse Java version major ($?)"
 		fi
 
-		# If the user specified a speficic version, use it no matter what.
+		# If the user specified a specific version, use it no matter what.
 		if [ "$java_version_forced" = 'true' ]; then
 			if [ "$java_version_number_" -eq "$java_version" ]; then
 				return 0
@@ -426,7 +475,7 @@ fetch_java() {
 		return 0
 	fi
 
-	jdk_home_="$(fetch_jdk)"
+	jdk_home_="$(fetch_jdk)" || fail "Failed to fetch JDK (release ${jdk_release})"
 
 	if [ ! -d "${jdk_home_?:EMPTY_JDK_HOME}" ]; then
 		fail "Failed to obtain JDK (release: ${jdk_release})"
@@ -494,15 +543,15 @@ nativize_path() {
 
 # Launch as a Wemi launcher
 launch_wemi() {
-	java_exe_="$(fetch_java)"
-	wemi_dist_dir_="$(fetch_wemi)"
+	java_exe_="$(fetch_java)" || fail "Failed to prepare java"
+	wemi_dist_dir_="$(fetch_wemi)" || fail "Failed to prepare Wemi"
 	java_options_="${WEMI_JAVA_OPTS}"
 
-	wemi_root_="$(dirname "$0")"
+	wemi_root_="$(dirname "$0")" || fail "Failed to derive Wemi root"
 	wemi_root_="${WEMI_ROOT:-$wemi_root_}"
 
-	wemi_dist_dir_="$(nativize_path "$wemi_dist_dir_")"
-	wemi_root_="$(nativize_path "$wemi_root_")"
+	wemi_dist_dir_="$(nativize_path "$wemi_dist_dir_")" || fail "Failed to nativize Wemi installation directory path"
+	wemi_root_="$(nativize_path "$wemi_root_")" || fail "Failed to nativize Wemi project root path"
 
 	while true; do
 		# shellcheck disable=SC2086
@@ -515,9 +564,9 @@ launch_wemi() {
 }
 
 if [ "$print_java_exe" = 'true' ]; then
-	nativize_path "$(fetch_java)"
+	nativize_path "$(fetch_java)" || fail "Failed to fetch Java"
 elif [ "$print_wemi_home" = 'true' ]; then
-	nativize_path "$(fetch_wemi)"
+	nativize_path "$(fetch_wemi)" || fail "Failed to fetch Wemi"
 else
 	launch_wemi "$@"
 fi

@@ -226,7 +226,7 @@ fun createKotlinCompilerProject(version:String):Project {
         }
     }
 
-    return createProject(projectName.toString(), path("src/main-kotlinc/$version"), Archetypes.JavaKotlinProject) {
+    return createProject(projectName.toString(), path("src/main-kotlinc/$version"), Archetypes.JavaKotlinProject, Archetypes.JUnitProject) {
         sources set { FileSet(projectRoot.get() / "src") }
 
         compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
