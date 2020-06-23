@@ -74,7 +74,7 @@ const val EXIT_CODE_MACHINE_OUTPUT_KEY_NOT_SET_ERROR = 55
 const val EXIT_CODE_MACHINE_OUTPUT_INVALID_COMMAND = 56
 
 /** Version of Wemi build system */
-const val WemiVersion:String = "0.13"
+const val WemiVersion:String = "0.14-SNAPSHOT"
 
 internal var WemiRunningInInteractiveMode = false
     private set
@@ -233,7 +233,7 @@ fun main(args: Array<String>) {
             },
             Option(Option.NO_SHORT_NAME, "version", "output version information and exit", false, null) { _, _ ->
                 System.err.println("Wemi $WemiVersion")
-                System.err.println("Copyright 2017–2019 Jan Polák")
+                System.err.println("Copyright 2017–2020 Jan Polák")
                 System.err.println("<https://github.com/Darkyenus/WEMI>")
                 exitProcess(EXIT_CODE_SUCCESS)
             })
