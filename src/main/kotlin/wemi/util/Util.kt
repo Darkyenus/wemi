@@ -776,7 +776,7 @@ internal fun <V> Map<String, V>.findCaseInsensitive(key: String): V? {
 /**
  * @return true if the string is a valid identifier, using Java identifier rules
  */
-internal fun String.isValidIdentifier(): Boolean {
+internal fun CharSequence.isValidIdentifier(): Boolean {
     if (isEmpty()) {
         return false
     }
@@ -789,6 +789,57 @@ internal fun String.isValidIdentifier(): Boolean {
         }
     }
     return true
+}
+
+/** @return receiver text modified so that it is a valid identifier.
+ * May return null if after removing/substituting all characters the resulting identifier is empty */
+fun CharSequence.toValidIdentifier(): String? {
+    val sb = StringBuilder()
+    var pendingWhitespace = false
+    this.forCodePoints { cp ->
+        if (Character.isIdentifierIgnorable(cp) || !Character.isDefined(cp)) {
+            // Skip control & invalid characters
+            return@forCodePoints
+        }
+
+        if (sb.isEmpty()) {
+            // First letter
+            if (Character.isJavaIdentifierStart(cp)) {
+                // Good start
+                sb.appendCodePoint(cp)
+            } else if (Character.isJavaIdentifierPart(cp)) {
+                // Prefix it with something valid
+                sb.append('_').appendCodePoint(cp)
+            } else if (!Character.isWhitespace(cp)) {
+                // Replace it
+                sb.append('_')
+            } // else Discard whitespace at the beginning
+        } else {
+            // Non-first letter
+            if (Character.isJavaIdentifierPart(cp)) {
+                if (pendingWhitespace) {
+                    sb.append('_')
+                    pendingWhitespace = false
+                }
+                sb.appendCodePoint(cp)
+            } else if (Character.isWhitespace(cp)) {
+                pendingWhitespace = true
+            } else {
+                // Replace it
+                sb.append('_')
+                // Ignore pending whitespace to prevent two replacement characters next to each other
+                pendingWhitespace = false
+            }
+        }
+    }
+
+    if (sb.all { it == '_' }) {
+        // If empty or made up of only replacement characters, return null,
+        // because the identifier has absolutely no informative meaning
+        return null
+    }
+
+    return sb.toString()
 }
 
 /**

@@ -415,6 +415,35 @@ object KeyDefaults {
         }
     }
 
+    val CompileKotlinJS: Value<Path> = {
+        using(Configurations.compiling) {
+            val output = Keys.outputJavascriptDirectory.get()
+            output.ensureEmptyDirectory()
+
+            val compilerFlags = Keys.compilerOptions.get()
+            val kotlinSources = Keys.sources.getLocatedPaths(*KotlinSourceFileExtensions)
+
+            val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
+            externalClasspath.addAll(Keys.generatedClasspath.get().map { it.classpathEntry })
+
+            if (kotlinSources.isNotEmpty()) {
+                val compiler = Keys.kotlinCompiler.get()
+
+                val cacheFolder = output.resolveSibling(output.name + "-kotlin-js-cache")
+                Files.createDirectories(cacheFolder)
+
+                when (val compileResult = compiler.compile(KotlinCompiler.CompilationType.JS, kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, KotlincLOG, null)) {
+                    KotlinCompiler.CompileExitStatus.OK -> {}
+                    KotlinCompiler.CompileExitStatus.CANCELLED -> throw WemiException.CompilationException("Kotlin compilation has been cancelled")
+                    KotlinCompiler.CompileExitStatus.COMPILATION_ERROR -> throw WemiException.CompilationException("Kotlin compilation failed")
+                    else -> throw WemiException.CompilationException("Kotlin compilation failed: $compileResult")
+                }
+            }
+
+            output
+        }
+    }
+
     val RunOptions: Value<List<String>> = {
         val options = WMutableList<String>()
         options.add("-ea")

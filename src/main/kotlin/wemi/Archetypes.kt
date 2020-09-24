@@ -23,6 +23,7 @@ import wemi.test.JUnitPlatformLauncher
 import wemi.util.FileSet
 import wemi.util.div
 import wemi.util.plus
+import wemi.util.toValidIdentifier
 import javax.tools.ToolProvider
 
 /**
@@ -59,6 +60,7 @@ object Archetypes {
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources")
         Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers")
+        Keys.outputJavascriptDirectory set KeyDefaults.outputClassesDirectory("javascript")
         Keys.compilerOptions set { CompilerFlags() }
 
         Keys.runDirectory set { Keys.projectRoot.get() }
@@ -110,7 +112,7 @@ object Archetypes {
 
     @PublishedApi
     internal val DefaultArchetypes
-        get() = arrayOf(JavaKotlinProject, JUnitProject)
+        get() = arrayOf(JavaKotlinProject, JUnitLayer)
 
     /** An archetype for projects that have no sources of their own, but are aggregation of their dependencies. */
     val AggregateJVMProject by archetype(::JVMBase) {
@@ -163,7 +165,7 @@ object Archetypes {
         Keys.compilerOptions[JavaCompilerFlags.customFlags] = { it + "-g" }
         Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = { "1.8" }
         Keys.compilerOptions[JavaCompilerFlags.targetVersion] = { "1.8" }
-        Keys.compilerOptions[KotlinCompilerFlags.moduleName] = { Keys.projectName.get() }
+        Keys.compilerOptions[KotlinCompilerFlags.moduleName] = { Keys.projectName.get().toValidIdentifier() ?: "myModule" }
         Keys.compilerOptions[KotlinJVMCompilerFlags.jvmTarget] = { "1.8" }
 
         Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance(progressListener) }
@@ -177,13 +179,34 @@ object Archetypes {
         }
     }
 
+    /** Primary archetype for projects that produce JavaScript source files as output */
+    val KotlinJSProject by archetype(::Base) {
+        Keys.repositories set Static(DefaultRepositories)
+
+        Keys.sources set { FileSet(Keys.projectRoot.get() / "src/main/kotlin") }
+        extend (Configurations.testing) {
+            Keys.sources modify { FileSet(Keys.projectRoot.get() / "src/test/kotlin", next = it) }
+        }
+        Keys.resources set { FileSet(Keys.projectRoot.get() / "src/main/resources") }
+        extend (Configurations.testing) {
+            Keys.resources modify { it + FileSet(Keys.projectRoot.get() / "src/test/resources") }
+        }
+
+        Keys.libraryDependencies add { kotlinDependency("stdlib-js") }
+
+        Keys.compilerOptions[KotlinCompilerFlags.moduleName] = { Keys.projectName.get().toValidIdentifier() ?: "myModule" }
+
+        Keys.kotlinCompiler set { Keys.kotlinVersion.get().compilerInstance(progressListener) }
+        Keys.compile set KeyDefaults.CompileKotlinJS
+    }
+
     //endregion
 
     //region Layer archetypes
 
     /** An archetype layer adding support for JUnit testing.
      * Intended to be used with other [JVMBase]-based archetype. */
-    val JUnitProject by archetype {
+    val JUnitLayer by archetype {
         Keys.testParameters set KeyDefaults.TestParameters
         Keys.test set KeyDefaults.Test
         extend(Configurations.testing) {
@@ -194,6 +217,9 @@ object Archetypes {
             ) }
         }
     }
+
+    @Deprecated("Use JUnitLayer instead", ReplaceWith("Archetypes.JUnitLayer", "wemi.Archetypes"))
+    val JUnitProject = JUnitLayer
 
     //endregion
 }
