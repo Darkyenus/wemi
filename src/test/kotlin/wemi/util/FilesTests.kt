@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Assumptions
+import java.net.MalformedURLException
 import java.net.URL
 import java.nio.file.Paths
 
@@ -14,7 +15,11 @@ import java.nio.file.Paths
 class FilesTests {
 
     private fun check(fromURL:String, toPath:String?) {
-        check(URL(fromURL), toPath)
+        try {
+            check(URL(fromURL), toPath)
+        } catch (e:MalformedURLException) {
+            assertNull(toPath)
+        }
     }
 
     private fun check(fromURL:URL, toPath:String?) {
