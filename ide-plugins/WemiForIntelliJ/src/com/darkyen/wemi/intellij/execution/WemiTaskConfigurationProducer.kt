@@ -24,17 +24,13 @@ class WemiTaskConfigurationProducer : LazyRunConfigurationProducer<WemiTaskConfi
 
 	override fun isConfigurationFromContext(configuration: WemiTaskConfiguration, context: ConfigurationContext): Boolean {
 		val psiElement = context.psiLocation ?: return false
+		val moduleName = getWemiModuleName(psiElement) ?: return false
 		val mainClass = getMainClassName(psiElement) ?: return false
-		val moduleName = getWemiModuleName(psiElement)
 		return configuration.options.tasks == buildRunMainTaskForClassName(moduleName, mainClass)
 	}
 
-	private fun buildRunMainTaskForClassName(moduleName:String?, className:String):List<Array<String>> {
-		if (moduleName == null) {
-			return listOf(arrayOf("runMain", className))
-		} else {
-			return listOf(arrayOf("$moduleName/runMain", className))
-		}
+	private fun buildRunMainTaskForClassName(moduleName:String, className:String):List<Array<String>> {
+		return listOf(arrayOf("$moduleName/runMain", className))
 	}
 
 	private fun getWemiModuleName(from:PsiElement):String? {
@@ -61,8 +57,8 @@ class WemiTaskConfigurationProducer : LazyRunConfigurationProducer<WemiTaskConfi
 
 	override fun setupConfigurationFromContext(configuration: WemiTaskConfiguration, context: ConfigurationContext, sourceElement: Ref<PsiElement>): Boolean {
 		val psiElement = sourceElement.get() ?: return false
+		val moduleName = getWemiModuleName(psiElement) ?: return false
 		val mainClass = getMainClassName(psiElement) ?: return false
-		val moduleName = getWemiModuleName(psiElement)
 		configuration.options.tasks = buildRunMainTaskForClassName(moduleName, mainClass)
 		configuration.useSuggestedName()
 		return true

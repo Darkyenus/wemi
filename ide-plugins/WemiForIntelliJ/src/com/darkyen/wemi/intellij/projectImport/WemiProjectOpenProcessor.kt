@@ -34,7 +34,7 @@ class WemiProjectOpenProcessor : ProjectOpenProcessor() {
 	override fun doOpenProject(virtualFile: VirtualFile, projectToClose: Project?, forceOpenInNewFrame: Boolean): Project? {
 		val directoryToImport = wemiDirectoryToImport(virtualFile)!!
 		val wizardContext = WizardContext(null, null)
-		wizardContext.projectFileDirectory = directoryToImport.path
+		wizardContext.setProjectFileDirectory(directoryToImport.canonicalPath)
 		if (wizardContext.projectName == null) {
 			if (wizardContext.projectStorageFormat == StorageScheme.DEFAULT) {
 				wizardContext.projectName = IdeBundle.message("project.import.default.name", name) + ProjectFileType.DOT_DEFAULT_EXTENSION
