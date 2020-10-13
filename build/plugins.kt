@@ -23,6 +23,8 @@ val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
     }
 }
 
+/** Plugin which translates Java bytecode to JavaScript through TeaVM.
+ * https://github.com/konsoletyper/teavm */
 val pluginTeaVM by project(path("plugins/teavm")) {
     projectGroup set { WemiGroup }
     projectName set { "wemi-plugin-teavm" }
@@ -45,6 +47,27 @@ val pluginTeaVM by project(path("plugins/teavm")) {
                 metadata,
                 "Wemi Plugin: TeaVM support",
                 "Compile Java bytecode to JavaScript using TeaVM",
+                "2020"
+        )
+    }
+}
+
+/** Plugin for building IntelliJ platform plugins.
+ * Based on https://github.com/JetBrains/gradle-intellij-plugin */
+val pluginIntellij by project(path("plugins/intellij")) {
+    projectGroup set { WemiGroup }
+    projectName set { "wemi-plugin-intellij" }
+    projectVersion set { using(wemi) { projectVersion.get() } }
+
+    projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
+    libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
+    libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
+
+    publishMetadata modify { metadata ->
+        setupSharedPublishMetadata(
+                metadata,
+                "Wemi Plugin: IntelliJ plugin build support",
+                "Build IntelliJ platform plugins",
                 "2018"
         )
     }
