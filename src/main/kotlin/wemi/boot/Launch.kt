@@ -156,7 +156,7 @@ internal val WemiBundledLibrariesExclude = listOf(
         //TODO Add Wemi itself here!
 )
 
-/** Build scripts can place arbitrary tasks to be completed here.
+/** Build scripts can place arbitrary tasks to be completed here.
  * Tasks will be evaluated directly after build script is loaded and before pre-specified or interactive tasks.
  * After that, it is not allowed to add new tasks. */
 internal var autoRunTasks:ArrayList<Task>? = ArrayList()

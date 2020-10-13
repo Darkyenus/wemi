@@ -319,7 +319,7 @@ private class RawResolvedDependency private constructor(
         val id: DependencyId, val dependencies: List<Dependency>,
         val resolvedFrom: Repository?, val log: CharSequence?, val artifact:ArtifactPath?) {
 
-    /** Error constructor */
+    /** Error constructor */
     constructor(id:DependencyId, log:CharSequence, resolvedFrom:Repository? = null)
             : this(id, emptyList(), resolvedFrom, log, null)
 

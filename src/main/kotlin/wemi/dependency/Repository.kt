@@ -176,7 +176,7 @@ enum class Checksum(val suffix: String, private val algo: String) {
 
 internal val CHECKSUMS = Checksum.values()
 
-/** [ByteArray] [data] wrapped with (lazily computed) checksums of that data. */
+/** [ByteArray] [data] wrapped with (lazily computed) checksums of that data. */
 internal class DataWithChecksum(val data:ByteArray) {
     private val checksums = arrayOfNulls<ByteArray>(CHECKSUMS.size)
 

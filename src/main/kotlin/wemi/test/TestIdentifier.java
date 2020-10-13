@@ -17,24 +17,24 @@ public final class TestIdentifier {
 	@NotNull
 	public final String id;
 
-	/** ID of the parent {@link TestIdentifier}. Blank if no parent exists. */
+	/** ID of the parent {@link TestIdentifier}. Blank if no parent exists. */
 	@NotNull
 	public final String parentId;
 
-	/** Name which should be displayed to the user */
+	/** Name which should be displayed to the user */
 	@NotNull
 	public final String displayName;
 
-	/** If this identifies a test that was executed */
+	/** If this identifies a test that was executed */
 	public final boolean isTest;
-	/** If this identifies a collection of tests (such collection can still have {@link TestData}) */
+	/** If this identifies a collection of tests (such collection can still have {@link TestData}) */
 	public final boolean isContainer;
 
-	/** Assigned tags */
+	/** Assigned tags */
 	@NotNull
 	public final Set<String> tags;
 
-	/** Source in which this test/container has been found. No content/format is guaranteed, used for debugging. May be blank. */
+	/** Source in which this test/container has been found. No content/format is guaranteed, used for debugging. May be blank. */
 	@NotNull
 	public final String testSource;
 

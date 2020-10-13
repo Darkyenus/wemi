@@ -41,7 +41,7 @@ public final class TestLauncher {
 	public static final byte MAGIC_MESSAGE_START = 14; // ASCII Shift Out
 	public static final byte MAGIC_MESSAGE_END = 15; // ASCII Shift In
 
-	/** The magic message start or end must repeat this many times to count as the delimiter. */
+	/** The magic message start or end must repeat this many times to count as the delimiter. */
 	public static final int MAGIC_MESSAGE_DELIMITER_REPEAT = 10;
 
 	public static void main(String[] args) {

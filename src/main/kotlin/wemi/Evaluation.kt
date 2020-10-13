@@ -35,7 +35,7 @@ class Binding<T> constructor(val key:Key<T>,
                  /** May be null when default key value is used. */
                  val value:Value<T>?,
                  val modifiers:Array<ValueModifier<T>>,
-                 /** BindingHolder in which [value] was found. Same nullability as [value]. */
+                 /** BindingHolder in which [value] was found. Same nullability as [value]. */
                  val valueOriginHolder:BindingHolder?) {
 
     internal val dependsOn = ArrayList<Binding<*>>()
@@ -235,14 +235,14 @@ class EvalScope @PublishedApi internal constructor(
         return result
     }
 
-    /** Return the value bound to this wemi.key in this scope.
+    /** Return the value bound to this wemi.key in this scope.
      * Throws exception if no value set. */
     fun <V> Key<V>.get(vararg input:Pair<String, String> = NO_INPUT): V {
         @Suppress("UNCHECKED_CAST")
         return getKeyValue(this, null, false, input) as V
     }
 
-    /** Return the value bound to this wemi.key in this scope.
+    /** Return the value bound to this wemi.key in this scope.
      * Returns [unset] if no value set. */
     fun <V : Else, Else> Key<V>.getOrElse(unset: Else, vararg input:Pair<String, String> = NO_INPUT): Else {
         return getKeyValue(this, unset, true, input)
@@ -270,7 +270,7 @@ class EvalScope @PublishedApi internal constructor(
         return result
     }
 
-    /** Obtain the contents of the [FileSet] and expire the result if it changes.
+    /** Obtain the contents of the [FileSet] and expire the result if it changes.
      * @see get for value retrieval
      * @see expiresWhen for expiration mechanism
      * @see FileSet.matchingFiles for path list retrieval */
@@ -290,7 +290,7 @@ class EvalScope @PublishedApi internal constructor(
         return result
     }
 
-    /** Obtain the contents of the [FileSet] and expire the result if it changes.
+    /** Obtain the contents of the [FileSet] and expire the result if it changes.
      * @see get for value retrieval
      * @see expiresWhen for expiration mechanism
      * @see FileSet.matchingFiles for path list retrieval */

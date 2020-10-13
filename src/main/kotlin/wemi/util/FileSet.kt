@@ -144,11 +144,11 @@ class FileSet(
          * order in which they are specified, to modify the set. Note that only files accessible through the [root]
          * (without `..`) are considered. */
         enum class Type {
-            /** When file matches ALL patterns, it is added to the set */
+            /** When file matches ALL patterns, it is added to the set */
             Include,
             /** When file from set matches ALL patterns, it is removed from the set */
             Exclude,
-            /** When file in set doesn't match ANY pattern, it is removed from the set */
+            /** When file in set doesn't match ANY pattern, it is removed from the set */
             Filter
         }
     }
@@ -219,7 +219,7 @@ internal fun sanitizePattern(pattern:String):SanitizedPattern {
     return modified
 }
 
-/** Matches `//`, `/./`, `///`, `/.//`, etc. */
+/** Matches `//`, `/./`, `///`, `/.//`, etc. */
 private val DUPLICATE_FILE_SEPARATORS = Regex("(?:/\\.?)+/")
 /** Matches `***`, `****`, etc. */
 private val EXTRA_BLOBS = Regex("\\*{3,}")
@@ -486,7 +486,7 @@ internal fun patternMatches(pattern:SanitizedPattern, path:CharSequence, caseSen
  * Matches all hidden files (those starting with .) */
 private const val DEFAULT_EXCLUDE_PATTERN = "**/.**"
 
-/** Tests if given [path] should be included based on [patterns] (and possibly [DEFAULT_EXCLUDE_PATTERN] if [defaultExcludes]).
+/** Tests if given [path] should be included based on [patterns] (and possibly [DEFAULT_EXCLUDE_PATTERN] if [defaultExcludes]).
  * @param caseSensitive passed through to [patternMatches] */
 internal fun matches(patterns: Array<out Pattern>, defaultExcludes:Boolean, caseSensitive:Boolean, path:CharSequence):Boolean {
     if (defaultExcludes && patternMatches(DEFAULT_EXCLUDE_PATTERN, path, false)) {
@@ -513,7 +513,7 @@ internal fun matches(patterns: Array<out Pattern>, defaultExcludes:Boolean, case
     return false
 }
 
-/** Like [matchingFiles], but ignoring [FileSet.next]. */
+/** Like [matchingFiles], but ignoring [FileSet.next]. */
 private fun ownMatchingFiles(fileSet:FileSet, collect:(Path) -> Unit) {
     val rootAttributes = try {
         Files.readAttributes<BasicFileAttributes>(fileSet.root, BasicFileAttributes::class.java, *NO_LINK_OPTIONS)

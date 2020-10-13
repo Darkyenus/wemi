@@ -87,7 +87,7 @@ class DependencyId constructor(
          * Examples: jar (default), pom (returns pom.xml, used internally)
          */
         type: String = DEFAULT_TYPE,
-        /** When [isSnapshot] and repository uses unique snapshots, `SNAPSHOT` in the [version]
+        /** When [isSnapshot] and repository uses unique snapshots, `SNAPSHOT` in the [version]
          * is replaced by this string for the last resolution pass. Resolver (Wemi) will automatically
          * replace it with the newest snapshot version (in format: `timestamp-buildNumber`),
          * but if you need a specific snapshot version, it can be set here. */
@@ -101,7 +101,7 @@ class DependencyId constructor(
         return DependencyId(group, name, version, classifier, type, snapshotVersion)
     }
 
-    /** Snapshot [version]s end with `-SNAPSHOT` suffix. */
+    /** Snapshot [version]s end with `-SNAPSHOT` suffix. */
     val isSnapshot:Boolean
         get() = version.endsWith("-SNAPSHOT")
 
@@ -379,13 +379,13 @@ class ResolvedDependency private constructor(
         val id: DependencyId,
         /** Scope in which the dependency was resolved. */
         val scope:DepScope,
-        /** Of the [id] that were found */
+        /** Of the [id] that were found */
         val dependencies: List<Dependency>,
         /** In which (non-cache) repository was [id] ultimately found in */
         val resolvedFrom: Repository?,
         /** May contain a message explaining why did the dependency failed to resolve, if [hasError] */
         val log: CharSequence?,
-        /** If the artifact has been resolved to a file in a local filesystem, it is here. */
+        /** If the artifact has been resolved to a file in a local filesystem, it is here. */
         val artifact:ArtifactPath?
 ) : JsonWritable {
 
@@ -393,7 +393,7 @@ class ResolvedDependency private constructor(
     val hasError: Boolean
         get() = log != null
 
-    /** Error constructor */
+    /** Error constructor */
     constructor(id:DependencyId, log:CharSequence, resolvedFrom:Repository? = null)
             : this(id, "", emptyList(), resolvedFrom, log, null)
 

@@ -210,7 +210,7 @@ fun Appendable.appendByteSize(bytes: Long): Appendable {
     return this
 }
 
-/** Like [appendByteSize], but only most significant unit and no spaces. */
+/** Like [appendByteSize], but only most significant unit and no spaces. */
 fun Appendable.appendShortByteSize(bytes: Long): Appendable {
     val KILO = 1000L
     val MEGA = 1000_000L

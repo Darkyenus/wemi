@@ -178,7 +178,7 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
 class BuildScriptInfo internal constructor(
         /** jar to which the build script has been compiled */
         val scriptJar: Path,
-        /** Source set from which [sources] were generated */
+        /** Source set from which [sources] were generated */
         val sourceSet:FileSet,
         /** source files, from which the build script is compiled */
         val sources: List<Path>,

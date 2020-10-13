@@ -23,7 +23,7 @@ interface PluginEnvironment {
      *
      * Example:
      * ```
-     * fun initialize() {
+     * fun initialize() {
      *      Archetypes::Base.inject {
      *          myKey set { "foo" }
      *      }

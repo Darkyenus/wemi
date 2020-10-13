@@ -638,7 +638,7 @@ private fun <T> Request.execute(listener:ActivityListener?, responseTranslator:R
     }
 }
 
-/** Wrap [this] to call [action] on received response. */
+/** Wrap [this] to call [action] on received response. */
 private fun <T> ResponseTranslator<T>.onResponse(action:(Response<*>) -> Unit):ResponseTranslator<T> {
     return object : ResponseTranslator<T> {
         override fun decode(response: Response<*>, `in`: InputStream): T {
