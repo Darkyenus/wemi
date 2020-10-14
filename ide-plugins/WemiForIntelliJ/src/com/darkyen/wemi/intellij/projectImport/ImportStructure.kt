@@ -129,15 +129,15 @@ private fun <T: Freezable> settings(from: BaseKotlinCompilerSettings<T>, cache:T
 	return cache ?: from.settings.unfrozen() as T
 }
 
-private fun ModuleNode.SourceResource.importSourceResource(content: ContentEntry, sourceType: JpsModuleSourceRootType<*>, resourceType:JpsModuleSourceRootType<*>, generated:Boolean) {
+private inline fun ModuleNode.SourceResource.importSourceResource(contentRootFor:(Path) -> ContentEntry, sourceType: JpsModuleSourceRootType<*>, resourceType:JpsModuleSourceRootType<*>, generated:Boolean) {
 	for (s in sourceRoots) {
-		val folder = content.addSourceFolder(s.toUrl(), sourceType)
+		val folder = contentRootFor(s).addSourceFolder(s.toUrl(), sourceType)
 		if (generated) {
 			(folder.jpsElement.properties as? JavaSourceRootProperties)?.isForGeneratedSources = true
 		}
 	}
 	for (s in resourceRoots) {
-		val folder = content.addSourceFolder(s.toUrl(), resourceType)
+		val folder = contentRootFor(s).addSourceFolder(s.toUrl(), resourceType)
 		if (generated) {
 			(folder.jpsElement.properties as? JavaResourceRootProperties)?.isForGeneratedSources = true
 		}
@@ -242,9 +242,10 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 	val wemiModules = HashMap<String, Module>()
 
 	for (module in modules) {
+		val moduleRootPath = module.rootPath
 		val ideModule = modifiableModuleModel.findModuleByName(module.wemiProjectName) ?: run {
-			Files.createDirectories(module.rootPath)
-			val moduleFilePath = module.rootPath.toRealPath().resolve("wemi.${module.wemiProjectName}${ModuleFileType.DOT_DEFAULT_EXTENSION}").toString()
+			Files.createDirectories(moduleRootPath)
+			val moduleFilePath = moduleRootPath.toRealPath().resolve("wemi.${module.wemiProjectName}${ModuleFileType.DOT_DEFAULT_EXTENSION}").toString()
 
 			val newModule = modifiableModuleModel.newModule(moduleFilePath, module.ideModuleType)
 			modifiableModuleModel.renameModule(newModule, module.wemiProjectName)
@@ -279,15 +280,27 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 			compilerModule.setCompilerOutputPathForTests(module.classOutputTesting?.toUrl())
 			compilerModule.inheritCompilerOutputPath(false)
 			if (!module.hasNoSources()) {
-				rootModel.addContentEntry(module.rootPath.toUrl()).apply {
-					module.roots.importSourceResource(this, JavaSourceRootType.SOURCE, JavaResourceRootType.RESOURCE, false)
-					module.testRoots.importSourceResource(this, JavaSourceRootType.TEST_SOURCE, JavaResourceRootType.TEST_RESOURCE, false)
-					module.generatedRoots.importSourceResource(this, JavaSourceRootType.SOURCE, JavaResourceRootType.RESOURCE, true)
-					module.generatedTestRoots.importSourceResource(this, JavaSourceRootType.TEST_SOURCE, JavaResourceRootType.TEST_RESOURCE, true)
+				val contentRoots = ArrayList<Pair<Path, ContentEntry>>()
+				contentRoots.add(moduleRootPath.toAbsolutePath().normalize() to rootModel.addContentEntry(moduleRootPath.toUrl()))
 
-					for (excludedRoot in module.excludedRoots) {
-						this.addExcludeFolder(excludedRoot.toUrl())
+				val contentRootFor:(Path) -> ContentEntry = root@{ path ->
+					val absPath = path.toAbsolutePath().normalize()
+					for ((contentRootPath, contentRoot) in contentRoots) {
+						if (absPath.startsWith(contentRootPath)) {
+							return@root contentRoot
+						}
 					}
+					val newRoot = rootModel.addContentEntry(path.toUrl())
+					contentRoots.add(absPath to newRoot)
+					newRoot
+				}
+				module.roots.importSourceResource(contentRootFor, JavaSourceRootType.SOURCE, JavaResourceRootType.RESOURCE, false)
+				module.testRoots.importSourceResource(contentRootFor, JavaSourceRootType.TEST_SOURCE, JavaResourceRootType.TEST_RESOURCE, false)
+				module.generatedRoots.importSourceResource(contentRootFor, JavaSourceRootType.SOURCE, JavaResourceRootType.RESOURCE, true)
+				module.generatedTestRoots.importSourceResource(contentRootFor, JavaSourceRootType.TEST_SOURCE, JavaResourceRootType.TEST_RESOURCE, true)
+
+				for (excludedRoot in module.excludedRoots) {
+					contentRootFor(excludedRoot).addExcludeFolder(excludedRoot.toUrl())
 				}
 			}
 		}

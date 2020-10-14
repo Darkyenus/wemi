@@ -40,7 +40,6 @@ import java.nio.file.Path
 import java.util.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
-import wemiplugin.teavm.TEAVM_VERSION
 
 object TeaVMCompilerFlags {
 	val minifying = CompilerFlag("teavm.minifying", "", true)
