@@ -96,15 +96,17 @@ private class DependencyManagementKey(val groupId:String, val name:String, val c
     }
 }
 
-private fun sanityCheckDependencyIdPart(id:DependencyId, part:String, partName:String) {
+private fun sanityCheckDependencyIdPart(id:DependencyId, part:String, partName:String, extraAllowedCharacters:String = "") {
     val problem = when {
         part.isEmpty() -> "is empty"
         part.startsWith('$') -> "appears to be an unresolved variable"
         (part.startsWith('(') || part.startsWith('[')) && ((part.endsWith(')') || part.endsWith(']'))) -> "appears to be a version range, which are unsupported"
-        part.any { !it.isJavaIdentifierPart() } -> "contains unusual character(s)"
+        // http://maven.40175.n5.nabble.com/Allowed-characters-in-GAV-and-how-where-to-sanitize-td5922078.html
+        // It is a mess, but we can be strict here, because it is just a warning
+        part.any { it !in 'a'..'z' && it !in 'A'..'Z' && it !in '0'..'9' && it !in ".-_" && it !in extraAllowedCharacters } -> "contains unusual character(s)"
         else -> return
     }
-    LOG.warn("{} of {} {}, this may indicate a problem and the resolution will probably fail", partName, id, problem)
+    LOG.warn("{} of {} {} - this may indicate a problem and the resolution will probably fail", partName, id, problem)
 }
 
 /**
@@ -144,9 +146,9 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
         // Sanity check
         sanityCheckDependencyIdPart(depId, depId.group, "group")
         sanityCheckDependencyIdPart(depId, depId.name, "name")
-        sanityCheckDependencyIdPart(depId, depId.version, "version")
+        sanityCheckDependencyIdPart(depId, depId.version, "version", "=+")
         if (depId.classifier.isNotEmpty()) {
-            sanityCheckDependencyIdPart(depId, depId.classifier, "classifier")
+            sanityCheckDependencyIdPart(depId, depId.classifier, "classifier", "=+")
         }
         sanityCheckDependencyIdPart(depId, depId.type, "type")
         if (depId.snapshotVersion.isNotEmpty()) {
