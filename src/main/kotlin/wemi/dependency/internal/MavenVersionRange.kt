@@ -225,3 +225,93 @@ fun parseMavenVersionRange(range:String):List<MavenVersionRange> {
 
 	return result
 }
+
+
+/** Take a Maven-style version range and extract a single explicit version from it.
+ * This parsing is very strict to the exact form of the version range, while very lenient to the actual versions. */
+internal fun extractSingleVersionFromVersionRange(version:String):String? {
+	// https://docs.oracle.com/middleware/1212/core/MAVEN/maven_version.htm#MAVEN402
+	if (!version.startsWith('[') && !version.startsWith('(')) {
+		// Simple version with no range weirdness, fast path
+		// Also catches the case when the version is empty
+		return null
+	}
+
+	val length = version.length
+	var i = 0
+	val rangeGroups = ArrayList<String>()
+
+	while (true) {
+		// Asserts that there is at least one character
+		val groupStart = i
+		if (version[groupStart] != '[' && version[groupStart] != '(') {
+			// Malformed group start
+			return null
+		}
+		i++
+
+		run {
+			while (i < length) {
+				val c = version[i++]
+				if (c == ']' || c == ')') {
+					return@run
+				}
+			}
+			// Missing group end
+			return null
+		}
+		rangeGroups.add(version.substring(groupStart, i))
+		// This is either the last group, or there is a comma and another group starts
+		if (i < length) {
+			if (version[i] != ',' || length - i - 1 < 3) {
+				// No comma or comma and not enough space for more
+				return null
+			}
+			i++ // Skip comma
+		} else break
+	}
+
+	// Now that we have a collection of version ranges, we have to find the best concrete one
+	for (rangeI in rangeGroups.indices.reversed()) {
+		val range = rangeGroups[rangeI]
+		assert(range.startsWith('[') || range.startsWith('(')) { "$range in $version" }
+		assert(range.endsWith(']') || range.endsWith(')')) { "$range in $version" }
+		val rangeLength = range.length
+		if (rangeLength < 3) {
+			// Invalid range, it does not contain a valid version
+			return null
+		}
+		val closedLeft = range.startsWith('[')
+		val closedRight = range.endsWith(']')
+		val commaI = range.indexOf(',')
+		if (commaI == -1) {
+			// This is a single number
+			if (closedLeft && closedRight) {
+				// This is a good exact version!
+				return range.substring(1, rangeLength - 1)
+			}
+			// Single version range can be only all closed, this is malformed
+			return null
+		}
+		// We have a comma
+		if (closedRight) {
+			// Right version can be used (it is the highest allowed)
+			val right = range.substring(commaI + 1, rangeLength - 1)
+			if (right.isEmpty()) {
+				// This is malformed and cruel
+				return null
+			}
+			return right
+		} else if (closedLeft) {
+			// Left version can be used
+			val left = range.substring(1, commaI)
+			if (left.isEmpty()) {
+				return null
+			}
+			return left
+		}
+	}
+
+	// Could not find a good version
+	return null
+}

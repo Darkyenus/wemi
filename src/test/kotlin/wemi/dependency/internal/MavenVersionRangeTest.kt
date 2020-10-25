@@ -66,4 +66,25 @@ class MavenVersionRangeTest {
 		range("(,1.0],[1.2,)", arrayOf("1.0", "0.9.9", "1.0-alpha", "2.0"), arrayOf("1.1", "1.0.1"))
 		range("(,1.1),(1.1,)", arrayOf("1.0", "0.9.9", "1.0-alpha", "2.0", "1.0.1"), arrayOf("1.1"))
 	}
+
+	@Test
+	fun mavenRangeExtraction() {
+		assertEquals(null, extractSingleVersionFromVersionRange("1.0"))
+		assertEquals(null, extractSingleVersionFromVersionRange("1,0-SNAPSHOT[foo]"))
+		assertEquals(null, extractSingleVersionFromVersionRange("[1.0"))
+		assertEquals("1.0", extractSingleVersionFromVersionRange("[1.0]"))
+		assertEquals(null, extractSingleVersionFromVersionRange("(1.0]"))
+		assertEquals("1.0", extractSingleVersionFromVersionRange("(,1.0]"))
+		assertEquals("1.3", extractSingleVersionFromVersionRange("[1.2,1.3]"))
+		assertEquals("1.0", extractSingleVersionFromVersionRange("[1.0,2.0)"))
+		assertEquals("1.5", extractSingleVersionFromVersionRange("[1.5,)"))
+		assertEquals("1.2", extractSingleVersionFromVersionRange("(,1.0],[1.2,)"))
+		assertEquals(null, extractSingleVersionFromVersionRange("(,1.0][1.2,)"))
+		assertEquals(null, extractSingleVersionFromVersionRange("(,1.0],,[1.2,)"))
+		assertEquals(null, extractSingleVersionFromVersionRange("(,1.0], [1.2,)"))
+		assertEquals("1.2", extractSingleVersionFromVersionRange("[0.9],(,1.0],[1.2,)"))
+		assertEquals(null, extractSingleVersionFromVersionRange("(,1.1),(1.1,)"))
+		assertEquals(null, extractSingleVersionFromVersionRange("(1.1,)"))
+		assertEquals(null, extractSingleVersionFromVersionRange("(1.1)"))
+	}
 }

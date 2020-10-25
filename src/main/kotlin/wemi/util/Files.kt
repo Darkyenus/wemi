@@ -6,6 +6,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.io.OutputStreamWriter
+import java.net.URISyntaxException
 import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
@@ -268,7 +269,14 @@ fun URL.toPath(): Path? {
 
         return if (url.protocol == "file") {
             // FileSystems.getDefault() is guaranteed to be "file" scheme FileSystem
-            FileSystems.getDefault().provider().getPath(url.toURI())
+            val uri = try { url.toURI() } catch (e:URISyntaxException) { null }
+            if (uri != null) {
+                FileSystems.getDefault().provider().getPath(url.toURI())
+            } else {
+                // URL is not strictly correct, try to do the conversion manually
+                // This happens for example when the path contains '{'
+                Paths.get(url.path)
+            }
         } else {
             null
         }
@@ -396,12 +404,12 @@ fun Path.lastModifiedMillis():Long {
 }
 
 /**
- * Size of the file on disk.
+ * Size of the file on disk, or -1 if failed to find out.
  *
  * @see [Files.size]
  */
 inline val Path.size: Long
-    get() = Files.size(this)
+    get() = try { Files.size(this) } catch (e:IOException) { -1 }
 
 /**
  * Reads the Path, line by line, and calls action for each line.

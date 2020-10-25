@@ -44,6 +44,20 @@ inline fun BindingHolder.generateSources(name:String = "", crossinline generate:
 }
 
 /**
+ * Create a new resource directory ([root]) for generated resources and add it to [wemi.Keys.resources].
+ * On each invocation of [wemi.Keys.resources], the directory is emptied and [generate] should generate necessary files.
+ */
+inline fun BindingHolder.generateResources(name:String = "", crossinline generate:EvalScope.(root:Path)->Unit) {
+	val rootName = if (name.isBlank()) "%08x".format(Arrays.hashCode(Thread.currentThread().stackTrace).toLong() and 0xFFFF_FFFFL) else name
+	val resourceDir = WemiCacheFolder / "-generated-resources-$rootName"
+	Keys.resources modify {
+		resourceDir.ensureEmptyDirectory()
+		generate(resourceDir)
+		it + FileSet(resourceDir)
+	}
+}
+
+/**
  * Create a new internal classpath directory ([root]) for generated classpath entries and add it to [wemi.Keys.generatedClasspath].
  * On each invocation of [wemi.Keys.generatedClasspath], the directory is emptied and [generate] should generate necessary files.
  *

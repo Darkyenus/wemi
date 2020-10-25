@@ -3,6 +3,8 @@ package wemi.run
 import org.jline.utils.OSUtils
 import org.slf4j.LoggerFactory
 import wemi.WemiException
+import wemi.boot.CLI
+import wemi.util.CliStatusDisplay.Companion.withStatus
 import wemi.util.absolutePath
 import wemi.util.div
 import java.nio.file.Files
@@ -77,4 +79,19 @@ fun prepareJavaProcess(javaExecutable: Path, workingDirectory: Path, classpath: 
     return ProcessBuilder(command)
             .directory(workingDirectory.toFile())
             .inheritIO()
+}
+
+/**
+ * Create a process from [builder] and run it to completion on CLI foreground.
+ * Signals are forwarded to the process as well.
+ */
+fun runForegroundProcess(builder:ProcessBuilder, separateOutputByNewlines:Boolean = true):Int {
+    // Separate process output from Wemi output
+    return CLI.MessageDisplay.withStatus(false) {
+        if (separateOutputByNewlines) println()
+        val process = builder.start()
+        val result = CLI.forwardSignalsTo(process) { process.waitFor() }
+        if (separateOutputByNewlines) println()
+        result
+    }
 }

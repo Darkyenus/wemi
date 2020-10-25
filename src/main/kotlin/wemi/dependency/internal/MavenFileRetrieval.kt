@@ -1,10 +1,8 @@
 package wemi.dependency.internal
 
-import WemiVersion
 import com.darkyen.dave.Request
 import com.darkyen.dave.Response
 import com.darkyen.dave.ResponseTranslator
-import com.darkyen.dave.Webb
 import com.darkyen.dave.WebbException
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
@@ -24,6 +22,7 @@ import wemi.util.appendSuffix
 import wemi.util.appendToPath
 import wemi.util.div
 import wemi.util.hashMatches
+import wemi.util.httpGet
 import wemi.util.parseHashSum
 import wemi.util.toHexString
 import wemi.util.toPath
@@ -37,63 +36,13 @@ import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
-import java.security.cert.X509Certificate
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
-import javax.net.ssl.X509TrustManager
 
 
 private val LOG = LoggerFactory.getLogger("MavenFileRetrieval")
-
-private fun createWebb():Webb {
-    return Webb(null).apply {
-        // NOTE: When User-Agent is not set, it defaults to "Java/<version>" and some servers (Sonatype Nexus)
-        // then return gutted version of some resources (at least maven-metadata.xml) for which the checksums don't match
-        // This seems to be due to: https://issues.sonatype.org/browse/NEXUS-6171 (not a bug, but a feature!)
-        setDefaultHeader("User-Agent", "Wemi/$WemiVersion")
-        // Just for consistency
-        setDefaultHeader("Accept", "*/*")
-        setDefaultHeader("Accept-Language", "*")
-        // Should be default, but just in case
-        setFollowRedirects(true)
-    }
-}
-
-private val WEBB = createWebb()
-
-private val UNSAFE_WEBB = createWebb().apply {
-    val sslContext = SSLContext.getInstance("TLS")
-    sslContext.init(null, arrayOf(object : X509TrustManager {
-        override fun checkClientTrusted(p0: Array<out X509Certificate>?, p1: String?) {}
-        override fun checkServerTrusted(p0: Array<out X509Certificate>?, p1: String?) {}
-        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-    }), null)
-
-    setSSLSocketFactory(sslContext.socketFactory)
-    setHostnameVerifier { _, _ -> true }
-}
-
-private fun httpGet(url: URL, ifModifiedSince:Long = -1, useUnsafeTransport:Boolean = false): Request {
-    val webb = if (useUnsafeTransport) {
-        LOG.warn("Forgoing all cryptography verifications on GET of {}", url)
-        UNSAFE_WEBB
-    } else WEBB
-
-    val request = webb.get(url.toExternalForm())
-    request.useCaches(false) // Do not use local caches, we do the caching ourselves
-    request.retry(2, true)
-    if (ifModifiedSince > 0) {
-        request.ifModifiedSince(ifModifiedSince)
-        request.header("Cache-Control", "no-transform")
-    } else {
-        request.header("Cache-Control", "no-transform, no-cache")
-    }
-
-    return request
-}
 
 private class CacheArtifactPath(val repository:Repository, val cacheFile: Path, val cacheFileExists: Boolean, val cacheControlMs: Long)
 

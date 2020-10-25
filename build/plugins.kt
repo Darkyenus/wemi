@@ -1,3 +1,4 @@
+import wemi.dependency.JCenter
 import wemi.dependency.ProjectDependency
 import wemi.generation.Constant
 import wemi.generation.generateKotlinConstantsFile
@@ -60,6 +61,15 @@ val pluginIntellij by project(path("plugins/intellij")) {
     projectVersion set { using(wemi) { projectVersion.get() } }
 
     projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
+    libraryDependencies add { dependency("org.apache.commons:commons-compress:1.20") }
+
+    repositories add { JCenter }
+    repositories add { Repository("jetbrains-bintray-intellij-plugin-service", "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service") }
+    //libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-base:3.139") }
+    //libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-intellij:3.139") }
+    //libraryDependencies add { dependency("org.jetbrains.intellij:blockmap:1.0.5", exclusions = listOf(DependencyExclusion(group = "org.jetbrains.kotlin"))) }
+    //libraryDependencies add { dependency("org.jetbrains.intellij:plugin-repository-rest-client:2.0.15", exclusions = listOf(DependencyExclusion(group = "org.jetbrains.kotlin"))) }
+
     libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
     libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
 
@@ -68,7 +78,7 @@ val pluginIntellij by project(path("plugins/intellij")) {
                 metadata,
                 "Wemi Plugin: IntelliJ plugin build support",
                 "Build IntelliJ platform plugins",
-                "2018"
+                "2020"
         )
     }
 }

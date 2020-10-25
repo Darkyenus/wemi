@@ -424,7 +424,7 @@ fun CodePoint.isCodePointSafeInFileName(): Boolean = when {
  *
  * @see isCodePointSafeInFileName
  */
-fun CharSequence.toSafeFileName(replacement: Char): CharSequence {
+fun CharSequence.toSafeFileName(replacement: Char = '_'): CharSequence {
     val sb = StringBuilder(length)
     var anyReplacements = false
 

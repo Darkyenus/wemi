@@ -50,6 +50,8 @@ class FileSet(
         val caseSensitive:Boolean = true,
         val next: FileSet? = null) : JsonWritable {
 
+    constructor(path:LocatedPath):this(path.root ?: path.file, *if (path.root == null) emptyArray<Pattern>() else arrayOf<Pattern>(include(path.path)))
+
     override fun JsonWriter.write() {
         writeArray {
             var fileSet = this@FileSet

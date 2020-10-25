@@ -18,7 +18,7 @@ private typealias BindingHolderInitializer = () -> Unit
 /** Internal structure holding all loaded build script data. */
 internal object BuildScriptData {
     val AllProjects: MutableMap<String, Project> = Collections.synchronizedMap(mutableMapOf<String, Project>())
-    val AllKeys: MutableMap<String, Key<Any>> = Collections.synchronizedMap(mutableMapOf<String, Key<Any>>())
+    val AllKeys: MutableMap<String, Key<*>> = Collections.synchronizedMap(mutableMapOf<String, Key<*>>())
     val AllConfigurations: MutableMap<String, Configuration> = Collections.synchronizedMap(mutableMapOf<String, Configuration>())
 
     /**
@@ -163,14 +163,26 @@ class KeyDelegate<V> internal constructor(
     private lateinit var key: Key<V>
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): KeyDelegate<V> {
-        this.key = Key(property.name, description, hasDefaultValue, defaultValue, inputKeys, prettyPrinter)
-        @Suppress("UNCHECKED_CAST")
-        synchronized(BuildScriptData.AllKeys) {
-            val existing = BuildScriptData.AllKeys[this.key.name]
-            if (existing != null) {
-                throw WemiException("Key ${key.name} already exists (desc: '${existing.description}')")
+        this.key = synchronized(BuildScriptData.AllKeys) {
+            var keyName = property.name
+            var existing = BuildScriptData.AllKeys[keyName]
+            while (existing != null) /* no looping, just break support */ {
+                if (thisRef != null) {
+                    val simpleName = thisRef.javaClass.simpleName
+                    val fullName = thisRef.javaClass.name
+                    val oldName = keyName
+                    keyName = (if (simpleName.isNullOrEmpty()) fullName else simpleName).replace('.', '_')+"_"+property.name
+                    existing = BuildScriptData.AllKeys[keyName]
+                    if (existing == null) {
+                        LOG.warn("Key {} already exists, renaming duplicate to {}", oldName, keyName)
+                        break
+                    }
+                }
+                throw WemiException("Key $keyName already exists (desc: '${existing.description}')")
             }
-            BuildScriptData.AllKeys.put(key.name, key as Key<Any>)
+            val key = Key(property.name, description, hasDefaultValue, defaultValue, inputKeys, prettyPrinter)
+            BuildScriptData.AllKeys[key.name] = key
+            key
         }
         return this
     }

@@ -63,7 +63,7 @@ object JvmHotswap {
                 }
                 val directory = Keys.runDirectory.get()
                 val mainClass = Keys.mainClass.get()
-                val options = Keys.runOptions.get().toMutable()
+                val options = Keys.runOptions.get().toMutableList()
                 val port = hotswapAgentPort.get()
                 val agentJar = Magic.classpathFileOf(JvmHotswap.javaClass)!!
                 LOG.debug("Agent jar: {}", agentJar)

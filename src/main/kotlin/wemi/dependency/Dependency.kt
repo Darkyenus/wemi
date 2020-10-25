@@ -3,12 +3,15 @@ package wemi.dependency
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.LoggerFactory
+import wemi.dependency.internal.extractSingleVersionFromVersionRange
 import wemi.util.*
 import java.io.IOException
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
+
+private val LOG = LoggerFactory.getLogger("Dependency")
 
 /**
  * Artifact classifier.
@@ -20,7 +23,7 @@ typealias Classifier = String
  * See https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope */
 typealias DepScope = String
 
-/** Check whether [scope] is in [scopeSet]. Empty [scopeSet] contains all scopes.
+/** Check whether [this] is in [scopeSet]. Empty [scopeSet] contains all scopes.
  * See [wemi.Keys.resolvedLibraryScopes] */
 infix fun DepScope.scopeIn(scopeSet:Set<DepScope>):Boolean {
     if (scopeSet.isEmpty()) {
@@ -71,7 +74,7 @@ class DependencyId constructor(
         /** name of the dependency (aka artifactId) */
         val name: String,
         /** version of the project (aka revision) */
-        val version: String,
+        version: String,
         /**
          * Various variants of the same dependency.
          * Examples: jdk15, sources, javadoc, linux
@@ -93,6 +96,15 @@ class DependencyId constructor(
          * but if you need a specific snapshot version, it can be set here. */
         snapshotVersion: String = DEFAULT_SNAPSHOT_VERSION) {
 
+    val version = run {
+        val trimVersion = version.trim()
+        // Sanitize version range numbers
+        val extracted = extractSingleVersionFromVersionRange(trimVersion)
+        if (extracted != null) {
+            LOG.info("Extracted single version {} out of {} for {}:{}, since version ranges are not supported", extracted, version, group, name)
+            extracted
+        } else trimVersion
+    }
     val classifier = classifier.trim().toLowerCase()
     val type = type.trim().toLowerCase()
     val snapshotVersion = snapshotVersion.trim().toLowerCase()

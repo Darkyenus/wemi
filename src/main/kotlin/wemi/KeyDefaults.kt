@@ -39,6 +39,9 @@ import wemi.dependency.scopeIn
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
+import wemi.run.prepareJavaProcess
+import wemi.run.prepareJavaProcessCommand
+import wemi.run.runForegroundProcess
 import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
 import wemi.test.TestReport
@@ -59,6 +62,8 @@ import wemi.util.ensureEmptyDirectory
 import wemi.util.exists
 import wemi.util.format
 import wemi.util.isDirectory
+import wemi.util.javadocUrl
+import wemi.util.jdkToolsJar
 import wemi.util.name
 import wemi.util.parseJavaVersion
 import wemi.util.pathExtension
@@ -451,6 +456,9 @@ object KeyDefaults {
         if (debugPort != null) {
             options.add("-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=$debugPort")
         }
+        for ((key, value) in Keys.runSystemProperties.get()) {
+            options.add("-D$key=$value")
+        }
         options
     }
 
@@ -465,27 +473,18 @@ object KeyDefaults {
             classpathEntries.add(locatedFile.classpathEntry)
         }
         val directory = Keys.runDirectory.get()
-        val options = Keys.runOptions.get()
+        val options = Keys.runOptions.get().toMutableList()
         val arguments = Keys.runArguments.get()
 
         val dry = read("dry", "Only print the command to run the program, instead of running it", BooleanValidator, ask = false) ?: false
         if (dry) {
-            val command = wemi.run.prepareJavaProcessCommand(javaExecutable, classpathEntries, mainClass, options, arguments)
+            val command = prepareJavaProcessCommand(javaExecutable, classpathEntries, mainClass, options, arguments)
             println(command.joinToString(" "))
             return 0
         }
 
-        val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, classpathEntries,
-                mainClass, options, arguments)
-
-        // Separate process output from Wemi output
-        return CLI.MessageDisplay.withStatus(false) {
-            println()
-            val process = processBuilder.start()
-            val result = CLI.forwardSignalsTo(process) { process.waitFor() }
-            println()
-            result
-        }
+        return runForegroundProcess(prepareJavaProcess(
+                javaExecutable, directory, classpathEntries, mainClass, options, arguments))
     }
 
     val Run: Value<Int> = {
@@ -670,26 +669,6 @@ object KeyDefaults {
                 expiresWith(outputFile)
                 outputFile
             }
-        }
-    }
-
-    /**
-     * When java is run from "jre" part of the JDK install, "tools.jar" is not in the classpath by default.
-     * This can locate the tools.jar in [Keys.javaHome] for explicit loading.
-     */
-    private fun jdkToolsJar(javaHome:Path):Path? {
-        return javaHome.resolve("lib/tools.jar").takeIf { it.exists() }
-                ?: (if (javaHome.name == "jre") javaHome.resolve("../lib/tools.jar").takeIf { it.exists() } else null)
-    }
-
-    /** Return URL at which Java SE Javadoc is hosted for given [javaVersion]. */
-    private fun javadocUrl(javaVersion:Int?):String {
-        val version = javaVersion ?: 14 // = newest
-        return when {
-            // These versions don't have API uploaded, so fall back to 1.5 (first one that is online)
-            version <= 5 -> "https://docs.oracle.com/javase/1.5.0/docs/api/"
-            version in 6..10 -> "https://docs.oracle.com/javase/${version}/docs/api/"
-            else -> "https://docs.oracle.com/en/java/javase/${version}/docs/api/"
         }
     }
 

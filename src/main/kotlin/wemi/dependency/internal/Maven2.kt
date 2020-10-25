@@ -96,6 +96,17 @@ private class DependencyManagementKey(val groupId:String, val name:String, val c
     }
 }
 
+private fun sanityCheckDependencyIdPart(id:DependencyId, part:String, partName:String) {
+    val problem = when {
+        part.isEmpty() -> "is empty"
+        part.startsWith('$') -> "appears to be an unresolved variable"
+        (part.startsWith('(') || part.startsWith('[')) && ((part.endsWith(')') || part.endsWith(']'))) -> "appears to be a version range, which are unsupported"
+        part.any { !it.isJavaIdentifierPart() } -> "contains unusual character(s)"
+        else -> return
+    }
+    LOG.warn("{} of {} {}, this may indicate a problem and the resolution will probably fail", partName, id, problem)
+}
+
 /**
  * Resolves artifacts for [dependencies] and their transitive dependencies.
  *
@@ -130,6 +141,18 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
     fun submitDependency(dep:Dependency): Future<Resolved>? {
         LOG.trace("submitDependency({})", dep)
         val depId = dep.dependencyId
+        // Sanity check
+        sanityCheckDependencyIdPart(depId, depId.group, "group")
+        sanityCheckDependencyIdPart(depId, depId.name, "name")
+        sanityCheckDependencyIdPart(depId, depId.version, "version")
+        if (depId.classifier.isNotEmpty()) {
+            sanityCheckDependencyIdPart(depId, depId.classifier, "classifier")
+        }
+        sanityCheckDependencyIdPart(depId, depId.type, "type")
+        if (depId.snapshotVersion.isNotEmpty()) {
+            sanityCheckDependencyIdPart(depId, depId.snapshotVersion, "snapshotVersion")
+        }
+
         val partialId = DependencyManagementKey(depId.group, depId.name, depId.classifier, depId.type)
 
         // Check if we haven't resolved this dependency (or its different version) previously
@@ -1000,7 +1023,11 @@ private class RawPom(
 
     class RawPomDependency(val group: String?, val name: String?, val version: String?,
                            val classifier:String?, val type:String?, val scope:String?, val optional:String?,
-                           val exclusions: List<DependencyExclusion>)
+                           val exclusions: List<DependencyExclusion>) {
+        override fun toString(): String {
+            return "RawPomDependency(group=$group, name=$name, version=$version, classifier=$classifier, type=$type, scope=$scope, optional=$optional, exclusions=$exclusions)"
+        }
+    }
 
     class TranslatedRawPomDependency constructor(val group: String?, val name: String?, val version: String?,
                            val classifier:String, val type:String, val scope:String?, val optional:Boolean?,
@@ -1170,12 +1197,15 @@ private class RawPom(
     }
 
     private fun String.translate(warn:Boolean): String {
-        if (!startsWith("\${", ignoreCase = false) || !endsWith('}', ignoreCase = false)) {
-            return this.trim()
-        }
+        var value = this
+        while (true) {
+            if (!value.startsWith("\${", ignoreCase = false) || !value.endsWith('}', ignoreCase = false)) {
+                return value
+            }
 
-        val key = substring(2, length - 1)
-        return getProperty(key, warn) ?: this.trim()
+            val key = value.substring(2, length - 1).trim()
+            value = getProperty(key, warn) ?: return value
+        }
     }
 
     private companion object {

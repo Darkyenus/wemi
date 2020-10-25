@@ -342,7 +342,7 @@ private fun gatherWemiProjectData(launcher:WemiLauncher, options: ProjectImportO
 			LOG.info("Wemi version is $wemiVersion")
 			session.wemiVersion = Version(wemiVersion)
 			if (session.wemiVersion < Version.WEMI_0_11) {
-				LOG.warn("Wemi versions smaller than 0.11 are not supported")
+				LOG.warn("Wemi versions older than 0.11 are not supported")
 			}
 		}
 
