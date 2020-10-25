@@ -33,7 +33,7 @@ val pluginTeaVM by project(path("plugins/teavm")) {
 
     val TEAVM_VERSION = "0.6.1"
 
-    generateSources {
+    generateSources("plugin-teavm-version") {
         generateKotlinConstantsFile(it, "wemiplugin.teavm.Version",
                 mapOf("TEAVM_VERSION" to Constant.StringConstant(TEAVM_VERSION, "The version of TeaVM to be used")))
     }

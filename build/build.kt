@@ -19,6 +19,9 @@ import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
 import wemi.dependency.ProjectDependency
 import wemi.expiresWith
+import wemi.generation.Constant
+import wemi.generation.generateKotlinConstantsFile
+import wemi.generation.generateSources
 import wemi.key
 import wemi.publish.InfoNode
 import wemi.read
@@ -165,6 +168,12 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
 
 /** Core functionality */
 val core:Project by project {
+
+    projectVersion set { using(wemi) { projectVersion.get() } }
+    generateSources("core-version") {
+        generateKotlinConstantsFile(it, "wemi.boot.Version",
+                mapOf("WemiVersion" to Constant.StringConstant(projectVersion.get(), "Version of Wemi build system")))
+    }
 
     repositories add { Jitpack }
 

@@ -2,7 +2,6 @@
 
 # Wemi Version update
 1. Change versions in
-	- [Wemi](../src/main/kotlin/wemi/boot/Launch.kt)
 	- [IDEA plugin](../ide-plugins/WemiForIntelliJ/resources/META-INF/plugin.xml)
 2. Update changes in
     - [Changelog](../CHANGES.md)
