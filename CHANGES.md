@@ -1,4 +1,10 @@
 # 0.14
+- Fix aggregate project's test attempting to test untestable subprojects
+- Improved `java` detection on macOS
+- Initial and work-in-progress support for Kotlin JavaScript backend and [TeaVM](http://teavm.org/)
+- Internal robustness improvements in handling broken dependencies and Maven version ranges
+- Add `runSystemProperties` key for easier handling of Java's system properties. The properties are included into `runOptions` by default.
+- Having multiple keys with the same name should no longer completely break the build
 
 # 0.13 2020-06-23
 - Add utility functions for source file and classpath generation, see the `wemi.generation` package
