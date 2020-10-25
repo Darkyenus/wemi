@@ -129,15 +129,15 @@ private fun <T: Freezable> settings(from: BaseKotlinCompilerSettings<T>, cache:T
 	return cache ?: from.settings.unfrozen() as T
 }
 
-private inline fun ModuleNode.SourceResource.importSourceResource(contentRootFor:(Path) -> ContentEntry, sourceType: JpsModuleSourceRootType<*>, resourceType:JpsModuleSourceRootType<*>, generated:Boolean) {
+private inline fun ModuleNode.SourceResource.importSourceResource(contentRootFor:(Path, Boolean) -> ContentEntry, sourceType: JpsModuleSourceRootType<*>, resourceType:JpsModuleSourceRootType<*>, generated:Boolean) {
 	for (s in sourceRoots) {
-		val folder = contentRootFor(s).addSourceFolder(s.toUrl(), sourceType)
+		val folder = contentRootFor(s, false).addSourceFolder(s.toUrl(), sourceType)
 		if (generated) {
 			(folder.jpsElement.properties as? JavaSourceRootProperties)?.isForGeneratedSources = true
 		}
 	}
 	for (s in resourceRoots) {
-		val folder = contentRootFor(s).addSourceFolder(s.toUrl(), resourceType)
+		val folder = contentRootFor(s, false).addSourceFolder(s.toUrl(), resourceType)
 		if (generated) {
 			(folder.jpsElement.properties as? JavaResourceRootProperties)?.isForGeneratedSources = true
 		}
@@ -240,6 +240,7 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 	// Import module info
 	val ideModulesToRemove = modifiableModuleModel.modules.toMutableSet()
 	val wemiModules = HashMap<String, Module>()
+	val allExcludedRoots = modules.flatMap { it.excludedRoots }
 
 	for (module in modules) {
 		val moduleRootPath = module.rootPath
@@ -283,10 +284,20 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 				val contentRoots = ArrayList<Pair<Path, ContentEntry>>()
 				contentRoots.add(moduleRootPath.toAbsolutePath().normalize() to rootModel.addContentEntry(moduleRootPath.toUrl()))
 
-				val contentRootFor:(Path) -> ContentEntry = root@{ path ->
+				val contentRootFor:(Path, forExclusion:Boolean) -> ContentEntry = root@{ path, forExclusion ->
 					val absPath = path.toAbsolutePath().normalize()
-					for ((contentRootPath, contentRoot) in contentRoots) {
+					findExisting@for ((contentRootPath, contentRoot) in contentRoots) {
 						if (absPath.startsWith(contentRootPath)) {
+							// If contentRootPath contains excluded dir of any project and absPath is in that,
+							// it can't be used, because it confuses IntelliJ.
+							// This does not matter for actual exclusion folders.
+							if (!forExclusion) {
+								for (excluded in allExcludedRoots) {
+									if (excluded.startsWith(contentRootPath) && absPath.startsWith(excluded)) {
+										break@findExisting
+									}
+								}
+							}
 							return@root contentRoot
 						}
 					}
@@ -300,7 +311,7 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 				module.generatedTestRoots.importSourceResource(contentRootFor, JavaSourceRootType.TEST_SOURCE, JavaResourceRootType.TEST_RESOURCE, true)
 
 				for (excludedRoot in module.excludedRoots) {
-					contentRootFor(excludedRoot).addExcludeFolder(excludedRoot.toUrl())
+					contentRootFor(excludedRoot, true).addExcludeFolder(excludedRoot.toUrl())
 				}
 			}
 		}
