@@ -1200,14 +1200,30 @@ private class RawPom(
 
     private fun String.translate(warn:Boolean): String {
         var value = this
-        while (true) {
+        var encounteredKeys:ArrayList<String>? = null
+        val iterations = 1000
+        for (iteration in 0 until iterations) {
             if (!value.startsWith("\${", ignoreCase = false) || !value.endsWith('}', ignoreCase = false)) {
                 return value
             }
 
-            val key = value.substring(2, length - 1).trim()
+            val key = value.substring(2, value.length - 1).trim()
             value = getProperty(key, warn) ?: return value
+            if (iteration == 5) {
+                encounteredKeys = ArrayList()
+            }
+            if (encounteredKeys != null) {
+                if (key in encounteredKeys) {
+                    // A loop!
+                    LOG.warn("A self-referential property loop encountered: {} - Using '{}' as a fallback value", encounteredKeys, value)
+                    return value
+                }
+                encounteredKeys.add(key)
+            }
         }
+
+        LOG.warn("Extremely long property chain encountered: {} - Using '{}' as a fallback value", encounteredKeys, this)
+        return this
     }
 
     private companion object {
