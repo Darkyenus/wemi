@@ -1,16 +1,14 @@
 package wemiplugin.intellij
 
+import Files
+import Keys
 import org.slf4j.LoggerFactory
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import wemi.EvalScope
-import wemi.WemiException
-import wemi.run.JavaHome
-import wemi.util.absolutePath
-import wemi.util.copyRecursively
 import wemi.util.div
-import wemi.util.jdkToolsJar
-import wemi.util.toSafeFileName
+import wemi.util.linkOrCopyRecursively
+import wemi.util.name
 import wemiplugin.intellij.utils.getFirstElement
 import wemiplugin.intellij.utils.namedElements
 import wemiplugin.intellij.utils.parseXml
@@ -24,33 +22,17 @@ class IntelliJIDESandbox(val base:Path, val config:Path, val plugins:Path, val s
 
 fun EvalScope.prepareIntelliJIDESandbox(sandboxDir: Path = Keys.cacheDirectory.get() / "idea-sandbox", testSuffix:String = "", vararg extraPluginDirectories: Path): IntelliJIDESandbox {
 	val destinationDir = sandboxDir / "plugins$testSuffix"
-	val librariesToIgnore = IntelliJ.resolvedIntellijIdeDependency.get().jarFiles.toMutableSet()// TODO(jp): There is probably a better way to do this, i.e. add these only on compiling:
-	jdkToolsJar(JavaHome)?.let {  librariesToIgnore.add(it) }
+	val pluginJar = IntelliJ.intellijPluginArchive.get()
+	pluginJar.linkOrCopyRecursively(destinationDir / pluginJar.name)
 
-	val pluginDependencies = IntelliJ.resolvedIntellijPluginDependencies.get()
-	val pluginName = IntelliJ.intellijPluginName.get().toSafeFileName()
-	val pluginJar = Keys.archive.get() ?: throw WemiException("Plugin must generate a jar on archive", false)
-
-	val pluginDir = destinationDir / pluginName / "lib"
-	val externalClasspath = using(Configurations.running) {
-		Keys.externalClasspath.get().map { it.classpathEntry } - librariesToIgnore
-	}.filterNot { external ->
-		pluginDependencies.any { external.startsWith(it.artifact.absolutePath) }
-	}
-
-	// TODO(jp): Instead of copying, just soft-link them!
-	pluginJar.copyRecursively(pluginDir)
-	for (path in externalClasspath) {
-		path.copyRecursively(pluginDir)
-	}
 	for (dependency in IntelliJ.resolvedIntellijPluginDependencies.get()) {
 		if (dependency.isBuiltin) {
 			continue
 		}
-		dependency.artifact.copyRecursively(pluginDir)
+		dependency.artifact.linkOrCopyRecursively(destinationDir / dependency.artifact.name)
 	}
 	for (path in extraPluginDirectories) {
-		path.copyRecursively(pluginDir)
+		path.linkOrCopyRecursively(destinationDir / path.name)
 	}
 
 	// Disable IDE update

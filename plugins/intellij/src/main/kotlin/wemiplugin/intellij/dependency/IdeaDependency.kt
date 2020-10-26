@@ -74,7 +74,7 @@ open class IdeaDependency(
 	}
 
 	override fun toString(): String {
-		return "IdeaDependency(name='$name', version='$version', buildNumber='$buildNumber', classes=$classes, sources=$sources, withKotlin=$withKotlin, pluginsRegistry=$pluginsRegistry, extraDependencies=$extraDependencies, jarFiles=$jarFiles)"
+		return "IdeaDependency(name='$name', version='$version', buildNumber='$buildNumber', classes=$classes, sources=$sources)"
 	}
 }
 

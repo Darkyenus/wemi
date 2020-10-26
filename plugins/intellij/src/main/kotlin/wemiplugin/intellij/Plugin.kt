@@ -7,22 +7,26 @@ import com.jetbrains.plugin.structure.intellij.version.IdeVersion
 import org.slf4j.LoggerFactory
 import wemi.Configurations
 import wemi.Key
+import wemi.WemiException
 import wemi.archetype
 import wemi.collections.toMutable
 import wemi.configuration
+import wemi.dependency
 import wemi.dependency.Dependency
-import wemi.dependency.DependencyId
 import wemi.dependency.Repository
 import wemi.dependency.ScopeProvided
+import wemi.dependency.resolveDependencyArtifacts
 import wemi.key
+import wemi.util.FileSet
 import wemi.util.LocatedPath
 import wemi.util.absolutePath
 import wemi.util.div
-import wemi.util.jdkToolsJar
+import wemi.util.name
+import wemi.util.pathWithoutExtension
+import wemi.util.plus
 import wemiplugin.intellij.dependency.IdeaDependency
-import wemiplugin.intellij.tasks.DownloadRobotServerPluginTask.intellijRobotServerPlugin
-import wemiplugin.intellij.tasks.DownloadRobotServerPluginTask.setupDownloadRobotServerPluginTask
-import wemiplugin.intellij.tasks.PatchPluginXmlTask.setupPatchPluginXmlTask
+import wemiplugin.intellij.utils.Patch
+import wemiplugin.intellij.utils.unZipIfNew
 import java.io.File
 import java.net.URL
 import java.util.stream.Collectors
@@ -53,12 +57,25 @@ object IntelliJ {
 	val resolvedIntellijIdeDependency by key<IdeaDependency>("IDE dependency to use for compilation and running")
 
 	val instrumentCode by key("Instrument Java classes with nullability assertions and compile forms created by IntelliJ GUI Designer.", true)
-	val verifyPlugin by key<Boolean>("Validates completeness and contents of plugin.xml descriptors as well as plugin’s archive structure.")
-	val verifyPluginStrictness by key("How strict the plugin verification should be", Strictness.ALLOW_WARNINGS)
+
+	val intellijRobotServerDependency: Key<Pair<Dependency, Repository>> by key("Dependency on robot-server plugin for UI testing")
+
+	val intelliJPluginXmlFiles by key<List<LocatedPath>>("plugin.xml files that should be patched and added to classpath", emptyList())
+	val intelliJPluginXmlPatches by key<List<Patch>>("Values to change in plugin.xml. Later added values override previous patches, unless using the ADD mode.", emptyList())
+	val intelliJPatchedPluginXmlFiles by key<List<LocatedPath>>("Patched variants of intelliJPluginXmlFiles")
 
 	val preparedIntellijIdeSandbox by key<IntelliJIDESandbox>("Prepare and return a sandbox directory that can be used for running an IDE along with the developed plugin")
 
-	val intellijPluginArchive by key<Path>("Prepare and return a directory or a zip file containing the packaged plugin")
+	val intellijVerifyPluginStrictness by key("How strict the plugin verification should be", Strictness.ALLOW_WARNINGS)
+	val intellijPluginFolder by key<Path>("Prepare and return a directory containing the packaged plugin")
+	val intellijPluginSearchableOptions by key<Path?>("A jar with indexing data for plugin's preferences (null if not supported for given IDE version)")
+	val intellijPluginArchive by key<Path>("Package $intellijPluginFolder into a zip file, together with $intellijPluginSearchableOptions")
+
+	val intellijPublishPluginToRepository: Key<Unit> by key("Publish plugin distribution on plugins.jetbrains.com")
+	val intellijPublishPluginRepository: Key<String> by key("Repository to which the IntelliJ plugins are published to", "https://plugins.jetbrains.com")
+	val intellijPublishPluginToken: Key<String> by key("Plugin publishing token")
+	val intellijPublishPluginChannels: Key<List<String>> by key("Channels to which the plugin is published", listOf("default"))
+
 
 	/**
 	 * configure extra dependency artifacts from intellij repo
@@ -67,17 +84,22 @@ object IntelliJ {
 	val extraDependencies by key<List<String>>("", emptyList())
 }
 
-val JetBrainsAnnotations = Dependency(DependencyId("org.jetbrains", "annotations", "20.1.0"), scope = ScopeProvided, optional = true)
+val JetBrainsAnnotationsDependency = dependency("org.jetbrains", "annotations", "20.1.0", scope = ScopeProvided)
 val IntelliJPluginsRepo = IntelliJPluginRepository.Maven(Repository("intellij-plugins-repo", "https://cache-redirector.jetbrains.com/plugins.jetbrains.com/maven"))
+val IntelliJThirdPartyRepo = Repository("intellij-third-party-dependencies", "https://jetbrains.bintray.com/intellij-third-party-dependencies")
+val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugin", "0.9.35")
+
 
 /** A layer over [wemi.Archetypes.JVMBase] which turns the project into an IntelliJ platform plugin. */
 val IntelliJPluginLayer by archetype {
 
 	IntelliJ.intellijPluginName set { Keys.projectName.get() }
 
-	Keys.libraryDependencies add { JetBrainsAnnotations }
+	Keys.libraryDependencies add { JetBrainsAnnotationsDependency }
 
 	IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox() }
+
+	IntelliJ.intellijRobotServerDependency set { RobotServerDependency to IntelliJThirdPartyRepo }
 
 	Keys.runSystemProperties modify DefaultModifySystemProperties
 	Keys.runOptions modify DefaultModifyRunOptions
@@ -112,7 +134,16 @@ val IntelliJPluginLayer by archetype {
 	}
 
 	extend(uiTesting) {
-		IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox(testSuffix = "-uiTest", extraPluginDirectories = *arrayOf(intellijRobotServerPlugin.get())) }
+		IntelliJ.preparedIntellijIdeSandbox set {
+			val (dep, repo) = IntelliJ.intellijRobotServerDependency.get()
+			val artifacts = resolveDependencyArtifacts(listOf(dep), listOf(repo), progressListener)
+					?: throw WemiException("Failed to obtain robot-server dependency", false)
+			val artifactZip = artifacts.singleOrNull()
+					?: throw WemiException("Failed to obtain robot-server dependency - single artifact expected, but got $artifacts", false)
+			val robotFolder = artifactZip.parent / artifactZip.name.pathWithoutExtension()
+			unZipIfNew(artifactZip, robotFolder)
+			prepareIntelliJIDESandbox(testSuffix = "-uiTest", extraPluginDirectories = *arrayOf(robotFolder))
+		}
 	}
 
 	extend(Configurations.publishing) {
@@ -146,18 +177,19 @@ val IntelliJPluginLayer by archetype {
 		 */
 	}
 
-
-	Keys.externalClasspath modify { cp ->
-		val mcp = cp.toMutable()
-		for (path in IntelliJ.resolvedIntellijIdeDependency.get().jarFiles) {
-			mcp.add(LocatedPath(path))
-		}
-		for (dependency in IntelliJ.resolvedIntellijPluginDependencies.get()) {
-			for (it in dependency.classpath()) {
-				mcp.add(LocatedPath(it))
+	extend(Configurations.compiling) {
+		Keys.externalClasspath modify { cp ->
+			val mcp = cp.toMutable()
+			for (path in IntelliJ.resolvedIntellijIdeDependency.get().jarFiles) {
+				mcp.add(LocatedPath(path))
 			}
+			for (dependency in IntelliJ.resolvedIntellijPluginDependencies.get()) {
+				for (it in dependency.classpath()) {
+					mcp.add(LocatedPath(it))
+				}
+			}
+			mcp
 		}
-		mcp
 	}
 
 	IntelliJ.intellijIdeDependency set { IntelliJIDE.External() }
@@ -170,16 +202,17 @@ val IntelliJPluginLayer by archetype {
 		}
 	}
 
-	// Apparently the IDE needs to have the tools.jar on classpath
-	extend(Configurations.running) {
-		Keys.externalClasspath addAll { jdkToolsJar(Keys.javaHome.get())?.let { listOf(LocatedPath(it)) } ?: emptyList() }
-	}
-
+	IntelliJ.intellijPluginFolder set DefaultIntelliJPluginFolder
+	IntelliJ.intellijPluginSearchableOptions set DefaultIntelliJSearchableOptions
+	IntelliJ.intellijPluginArchive set DefaultIntelliJPluginArchive
 	IntelliJ.resolvedIntellijPluginDependencies set DefaultResolvedIntellijPluginDependencies
 
-	setupDownloadRobotServerPluginTask()
-	setupPatchPluginXmlTask()
-	IntelliJ.verifyPlugin set DefaultVerifyIntellijPlugin
+	IntelliJ.intelliJPluginXmlPatches addAll  DefaultIntelliJPluginXmlPatches
+	IntelliJ.intelliJPatchedPluginXmlFiles set PatchedPluginXmlFiles
+	IntelliJ.intellijPublishPluginToRepository set DefaultIntellijPublishPluginToRepository
+
+	// Add the patched xml files into resources
+	Keys.resources modify { it + IntelliJ.intelliJPatchedPluginXmlFiles.get().fold(null as FileSet?) { left, next -> left + FileSet(next) } }
 }
 
 val uiTesting by configuration("IDE UI Testing", Configurations.testing) {}

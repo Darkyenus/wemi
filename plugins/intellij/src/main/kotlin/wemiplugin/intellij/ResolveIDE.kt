@@ -1,6 +1,7 @@
 package wemiplugin.intellij
 
 import org.slf4j.LoggerFactory
+import wemi.ActivityListener
 import wemi.Configurations
 import wemi.Value
 import wemi.WemiException
@@ -38,14 +39,14 @@ sealed class IntelliJIDE {
 	 * @param path to the IDE's home directory
 	 * @param sources folders or jars of IDE's sources
 	 */
-	class Local(val path:Path, val sources:List<Path>) : IntelliJIDE()
+	data class Local(val path:Path, val sources:List<Path>) : IntelliJIDE()
 
 	/**
 	 * A dependency on an IDE from a remote repository.
 	 * @param version of the IDE, see [version documentation](https://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html)
 	 * @param type of IDE distribution (IC, IU, CL, PY, PC, RD or JPS)
 	 */
-	class External(val type:String = "IC", val version:String = "LATEST-EAP-SNAPSHOT") : IntelliJIDE()
+	data class External(val type:String = "IC", val version:String = "LATEST-EAP-SNAPSHOT") : IntelliJIDE()
 }
 
 fun defaultIdeDependency(downloadSources:Boolean): Value<IdeaDependency> = {
@@ -56,7 +57,7 @@ fun defaultIdeDependency(downloadSources:Boolean): Value<IdeaDependency> = {
 	val result = when (val dependency = IntelliJ.intellijIdeDependency.get()) {
 		is IntelliJIDE.Local -> resolveLocalIDE(dependency.path, dependency.sources, withKotlin)
 		is IntelliJIDE.External -> {
-			resolveRemoteIDE(IntelliJ.intellijIdeRepository.get(), dependency.version, dependency.type, downloadSources, IntelliJ.extraDependencies.get(), withKotlin)
+			resolveRemoteIDE(IntelliJ.intellijIdeRepository.get(), dependency.version, dependency.type, downloadSources, IntelliJ.extraDependencies.get(), withKotlin, progressListener)
 		}
 	}
 
@@ -69,7 +70,7 @@ fun defaultIdeDependency(downloadSources:Boolean): Value<IdeaDependency> = {
 }
 
 /** Resolve IDE from remote repository. */
-fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Boolean, extraDependencies: List<String>, withKotlin: Boolean): IdeaDependency {
+fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Boolean, extraDependencies: List<String>, withKotlin: Boolean, progressListener: ActivityListener?): IdeaDependency {
 	val releaseType = Utils.releaseType(version)
 
 	var dependencyGroup = "com.jetbrains.intellij.idea"
@@ -92,9 +93,9 @@ fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Bool
 		}
 	}
 
-	val repository = Repository("idea-${repoUrl.toString().toSafeFileName()}-$releaseType", repoUrl / releaseType)
-	val dependency = dependency(dependencyGroup, dependencyName, version)
-	val ideZipFile = resolveDependencyArtifacts(listOf(dependency), listOf(repository), null)
+	val repository = Repository("idea-${repoUrl.host}-${repoUrl.path.toSafeFileName()}-$releaseType", repoUrl / releaseType)
+	val dependency = dependency(dependencyGroup, dependencyName, version, type = "zip")
+	val ideZipFile = resolveDependencyArtifacts(listOf(dependency), listOf(repository), progressListener)
 			?.single()
 			?: throw WemiException("Failed to resolve IDE dependency $dependency from $repository")
 	LOG.debug("Resolved IDE zip: {}", ideZipFile)
@@ -102,8 +103,8 @@ fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Bool
 	val classesDirectory = unzipDependencyFile(getZipCacheDirectory(ideZipFile, type), ideZipFile, type, version.endsWith("-SNAPSHOT"))
 	LOG.info("IDE dependency cache directory: {}", classesDirectory)
 	val buildNumber = Utils.ideBuildNumber(classesDirectory)
-	val sourceDirs = if (sources) resolveSources(version, repository) else null
-	val resolvedExtraDependencies = resolveExtraDependencies(version, extraDependencies, repository)
+	val sourceDirs = if (sources) resolveSources(version, repository, progressListener) else null
+	val resolvedExtraDependencies = resolveExtraDependencies(version, extraDependencies, repository, progressListener)
 	return createDependency(dependencyName, type, version, buildNumber, classesDirectory, sourceDirs ?: emptyList(), resolvedExtraDependencies, withKotlin)
 }
 
@@ -141,9 +142,9 @@ private fun createDependency(name: String, type: String?, version: String, build
 	return IdeaDependency(name, version, buildNumber, classesDirectory, sourceDirs, withKotlin, pluginsRegistry, extraDependencies)
 }
 
-private fun resolveSources(version: String, repository: Repository): List<Path>? {
+private fun resolveSources(version: String, repository: Repository, progressListener: ActivityListener?): List<Path>? {
 	val dependency = dependency("com.jetbrains.intellij.idea", "ideaIC", version, classifier = "sources", type = "jar")
-	val artifacts = resolveDependencyArtifacts(listOf(dependency), listOf(repository), null) ?: return null
+	val artifacts = resolveDependencyArtifacts(listOf(dependency), listOf(repository), progressListener) ?: return null
 	LOG.debug("IDE sources: {}", artifacts)
 	return artifacts
 }
@@ -156,7 +157,7 @@ private fun getZipCacheDirectory(zipFile: Path, type: String): Path {
 	return zipFile.parent
 }
 
-private fun resolveExtraDependencies(version: String, extraDependencies: List<String>, repository: Repository):Collection<IdeaExtraDependency> {
+private fun resolveExtraDependencies(version: String, extraDependencies: List<String>, repository: Repository, progressListener: ActivityListener?):Collection<IdeaExtraDependency> {
 	if (extraDependencies.isEmpty()) {
 		return emptyList()
 	}
@@ -167,7 +168,7 @@ private fun resolveExtraDependencies(version: String, extraDependencies: List<St
 	}
 	val resolvedExtraDependencies = ArrayList<IdeaExtraDependency>()
 	for (name in extraDependencies) {
-		val dependencyFile = resolveExtraDependency(version, name, repository) ?: continue
+		val dependencyFile = resolveExtraDependency(version, name, repository, progressListener) ?: continue
 		val extraDependency = IdeaExtraDependency(name, dependencyFile)
 		LOG.debug("IDE extra dependency $name in $dependencyFile files: ${extraDependency.jarFiles}")
 		resolvedExtraDependencies.add(extraDependency)
@@ -175,9 +176,9 @@ private fun resolveExtraDependencies(version: String, extraDependencies: List<St
 	return resolvedExtraDependencies
 }
 
-private fun resolveExtraDependency(version: String, name: String, repository: Repository) : Path? {
+private fun resolveExtraDependency(version: String, name: String, repository: Repository, progressListener: ActivityListener?) : Path? {
 	val dependency = dependency("com.jetbrains.intellij.idea", name, version)
-	val files = resolveDependencyArtifacts(listOf(dependency), listOf(repository), null)
+	val files = resolveDependencyArtifacts(listOf(dependency), listOf(repository), progressListener)
 	if (files == null) {
 		LOG.warn("Cannot resolve IDE extra dependency {}", name)
 		return null

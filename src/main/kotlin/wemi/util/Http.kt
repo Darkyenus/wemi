@@ -1,18 +1,18 @@
 package wemi.util
 
+import Files
 import com.darkyen.dave.Request
 import com.darkyen.dave.Response
 import com.darkyen.dave.ResponseTranslator
 import com.darkyen.dave.Webb
-import com.darkyen.dave.WebbConst
 import com.darkyen.dave.WebbException
 import org.slf4j.LoggerFactory
+import wemi.ActivityListener
+import wemi.boot.WemiUnicodeOutputSupported
 import wemi.boot.WemiVersion
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.URL
-import java.nio.file.CopyOption
-import java.nio.file.OpenOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
@@ -69,7 +69,88 @@ fun httpGet(url: URL, ifModifiedSince:Long = -1, useUnsafeTransport:Boolean = fa
 	return request
 }
 
-fun httpGetFile(url:URL, file: Path, useUnsafeTransport:Boolean = false):Boolean {
+fun <T> Request.execute(listener: ActivityListener?, responseTranslator:ResponseTranslator<T>):Response<T> {
+	if (listener == null) {
+		return execute(responseTranslator)
+	} else {
+		listener.beginActivity(uriToActivityName(uri))
+		try {
+			return execute(object : ResponseTranslator<T> {
+				private val startNs = System.nanoTime()
+
+				override fun decode(response: Response<*>, originalIn: InputStream): T {
+					val totalLength = response.headers.entries.find { it.key.equals("Content-Length", ignoreCase = true) }?.value?.first()?.toLongOrNull() ?: 0L
+
+					listener.activityDownloadProgress(0L, totalLength, System.nanoTime() - startNs)
+
+					return responseTranslator.decode(response, object : GaugedInputStream(originalIn) {
+
+						override var totalRead:Long = 0L
+							set(value) {
+								field = value
+								listener.activityDownloadProgress(value, totalLength, System.nanoTime() - startNs)
+							}
+					})
+				}
+
+				override fun decodeEmptyBody(response: Response<*>): T {
+					return responseTranslator.decodeEmptyBody(response)
+				}
+			})
+		} finally {
+			listener.endActivity()
+		}
+	}
+}
+
+private fun uriToActivityName(uri:String):String {
+	val maxCharacters = 64
+	if (uri.length < maxCharacters) {
+		return uri
+	}
+
+	val protocolEnd = uri.indexOf("//")
+	if (protocolEnd == -1 || (!uri.startsWith("https://", ignoreCase = true) && !uri.startsWith("http://"))) {
+		return uri
+	}
+
+	// Shorten to domain/...file
+	val domainStart = protocolEnd + 2
+	var domainEnd = uri.indexOf('/', startIndex = domainStart)
+	if (domainEnd == -1)
+		domainEnd = uri.length
+
+	val remainingCharacters = uri.length - domainEnd
+	val availableCharacters = maxCharacters - (domainEnd - domainStart)
+
+	if (remainingCharacters <= availableCharacters) {
+		return uri.substring(domainStart)
+	} else {
+		val result = StringBuilder(70)
+		result.append(uri, domainStart, domainEnd)
+		result.append('/').append(if (WemiUnicodeOutputSupported) "[…]" else "[...]")
+		val remaining = maxCharacters - result.length
+		result.append(uri, uri.length - remaining, uri.length)
+		return result.toString()
+	}
+}
+
+/** Wrap [this] to call [action] on received response. */
+fun <T> ResponseTranslator<T>.onResponse(action:(Response<*>) -> Unit):ResponseTranslator<T> {
+	return object : ResponseTranslator<T> {
+		override fun decode(response: Response<*>, `in`: InputStream): T {
+			action(response)
+			return this@onResponse.decode(response, `in`)
+		}
+
+		override fun decodeEmptyBody(response: Response<*>): T {
+			action(response)
+			return this@onResponse.decodeEmptyBody(response)
+		}
+	}
+}
+
+fun httpGetFile(url:URL, file: Path, listener: ActivityListener?, useUnsafeTransport:Boolean = false):Boolean {
 	Files.createDirectories(file.parent)
 	val fileLastModified = file.lastModifiedMillis()
 	val downloadFile = file.resolveSibling(file.name+".downloading")
@@ -83,7 +164,7 @@ fun httpGetFile(url:URL, file: Path, useUnsafeTransport:Boolean = false):Boolean
 			request.header("Range", "bytes=$downloadFileSize-")
 		}
 
-		request.execute(object : ResponseTranslator<Boolean> {
+		request.execute(listener, object : ResponseTranslator<Boolean> {
 			override fun decode(response: Response<*>, inp: InputStream): Boolean {
 				if (hasCache && response.statusCode == 304) {
 					LOG.debug("Not re-downloading {}, cache is still good", url)

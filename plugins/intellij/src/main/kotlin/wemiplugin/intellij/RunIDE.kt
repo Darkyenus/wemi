@@ -1,5 +1,6 @@
 package wemiplugin.intellij
 
+import Keys
 import org.slf4j.LoggerFactory
 import wemi.EvalScope
 import wemi.ValueModifier
@@ -105,6 +106,7 @@ fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
 	val executable = Keys.javaExecutable.get()
 
 	val classpath = ArrayList<Path>()
+	// Apparently the IDE needs to have the tools.jar on classpath
 	val toolsJar = Utils.resolveToolsJar(executable)
 	if (toolsJar != null) {
 		classpath.add(toolsJar)

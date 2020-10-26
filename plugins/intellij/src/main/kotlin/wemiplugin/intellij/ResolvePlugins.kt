@@ -3,6 +3,7 @@ package wemiplugin.intellij
 import com.darkyen.dave.WebbException
 import com.jetbrains.plugin.structure.intellij.version.IdeVersion
 import org.slf4j.LoggerFactory
+import wemi.ActivityListener
 import wemi.EvalScope
 import wemi.Value
 import wemi.WemiException
@@ -148,9 +149,11 @@ class ResolvedIntelliJPluginDependency(val dependency:IntelliJPluginDependency, 
 sealed class IntelliJPluginRepository {
 
 	/** A maven repository with plugins */
-	class Maven(val repo: Repository):IntelliJPluginRepository() {
-		override fun resolve(dep: IntelliJPluginDependency.External):Path? {
-			return resolveDependencyArtifacts(listOf(Dependency(dep.toDependency())), listOf(repo), null)?.firstOrNull()
+	data class Maven(val repo: Repository):IntelliJPluginRepository() {
+		override fun resolve(dep: IntelliJPluginDependency.External, progressListener: ActivityListener?):Path? {
+			// TODO(jp): There might be a massive problem here: some plugins are distributed as zip, some as jars, and we have to know it before attempting resolution
+			//  This is really a hole in maven system, probably. Maybe gradle does not suffer it? dunno.
+			return resolveDependencyArtifacts(listOf(Dependency(dep.toDependency())), listOf(repo), progressListener)?.firstOrNull()
 		}
 	}
 
@@ -230,20 +233,39 @@ sealed class IntelliJPluginRepository {
 				LOG.warn("Unrecognized structure of {}: {}", pluginsXmlUrl, rootNode)
 				return@lazy null
 			}
+
+
 		}
 
-		override fun resolve(dep: IntelliJPluginDependency.External):Path? {
+		override fun resolve(dep: IntelliJPluginDependency.External, progressListener: ActivityListener?):Path? {
 			val downloadUrl = (plugins ?: return null)
 					.find { it.id.equals(dep.pluginId, ignoreCase = true) && it.version.equals(dep.version, ignoreCase = true) }
 					?.url ?: return null
 			val cacheZip = WemiCacheFolder / "-intellij-plugin-custom-repository-cache" / repoUrl.host.toSafeFileName('_') / (dep.channel?.toSafeFileName('_') ?: "default") / "${dep.pluginId}-${dep.version}.zip"
-			if (httpGetFile(downloadUrl, cacheZip)) {
+			if (httpGetFile(downloadUrl, cacheZip, progressListener)) {
 				return cacheZip
 			} else return null
 		}
+
+		override fun equals(other: Any?): Boolean {
+			if (this === other) return true
+			if (other !is Custom) return false
+
+			if (pluginsXmlUrl != other.pluginsXmlUrl) return false
+
+			return true
+		}
+
+		override fun hashCode(): Int {
+			return pluginsXmlUrl.hashCode()
+		}
+
+		override fun toString(): String {
+			return "Custom(pluginsXmlUrl=$pluginsXmlUrl)"
+		}
 	}
 
-	abstract fun resolve(dep: IntelliJPluginDependency.External):Path?
+	abstract fun resolve(dep: IntelliJPluginDependency.External, progressListener: ActivityListener?):Path?
 }
 
 private val cacheDirectoryPath: Path = WemiSystemCacheFolder / "intellij-plugin-cache"
@@ -300,7 +322,7 @@ fun EvalScope.resolveIntelliJPlugin(dependency: IntelliJPluginDependency, ideaDe
 		}
 		is IntelliJPluginDependency.External -> {
 			for (repo in repositories) {
-				val pluginFile = repo.resolve(dependency)
+				val pluginFile = repo.resolve(dependency, progressListener)
 				if (pluginFile != null) {
 					if (Utils.isZipFile(pluginFile)) {
 						return zippedPluginDependency(pluginFile, dependency)

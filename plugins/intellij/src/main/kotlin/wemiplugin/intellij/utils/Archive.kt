@@ -132,6 +132,10 @@ fun unTar(tarFile: Path, outputDirectory: Path, allowOutsideLinks:Boolean = fals
 }
 
 private fun copyTarAttributes(entry: TarArchiveEntry, file: Path) {
+	// TODO(jp): Can't set this to false, because removing write permissions during extraction
+	//  breaks the whole thing
+	val onlyGrantPermissions = true
+
 	val modTime = entry.modTime?.time ?: 0L
 	if (modTime > 0L) {
 		try {
@@ -145,7 +149,9 @@ private fun copyTarAttributes(entry: TarArchiveEntry, file: Path) {
 	if (mode != 0) {
 		// While 0 is a valid mode, it is more probable that the mode was not saved properly
 		try {
-			val permissions = EnumSet.noneOf(PosixFilePermission::class.java)
+			val permissions = if (onlyGrantPermissions) {
+				Files.getPosixFilePermissions(file)
+			} else EnumSet.noneOf(PosixFilePermission::class.java)
 			// Bits from https://www.gnu.org/software/tar/manual/html_node/Standard.html
 			//#define TUREAD   00400          /* read by owner */
 			//#define TUWRITE  00200          /* write by owner */
@@ -272,6 +278,10 @@ fun unZip(zipFile: Path, outputDirectory: Path, allowOutsideLinks: Boolean = fal
 }
 
 private fun copyZipAttributes(entry: ZipArchiveEntry, file: Path) {
+	// TODO(jp): Can't set this to false, because removing write permissions during extraction
+	//  breaks the whole thing
+	val onlyGrantPermissions = true
+
 	val modTime = entry.time
 	if (modTime > 0L) {
 		try {
@@ -285,7 +295,9 @@ private fun copyZipAttributes(entry: ZipArchiveEntry, file: Path) {
 	if (mode != 0) {
 		// While 0 is a valid mode, it is more probable that the mode was not saved properly
 		try {
-			val permissions = EnumSet.noneOf(PosixFilePermission::class.java)
+			val permissions = if (onlyGrantPermissions) {
+				Files.getPosixFilePermissions(file)
+			} else EnumSet.noneOf(PosixFilePermission::class.java)
 			// Apparently same as in Tar: https://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute
 			//#define TUREAD   00400          /* read by owner */
 			//#define TUWRITE  00200          /* write by owner */

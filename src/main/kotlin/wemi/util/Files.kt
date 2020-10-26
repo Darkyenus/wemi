@@ -524,20 +524,20 @@ fun Path.deleteRecursively() {
 /**
  * Copy this file or folder to [to].
  *
- * Does nothing when the file does not exist, copies as file when this is file, copies recursively all contents
+ * Does nothing when [this] file does not exist, copies as file when this is file, copies recursively all contents
  * when this is directory.
  */
 fun Path.copyRecursively(to:Path, vararg options:CopyOption) {
     if (!Files.exists(this)) {
         return
     }
+    Files.createDirectories(to.parent)
     if (!Files.isDirectory(this)) {
         // File
         Files.copy(this, to, *options)
     } else {
         // Directory
         val root = this
-        Files.createDirectories(to.parent)
         val copyAttributes = options.contains<CopyOption>(StandardCopyOption.COPY_ATTRIBUTES)
 
         Files.walkFileTree(root, object : FileVisitor<Path>{
@@ -609,6 +609,21 @@ fun Path.copyRecursively(to:Path, vararg options:CopyOption) {
                 throw exc
             }
         })
+    }
+}
+
+/**
+ * Similar to [copyRecursively], but only soft-links if that is enough.
+ */
+fun Path.linkOrCopyRecursively(to:Path, vararg options:CopyOption) {
+    if (!Files.exists(this)) {
+        return
+    }
+    Files.createDirectories(to.parent)
+    try {
+        Files.createSymbolicLink(to, this.toAbsolutePath())
+    } catch (e:UnsupportedOperationException) {
+        this.copyRecursively(to, *options)
     }
 }
 

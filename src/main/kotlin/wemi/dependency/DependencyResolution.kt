@@ -2,11 +2,16 @@ package wemi.dependency
 
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
+import wemi.EvalScope
 import wemi.util.Partial
 import wemi.util.appendShortByteSize
 import wemi.util.directorySynchronized
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
+
+fun EvalScope.resolveDependencyArtifacts(dependencies: Collection<Dependency>, repositories: Collection<Repository>): List<Path>? {
+    return resolveDependencyArtifacts(dependencies, repositories, progressListener)
+}
 
 /**
  * Utility method to [resolveDependencies] dependencies and retrieve their [artifacts].

@@ -21,8 +21,10 @@ import wemi.util.ParsedChecksumFile
 import wemi.util.appendSuffix
 import wemi.util.appendToPath
 import wemi.util.div
+import wemi.util.execute
 import wemi.util.hashMatches
 import wemi.util.httpGet
+import wemi.util.onResponse
 import wemi.util.parseHashSum
 import wemi.util.toHexString
 import wemi.util.toPath
@@ -519,85 +521,4 @@ internal fun retrieveFile(path:String, snapshot:Boolean, repositories: Compatibl
     }
 
     return@fileRetrievalMutex failure?.reFail() ?: Failable.failure("No suitable repositories to search in")
-}
-
-private fun uriToActivityName(uri:String):String {
-    val maxCharacters = 64
-    if (uri.length < maxCharacters) {
-        return uri
-    }
-
-    val protocolEnd = uri.indexOf("//")
-    if (protocolEnd == -1 || (!uri.startsWith("https://", ignoreCase = true) && !uri.startsWith("http://"))) {
-        return uri
-    }
-
-    // Shorten to domain/...file
-    val domainStart = protocolEnd + 2
-    var domainEnd = uri.indexOf('/', startIndex = domainStart)
-    if (domainEnd == -1)
-        domainEnd = uri.length
-
-    val remainingCharacters = uri.length - domainEnd
-    val availableCharacters = maxCharacters - (domainEnd - domainStart)
-
-    if (remainingCharacters <= availableCharacters) {
-        return uri.substring(domainStart)
-    } else {
-        val result = StringBuilder(70)
-        result.append(uri, domainStart, domainEnd)
-        result.append('/').append(if (WemiUnicodeOutputSupported) "[…]" else "[...]")
-        val remaining = maxCharacters - result.length
-        result.append(uri, uri.length - remaining, uri.length)
-        return result.toString()
-    }
-}
-
-private fun <T> Request.execute(listener:ActivityListener?, responseTranslator:ResponseTranslator<T>):Response<T> {
-    if (listener == null) {
-        return execute(responseTranslator)
-    } else {
-        listener.beginActivity(uriToActivityName(uri))
-        try {
-            return execute(object : ResponseTranslator<T> {
-                private val startNs = System.nanoTime()
-
-                override fun decode(response: Response<*>, originalIn: InputStream): T {
-                    val totalLength = response.headers.entries.find { it.key.equals("Content-Length", ignoreCase = true) }?.value?.first()?.toLongOrNull() ?: 0L
-
-                    listener.activityDownloadProgress(0L, totalLength, System.nanoTime() - startNs)
-
-                    return responseTranslator.decode(response, object : GaugedInputStream(originalIn) {
-
-                        override var totalRead:Long = 0L
-                            set(value) {
-                                field = value
-                                listener.activityDownloadProgress(value, totalLength, System.nanoTime() - startNs)
-                            }
-                    })
-                }
-
-                override fun decodeEmptyBody(response: Response<*>): T {
-                    return responseTranslator.decodeEmptyBody(response)
-                }
-            })
-        } finally {
-            listener.endActivity()
-        }
-    }
-}
-
-/** Wrap [this] to call [action] on received response. */
-private fun <T> ResponseTranslator<T>.onResponse(action:(Response<*>) -> Unit):ResponseTranslator<T> {
-    return object : ResponseTranslator<T> {
-        override fun decode(response: Response<*>, `in`: InputStream): T {
-            action(response)
-            return this@onResponse.decode(response, `in`)
-        }
-
-        override fun decodeEmptyBody(response: Response<*>): T {
-            action(response)
-            return this@onResponse.decodeEmptyBody(response)
-        }
-    }
 }

@@ -64,7 +64,7 @@ val pluginIntellij by project(path("plugins/intellij")) {
     libraryDependencies add { dependency("org.apache.commons:commons-compress:1.20") }
 
     repositories add { JCenter }
-    repositories add { Repository("jetbrains-bintray-intellij-plugin-service", "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service") }
+    //repositories add { Repository("jetbrains-bintray-intellij-plugin-service", "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service") }
     libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-base:3.139") }
     libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-intellij:3.139") }
     libraryDependencies add { dependency("org.jetbrains.intellij:blockmap:1.0.5", exclusions = listOf(DependencyExclusion(group = "org.jetbrains.kotlin"))) }

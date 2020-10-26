@@ -785,8 +785,8 @@ object KeyDefaults {
 
         val options = DokkaOptions()
 
-        for (sourceRoot in Keys.sources.getLocatedPaths()) {
-            options.sourceRoots.add(DokkaOptions.SourceRoot(sourceRoot.root ?: continue))
+        for (sourceRoot in Keys.sources.getLocatedPaths().mapNotNullTo(HashSet()) { it.root?.toAbsolutePath() }) {
+            options.sourceRoots.add(DokkaOptions.SourceRoot(sourceRoot))
         }
 
         options.moduleName = compilerOptions.getOrNull(KotlinCompilerFlags.moduleName) ?: Keys.projectName.get()

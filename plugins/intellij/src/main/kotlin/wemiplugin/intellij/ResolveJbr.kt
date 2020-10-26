@@ -3,6 +3,7 @@ package wemiplugin.intellij
 import Files
 import Keys
 import org.slf4j.LoggerFactory
+import wemi.ActivityListener
 import wemi.Value
 import wemi.boot.WemiSystemCacheFolder
 import wemi.dependency.internal.OS_ARCH
@@ -39,7 +40,7 @@ val DefaultJavaExecutable: Value<Path> = v@{
 	val jbrRepo = IntelliJ.intellijJbrRepository.get()
 	val jbrVersion = IntelliJ.intellijJbrVersion.get()
 	if (jbrVersion != null) {
-		val jbr = resolveJbr(jbrVersion, jbrRepo)
+		val jbr = resolveJbr(jbrVersion, jbrRepo, progressListener)
 		if (jbr != null) {
 			return@v jbr.javaExecutable
 		}
@@ -47,7 +48,7 @@ val DefaultJavaExecutable: Value<Path> = v@{
 	}
 	val builtinJbrVersion = Utils.getBuiltinJbrVersion(ideSdkDirectory())
 	if (builtinJbrVersion != null) {
-		val builtinJbr = resolveJbr(builtinJbrVersion, jbrRepo)
+		val builtinJbr = resolveJbr(builtinJbrVersion, jbrRepo, progressListener)
 		if (builtinJbr != null) {
 			return@v builtinJbr.javaExecutable
 		}
@@ -59,7 +60,7 @@ val DefaultJavaExecutable: Value<Path> = v@{
 
 private val JbrCacheFolder = WemiSystemCacheFolder / "intellij-jbr-cache"
 
-fun resolveJbr(version:String, overrideRepoUrl:URL?):Jbr? {
+fun resolveJbr(version:String, overrideRepoUrl:URL?, progressListener: ActivityListener?):Jbr? {
 	val jbrArtifact = jbrArtifactFrom(if (version.startsWith('u')) "8$version" else version)
 	val javaDir = JbrCacheFolder / jbrArtifact.name.toSafeFileName('_')
 	if (javaDir.exists()) {
@@ -77,7 +78,7 @@ fun resolveJbr(version:String, overrideRepoUrl:URL?):Jbr? {
 			return@run javaArchive
 		}
 		val url = (overrideRepoUrl ?: jbrArtifact.defaultRepoUrl) / "archiveName"
-		if (httpGetFile(url, javaArchive)) {
+		if (httpGetFile(url, javaArchive, progressListener)) {
 			return@run javaArchive
 		} else {
 			LOG.warn("Could not download JetBrains Java Runtime {} from {}", artifactName, url)
