@@ -1,5 +1,6 @@
 package wemi.dependency
 
+import wemi.boot.WemiSystemCacheFolder
 import wemi.util.div
 import java.net.URL
 import java.nio.file.Path
@@ -11,7 +12,7 @@ val LocalM2Repository = Repository("local", Paths.get(System.getProperty("user.h
 /** Construct a path to the cache directory for a repository named [repositoryName]. */
 fun repositoryCachePath(repositoryName:String): Path {
     val safePath = StringBuilder()
-    safePath.append(".wemi/maven-cache/")
+    safePath.append("maven-cache/")
     for (c in repositoryName) {
         // https://superuser.com/questions/358855/what-characters-are-safe-in-cross-platform-file-names-for-linux-windows-and-os
         if (c in "\\/:*?\"<>|" || Character.isISOControl(c)) {
@@ -21,7 +22,7 @@ fun repositoryCachePath(repositoryName:String): Path {
         }
     }
     safePath.append('/')
-    return Paths.get(System.getProperty("user.home")) / safePath
+    return WemiSystemCacheFolder / safePath
 }
 
 /** Maven Central repository at [maven.org](https://maven.org). Cached by [LocalM2Repository]. */

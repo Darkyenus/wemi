@@ -585,7 +585,7 @@ sealed class BindingHolder : WithDescriptiveString {
     }
     //endregion
 
-    //region CompilerFlags utility methods
+    //region Specific utility methods
     /**
      * Modify [CompilerFlags] to set the given compiler [flag] to the given [value]
      * that will be evaluated as if it was a key binding.

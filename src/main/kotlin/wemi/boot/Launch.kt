@@ -35,6 +35,7 @@ import wemi.util.directorySynchronized
 import wemi.util.div
 import wemi.util.format
 import wemi.util.include
+import wemi.util.isDirectory
 import wemi.util.matchingFiles
 import java.io.BufferedReader
 import java.io.File
@@ -120,6 +121,10 @@ lateinit var WemiBuildFolder: Path
 
 /** ./build/cache folder */
 lateinit var WemiCacheFolder: Path
+    private set
+
+/** ~/.wemi folder */
+lateinit var WemiSystemCacheFolder: Path
     private set
 
 const val WemiBuildScriptProjectName = "wemi-build"
@@ -260,6 +265,18 @@ fun main(args: Array<String>) {
     WemiBuildFolder = buildDirectory
     WemiCacheFolder = cacheDirectory
     WemiReloadSupported = reloadSupported
+
+    WemiSystemCacheFolder = run {
+        val userHomePath = System.getProperty("user.home")
+        if (userHomePath.isNullOrBlank()) {
+            return@run WemiRootFolder / ".wemi"
+        }
+        val userHome = Paths.get(userHomePath)
+        if (!userHome.isDirectory()) {
+            return@run WemiRootFolder / ".wemi"
+        }
+        userHome / ".wemi"
+    }
 
     TPLogger.attachUnhandledExceptionLogger()
     JavaLoggingIntegration.enable()

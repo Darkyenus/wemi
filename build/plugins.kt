@@ -65,10 +65,10 @@ val pluginIntellij by project(path("plugins/intellij")) {
 
     repositories add { JCenter }
     repositories add { Repository("jetbrains-bintray-intellij-plugin-service", "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service") }
-    //libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-base:3.139") }
-    //libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-intellij:3.139") }
-    //libraryDependencies add { dependency("org.jetbrains.intellij:blockmap:1.0.5", exclusions = listOf(DependencyExclusion(group = "org.jetbrains.kotlin"))) }
-    //libraryDependencies add { dependency("org.jetbrains.intellij:plugin-repository-rest-client:2.0.15", exclusions = listOf(DependencyExclusion(group = "org.jetbrains.kotlin"))) }
+    libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-base:3.139") }
+    libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-intellij:3.139") }
+    libraryDependencies add { dependency("org.jetbrains.intellij:blockmap:1.0.5", exclusions = listOf(DependencyExclusion(group = "org.jetbrains.kotlin"))) }
+    libraryDependencies add { dependency("org.jetbrains.intellij:plugin-repository-rest-client:2.0.15", exclusions = listOf(DependencyExclusion(group = "org.jetbrains.kotlin"))) }
 
     libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
     libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }

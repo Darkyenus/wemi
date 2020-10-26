@@ -14,7 +14,7 @@ import wemi.util.absolutePath
 import wemi.util.div
 import wemi.util.ensureEmptyDirectory
 import wemi.util.matchingLocatedFiles
-import wemiplugin.intellij.tasks.RunIdeTask.runIde
+import wemiplugin.intellij.runIde
 import wemiplugin.intellij.utils.Utils.ideBuildNumber
 import wemiplugin.intellij.utils.Utils.ideSdkDirectory
 import java.nio.file.Path
@@ -37,7 +37,7 @@ object SearchableOptionsTask {
 			val cacheDir = Keys.cacheDirectory.get()
 			val outputDir = cacheDir / "-intellij-searchable-options"
 			outputDir.ensureEmptyDirectory()
-			runIde(false, listOf("traverseUI", outputDir.absolutePath, "true"))
+			runIde(listOf("traverseUI", outputDir.absolutePath, "true"))
 
 			// Now package it
 			val jar = outputDir / "searchableOptions.jar"
@@ -55,7 +55,6 @@ object SearchableOptionsTask {
 	/*private static void configureJarSearchableOptionsTask(@NotNull Project project) {
 		Utils.info(project, "Configuring jar searchable options task")
 		project.tasks.create(JAR_SEARCHABLE_OPTIONS_TASK_NAME, JarSearchableOptionsTask).with {
-			group = GROUP_NAME
 			description = "Jars searchable options."
 			if (VersionNumber.parse(project.gradle.gradleVersion) >= VersionNumber.parse("5.1")) {
 				archiveBaseName.set('lib/searchableOptions')

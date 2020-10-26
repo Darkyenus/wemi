@@ -12,8 +12,17 @@ log "Working from home: $wemi_home"
 wemi_version=$(./wemi --machine-readable-output=shell wemi/projectVersion) || fail "wemi ($?) (version)"
 log "Wemi version: $wemi_version"
 
+task="wemi/distributionArchive"
+if [ "$1" = "--skipTest" ]; then
+	task="wemi/distributionArchive skipTest=true"
+fi
+
 # Build the archive files in Wemi
-wemi_dist_dir=$(./wemi --machine-readable-output=shell wemi/distributionArchive) || fail "wemi ($?) (archive)"
+wemi_dist_dir=$(./wemi --machine-readable-output=shell "$task") || fail "wemi ($?) (archive)"
+
+if [ "$1" = "--skipTest" ]; then
+	exit 0
+fi
 
 # Copy IDE plugins
 intellij_plugin_path="${wemi_home}/ide-plugins/WemiForIntelliJ/WemiForIntelliJ.zip"

@@ -1,7 +1,9 @@
 package wemiplugin.intellij.dependency
 
 import wemi.util.isDirectory
+import wemiplugin.intellij.utils.Utils
 import java.nio.file.Path
+import java.util.stream.Collectors
 
 /**
  *
@@ -9,7 +11,7 @@ import java.nio.file.Path
 class IdeaExtraDependency(val name:String, val classes:Path) {
 
 	val jarFiles:Collection<Path> = if (classes.isDirectory()) {
-		Utils.collectJars(classes, { file -> true })
+		Utils.collectJars(classes).collect(Collectors.toList())
 	} else {
 		setOf(classes)
 	}

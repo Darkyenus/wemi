@@ -1,33 +1,32 @@
 package wemiplugin.intellij.utils
 
+import Files
+import Keys
+import com.jetbrains.plugin.structure.base.plugin.PluginCreationFail
+import com.jetbrains.plugin.structure.base.plugin.PluginCreationSuccess
+import com.jetbrains.plugin.structure.base.plugin.PluginProblem
+import com.jetbrains.plugin.structure.intellij.plugin.IdePlugin
+import com.jetbrains.plugin.structure.intellij.plugin.IdePluginManager
 import org.slf4j.LoggerFactory
 import wemi.EvalScope
 import wemi.KeyDefaults.inProjectDependencies
-import wemi.Project
 import wemi.dependency.internal.OS_FAMILY
 import wemi.dependency.internal.OS_FAMILY_MAC
 import wemi.util.LocatedPath
 import wemi.util.absolutePath
 import wemi.util.div
 import wemi.util.exists
+import wemi.util.isRegularFile
 import wemi.util.jdkToolsJar
-import wemi.util.matchingLocatedFiles
 import wemi.util.name
 import wemi.util.pathHasExtension
 import wemiplugin.intellij.IntelliJ
-import wemiplugin.intellij.dependency.IntellijIvyArtifact
-import wemiplugin.intellij.dependency.PluginDependencyNotation
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileReader
 import java.io.IOException
-import java.io.InputStream
 import java.nio.file.Path
 import java.util.*
-import java.util.function.Predicate
 import java.util.regex.Pattern
+import java.util.stream.Stream
 import kotlin.collections.ArrayList
-import kotlin.collections.HashSet
 
 /**
  *
@@ -37,22 +36,6 @@ object Utils {
 	private val LOG = LoggerFactory.getLogger(Utils.javaClass)
 
 	val VERSION_PATTERN = Pattern.compile("^([A-Z]{2})-([0-9.A-z]+)\\s*$")
-
-	fun createJarDependency(file: File, configuration:String, baseDir:File, classifier:String? = null):IvyArtifact {
-		return createDependency(baseDir, file, configuration, "jar", "jar", classifier)
-	}
-
-	fun createDirectoryDependency(file:File, configuration:String, baseDir:File, classifier:String? = null):IvyArtifact {
-		return createDependency(baseDir, file, configuration, "", "directory", classifier)
-	}
-
-	private fun createDependency(baseDir:File, file:File, configuration:String, extension:String, type:String, classifier:String):IvyArtifact {
-		val relativePath = baseDir.toURI().relativize(file.toURI()).getPath()
-		val name = extension ? relativePath - ".$extension" : relativePath
-		val artifact = IntellijIvyArtifact(file, name, extension, type, classifier)
-		artifact.conf = configuration
-		return artifact
-	}
 
 	fun EvalScope.sourcePluginXmlFiles(validate:Boolean = true):List<LocatedPath> {
 		return Keys.resources.getLocatedPaths().filter {
@@ -75,15 +58,9 @@ object Utils {
 		return result
 	}
 
+	// TODO(jp): This should be built-int into ideaDependency resolution!
 	fun EvalScope.ideSdkDirectory():Path {
-		val path = IntelliJ.alternativeIdePath?.let { ideaDir(it) }
-		val usedPath = if (path == null || !path.exists()) {
-			IntelliJ.ideaDependency.get().classes
-		} else path
-		if (path != null && usedPath != path) {
-			LOG.warn("Cannot find alternate SDK path: {}. Default IDE will be used: {}", path, usedPath)
-		}
-		return usedPath
+		return IntelliJ.resolvedIntellijIdeDependency.get().classes
 	}
 
 	fun ideBuildNumber(ideDirectory: Path):String {
@@ -124,13 +101,8 @@ object Utils {
 
 	fun isZipFile(file:Path):Boolean = file.name.pathHasExtension("zip")
 
-	fun collectJars(directory:File, filter: Predicate<File>):Collection<File> {
-		return FileUtils.listFiles(directory, new AbstractFileFilter() {
-			@Override
-			boolean accept(File file) {
-				return isJarFile(file) && filter.test(file)
-			}
-		}, FalseFileFilter.FALSE)
+	fun collectJars(directory:Path): Stream<Path> {
+		return Files.list(directory).filter { it.isRegularFile() && it.name.pathHasExtension("jar") }
 	}
 
 	// TODO(jp): Make it take javaHome and remove it, if possible
@@ -154,32 +126,6 @@ object Utils {
 		return null
 	}
 
-	fun unzip(zipFile:Path, cacheDirectory:Path, project:Project, isUpToDate:Predicate<File>?, markUpToDate:BiConsumer<File, File>?, targetDirName:String? = null):Path {
-		def targetDirectory = new File(cacheDirectory, targetDirName ?: zipFile.name - ".zip")
-		def markerFile = new File(targetDirectory, "markerFile")
-		if (markerFile.exists() && (isUpToDate == null || isUpToDate.test(markerFile))) {
-			return targetDirectory
-		}
-
-		if (targetDirectory.exists()) {
-			targetDirectory.deleteDir()
-		}
-		targetDirectory.mkdir()
-
-		debug(project, "Unzipping ${zipFile.name}")
-		project.copy {
-			it.from(project.zipTree(zipFile))
-			it.into(targetDirectory)
-		}
-		debug(project, "Unzipped ${zipFile.name}")
-
-		markerFile.createNewFile()
-		if (markUpToDate != null) {
-			markUpToDate.accept(targetDirectory, markerFile)
-		}
-		return targetDirectory
-	}
-
 	private val MAJOR_VERSION_PATTERN = Pattern.compile("(RIDER-)?\\d{4}\\.\\d-SNAPSHOT")
 
 	fun releaseType(version:String):String {
@@ -192,17 +138,36 @@ object Utils {
 		return "releases"
 	}
 
-	fun createPlugin(artifact:File, validatePluginXml:Boolean):IdePlugin {
-		val creationResult = IdePluginManager.createManager().createPlugin(artifact.toPath(), validatePluginXml, IdePluginManager.PLUGIN_XML)
-		if (creationResult is PluginCreationSuccess) {
-			return creationResult.plugin as IdePlugin
-		} else if (creationResult instanceof PluginCreationFail) {
-			val problems = creationResult.errorsAndWarnings.findAll { it.level == PluginProblem.Level.ERROR }.join(", ")
-			warn(loggingContext, "Cannot create plugin from file ($artifact): $problems")
-		} else {
-			warn(loggingContext, "Cannot create plugin from file ($artifact). $creationResult")
+	fun createPlugin(artifact:Path, validatePluginXml:Boolean, logProblems:Boolean): IdePlugin? {
+		if (!artifact.exists()) {
+			if (logProblems) {
+				LOG.warn("Cannot create plugin from {}: file does not exist", artifact)
+			}
+			return null
 		}
-		return null
+		return when (val creationResult = IdePluginManager.createManager().createPlugin(artifact, validatePluginXml)) {
+			is PluginCreationSuccess -> {
+				val warnings = creationResult.warnings
+				if (logProblems && warnings.isNotEmpty()) {
+					LOG.warn("{} warning(s) on plugin from {}", warnings.size, artifact)
+					for (warning in warnings) {
+						LOG.warn("{}", warning)
+					}
+				}
+				creationResult.plugin
+			}
+			is PluginCreationFail -> {
+				if (logProblems) {
+					val warningCount = creationResult.errorsAndWarnings.count { it.level == PluginProblem.Level.WARNING }
+					val errorCount = creationResult.errorsAndWarnings.size - warningCount
+					LOG.warn("Cannot create plugin from {}: {} error(s) and {} warning(s)", artifact, errorCount, warningCount)
+					for (problem in creationResult.errorsAndWarnings) {
+						LOG.warn("{}", problem)
+					}
+				}
+				null
+			}
+		}
 	}
 
 }

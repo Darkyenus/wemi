@@ -2,7 +2,12 @@ package wemiplugin.intellij.dependency
 
 import wemi.util.div
 import wemi.util.isDirectory
+import wemi.util.name
+import wemi.util.pathWithoutExtension
+import wemiplugin.intellij.isKotlinRuntime
+import wemiplugin.intellij.utils.Utils
 import java.nio.file.Path
+import java.util.stream.Collectors
 
 /**
  *
@@ -13,7 +18,7 @@ open class IdeaDependency(
 		val version:String,
 		val buildNumber:String,
 		val classes: Path,
-		val sources:Path?,
+		val sources:List<Path>,
 		val withKotlin:Boolean,
 		@Transient
 		val pluginsRegistry : BuiltinPluginsRegistry,
@@ -26,30 +31,14 @@ open class IdeaDependency(
 	open val ivyRepositoryDirectory:Path?
 		get() = classes
 
-	val fqn:String
-		get() {
-			val fqn = StringBuilder()
-			fqn.append(name).append('-').append(version)
-			if (withKotlin) {
-				fqn.append("-withKotlin")
-			}
-			if (sources != null) {
-				fqn.append("-withSources")
-			}
-			fqn.append("-withoutAnnotations")
-			return fqn.toString()
-		}
-
 	protected open fun collectJarFiles():Collection<Path> {
-		if (classes.isDirectory()) {
-			val lib = classes / "lib"
-			if (lib.isDirectory()) {
-				return Utils.collectJars(lib, { file ->
-					return (withKotlin || !IdeaDependencyManager.isKotlinRuntime(file.name - '.jar')) &&
-							file.name != 'junit.jar' &&
-							file.name != 'annotations.jar'
-				}).sort()
-			}
+		val lib = classes / "lib"
+		if (lib.isDirectory()) {
+			return Utils.collectJars(lib).filter {
+				val name = it.name
+				(withKotlin || !isKotlinRuntime(name.pathWithoutExtension())) &&
+						name != "junit.jar" && name != "annotations.jar"
+			}.sorted().collect(Collectors.toList())
 		}
 		return emptySet()
 	}
@@ -76,7 +65,7 @@ open class IdeaDependency(
 		result = 31 * result + version.hashCode()
 		result = 31 * result + buildNumber.hashCode()
 		result = 31 * result + classes.hashCode()
-		result = 31 * result + (sources?.hashCode() ?: 0)
+		result = 31 * result + sources.hashCode()
 		result = 31 * result + withKotlin.hashCode()
 		result = 31 * result + pluginsRegistry.hashCode()
 		result = 31 * result + extraDependencies.hashCode()
@@ -87,4 +76,41 @@ open class IdeaDependency(
 	override fun toString(): String {
 		return "IdeaDependency(name='$name', version='$version', buildNumber='$buildNumber', classes=$classes, sources=$sources, withKotlin=$withKotlin, pluginsRegistry=$pluginsRegistry, extraDependencies=$extraDependencies, jarFiles=$jarFiles)"
 	}
+}
+
+
+/**
+ *
+ */
+class JpsIdeaDependency(
+		version: String,
+		buildNumber: String,
+		classes: Path,
+		sources: List<Path>,
+		withKotlin: Boolean)
+	: IdeaDependency("ideaJPS", version, buildNumber, classes, sources, withKotlin, BuiltinPluginsRegistry(classes), emptyList()) {
+
+	override fun collectJarFiles(): Collection<Path> {
+		return super.collectJarFiles().filter { ALLOWED_JAR_NAMES.contains(it.name) }
+	}
+
+	companion object {
+		val ALLOWED_JAR_NAMES = setOf("jps-builders.jar", "jps-model.jar", "util.jar")
+	}
+}
+
+
+/**
+ *
+ */
+class LocalIdeaDependency(
+		name: String, version: String, buildNumber: String,
+		classes: Path, sources: List<Path>,
+		withKotlin: Boolean,
+		pluginsRegistry: BuiltinPluginsRegistry,
+		extraDependencies: Collection<IdeaExtraDependency>)
+	: IdeaDependency(name, version, buildNumber, classes, sources, withKotlin, pluginsRegistry, extraDependencies) {
+
+	override val ivyRepositoryDirectory: Path?
+		get() = if (version.endsWith(".SNAPSHOT")) null else super.ivyRepositoryDirectory
 }

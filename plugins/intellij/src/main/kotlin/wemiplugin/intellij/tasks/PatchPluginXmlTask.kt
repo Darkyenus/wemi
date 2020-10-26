@@ -1,6 +1,7 @@
 package wemiplugin.intellij.tasks
 
 import Keys
+import com.jetbrains.plugin.structure.intellij.version.IdeVersion
 import org.slf4j.LoggerFactory
 import wemi.BindingHolder
 import wemi.KeyDefaults
@@ -53,17 +54,10 @@ object PatchPluginXmlTask {
 			val namePatch = Keys.projectName.getOrElse(null)?.let { Patch("name", content = it) }
 			val idPatch = Keys.projectGroup.getOrElse(null)?.let { Patch("id", content = it) }
 			val versionPatch = Keys.projectVersion.getOrElse(null)?.let { Patch("version", content = it) }
+			val ideVersion = IdeVersion.createIdeVersion(IntelliJ.resolvedIntellijIdeDependency.get().buildNumber)
 
-			val intelliJVersion = IntelliJ.intellijVersion.getOrElse(null)
-			// TODO(jp): Use this:
-			//   def ideVersion = IdeVersion.createIdeVersion(extension.ideaDependency.buildNumber)
-			//                    return "$ideVersion.baselineVersion.$ideVersion.build".toString()
-			val sinceBuildPatch = intelliJVersion?.let { Patch("idea-version", attribute = "since-build", content = it) }
-			// TODO(jp): Base this on the baselineVersion of intelliJVersion
-			//   def ideVersion = IdeVersion.createIdeVersion(extension.ideaDependency.buildNumber)
-			//                    return extension.sameSinceUntilBuild ? "${getSinceBuild()}.*".toString()
-			//                            : "$ideVersion.baselineVersion.*".toString()
-			val untilBuildPatch = intelliJVersion?.let { Patch("idea-version", attribute = "since-build", content = "$it.*") }
+			val sinceBuildPatch = Patch("idea-version", attribute = "since-build", content = "${ideVersion.baselineVersion}.${ideVersion.build}")
+			val untilBuildPatch = Patch("idea-version", attribute = "since-build", content = "${ideVersion.baselineVersion}.*")
 
 			// TODO(jp): Also handle module dependencies
 

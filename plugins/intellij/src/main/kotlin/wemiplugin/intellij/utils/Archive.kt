@@ -12,6 +12,8 @@ import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStre
 import org.slf4j.LoggerFactory
 import wemi.util.div
 import wemi.util.ensureEmptyDirectory
+import wemi.util.isDirectory
+import wemi.util.lastModifiedMillis
 import wemi.util.name
 import wemi.util.pathHasExtension
 import java.io.BufferedInputStream
@@ -187,6 +189,30 @@ private fun copyTarAttributes(entry: TarArchiveEntry, file: Path) {
 		}
 	}
 	// Ignoring owner, group and other stuff, it is not important for our use-case
+}
+
+/**
+ * @return true if just unzipped, false if the cache was still fresh
+ */
+fun unZipIfNew(zipFile: Path, outputDirectory: Path, allowOutsideLinks: Boolean = false, existenceIsEnough:Boolean = false):Boolean {
+	if (existenceIsEnough) {
+		if (!outputDirectory.isDirectory()) {
+			unZip(zipFile, outputDirectory, allowOutsideLinks)
+			return true
+		}
+	} else {
+		val markerFile = outputDirectory / ".wemi_unzip_marker"
+		val markerMod = markerFile.lastModifiedMillis()
+		val zipMod = zipFile.lastModifiedMillis()
+		if (markerMod < 0L || markerMod < zipMod) {
+			unZip(zipFile, outputDirectory, allowOutsideLinks)
+			Files.deleteIfExists(markerFile)
+			Files.createFile(markerFile)
+			return true
+		}
+	}
+
+	return false
 }
 
 fun unZip(zipFile: Path, outputDirectory: Path, allowOutsideLinks: Boolean = false) {

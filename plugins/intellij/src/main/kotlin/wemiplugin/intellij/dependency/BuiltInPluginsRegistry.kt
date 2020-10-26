@@ -1,41 +1,77 @@
 package wemiplugin.intellij.dependency
 
+import Files
 import org.slf4j.LoggerFactory
 import wemi.util.div
-import wemi.util.exists
 import wemi.util.isDirectory
+import wemi.util.name
+import wemiplugin.intellij.utils.Utils
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 
 /**
  *
  */
 class BuiltinPluginsRegistry (private val pluginsDirectory: Path) {
 
-	private val plugins = HashMap<String, Plugin>()
+	private val pluginsById = HashMap<String, Plugin>()
 	private val directoryNameMapping = HashMap<String, String>()
 
+	private fun cacheFile():Path {
+		return pluginsDirectory / "builtinRegistry.bin"
+	}
 
 	private fun fillFromCache():Boolean {
 		val cache = cacheFile()
-		if (!cache.exists()) {
-			return false
-		}
-
-		LOG.debug("Builtin registry cache is found. Loading from {}", cache)
 		try {
-			Utils.parseXml(cache).children().forEach { node ->
-				def dependencies = node.dependencies.first().dependency*.text() as Collection<String>
-				plugins.put(node.@id, new Plugin(node.@id, node.@directoryName, dependencies))
-				directoryNameMapping.put(node.@directoryName, node.@id)
+			DataInputStream(BufferedInputStream(Files.newInputStream(cache))).use { inp ->
+				LOG.debug("Builtin registry cache is found. Loading from {}", cache)
+
+				for (i in 0 until inp.readInt()) {
+					val id = inp.readUTF()
+					val directoryName = inp.readUTF()
+					val dependenciesSize = inp.readInt()
+					val dependencies = ArrayList<String>(dependenciesSize)
+					for (d in 0 until dependenciesSize) {
+						dependencies.add(inp.readUTF())
+					}
+					pluginsById[id] = Plugin(id, directoryName, dependencies)
+				}
 			}
 			return true
-		} catch (Throwable t) {
-			Utils.warn(loggingContext, "Cannot read builtin registry cache", t)
+		} catch (e:FileNotFoundException) {
+			return false
+		} catch (e:Exception) {
+			LOG.warn("Failed to read builtin plugin cache from {}", cache, e)
 			return false
 		}
 	}
 
+	private fun dumpToCache() {
+		LOG.debug("Dumping cache for builtin plugin")
+		val cacheFile = cacheFile()
+		try {
+			DataOutputStream(BufferedOutputStream(Files.newOutputStream(cacheFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))).use { out ->
+				out.writeInt(pluginsById.size)
+				for (plugin in pluginsById.values) {
+					out.writeUTF(plugin.id)
+					out.writeUTF(plugin.directoryName)
+					out.writeInt(plugin.dependencies.size)
+					for (dependency in plugin.dependencies) {
+						out.writeUTF(dependency)
+					}
+				}
+			}
+		} catch (e:Exception) {
+			LOG.warn("Failed to dump cache to {} for builtin plugin", cacheFile, e)
+		}
+	}
 
 	private fun fillFromDirectory() {
 		try {
@@ -47,41 +83,11 @@ class BuiltinPluginsRegistry (private val pluginsDirectory: Path) {
 		} catch (e: IOException) {
 			LOG.debug("Failed to read {}", pluginsDirectory, e)
 		}
-		LOG.debug("Builtin registry populated with {} plugins", plugins.size)
-	}
-
-	private fun dumpToCache() {
-		LOG.debug("Dumping cache for builtin plugin")
-		val cacheFile = cacheFile()
-		def writer = null
-		try {
-			writer = new FileWriter(cacheFile)
-			new MarkupBuilder(writer).plugins {
-				for (p in plugins) {
-					plugin(id: p.key, directoryName: p.value.directoryName) {
-						dependencies {
-							for (def d in p.value.dependencies) {
-							dependency(d)
-						}
-						}
-					}
-				}
-			}
-		} catch (Throwable t) {
-			Utils.warn(loggingContext, "Failed to dump cache for builtin plugin", t)
-		} finally {
-			if (writer != null) {
-				writer.close()
-			}
-		}
-	}
-
-	private fun cacheFile():Path {
-		return pluginsDirectory / "builtinRegistry.xml"
+		LOG.debug("Builtin registry populated with {} plugins", pluginsById.size)
 	}
 
 	fun findPlugin(name:String):Path? {
-		val plugin = plugins[name] ?: plugins[directoryNameMapping[name]]
+		val plugin = pluginsById[name] ?: pluginsById[directoryNameMapping[name]]
 		if (plugin != null) {
 			val result = pluginsDirectory / plugin.directoryName
 			return if (result.isDirectory()) result else null
@@ -94,7 +100,7 @@ class BuiltinPluginsRegistry (private val pluginsDirectory: Path) {
 		val result = HashSet<String>()
 		while (idsToProcess.isNotEmpty()) {
 			val id = idsToProcess.removeAt(0)
-			val plugin = plugins[id] ?: plugins[directoryNameMapping[id]]
+			val plugin = pluginsById[id] ?: pluginsById[directoryNameMapping[id]]
 			if (plugin != null && result.add(id)) {
 				idsToProcess.addAll(plugin.dependencies - result)
 			}
@@ -103,17 +109,13 @@ class BuiltinPluginsRegistry (private val pluginsDirectory: Path) {
 	}
 
 	fun add(artifact:Path) {
-		LOG.debug("Adding directory to plugins index: {})", artifact)
-		val intellijPlugin = Utils.createPlugin(artifact, false, loggingContext)
-		if (intellijPlugin != null) {
-			def dependencies = intellijPlugin.dependencies
-					.findAll { !it.optional }
-					.collect { it.id }
-			def plugin = new Plugin(intellijPlugin.pluginId, artifact.name, dependencies)
-			plugins.put(intellijPlugin.pluginId, plugin)
-			if (plugin.directoryName != plugin.id) {
-				directoryNameMapping.put(plugin.directoryName, plugin.id)
-			}
+		LOG.debug("Adding directory to plugins index: {}", artifact)
+		val intellijPlugin = Utils.createPlugin(artifact, validatePluginXml = false, logProblems = false) ?: return
+		val dependencies = intellijPlugin.dependencies.filterNot { it.isOptional }.map { it.id }
+		val plugin = Plugin(intellijPlugin.pluginId!!, artifact.name, dependencies)
+		pluginsById[plugin.id] = plugin
+		if (plugin.directoryName != plugin.id) {
+			directoryNameMapping[plugin.directoryName] = plugin.id
 		}
 	}
 
