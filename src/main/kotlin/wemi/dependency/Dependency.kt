@@ -395,7 +395,7 @@ class ResolvedDependency private constructor(
         val dependencies: List<Dependency>,
         /** In which (non-cache) repository was [id] ultimately found in */
         val resolvedFrom: Repository?,
-        /** May contain a message explaining why did the dependency failed to resolve, if [hasError] */
+        /** May contain a message explaining why did the dependency failed to resolve, not null iff [hasError] */
         val log: CharSequence?,
         /** If the artifact has been resolved to a file in a local filesystem, it is here. */
         val artifact:ArtifactPath?

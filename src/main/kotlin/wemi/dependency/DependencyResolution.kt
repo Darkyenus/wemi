@@ -17,6 +17,15 @@ fun resolveDependencyArtifacts(dependencies: Collection<Dependency>, repositorie
     val (resolved, ok ) = resolveDependencies(dependencies, repositories, progressListener = progressListener)
 
     if (!ok) {
+        for (value in resolved.values) {
+            val log = value.log ?: continue
+            val repo = value.resolvedFrom
+            if (repo == null) {
+                LOG.warn("Artifact resolution failure in {}: {}", value.id, log)
+            } else {
+                LOG.warn("Artifact resolution failure in {} from {}: {}", value.id, repo, log)
+            }
+        }
         return null
     }
 

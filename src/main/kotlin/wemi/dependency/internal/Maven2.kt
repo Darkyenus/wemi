@@ -422,10 +422,14 @@ private fun resolveInM2Repository(
             retrievedArtifact.data = null
             return RawResolvedDependency(resolvedDependencyId, pom.dependencies, repository, retrievedArtifact)
         }, { failure ->
+            if (pom.packaging.isNotBlank() && !extension.equals(pom.packaging, ignoreCase = true)) {
+                LOG.info("Retrieving {}, which maps to file extension {}, failed, while the remote POM uses {} packaging - maybe the type is wrong?", resolvedDependencyId, extension, pom.packaging)
+            }
+
             if (retrievedPom.path.possibleAlternateRepositories.isNotEmpty()) {
                 usedRepositories = retrievedPom.path.possibleAlternateRepositories.toList()
             } else {
-                LOG.warn("Failed to retrieve file at '{}' in {}", filePath, compatibleRepositories)
+                LOG.debug("Failed to retrieve file at '{}' in {}", filePath, compatibleRepositories)
                 return RawResolvedDependency(resolvedDependencyId, failure)
             }
         })
