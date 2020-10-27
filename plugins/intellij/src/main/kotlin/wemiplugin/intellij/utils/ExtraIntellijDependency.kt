@@ -1,0 +1,5 @@
+package wemiplugin.intellij.utils
+
+/**
+ * 
+ */
