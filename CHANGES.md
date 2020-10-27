@@ -5,6 +5,8 @@
 - Internal robustness improvements in handling broken dependencies and Maven version ranges
 - Add `runSystemProperties` key for easier handling of Java's system properties. The properties are included into `runOptions` by default.
 - Having multiple keys with the same name should no longer completely break the build
+- Maven dependency resolver now checks `WEMI_MAVEN_OS_NAME`, `WEMI_MAVEN_OS_ARCH`, `WEMI_MAVEN_OS_VERSION` and `WEMI_MAVEN_OS_FAMILY`
+    environment variables to detect relevant profile activation properties
 
 # 0.13 2020-06-23
 - Add utility functions for source file and classpath generation, see the `wemi.generation` package

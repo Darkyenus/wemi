@@ -19,11 +19,11 @@ const val OS_FAMILY_ZOS = "z/os"
 const val OS_FAMILY_OS400 = "os/400"
 const val OS_FAMILY_OPENVMS = "openvms"
 
-val OS_NAME:String = System.getProperty("os.name").toLowerCase(Locale.US)
-val OS_ARCH:String = System.getProperty("os.arch").toLowerCase(Locale.US)
-val OS_VERSION:String = System.getProperty("os.version").toLowerCase(Locale.US)
+val OS_NAME:String = System.getenv("WEMI_MAVEN_OS_NAME") ?: System.getProperty("os.name").toLowerCase(Locale.US)
+val OS_ARCH:String = System.getenv("WEMI_MAVEN_OS_ARCH") ?: System.getProperty("os.arch").toLowerCase(Locale.US)
+val OS_VERSION:String = System.getenv("WEMI_MAVEN_OS_VERSION") ?: System.getProperty("os.version").toLowerCase(Locale.US)
 
-val OS_FAMILY:String = run {
+val OS_FAMILY:String = System.getenv("WEMI_MAVEN_OS_FAMILY") ?: run {
 	val pathSeparator = System.getProperty("path.separator")
 	val osName = OS_NAME
 
