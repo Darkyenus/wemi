@@ -615,8 +615,8 @@ fun Path.copyRecursively(to:Path, vararg options:CopyOption) {
 /**
  * Similar to [copyRecursively], but only soft-links if that is enough.
  */
-fun Path.linkOrCopyRecursively(to:Path, vararg options:CopyOption) {
-    if (!Files.exists(this)) {
+fun Path.linkOrCopyRecursively(to:Path, vararg options:CopyOption, skipIfDestinationExists:Boolean = true) {
+    if (!Files.exists(this) || (skipIfDestinationExists && Files.exists(to))) {
         return
     }
     Files.createDirectories(to.parent)

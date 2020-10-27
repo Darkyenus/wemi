@@ -24,8 +24,6 @@ import wemi.util.matchingLocatedFiles
 import wemi.util.name
 import wemi.util.pathHasExtension
 import wemi.util.toSafeFileName
-import wemiplugin.intellij.utils.Utils
-import wemiplugin.intellij.utils.Utils.ideSdkDirectory
 import java.nio.file.Path
 
 
@@ -43,6 +41,7 @@ enum class Strictness {
 val DefaultIntelliJPluginFolder : Value<Path> = {
 	val pluginName = IntelliJ.intellijPluginName.get().toSafeFileName()
 	val pluginDir = Keys.cacheDirectory.get() / "-intellij-plugin-archive" / pluginName
+	pluginDir.ensureEmptyDirectory()
 	val pluginLibDir = pluginDir / "lib"
 	Files.createDirectories(pluginLibDir)
 
@@ -51,13 +50,13 @@ val DefaultIntelliJPluginFolder : Value<Path> = {
 	}
 
 	val pluginJar = Keys.archive.get()
-	if (pluginJar == null || !pluginJar.isRegularFile() || pluginJar.name.pathHasExtension("jar")) {
+	if (pluginJar == null || !pluginJar.isRegularFile() || !pluginJar.name.pathHasExtension("jar")) {
 		throw WemiException("Archive must produce a jar, got: $pluginJar")
 	}
 
-	pluginJar.linkOrCopyRecursively(pluginDir / pluginJar.name)
+	pluginJar.linkOrCopyRecursively(pluginLibDir / pluginJar.name)
 	for (path in externalClasspath) {
-		path.linkOrCopyRecursively(pluginDir / path.name)
+		path.linkOrCopyRecursively(pluginLibDir / path.name)
 	}
 
 	val strictness = IntelliJ.intellijVerifyPluginStrictness.get()
@@ -86,11 +85,11 @@ val DefaultIntelliJPluginFolder : Value<Path> = {
 		}
 	}
 
-	pluginJar
+	pluginDir
 }
 
 val DefaultIntelliJSearchableOptions : Value<Path?> = v@{
-	val buildNumber = Utils.ideBuildNumber(ideSdkDirectory())
+	val buildNumber = IntelliJ.resolvedIntellijIdeDependency.get().buildNumber
 	if (Version(buildNumber.takeWhile { it != '-' }) < Version("191.2752")) {
 		return@v null
 	}
@@ -164,11 +163,11 @@ val DefaultIntelliJPluginArchive : Value<Path> = {
 	val zip = folder.parent / "${folder.name}.zip"
 	AssemblyOperation().use {
 		for (file in FileSet(folder).matchingLocatedFiles()) {
-			it.addSource(file, true)
+			it.addSource(file, true, extractJarEntries = false)
 		}
 		if (searchableOptions != null) {
 			// TODO(jp): This path is probably wrong
-			it.addSource(LocatedPath(searchableOptions), true)
+			it.addSource(LocatedPath(searchableOptions), true, extractJarEntries = false)
 		}
 		it.assembly(NoConflictStrategyChooser, DefaultRenameFunction, DefaultAssemblyMapFilter, zip, NoPrependData, true)
 	}

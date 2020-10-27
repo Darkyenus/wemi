@@ -1,5 +1,6 @@
 package wemiplugin.intellij
 
+import Files
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
 import wemi.Configurations
@@ -9,6 +10,7 @@ import wemi.boot.WemiCacheFolder
 import wemi.dependency
 import wemi.dependency.Repository
 import wemi.dependency.internal.OS_FAMILY
+import wemi.dependency.internal.OS_FAMILY_MAC
 import wemi.dependency.internal.OS_FAMILY_WINDOWS
 import wemi.dependency.resolveDependencyArtifacts
 import wemi.util.div
@@ -16,17 +18,16 @@ import wemi.util.executable
 import wemi.util.exists
 import wemi.util.isDirectory
 import wemi.util.name
+import wemi.util.pathHasExtension
 import wemi.util.pathWithoutExtension
 import wemi.util.toSafeFileName
 import wemiplugin.intellij.dependency.BuiltinPluginsRegistry
-import wemiplugin.intellij.dependency.IdeaDependency
 import wemiplugin.intellij.dependency.IdeaExtraDependency
-import wemiplugin.intellij.dependency.JpsIdeaDependency
-import wemiplugin.intellij.dependency.LocalIdeaDependency
 import wemiplugin.intellij.utils.Utils
 import wemiplugin.intellij.utils.unZipIfNew
 import java.net.URL
 import java.nio.file.Path
+import java.util.stream.Collectors
 
 private val LOG = LoggerFactory.getLogger("ResolveIDE")
 
@@ -49,7 +50,19 @@ sealed class IntelliJIDE {
 	data class External(val type:String = "IC", val version:String = "LATEST-EAP-SNAPSHOT") : IntelliJIDE()
 }
 
-fun defaultIdeDependency(downloadSources:Boolean): Value<IdeaDependency> = {
+class ResolvedIntelliJIDE(
+		val buildNumber:String,
+		val homeDir: Path,
+		val sources:List<Path>,
+		val pluginsRegistry : BuiltinPluginsRegistry,
+		val extraDependencies:Collection<IdeaExtraDependency>,
+		val jarFiles:Collection<Path>) {
+	override fun toString(): String {
+		return "IdeaDependency(buildNumber='$buildNumber', classes=$homeDir, sources=$sources)"
+	}
+}
+
+fun defaultIdeDependency(downloadSources:Boolean): Value<ResolvedIntelliJIDE> = {
 	val withKotlin = using(Configurations.running) {
 		!Keys.libraryDependencies.get().any { it.dependencyId.group == "org.jetbrains.kotlin" && isKotlinRuntime(it.dependencyId.name) }
 	}
@@ -70,7 +83,7 @@ fun defaultIdeDependency(downloadSources:Boolean): Value<IdeaDependency> = {
 }
 
 /** Resolve IDE from remote repository. */
-fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Boolean, extraDependencies: List<String>, withKotlin: Boolean, progressListener: ActivityListener?): IdeaDependency {
+fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Boolean, extraDependencies: List<String>, withKotlin: Boolean, progressListener: ActivityListener?): ResolvedIntelliJIDE {
 	val releaseType = Utils.releaseType(version)
 
 	var dependencyGroup = "com.jetbrains.intellij.idea"
@@ -100,27 +113,27 @@ fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Bool
 			?: throw WemiException("Failed to resolve IDE dependency $dependency from $repository")
 	LOG.debug("Resolved IDE zip: {}", ideZipFile)
 
-	val classesDirectory = unzipDependencyFile(getZipCacheDirectory(ideZipFile, type), ideZipFile, type, version.endsWith("-SNAPSHOT"))
-	LOG.info("IDE dependency cache directory: {}", classesDirectory)
-	val buildNumber = Utils.ideBuildNumber(classesDirectory)
+	val homeDir = unzipDependencyFile(getZipCacheDirectory(ideZipFile, type), ideZipFile, type, version.endsWith("-SNAPSHOT"))
+	LOG.info("IDE dependency cache directory: {}", homeDir)
 	val sourceDirs = if (sources) resolveSources(version, repository, progressListener) else null
 	val resolvedExtraDependencies = resolveExtraDependencies(version, extraDependencies, repository, progressListener)
-	return createDependency(dependencyName, type, version, buildNumber, classesDirectory, sourceDirs ?: emptyList(), resolvedExtraDependencies, withKotlin)
+	return createDependency(type, homeDir, sourceDirs ?: emptyList(), resolvedExtraDependencies, withKotlin)
 }
 
 /**
  * Resolve IDE from local installation.
  */
-fun resolveLocalIDE(localPath: Path, localPathSources: List<Path>, withKotlin: Boolean): IdeaDependency {
+fun resolveLocalIDE(localPath: Path, localPathSources: List<Path>, withKotlin: Boolean): ResolvedIntelliJIDE {
 	LOG.debug("Adding local IDE dependency")
-	val ideaDir = Utils.ideaDir(localPath)
-	if (!ideaDir.exists() || !ideaDir.isDirectory()) {
+	val homeDir = if (localPath.name.pathHasExtension("app")) {
+		localPath.resolve("Contents")
+	} else localPath
+
+	if (!homeDir.exists() || !homeDir.isDirectory()) {
 		throw WemiException("Specified localPath '$localPath' doesn't exist or is not a directory", false)
 	}
-	val buildNumber = Utils.ideBuildNumber(ideaDir)
-	return createDependency("ideaLocal", null, buildNumber, buildNumber, ideaDir, localPathSources, emptyList(), withKotlin)
+	return createDependency(null, homeDir, localPathSources, emptyList(), withKotlin)
 }
-
 
 private val mainDependencies = arrayOf("ideaIC", "ideaIU", "riderRD", "riderRS")
 
@@ -128,18 +141,37 @@ fun isKotlinRuntime(name:String):Boolean {
 	return "kotlin-runtime" == name || "kotlin-reflect" == name || name.startsWith("kotlin-stdlib")
 }
 
-private fun createDependency(name: String, type: String?, version: String, buildNumber: String,
-                             classesDirectory: Path, sourceDirs: List<Path>,
-                             extraDependencies: Collection<IdeaExtraDependency>,
-                             withKotlin: Boolean): IdeaDependency {
-	if (type == "JPS") {
-		return JpsIdeaDependency(version, buildNumber, classesDirectory, sourceDirs, withKotlin)
-	} else if (type == null) {
-		val pluginsRegistry = BuiltinPluginsRegistry.fromDirectory(classesDirectory / "plugins")
-		return LocalIdeaDependency(name, version, buildNumber, classesDirectory, sourceDirs, withKotlin, pluginsRegistry, extraDependencies)
+private val ALLOWED_JPS_JAR_NAMES = arrayOf("jps-builders.jar", "jps-model.jar", "util.jar")
+
+private fun createDependency(type: String?, homeDir: Path, sourceDirs: List<Path>,
+                             extraDependencies: Collection<IdeaExtraDependency>, withKotlin: Boolean): ResolvedIntelliJIDE {
+	val lib = homeDir / "lib"
+	var jars = Utils.collectJars(lib).filter {
+		val libName = it.name
+		(withKotlin || !isKotlinRuntime(libName.pathWithoutExtension())) && libName != "junit.jar" && libName != "annotations.jar"
 	}
-	val pluginsRegistry = BuiltinPluginsRegistry.fromDirectory(classesDirectory / "plugins")
-	return IdeaDependency(name, version, buildNumber, classesDirectory, sourceDirs, withKotlin, pluginsRegistry, extraDependencies)
+	val pluginsRegistry:BuiltinPluginsRegistry
+	if (type == "JPS") {
+		// What is JPS? I don't know. Probably this?
+		// https://intellij-support.jetbrains.com/hc/en-us/community/posts/360008114139-IDEA-independent-building-
+		jars = jars.filter { it.name in ALLOWED_JPS_JAR_NAMES }
+		pluginsRegistry = BuiltinPluginsRegistry(homeDir)
+	} else {
+		pluginsRegistry = BuiltinPluginsRegistry.fromDirectory(homeDir / "plugins")
+	}
+
+	val buildTxt = Utils.run {
+		if (OS_FAMILY == OS_FAMILY_MAC) {
+			val file = homeDir.resolve("Resources/build.txt")
+			if (file.exists()) {
+				return@run file
+			}
+		}
+		homeDir.resolve("build.txt")
+	}
+	val buildNumber = String(Files.readAllBytes(buildTxt), Charsets.UTF_8).trim()
+
+	return ResolvedIntelliJIDE(buildNumber, homeDir, sourceDirs, pluginsRegistry, extraDependencies, jars.collect(Collectors.toList()))
 }
 
 private fun resolveSources(version: String, repository: Repository, progressListener: ActivityListener?): List<Path>? {

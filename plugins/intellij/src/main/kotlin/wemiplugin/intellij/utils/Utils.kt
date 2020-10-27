@@ -10,17 +10,13 @@ import com.jetbrains.plugin.structure.intellij.plugin.IdePluginManager
 import org.slf4j.LoggerFactory
 import wemi.EvalScope
 import wemi.KeyDefaults.inProjectDependencies
-import wemi.dependency.internal.OS_FAMILY
-import wemi.dependency.internal.OS_FAMILY_MAC
 import wemi.util.LocatedPath
 import wemi.util.absolutePath
 import wemi.util.div
 import wemi.util.exists
 import wemi.util.isRegularFile
-import wemi.util.jdkToolsJar
 import wemi.util.name
 import wemi.util.pathHasExtension
-import wemiplugin.intellij.IntelliJ
 import java.io.IOException
 import java.nio.file.Path
 import java.util.*
@@ -31,7 +27,7 @@ import kotlin.collections.ArrayList
 /**
  *
  */
-object Utils {
+internal object Utils {
 
 	private val LOG = LoggerFactory.getLogger(Utils.javaClass)
 
@@ -42,7 +38,7 @@ object Utils {
 			it.path == "META-INF/plugin.xml" && (!validate || run {
 				// Validate this file, that it really contains idea-plugin
 				val xml = parseXml(it.file) ?: return@run false
-				xml.documentElement.getFirstElement("idea-plugin") != null
+				xml.documentElement?.tagName.equals("idea-plugin", true)
 			})
 		}
 	}
@@ -58,27 +54,6 @@ object Utils {
 		return result
 	}
 
-	// TODO(jp): This should be built-int into ideaDependency resolution!
-	fun EvalScope.ideSdkDirectory():Path {
-		return IntelliJ.resolvedIntellijIdeDependency.get().classes
-	}
-
-	fun ideBuildNumber(ideDirectory: Path):String {
-		if (OS_FAMILY == OS_FAMILY_MAC) {
-			val file = ideDirectory.resolve("Resources/build.txt")
-			if (file.exists()) {
-				return String(Files.readAllBytes(file), Charsets.UTF_8).trim()
-			}
-		}
-		return String(Files.readAllBytes(ideDirectory.resolve("build.txt")), Charsets.UTF_8).trim()
-	}
-
-	fun ideaDir(path:Path):Path {
-		if (path.name.pathHasExtension("app")) {
-			return path.resolve("Contents")
-		} else return path
-	}
-
 	fun EvalScope.getPluginIds():List<String> {
 		val result = ArrayList<String>()
 		getProjectPluginIds(result)
@@ -90,7 +65,7 @@ object Utils {
 
 	private fun EvalScope.getProjectPluginIds(to:MutableList<String>) {
 		for (pluginXml in sourcePluginXmlFiles(false)) {
-			val id = parseXml(pluginXml.file)?.documentElement?.getFirstElement("idea-plugin")?.getFirstElement("id")?.textContent
+			val id = parseXml(pluginXml.file)?.documentElement?.getFirstElement("id")?.textContent
 			if (id != null) {
 				to.add(id)
 			}
@@ -99,17 +74,12 @@ object Utils {
 
 	fun isJarFile(file:Path):Boolean = file.name.pathHasExtension("jar")
 
-	fun isZipFile(file:Path):Boolean = file.name.pathHasExtension("zip")
-
 	fun collectJars(directory:Path): Stream<Path> {
-		return Files.list(directory).filter { it.isRegularFile() && it.name.pathHasExtension("jar") }
-	}
-
-	// TODO(jp): Make it take javaHome and remove it, if possible
-	fun resolveToolsJar(javaExec:Path):Path? {
-		val bin = javaExec.parent
-		val home = if (OS_FAMILY == OS_FAMILY_MAC) bin.parent.parent else bin.parent
-		return jdkToolsJar(home)
+		try {
+			return Files.list(directory).filter { it.isRegularFile() && it.name.pathHasExtension("jar") }
+		} catch (e:IOException) {
+			return Stream.empty()
+		}
 	}
 
 	fun getBuiltinJbrVersion(ideDirectory:Path):String? {
@@ -128,14 +98,16 @@ object Utils {
 
 	private val MAJOR_VERSION_PATTERN = Pattern.compile("(RIDER-)?\\d{4}\\.\\d-SNAPSHOT")
 
-	fun releaseType(version:String):String {
-		if (version.endsWith("-EAP-SNAPSHOT") || version.endsWith("-EAP-CANDIDATE-SNAPSHOT") || version.endsWith("-CUSTOM-SNAPSHOT") || MAJOR_VERSION_PATTERN.matcher(version).matches()) {
-			return "snapshots"
+	internal fun releaseType(version:String):String {
+		return when {
+			version.endsWith("-EAP-SNAPSHOT") || version.endsWith("-EAP-CANDIDATE-SNAPSHOT") || version.endsWith("-CUSTOM-SNAPSHOT") || MAJOR_VERSION_PATTERN.matcher(version).matches() -> {
+				"snapshots"
+			}
+			version.endsWith("-SNAPSHOT") -> {
+				"nightly"
+			}
+			else -> "releases"
 		}
-		if (version.endsWith("-SNAPSHOT")) {
-			return "nightly"
-		}
-		return "releases"
 	}
 
 	fun createPlugin(artifact:Path, validatePluginXml:Boolean, logProblems:Boolean): IdePlugin? {

@@ -21,8 +21,8 @@ import wemi.util.httpGet
 import wemi.util.httpGetFile
 import wemi.util.isDirectory
 import wemi.util.name
+import wemi.util.pathHasExtension
 import wemi.util.toSafeFileName
-import wemiplugin.intellij.dependency.IdeaDependency
 import wemiplugin.intellij.utils.Utils
 import wemiplugin.intellij.utils.Utils.sourcePluginXmlFiles
 import wemiplugin.intellij.utils.forEachElement
@@ -130,10 +130,8 @@ class ResolvedIntelliJPluginDependency(val dependency:IntelliJPluginDependency, 
 			classpath.add(artifact)
 		} else if (artifact.isDirectory()) {
 			val lib = artifact / "lib"
-			if (lib.isDirectory()) {
-				for (jar in Utils.collectJars(lib)) {
-					classpath.add(jar)
-				}
+			for (jar in Utils.collectJars(lib)) {
+				classpath.add(jar)
 			}
 			val classes = artifact / "classes"
 			if (classes.isDirectory()) {
@@ -293,10 +291,10 @@ val DefaultResolvedIntellijPluginDependencies : Value<List<ResolvedIntelliJPlugi
 	// TODO(jp): Add all Maven plugin repositories which were used to resolve something to Keys.repositories (original plugin does this, for some reason)
 
 	// TODO(jp): Maybe there is a better way to do this? I.e. managing dependencies from Wemi directly and patching xml?
-	if (!pluginDependencyIds.any { it is IntelliJPluginDependency.Bundled && it.name == "java" } && (ideaDependency.classes / "plugins/java").exists()) {
+	if (!pluginDependencyIds.any { it is IntelliJPluginDependency.Bundled && it.name == "java" } && (ideaDependency.homeDir / "plugins/java").exists()) {
 		for (file in sourcePluginXmlFiles(false)) {
 			val pluginXml = parseXml(file.file) ?: continue
-			val depends = pluginXml.documentElement.getFirstElement("idea-plugin")?.namedElements("depends") ?: continue
+			val depends = pluginXml.documentElement?.namedElements("depends") ?: continue
 			for (depend in depends) {
 				if (depend.textContent == "com.intellij.modules.java") {
 					throw WemiException("The project depends on `com.intellij.modules.java` module but doesn't declare a compile dependency on it.\n" +
@@ -309,22 +307,22 @@ val DefaultResolvedIntellijPluginDependencies : Value<List<ResolvedIntelliJPlugi
 	pluginDependencies
 }
 
-fun EvalScope.resolveIntelliJPlugin(dependency: IntelliJPluginDependency, ideaDependency: IdeaDependency, repositories: List<IntelliJPluginRepository>) : ResolvedIntelliJPluginDependency {
+fun EvalScope.resolveIntelliJPlugin(dependency: IntelliJPluginDependency, resolvedIntelliJIDE: ResolvedIntelliJIDE, repositories: List<IntelliJPluginRepository>) : ResolvedIntelliJPluginDependency {
 	return when (dependency) {
 		is IntelliJPluginDependency.Bundled -> {
-			LOG.info("Looking for builtin {} in {}", dependency.name, ideaDependency.classes)
-			val pluginDirectory = ideaDependency.pluginsRegistry.findPlugin(dependency.name)
+			LOG.info("Looking for builtin {} in {}", dependency.name, resolvedIntelliJIDE.homeDir)
+			val pluginDirectory = resolvedIntelliJIDE.pluginsRegistry.findPlugin(dependency.name)
 			if (pluginDirectory != null) {
 				ResolvedIntelliJPluginDependency(dependency, pluginDirectory)
 			} else {
-				throw WemiException("Cannot find builtin plugin ${dependency.name} for IDE: ${ideaDependency.classes}", false)
+				throw WemiException("Cannot find builtin plugin ${dependency.name} for IDE: ${resolvedIntelliJIDE.homeDir}", false)
 			}
 		}
 		is IntelliJPluginDependency.External -> {
 			for (repo in repositories) {
 				val pluginFile = repo.resolve(dependency, progressListener)
 				if (pluginFile != null) {
-					if (Utils.isZipFile(pluginFile)) {
+					if (pluginFile.name.pathHasExtension("zip")) {
 						return zippedPluginDependency(pluginFile, dependency)
 					} else if (Utils.isJarFile(pluginFile)) {
 						return externalPluginDependency(pluginFile, dependency)

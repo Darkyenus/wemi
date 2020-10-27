@@ -20,7 +20,6 @@ import wemi.util.isDirectory
 import wemi.util.name
 import wemi.util.toSafeFileName
 import wemiplugin.intellij.utils.Utils
-import wemiplugin.intellij.utils.Utils.ideSdkDirectory
 import wemiplugin.intellij.utils.unTar
 import java.net.URL
 import java.nio.file.Path
@@ -46,7 +45,7 @@ val DefaultJavaExecutable: Value<Path> = v@{
 		}
 		LOG.warn("Cannot resolve JBR {}. Falling back to builtin JBR.", jbrVersion)
 	}
-	val builtinJbrVersion = Utils.getBuiltinJbrVersion(ideSdkDirectory())
+	val builtinJbrVersion = Utils.getBuiltinJbrVersion(IntelliJ.resolvedIntellijIdeDependency.get().homeDir)
 	if (builtinJbrVersion != null) {
 		val builtinJbr = resolveJbr(builtinJbrVersion, jbrRepo, progressListener)
 		if (builtinJbr != null) {

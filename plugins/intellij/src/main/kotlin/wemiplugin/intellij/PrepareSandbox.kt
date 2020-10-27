@@ -9,7 +9,6 @@ import wemi.EvalScope
 import wemi.util.div
 import wemi.util.linkOrCopyRecursively
 import wemi.util.name
-import wemiplugin.intellij.utils.getFirstElement
 import wemiplugin.intellij.utils.namedElements
 import wemiplugin.intellij.utils.parseXml
 import wemiplugin.intellij.utils.saveXml
@@ -18,11 +17,15 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 private val LOG = LoggerFactory.getLogger("PrepareSandbox")
 
-class IntelliJIDESandbox(val base:Path, val config:Path, val plugins:Path, val system:Path)
+class IntelliJIDESandbox(val base:Path, val config:Path, val plugins:Path, val system:Path) {
+	override fun toString(): String {
+		return "IntelliJIDESandbox(base=$base, config=${base.relativize(config)}, plugins=${base.relativize(plugins)}, system=${base.relativize(system)})"
+	}
+}
 
 fun EvalScope.prepareIntelliJIDESandbox(sandboxDir: Path = Keys.cacheDirectory.get() / "idea-sandbox", testSuffix:String = "", vararg extraPluginDirectories: Path): IntelliJIDESandbox {
 	val destinationDir = sandboxDir / "plugins$testSuffix"
-	val pluginJar = IntelliJ.intellijPluginArchive.get()
+	val pluginJar = IntelliJ.intellijPluginFolder.get()
 	pluginJar.linkOrCopyRecursively(destinationDir / pluginJar.name)
 
 	for (dependency in IntelliJ.resolvedIntellijPluginDependencies.get()) {
@@ -65,7 +68,7 @@ private fun disableIdeUpdate(configDir: Path) {
 		document
 	}
 
-	val application = updatesXml.documentElement.getFirstElement("application")!!
+	val application = updatesXml.documentElement!!
 	val updatesConfigurable = application.namedElements("component")
 			.find { it.getAttribute("name") == "UpdatesConfigurable" }
 			?: run {

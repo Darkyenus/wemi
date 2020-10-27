@@ -50,6 +50,8 @@ fun parseXml(path: Path):Document? {
 		Files.newBufferedReader(path, Charsets.UTF_8)
 	} catch (e: FileNotFoundException) {
 		return null
+	} catch (e: java.nio.file.NoSuchFileException) {
+		return null
 	} catch (e: IOException) {
 		LOG.warn("Failed to read {}", path, e)
 		return null
@@ -185,8 +187,8 @@ fun Document.patchInPlace(rootElementName:String, patches: List<Patch>) {
 	}
 
 	// Do the patching
-	val root = documentElement.getFirstElement(rootElementName)
-	if (root == null) {
+	val root = documentElement
+	if (root == null || !root.tagName.equals(rootElementName, ignoreCase = true)) {
 		LOG.warn("Can't patch - root <{}> not found", rootElementName)
 		return
 	}

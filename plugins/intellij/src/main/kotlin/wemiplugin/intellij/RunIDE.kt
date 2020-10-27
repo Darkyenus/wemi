@@ -13,9 +13,9 @@ import wemi.util.Version
 import wemi.util.absolutePath
 import wemi.util.div
 import wemi.util.exists
+import wemi.util.jdkToolsJar
 import wemiplugin.intellij.utils.Utils
 import wemiplugin.intellij.utils.Utils.getPluginIds
-import wemiplugin.intellij.utils.Utils.ideSdkDirectory
 import java.nio.file.Path
 
 private val LOG = LoggerFactory.getLogger("RunIDE")
@@ -39,9 +39,8 @@ private val PREFIXES = mapOf(
 
 val DefaultModifySystemProperties : ValueModifier<Map<String, String>> = {
 	val systemProperties = it.toMutableMap()
-	val ideDirectory = ideSdkDirectory()
 	val sandboxDir = IntelliJ.preparedIntellijIdeSandbox.get()
-	val ideBuildNumber = Utils.ideBuildNumber(ideDirectory)
+	val ideBuildNumber = IntelliJ.resolvedIntellijIdeDependency.get().buildNumber
 
 	val configDirectory = sandboxDir.config
 	val pluginsDirectory = sandboxDir.plugins
@@ -96,18 +95,22 @@ val DefaultModifyRunOptions : ValueModifier<List<String>> = {
 	if (!runOptions.any { o -> o.startsWith("-Xms") }) {
 		runOptions.add("-Xms256m")
 	}
-	val bootJar = ideSdkDirectory() / "lib/boot.jar"
+	val bootJar = IntelliJ.resolvedIntellijIdeDependency.get().homeDir / "lib/boot.jar"
 	if (bootJar.exists()) runOptions.add("-Xbootclasspath/a:${bootJar.absolutePath}")
 	runOptions
 }
 
 fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
-	val ideDirectory = ideSdkDirectory()
+	val ideDirectory = IntelliJ.resolvedIntellijIdeDependency.get().homeDir
 	val executable = Keys.javaExecutable.get()
 
 	val classpath = ArrayList<Path>()
 	// Apparently the IDE needs to have the tools.jar on classpath
-	val toolsJar = Utils.resolveToolsJar(executable)
+	val toolsJar = run {
+		val bin = executable.parent
+		val home = if (OS_FAMILY == OS_FAMILY_MAC) bin.parent.parent else bin.parent
+		jdkToolsJar(home)
+	}
 	if (toolsJar != null) {
 		classpath.add(toolsJar)
 	}

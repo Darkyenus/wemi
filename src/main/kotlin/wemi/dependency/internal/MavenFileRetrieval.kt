@@ -1,12 +1,10 @@
 package wemi.dependency.internal
 
-import com.darkyen.dave.Request
 import com.darkyen.dave.Response
 import com.darkyen.dave.ResponseTranslator
 import com.darkyen.dave.WebbException
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
-import wemi.boot.WemiUnicodeOutputSupported
 import wemi.collections.toMutable
 import wemi.dependency.ArtifactPath
 import wemi.dependency.CHECKSUMS
@@ -16,7 +14,6 @@ import wemi.dependency.Repository
 import wemi.dependency.SortedRepositories
 import wemi.submit
 import wemi.util.Failable
-import wemi.util.GaugedInputStream
 import wemi.util.ParsedChecksumFile
 import wemi.util.appendSuffix
 import wemi.util.appendToPath
@@ -31,7 +28,6 @@ import wemi.util.toPath
 import wemi.util.writeText
 import java.io.FileNotFoundException
 import java.io.IOException
-import java.io.InputStream
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path

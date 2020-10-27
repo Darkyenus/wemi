@@ -24,7 +24,6 @@ import wemi.util.div
 import wemi.util.name
 import wemi.util.pathWithoutExtension
 import wemi.util.plus
-import wemiplugin.intellij.dependency.IdeaDependency
 import wemiplugin.intellij.utils.Patch
 import wemiplugin.intellij.utils.unZipIfNew
 import java.io.File
@@ -54,7 +53,7 @@ object IntelliJ {
 
 	val intellijIdeDependency by key<IntelliJIDE>("The IntelliJ Platform IDE dependency specification")
 	val intellijIdeRepository: Key<URL> by key("Repository to search for IntelliJ Platform IDE dependencies", IntelliJIDERepo)
-	val resolvedIntellijIdeDependency by key<IdeaDependency>("IDE dependency to use for compilation and running")
+	val resolvedIntellijIdeDependency by key<ResolvedIntelliJIDE>("IDE dependency to use for compilation and running")
 
 	val instrumentCode by key("Instrument Java classes with nullability assertions and compile forms created by IntelliJ GUI Designer.", true)
 
@@ -111,8 +110,8 @@ val IntelliJPluginLayer by archetype {
 		Keys.externalClasspath modify {
 			val ec = it.toMutable()
 			val ideaDependency = IntelliJ.resolvedIntellijIdeDependency.get()
-			ec.add(LocatedPath(ideaDependency.classes / "lib/resources.jar"))
-			ec.add(LocatedPath(ideaDependency.classes / "lib/idea.jar"))
+			ec.add(LocatedPath(ideaDependency.homeDir / "lib/resources.jar"))
+			ec.add(LocatedPath(ideaDependency.homeDir / "lib/idea.jar"))
 			ec
 		}
 
