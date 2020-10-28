@@ -14,7 +14,6 @@ import com.darkyen.tproll.util.prettyprint.PrettyPrinterFileModule
 import com.darkyen.tproll.util.prettyprint.PrettyPrinterPathModule
 import org.jline.reader.EndOfFileException
 import org.jline.reader.UserInterruptException
-import org.jline.utils.OSUtils
 import org.joda.time.Duration
 import org.slf4j.LoggerFactory
 import wemi.AllProjects
@@ -27,6 +26,7 @@ import wemi.WithExitCode
 import wemi.dependency.DependencyExclusion
 import wemi.util.Color
 import wemi.util.FileSet
+import wemi.util.SystemInfo
 import wemi.util.WemiPrettyPrintFileModule
 import wemi.util.WemiPrettyPrintFunctionModule
 import wemi.util.WemiPrettyPrintLocatedPathModule
@@ -82,7 +82,7 @@ internal var WemiReloadSupported = false
 
 @JvmField
 internal val WemiUnicodeOutputSupported:Boolean = System.getenv("WEMI_UNICODE").let {
-    it?.equals("true", true) ?: !OSUtils.IS_WINDOWS
+    it?.equals("true", true) ?: !SystemInfo.IS_WINDOWS
 }
 
 @JvmField
@@ -96,7 +96,7 @@ internal val WemiColorOutputSupported: Boolean = run {
     @Suppress("RedundantIf")// For readability
     val enabled = BooleanValidator(System.getenv("WEMI_COLOR") ?: System.getenv("TPROLL_COLOR") ?: "").value
             ?: // Not specified explicitly, guess
-            if (OSUtils.IS_WINDOWS) {
+            if (SystemInfo.IS_WINDOWS) {
                 // Windows supports color only if terminal is sane
                 val term = System.getenv("TERM")
                 term?.contains("xterm") == true || term?.contains("color") == true

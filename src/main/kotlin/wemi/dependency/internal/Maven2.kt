@@ -25,6 +25,7 @@ import wemi.dependency.NoClassifier
 import wemi.dependency.Repository
 import wemi.dependency.ResolvedDependency
 import wemi.dependency.SortedRepositories
+import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.internal.PomBuildingXMLHandler.Companion.SupportedModelVersion
 import wemi.publish.InfoNode
 import wemi.submit
@@ -150,7 +151,9 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
         if (depId.classifier.isNotEmpty()) {
             sanityCheckDependencyIdPart(depId, depId.classifier, "classifier", "=+")
         }
-        sanityCheckDependencyIdPart(depId, depId.type, "type")
+        if (depId.type != TypeChooseByPackaging) {
+            sanityCheckDependencyIdPart(depId, depId.type, "type")
+        }
         if (depId.snapshotVersion.isNotEmpty()) {
             sanityCheckDependencyIdPart(depId, depId.snapshotVersion, "snapshotVersion")
         }
@@ -339,6 +342,15 @@ private val TYPE_TO_EXTENSION_MAPPING:Map<String, String> = mapOf(
         "javadoc" to "jar"
 )
 
+/** Maven packaging to extension mapping for packaging types that are not equal to their extensions.
+ * See https://maven.apache.org/pom.html#packaging */
+private val PACKAGING_TO_EXTENSION_MAPPING:Map<String, String> = mapOf(
+        "maven-plugin" to "jar",
+        "ejb" to "jar",
+        "ear" to "jar"
+        // probably more, I don't have experience with this enterprise shtuff
+)
+
 /** Same as [ResolvedDependency], but without some fields which are filled in later, such as [ResolvedDependency.scope]. */
 private class RawResolvedDependency private constructor(
         val id: DependencyId, val dependencies: List<Dependency>,
@@ -401,7 +413,13 @@ private fun resolveInM2Repository(
             return RawResolvedDependency(resolvedDependencyId, log, repository)
         })
 
-        val extension = TYPE_TO_EXTENSION_MAPPING.getOrDefault(resolvedDependencyId.type, resolvedDependencyId.type)
+        val extension = if (resolvedDependencyId.type == TypeChooseByPackaging) {
+            if (pom.packaging.isBlank()) {
+                DEFAULT_TYPE
+            } else {
+                PACKAGING_TO_EXTENSION_MAPPING.getOrDefault(pom.packaging, pom.packaging)
+            }
+        } else TYPE_TO_EXTENSION_MAPPING.getOrDefault(resolvedDependencyId.type, resolvedDependencyId.type)
 
         val filePath = artifactPath(resolvedDependencyId.group, resolvedDependencyId.name, resolvedDependencyId.version, resolvedDependencyId.classifier, extension, resolvedDependencyId.snapshotVersion)
         val artifactRepositories = ArrayList<Repository>(1 + retrievedPom.path.alternateRepositories.size)
@@ -422,7 +440,7 @@ private fun resolveInM2Repository(
             retrievedArtifact.data = null
             return RawResolvedDependency(resolvedDependencyId, pom.dependencies, repository, retrievedArtifact)
         }, { failure ->
-            if (pom.packaging.isNotBlank() && !extension.equals(pom.packaging, ignoreCase = true)) {
+            if (pom.packaging.isNotBlank() && resolvedDependencyId.type != TypeChooseByPackaging && !extension.equals(pom.packaging, ignoreCase = true)) {
                 LOG.info("Retrieving {}, which maps to file extension {}, failed, while the remote POM uses {} packaging - maybe the type is wrong?", resolvedDependencyId, extension, pom.packaging)
             }
 

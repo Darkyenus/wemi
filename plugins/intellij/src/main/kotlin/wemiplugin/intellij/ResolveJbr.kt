@@ -6,11 +6,8 @@ import org.slf4j.LoggerFactory
 import wemi.ActivityListener
 import wemi.Value
 import wemi.boot.WemiSystemCacheFolder
-import wemi.dependency.internal.OS_ARCH
-import wemi.dependency.internal.OS_FAMILY
-import wemi.dependency.internal.OS_FAMILY_MAC
-import wemi.dependency.internal.OS_FAMILY_WINDOWS
 import wemi.run.javaExecutable
+import wemi.util.SystemInfo
 import wemi.util.Version
 import wemi.util.deleteRecursively
 import wemi.util.div
@@ -60,7 +57,7 @@ val DefaultJavaExecutable: Value<Path> = v@{
 private val JbrCacheFolder = WemiSystemCacheFolder / "intellij-jbr-cache"
 
 fun resolveJbr(version:String, overrideRepoUrl:URL?, progressListener: ActivityListener?):Jbr? {
-	val jbrArtifact = jbrArtifactFrom(if (version.startsWith('u')) "8$version" else version)
+	val jbrArtifact = jbrArtifactFrom(if (version.startsWith('u')) "8$version" else version) ?: return null
 	val javaDir = JbrCacheFolder / jbrArtifact.name.toSafeFileName('_')
 	if (javaDir.exists()) {
 		if (javaDir.isDirectory()) {
@@ -76,7 +73,7 @@ fun resolveJbr(version:String, overrideRepoUrl:URL?, progressListener: ActivityL
 		if (javaArchive.exists()) {
 			return@run javaArchive
 		}
-		val url = (overrideRepoUrl ?: jbrArtifact.defaultRepoUrl) / "archiveName"
+		val url = (overrideRepoUrl ?: jbrArtifact.defaultRepoUrl) / archiveName
 		if (httpGetFile(url, javaArchive, progressListener)) {
 			return@run javaArchive
 		} else {
@@ -109,13 +106,13 @@ private fun findJavaExecutable(javaHome:Path):Path? {
 	}.findFirst().orElse(null)
 
 	val root = if (jbr != null) {
-		if (OS_FAMILY == OS_FAMILY_MAC) {
+		if (SystemInfo.IS_MAC_OS) {
 			jbr / "Contents/Home"
 		} else {
 			jbr
 		}
 	} else {
-		if (OS_FAMILY == OS_FAMILY_MAC) {
+		if (SystemInfo.IS_MAC_OS) {
 			javaHome / "jdk/Contents/Home"
 		} else {
 			javaHome
@@ -124,7 +121,7 @@ private fun findJavaExecutable(javaHome:Path):Path? {
 
 	val jre = root / "jre"
 	val base = if (jre.exists()) jre else root
-	val java = base / (if (OS_FAMILY == OS_FAMILY_WINDOWS) "bin/java.exe" else "bin/java")
+	val java = base / (if (SystemInfo.IS_WINDOWS) "bin/java.exe" else "bin/java")
 	return if (java.exists()) {
 		java.toAbsolutePath()
 	} else null
@@ -133,7 +130,7 @@ private fun findJavaExecutable(javaHome:Path):Path? {
 private val DEFAULT_JBR_REPO = URL("https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-jbr/")
 private val DEFAULT_OLD_JBR_REPO = URL("https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-jdk/")
 
-private fun jbrArtifactFrom(version:String):JbrArtifact {
+private fun jbrArtifactFrom(version:String):JbrArtifact? {
 	var prefix = when {
 		version.startsWith("jbrsdk-") -> "jbrsdk-"
 		version.startsWith("jbr_jcef-") -> "jbr_jcef-"
@@ -154,27 +151,32 @@ private fun jbrArtifactFrom(version:String):JbrArtifact {
 		DEFAULT_OLD_JBR_REPO
 	}
 
-	val os = when (OS_FAMILY) {
-		OS_FAMILY_WINDOWS -> "windows"
-		OS_FAMILY_MAC -> "osx"
-		else -> "linux"
+	val os = when {
+		SystemInfo.IS_WINDOWS -> "windows"
+		SystemInfo.IS_MAC_OS -> "osx"
+		SystemInfo.IS_LINUX -> "linux"
+		else -> {
+			LOG.warn("JBR is not available for current operating system")
+			return null
+		}
 	}
 
 	val oldFormat = prefix == "jbrex" || isJava8 && buildNumber < Version("1483.24")
-	if (oldFormat) {
-		val arch = when (OS_ARCH) {
-			"x86" -> "x86"
-			else -> "x64"
+	val arch = when {
+		SystemInfo.IS_X86 && SystemInfo.IS_64_BIT -> "x64"
+		SystemInfo.IS_X86 && SystemInfo.IS_32_BIT -> if (oldFormat) "x86" else "i586"
+		else -> {
+			LOG.warn("JBR is not available for current processor architecture")
+			return null
 		}
+	}
+
+	if (oldFormat) {
 		return JbrArtifact("jbrex${majorVersion}b${buildNumberString}_${os}_${arch}", repoUrl)
 	}
 
 	if (prefix.isEmpty()) {
 		prefix = if (isJava8) "jbrx-" else "jbr-"
-	}
-	val arch = when (OS_ARCH) {
-		"x86" -> "i586"
-		else -> "x64"
 	}
 	return JbrArtifact("$prefix$majorVersion-$os-$arch-b$buildNumberString", repoUrl)
 }

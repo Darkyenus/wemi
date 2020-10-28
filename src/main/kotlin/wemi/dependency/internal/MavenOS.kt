@@ -7,23 +7,23 @@ import java.util.*
  * Based on https://github.com/codehaus-plexus/plexus-utils/blob/master/src/main/java/org/codehaus/plexus/util/Os.java
  */
 
-const val OS_FAMILY_DOS = "dos"
-const val OS_FAMILY_MAC = "mac"
-const val OS_FAMILY_NETWARE = "netware"
-const val OS_FAMILY_OS2 = "os/2"
-const val OS_FAMILY_TANDEM = "tandem"
-const val OS_FAMILY_UNIX = "unix"
-const val OS_FAMILY_WINDOWS = "windows"
-const val OS_FAMILY_WIN9X = "win9x"
-const val OS_FAMILY_ZOS = "z/os"
-const val OS_FAMILY_OS400 = "os/400"
-const val OS_FAMILY_OPENVMS = "openvms"
+internal const val OS_FAMILY_DOS = "dos"
+internal const val OS_FAMILY_MAC = "mac"
+internal const val OS_FAMILY_NETWARE = "netware"
+internal const val OS_FAMILY_OS2 = "os/2"
+internal const val OS_FAMILY_TANDEM = "tandem"
+internal const val OS_FAMILY_UNIX = "unix"
+internal const val OS_FAMILY_WINDOWS = "windows"
+internal const val OS_FAMILY_WIN9X = "win9x"
+internal const val OS_FAMILY_ZOS = "z/os"
+internal const val OS_FAMILY_OS400 = "os/400"
+internal const val OS_FAMILY_OPENVMS = "openvms"
 
-val OS_NAME:String = System.getenv("WEMI_MAVEN_OS_NAME") ?: System.getProperty("os.name").toLowerCase(Locale.US)
-val OS_ARCH:String = System.getenv("WEMI_MAVEN_OS_ARCH") ?: System.getProperty("os.arch").toLowerCase(Locale.US)
-val OS_VERSION:String = System.getenv("WEMI_MAVEN_OS_VERSION") ?: System.getProperty("os.version").toLowerCase(Locale.US)
+internal val OS_NAME:String = System.getenv("WEMI_MAVEN_OS_NAME") ?: System.getProperty("os.name").toLowerCase(Locale.US)
+internal val OS_ARCH:String = System.getenv("WEMI_MAVEN_OS_ARCH") ?: System.getProperty("os.arch").toLowerCase(Locale.US)
+internal val OS_VERSION:String = System.getenv("WEMI_MAVEN_OS_VERSION") ?: System.getProperty("os.version").toLowerCase(Locale.US)
 
-val OS_FAMILY:String = System.getenv("WEMI_MAVEN_OS_FAMILY") ?: run {
+internal val OS_FAMILY:String = System.getenv("WEMI_MAVEN_OS_FAMILY") ?: run {
 	val pathSeparator = System.getProperty("path.separator")
 	val osName = OS_NAME
 
@@ -64,5 +64,5 @@ val OS_FAMILY:String = System.getenv("WEMI_MAVEN_OS_FAMILY") ?: run {
 		OS_FAMILY_MAC
 	}
 
-	osName
+	else osName
 }

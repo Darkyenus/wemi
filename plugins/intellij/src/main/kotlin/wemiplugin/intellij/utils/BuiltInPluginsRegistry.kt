@@ -1,11 +1,10 @@
-package wemiplugin.intellij.dependency
+package wemiplugin.intellij.utils
 
 import Files
 import org.slf4j.LoggerFactory
 import wemi.util.div
 import wemi.util.isDirectory
 import wemi.util.name
-import wemiplugin.intellij.utils.Utils
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream

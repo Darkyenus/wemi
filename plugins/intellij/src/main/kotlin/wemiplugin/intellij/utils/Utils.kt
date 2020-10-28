@@ -31,8 +31,6 @@ internal object Utils {
 
 	private val LOG = LoggerFactory.getLogger(Utils.javaClass)
 
-	val VERSION_PATTERN = Pattern.compile("^([A-Z]{2})-([0-9.A-z]+)\\s*$")
-
 	fun EvalScope.sourcePluginXmlFiles(validate:Boolean = true):List<LocatedPath> {
 		return Keys.resources.getLocatedPaths().filter {
 			it.path == "META-INF/plugin.xml" && (!validate || run {

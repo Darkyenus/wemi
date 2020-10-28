@@ -1,6 +1,5 @@
 package wemiplugin.intellij
 
-import com.jetbrains.plugin.structure.intellij.version.IdeVersion
 import org.slf4j.LoggerFactory
 import wemi.KeyDefaults
 import wemi.Value
@@ -39,7 +38,7 @@ val DefaultIntelliJPluginXmlPatches : Value<Iterable<Patch>> = {
 	val namePatch = Keys.projectName.getOrElse(null)?.let { Patch("name", content = it) }
 	val idPatch = Keys.projectGroup.getOrElse(null)?.let { Patch("id", content = it) }
 	val versionPatch = Keys.projectVersion.getOrElse(null)?.let { Patch("version", content = it) }
-	val ideVersion = IdeVersion.createIdeVersion(IntelliJ.resolvedIntellijIdeDependency.get().buildNumber)
+	val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
 
 	val sinceBuildPatch = Patch("idea-version", attribute = "since-build", content = "${ideVersion.baselineVersion}.${ideVersion.build}")
 	val untilBuildPatch = Patch("idea-version", attribute = "since-build", content = "${ideVersion.baselineVersion}.*")

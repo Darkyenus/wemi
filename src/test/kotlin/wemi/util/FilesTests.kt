@@ -1,10 +1,9 @@
 package wemi.util
 
-import org.jline.utils.OSUtils
-import org.junit.jupiter.api.Test
-
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assumptions
+import org.junit.jupiter.api.Test
 import java.net.MalformedURLException
 import java.net.URL
 import java.nio.file.Paths
@@ -34,7 +33,7 @@ class FilesTests {
 
     @Test
     fun unixPaths() {
-        Assumptions.assumeTrue(!OSUtils.IS_WINDOWS)
+        Assumptions.assumeTrue(!SystemInfo.IS_WINDOWS)
 
         check("jar:file:/Directory/wemi!/wemi/util/MagicKt.class", "/Directory/wemi")
         check("file://localhost/Directory/thing.pom", "/Directory/thing.pom")
@@ -44,7 +43,7 @@ class FilesTests {
 
     @Test
     fun windowsPaths() {
-        Assumptions.assumeTrue(OSUtils.IS_WINDOWS)
+        Assumptions.assumeTrue(SystemInfo.IS_WINDOWS)
 
         //check("jar:file:/Directory/wemi!/wemi/util/MagicKt.class", "/Directory/wemi")
         //check("file://localhost/Directory/thing.pom", "/Directory/thing.pom")

@@ -1,10 +1,10 @@
 package wemi.run
 
-import org.jline.utils.OSUtils
 import org.slf4j.LoggerFactory
 import wemi.WemiException
 import wemi.boot.CLI
 import wemi.util.CliStatusDisplay.Companion.withStatus
+import wemi.util.SystemInfo
 import wemi.util.absolutePath
 import wemi.util.div
 import java.nio.file.Files
@@ -35,13 +35,13 @@ fun javaExecutable(javaHome: Path): Path {
     } else if (!winExists && unixExists) {
         return unixFile
     } else if (!winExists && !unixExists) {
-        if (OSUtils.IS_WINDOWS) {
+        if (SystemInfo.IS_WINDOWS) {
             throw WemiException("Java executable should be at $windowsFile, but it does not exist")
         } else {
             throw WemiException("Java executable should be at $unixFile, but it does not exist")
         }
     } else {
-        return if (OSUtils.IS_WINDOWS) {
+        return if (SystemInfo.IS_WINDOWS) {
             windowsFile
         } else {
             unixFile

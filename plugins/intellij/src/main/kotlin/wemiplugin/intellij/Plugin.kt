@@ -3,7 +3,6 @@ package wemiplugin.intellij
 import Files
 import Keys
 import Path
-import com.jetbrains.plugin.structure.intellij.version.IdeVersion
 import org.slf4j.LoggerFactory
 import wemi.Configurations
 import wemi.Key
@@ -15,6 +14,7 @@ import wemi.dependency
 import wemi.dependency.Dependency
 import wemi.dependency.Repository
 import wemi.dependency.ScopeProvided
+import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.resolveDependencyArtifacts
 import wemi.key
 import wemi.util.FileSet
@@ -74,19 +74,12 @@ object IntelliJ {
 	val intellijPublishPluginRepository: Key<String> by key("Repository to which the IntelliJ plugins are published to", "https://plugins.jetbrains.com")
 	val intellijPublishPluginToken: Key<String> by key("Plugin publishing token")
 	val intellijPublishPluginChannels: Key<List<String>> by key("Channels to which the plugin is published", listOf("default"))
-
-
-	/**
-	 * configure extra dependency artifacts from intellij repo
-	 *  the dependencies on them could be configured only explicitly using intellijExtra function in the dependencies block
-	 */
-	val extraDependencies by key<List<String>>("", emptyList())
 }
 
 val JetBrainsAnnotationsDependency = dependency("org.jetbrains", "annotations", "20.1.0", scope = ScopeProvided)
 val IntelliJPluginsRepo = IntelliJPluginRepository.Maven(Repository("intellij-plugins-repo", "https://cache-redirector.jetbrains.com/plugins.jetbrains.com/maven"))
 val IntelliJThirdPartyRepo = Repository("intellij-third-party-dependencies", "https://jetbrains.bintray.com/intellij-third-party-dependencies")
-val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugin", "0.9.35")
+val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugin", "0.9.35", type = TypeChooseByPackaging)
 
 
 /** A layer over [wemi.Archetypes.JVMBase] which turns the project into an IntelliJ platform plugin. */
@@ -123,7 +116,7 @@ val IntelliJPluginLayer by archetype {
 			// since 193 plugins from classpath are loaded before plugins from plugins directory
 			// to handle this, use plugin.path property as task's the very first source of plugins
 			// we cannot do this for IDEA < 193, as plugins from plugin.path can be loaded twice
-			val ideVersion = IdeVersion.createIdeVersion(IntelliJ.resolvedIntellijIdeDependency.get().buildNumber)
+			val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
 			if (ideVersion.baselineVersion >= 193) {
 				sp["plugin.path"] = Files.list(sandboxDir.plugins).collect(Collectors.toList()).joinToString(File.pathSeparator+",") { p -> p.absolutePath }
 			}

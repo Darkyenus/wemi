@@ -270,7 +270,7 @@ private val cacheDirectoryPath: Path = WemiSystemCacheFolder / "intellij-plugin-
 
 val DefaultResolvedIntellijPluginDependencies : Value<List<ResolvedIntelliJPluginDependency>> = {
 	val ideaDependency = IntelliJ.resolvedIntellijIdeDependency.get()
-	val ideVersion = IdeVersion.createIdeVersion(ideaDependency.buildNumber)
+	val ideVersion = ideaDependency.version
 	val repositories = IntelliJ.intellijPluginRepositories.get()
 
 	val pluginDependencyIds = HashSet(IntelliJ.intellijPluginDependencies.get())

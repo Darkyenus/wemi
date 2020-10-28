@@ -58,6 +58,9 @@ const val ScopeRuntime: DepScope = "runtime"
 /** Available for testing only. */
 const val ScopeTest: DepScope = "test"
 
+/** A special [DependencyId.type] value that lets Wemi choose the appropriate type by the packaging indicated in POM. */
+const val TypeChooseByPackaging:String = ""
+
 internal const val DEFAULT_TYPE:String = "jar"
 internal const val DEFAULT_SCOPE:DepScope = ScopeCompile
 internal const val DEFAULT_OPTIONAL:Boolean = false

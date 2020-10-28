@@ -1,5 +1,8 @@
 package wemiplugin.intellij
 
+import Configurations
+import Files
+import Keys
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationFail
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationSuccess
 import com.jetbrains.plugin.structure.base.plugin.PluginProblem
@@ -14,7 +17,6 @@ import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
 import wemi.util.FileSet
 import wemi.util.LocatedPath
-import wemi.util.Version
 import wemi.util.absolutePath
 import wemi.util.div
 import wemi.util.ensureEmptyDirectory
@@ -89,8 +91,8 @@ val DefaultIntelliJPluginFolder : Value<Path> = {
 }
 
 val DefaultIntelliJSearchableOptions : Value<Path?> = v@{
-	val buildNumber = IntelliJ.resolvedIntellijIdeDependency.get().buildNumber
-	if (Version(buildNumber.takeWhile { it != '-' }) < Version("191.2752")) {
+	val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
+	if (ideVersion.baselineVersion < 191 || (ideVersion.baselineVersion == 191 && ideVersion.build < 2752)) {
 		return@v null
 	}
 

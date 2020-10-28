@@ -5,11 +5,8 @@ import org.slf4j.LoggerFactory
 import wemi.EvalScope
 import wemi.ValueModifier
 import wemi.collections.toMutable
-import wemi.dependency.internal.OS_FAMILY
-import wemi.dependency.internal.OS_FAMILY_MAC
-import wemi.dependency.internal.OS_FAMILY_UNIX
 import wemi.run.runForegroundProcess
-import wemi.util.Version
+import wemi.util.SystemInfo
 import wemi.util.absolutePath
 import wemi.util.div
 import wemi.util.exists
@@ -40,7 +37,7 @@ private val PREFIXES = mapOf(
 val DefaultModifySystemProperties : ValueModifier<Map<String, String>> = {
 	val systemProperties = it.toMutableMap()
 	val sandboxDir = IntelliJ.preparedIntellijIdeSandbox.get()
-	val ideBuildNumber = IntelliJ.resolvedIntellijIdeDependency.get().buildNumber
+	val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
 
 	val configDirectory = sandboxDir.config
 	val pluginsDirectory = sandboxDir.plugins
@@ -51,16 +48,14 @@ val DefaultModifySystemProperties : ValueModifier<Map<String, String>> = {
 	 * modified. This allows a much faster development cycle by avoiding a full restart of the development instance
 	 * after code changes. Enabled by default in 2020.2 and higher.
 	 */
-	val autoReloadPlugins:Boolean = run {
-		Version(ideBuildNumber.takeWhile { c -> c != '-' }) >= Version("202.0")
-	}
+	val autoReloadPlugins:Boolean = ideVersion.baselineVersion >= 202
 
 	systemProperties.putAll(Utils.getIdeaSystemProperties(configDirectory, systemDirectory, pluginsDirectory, requiredPluginIds))
-	if (OS_FAMILY == OS_FAMILY_MAC) {
+	if (SystemInfo.IS_MAC_OS) {
 		systemProperties.putIfAbsent("idea.smooth.progress", "false")
 		systemProperties.putIfAbsent("apple.laf.useScreenMenuBar", "true")
 		systemProperties.putIfAbsent("apple.awt.fileDialogForDirectories", "true")
-	} else if (OS_FAMILY == OS_FAMILY_UNIX) {
+	} else if (SystemInfo.IS_UNIX) {
 		systemProperties.putIfAbsent("sun.awt.disablegrab", "true")
 	}
 	systemProperties.putIfAbsent("idea.classpath.index.enabled", "false")
@@ -68,18 +63,15 @@ val DefaultModifySystemProperties : ValueModifier<Map<String, String>> = {
 	systemProperties.putIfAbsent("idea.auto.reload.plugins", autoReloadPlugins.toString())
 
 	if (!systemProperties.containsKey("idea.platform.prefix")) {
-		val matcher = Utils.VERSION_PATTERN.matcher(ideBuildNumber)
-		if (matcher.find()) {
-			val abbreviation = matcher.group(1)
-			val prefix = PREFIXES[abbreviation]
-			if (prefix != null && prefix.isNotBlank()) {
-				systemProperties["idea.platform.prefix"] = prefix
+		val abbreviation = ideVersion.productCode
+		val prefix = PREFIXES[abbreviation]
+		if (prefix != null && prefix.isNotBlank()) {
+			systemProperties["idea.platform.prefix"] = prefix
 
-				if (abbreviation == "RD") {
-					// Allow debugging Rider's out of process ReSharper host
-					systemProperties.putIfAbsent("rider.debug.mono.debug", "true")
-					systemProperties.putIfAbsent("rider.debug.mono.allowConnect", "true")
-				}
+			if (abbreviation == "RD") {
+				// Allow debugging Rider's out of process ReSharper host
+				systemProperties.putIfAbsent("rider.debug.mono.debug", "true")
+				systemProperties.putIfAbsent("rider.debug.mono.allowConnect", "true")
 			}
 		}
 	}
@@ -108,7 +100,7 @@ fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
 	// Apparently the IDE needs to have the tools.jar on classpath
 	val toolsJar = run {
 		val bin = executable.parent
-		val home = if (OS_FAMILY == OS_FAMILY_MAC) bin.parent.parent else bin.parent
+		val home = if (SystemInfo.IS_MAC_OS) bin.parent.parent else bin.parent
 		jdkToolsJar(home)
 	}
 	if (toolsJar != null) {
