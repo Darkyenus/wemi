@@ -227,49 +227,50 @@ fun unZip(zipFile: Path, outputDirectory: Path, allowOutsideLinks: Boolean = fal
 	tempDir.ensureEmptyDirectory()
 
 	Files.newByteChannel(zipFile, StandardOpenOption.READ).use { channel ->
-		val zip = ZipFile(channel, zipFile.name, Charsets.UTF_8.name(), true, false)
+		ZipFile(channel, zipFile.name, Charsets.UTF_8.name(), true, false).use { zip ->
 
-		for (entry in zip.entries) {
-			val entryPath = (tempDir / entry.name).normalize()
-			if (!entryPath.startsWith(tempDir)) {
-				LOG.warn("UnZip: Skipping entry {} of {} - it goes outside of the result folder!", entry.name, zipFile)
-				continue
-			}
-			if (entry.isDirectory) {
-				LOG.debug("UnZip: {} of {} to {} (a directory)", entry.name, zipFile, entryPath)
-				Files.createDirectories(entryPath)
-				copyZipAttributes(entry, entryPath)
-				continue
-			}
-			if (!zip.canReadEntryData(entry)) {
-				LOG.warn("UnZip: Skipping entry {} of {} - can't read", entry.name, zipFile)
-				continue
-			}
-
-			if (entry.isUnixSymlink) {
-				LOG.debug("UnZip: {} of {} to {} (a symbolic link)", entry.name, zipFile, entryPath)
-
-				val linkPath = (tempDir / zip.getUnixSymlink(entry)).normalize()
-				if (linkPath.startsWith(tempDir) && !allowOutsideLinks) {
-					LOG.warn("UnZip: Skipping entry {} of {} - symbolically linked file is outside of the result folder", entry.name, zipFile)
+			for (entry in zip.entries) {
+				val entryPath = (tempDir / entry.name).normalize()
+				if (!entryPath.startsWith(tempDir)) {
+					LOG.warn("UnZip: Skipping entry {} of {} - it goes outside of the result folder!", entry.name, zipFile)
 					continue
 				}
-				try {
-					Files.createDirectories(entryPath.parent)
-					Files.createSymbolicLink(entryPath, linkPath)
+				if (entry.isDirectory) {
+					LOG.debug("UnZip: {} of {} to {} (a directory)", entry.name, zipFile, entryPath)
+					Files.createDirectories(entryPath)
 					copyZipAttributes(entry, entryPath)
-				} catch (e:Exception) {
-					LOG.warn("UnZip: Failure on symbolic link entry {} of {}", entry.name, zipFile, e)
+					continue
 				}
-				continue
-			}
+				if (!zip.canReadEntryData(entry)) {
+					LOG.warn("UnZip: Skipping entry {} of {} - can't read", entry.name, zipFile)
+					continue
+				}
 
-			LOG.debug("UnZip: {} of {} to {} (a normal file)", entry.name, zipFile, entryPath)
-			Files.createDirectories(entryPath.parent)
-			Files.newOutputStream(entryPath).use {
-				zip.getInputStream(entry).copyTo(it)
+				if (entry.isUnixSymlink) {
+					LOG.debug("UnZip: {} of {} to {} (a symbolic link)", entry.name, zipFile, entryPath)
+
+					val linkPath = (tempDir / zip.getUnixSymlink(entry)).normalize()
+					if (linkPath.startsWith(tempDir) && !allowOutsideLinks) {
+						LOG.warn("UnZip: Skipping entry {} of {} - symbolically linked file is outside of the result folder", entry.name, zipFile)
+						continue
+					}
+					try {
+						Files.createDirectories(entryPath.parent)
+						Files.createSymbolicLink(entryPath, linkPath)
+						copyZipAttributes(entry, entryPath)
+					} catch (e: Exception) {
+						LOG.warn("UnZip: Failure on symbolic link entry {} of {}", entry.name, zipFile, e)
+					}
+					continue
+				}
+
+				LOG.debug("UnZip: {} of {} to {} (a normal file)", entry.name, zipFile, entryPath)
+				Files.createDirectories(entryPath.parent)
+				Files.newOutputStream(entryPath).use {
+					zip.getInputStream(entry).copyTo(it)
+				}
+				copyZipAttributes(entry, entryPath)
 			}
-			copyZipAttributes(entry, entryPath)
 		}
 	}
 

@@ -120,7 +120,7 @@ fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Bool
 	LOG.debug("Resolved IDE zip: {}", ideZipFile)
 
 	val homeDir = unzipDependencyFile(getZipCacheDirectory(ideZipFile, type), ideZipFile, type, version.endsWith("-SNAPSHOT"))
-	LOG.info("IDE dependency cache directory: {}", homeDir)
+	LOG.debug("IDE dependency cache directory: {}", homeDir)
 	val sourceDirs = if (sources) resolveSources(version, repository, progressListener) else null
 	return createDependency(type, homeDir, sourceDirs ?: emptyList(), withKotlin)
 }

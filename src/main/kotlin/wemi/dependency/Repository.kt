@@ -40,6 +40,8 @@ class Repository(
         /** When resolving snapshots, check for newer only if cached ones are older than this amount.
          * @see SnapshotCheckDaily default, but other constants are available for convenience */
         val snapshotUpdateDelaySeconds:Long = SnapshotCheckDaily,
+        /** Should checksums be downloaded and verified? */
+        val verifyChecksums:Boolean = true,
         /** When checksums mismatch, should the resolution fail or warn and continue? (After retrying.) */
         val tolerateChecksumMismatch:Boolean = false,
         /** Local repositories can be caches and may not be cached. Non-local repositories need caches and are not caches.
@@ -71,11 +73,12 @@ class Repository(
     fun copy(name:String = this.name, url:URL = this.url, cache:Path? = this.cache,
              releases:Boolean = this.releases, snapshots:Boolean = this.snapshots,
              snapshotUpdateDelaySeconds:Long = this.snapshotUpdateDelaySeconds,
+             verifyChecksums: Boolean = this.verifyChecksums,
              tolerateChecksumMismatch: Boolean = this.tolerateChecksumMismatch,
              local:Boolean = this.local,
              useUnsafeTransport: Boolean = this.useUnsafeTransport,
              authoritative:Boolean = this.authoritative):Repository {
-        return Repository(name=name, url=url, cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local, useUnsafeTransport=useUnsafeTransport, authoritative = authoritative)
+        return Repository(name=name, url=url, cache=cache, releases=releases, snapshots=snapshots, snapshotUpdateDelaySeconds=snapshotUpdateDelaySeconds, verifyChecksums = verifyChecksums, tolerateChecksumMismatch=tolerateChecksumMismatch, local=local, useUnsafeTransport=useUnsafeTransport, authoritative = authoritative)
     }
 
     /** Repository acting as a cache for this repository, if [local]` == false`, otherwise not used.

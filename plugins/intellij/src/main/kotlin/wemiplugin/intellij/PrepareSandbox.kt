@@ -82,7 +82,7 @@ private fun disableIdeUpdate(configDir: Path) {
 			?: run {
 				val cn: Element = updatesXml.createElement("option")
 				cn.setAttribute("name", "CHECK_NEEDED")
-				application.appendChild(cn)
+				updatesConfigurable.appendChild(cn)
 				cn
 			}
 

@@ -6,13 +6,10 @@ import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.Node
 import org.xml.sax.InputSource
-import java.io.ByteArrayInputStream
 import java.io.FileNotFoundException
 import java.io.IOException
-import java.io.InputStream
-import java.io.InputStreamReader
 import java.io.Reader
-import java.nio.charset.Charset
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import javax.xml.parsers.DocumentBuilder
 import javax.xml.parsers.DocumentBuilderFactory
@@ -24,25 +21,41 @@ import javax.xml.transform.stream.StreamResult
 private val LOG = LoggerFactory.getLogger("Xml")
 
 /**
- *
+ * Parse XML from given [reader] into a [Document].
+ * Does not preserve ignorable whitespace, does not validate.
  */
-@Throws(Exception::class)
-fun parseXml(bytes:ByteArray, charset: Charset = Charsets.UTF_8):Document {
-	return parseXml(ByteArrayInputStream(bytes), charset)
-}
-
-@Throws(Exception::class)
-fun parseXml(inputStream: InputStream, charset: Charset = Charsets.UTF_8):Document {
-	val factory: DocumentBuilderFactory = DocumentBuilderFactory.newInstance()
-	val builder: DocumentBuilder = factory.newDocumentBuilder()
-	return builder.parse(InputSource(InputStreamReader(inputStream, charset)))
-}
-
 @Throws(Exception::class)
 fun parseXml(reader: Reader):Document {
 	val factory: DocumentBuilderFactory = DocumentBuilderFactory.newInstance()
 	val builder: DocumentBuilder = factory.newDocumentBuilder()
-	return builder.parse(InputSource(reader))
+	val document = builder.parse(InputSource(reader))
+	// We have to strip whitespace to get nice output without double formatting.
+	// We have to do it manually because XML is a clowntown and factory.isIgnoringElementContentWhitespace
+	// apparently requires us to supply schema and enable validation, which is absolutely nuts.
+	document.stripWhitespace()
+	return document
+}
+
+private fun Node.stripWhitespace() {
+	val childNodes = childNodes
+	var i = childNodes.length - 1
+	while (i >= 0) {
+		val node = childNodes.item(i--)
+		val nodeType = node.nodeType
+		if (nodeType == Node.TEXT_NODE) {
+			val nodeValue = node.nodeValue
+			if (nodeValue.isNullOrBlank()) {
+				// Keep blank lines, because they help readability
+				if (nodeValue.count { it == '\n' } > 1) {
+					node.nodeValue = "\n"
+				} else {
+					removeChild(node)
+				}
+			}
+		} else if (nodeType == Node.ELEMENT_NODE) {
+			node.stripWhitespace()
+		}
+	}
 }
 
 fun parseXml(path: Path):Document? {
@@ -50,7 +63,7 @@ fun parseXml(path: Path):Document? {
 		Files.newBufferedReader(path, Charsets.UTF_8)
 	} catch (e: FileNotFoundException) {
 		return null
-	} catch (e: java.nio.file.NoSuchFileException) {
+	} catch (e: NoSuchFileException) {
 		return null
 	} catch (e: IOException) {
 		LOG.warn("Failed to read {}", path, e)
@@ -76,6 +89,7 @@ fun saveXml(path:Path, document:Document):Boolean {
 			transformerFactory.setAttribute("indent-number", 2)
 			val transformer = transformerFactory.newTransformer()
 			transformer.setOutputProperty(OutputKeys.INDENT, "yes")
+			transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes")
 			transformer.transform(DOMSource(document), xmlOutput)
 		}
 	} catch (e:Exception) {

@@ -1,0 +1,26 @@
+<idea-plugin>
+    <id>com.darkyen.example</id>
+    <name>Example</name>
+    <version></version>
+    <vendor>Example Vendor</vendor>
+
+    <idea-version since-build=""/>
+
+    <description>An example plugin that does pretty much nothing.</description>
+
+    <change-notes><![CDATA[
+Nothing to see here! <b>Just some bold text!</b>
+]]>
+    </change-notes>
+
+    <!-- Product and plugin compatibility requirements -->
+    <!-- https://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.darkyen.darkyenustimetracker</depends>
+
+    <actions>
+        <action id="ExamplePluginAlert" class="com.darkyen.example.ExampleAction" text="Does It Work?" description="Check whether it works.">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

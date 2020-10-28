@@ -30,6 +30,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.net.URL
 import java.nio.file.Files
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributes
@@ -147,7 +148,8 @@ private sealed class DownloadResult {
     class Success(val remoteLastModifiedTime:Long, val remoteArtifactData:DataWithChecksum, val checksumMismatches:Int):DownloadResult()
 }
 
-private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheControlMs: Long, snapshot: Boolean, useUnsafeTransport:Boolean, progressTracker: ActivityListener?):DownloadResult {
+private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheControlMs: Long, snapshot: Boolean, useUnsafeTransport: Boolean, verifyChecksums: Boolean, progressTracker: ActivityListener?):DownloadResult {
+    // TODO(jp): Save to file directly while computing checksum, some things can get rather large
     var checksumPrefetch: Future<List<ParsedChecksumFile?>>? = null
     try {
 
@@ -157,7 +159,7 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
         try {
             response = httpGet(repositoryArtifactUrl, cacheControlMs, useUnsafeTransport = useUnsafeTransport)
                     .execute(progressTracker, ResponseTranslator.BYTES_TRANSLATOR.onResponse { responseStart ->
-                        if (responseStart.isSuccess) {
+                        if (responseStart.isSuccess && verifyChecksums) {
                             // We got response, and it is likely that we will need checksums, start fetching them now
                             checksumPrefetch = ForkJoinPool.commonPool().submit({ tracker -> retrieveChecksums(repositoryArtifactUrl, useUnsafeTransport, tracker) }, progressTracker, "Checksum pre-fetch")
                         }
@@ -172,7 +174,7 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
             }
         } catch (e: WebbException) {
             when (e.cause) {
-                is FileNotFoundException ->
+                is FileNotFoundException, is NoSuchFileException ->
                     LOG.trace("Failed to retrieve '{}', file not found", repositoryArtifactUrl)
                 is SSLException -> {
                     LOG.warn("Failed to retrieve '{}', problem with SSL", repositoryArtifactUrl, e.cause)
@@ -199,14 +201,19 @@ private fun retrieveFileDownloadAndVerify(repositoryArtifactUrl: URL, cacheContr
         val remoteArtifactData = DataWithChecksum(response.body)
 
         // Step 4: download and verify checksums
-        val checksums = checksumPrefetch.let { checksumPrefetch_ ->
-            if (checksumPrefetch_ != null) {
-                checksumPrefetch_.get()
-            } else {
-                retrieveChecksums(repositoryArtifactUrl, useUnsafeTransport, progressTracker)
+        val checksumMismatches = if (verifyChecksums) {
+            val checksums = checksumPrefetch.let { checksumPrefetch_ ->
+                if (checksumPrefetch_ != null) {
+                    checksumPrefetch_.get()
+                } else {
+                    retrieveChecksums(repositoryArtifactUrl, useUnsafeTransport, progressTracker)
+                }
             }
+            verifyChecksums(checksums, repositoryArtifactUrl, remoteArtifactData, progressTracker)
+        } else {
+            LOG.debug("Not downloading and not verifying checksums on {} - verifyChecksums is disabled", repositoryArtifactUrl)
+            0
         }
-        val checksumMismatches = verifyChecksums(checksums, repositoryArtifactUrl, remoteArtifactData, progressTracker)
 
         return DownloadResult.Success(remoteLastModifiedTime, remoteArtifactData, checksumMismatches)
     } finally {
@@ -231,7 +238,7 @@ private fun retrieveChecksums(repositoryArtifactUrl: URL, useUnsafeTransport: Bo
                     checksumResponse.body
                 } catch (e: WebbException) {
                     when (e.cause) {
-                        is FileNotFoundException ->
+                        is FileNotFoundException, is NoSuchFileException ->
                             LOG.trace("Failed to retrieve checksum '{}', file not found", repositoryArtifactUrl)
                         is SSLException -> {
                             LOG.warn("Failed to retrieve checksum '{}', problem with SSL", repositoryArtifactUrl, e.cause)
@@ -312,7 +319,7 @@ private fun retrieveFileForVerificationOnly(repository:Repository, path:String, 
         response = httpGet(repositoryArtifactUrl, useUnsafeTransport = repository.useUnsafeTransport).execute(listener, ResponseTranslator.BYTES_TRANSLATOR)
     } catch (e: WebbException) {
         when (e.cause) {
-            is FileNotFoundException ->
+            is FileNotFoundException, is NoSuchFileException ->
                 LOG.trace("Failed to retrieve '{}', file not found", repositoryArtifactUrl)
             is SSLException -> {
                 LOG.warn("Failed to retrieve '{}', problem with SSL", repositoryArtifactUrl, e.cause)
@@ -341,10 +348,8 @@ private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:
 
     // Download may fail, or checksums may fail, so try multiple times
     var downloadFileSuccess:DownloadResult.Success? = null
-    val retries = 3
-    for (downloadTry in 1 .. retries) {
-        val downloadFileResult = retrieveFileDownloadAndVerify(repositoryArtifactUrl, cache.cacheControlMs, snapshot, repository.useUnsafeTransport, progressTracker)
-        when (downloadFileResult) {
+    checksumMismatchRetryLoop@for (downloadTry in (0 until 3).reversed()) {
+        when (val downloadFileResult = retrieveFileDownloadAndVerify(repositoryArtifactUrl, cache.cacheControlMs, snapshot, repository.useUnsafeTransport, repository.verifyChecksums, progressTracker)) {
             is DownloadResult.Failure -> return Failable.failure("Failed to download file: ${downloadFileResult.reason}")
             DownloadResult.UseCache -> {
                 LOG.trace("Using local artifact cache (snapshot not modified): {}", cacheFile)
@@ -352,17 +357,20 @@ private fun retrieveFileRemotely(repository: Repository, path: String, snapshot:
             }
             is DownloadResult.Success -> {
                 val mismatches = downloadFileResult.checksumMismatches
-                if (mismatches > 0) {
-                    if (downloadTry < retries) {
-                        LOG.warn("Retrying download after {} checksum(s) mismatched", mismatches)
-                    } else if (repository.tolerateChecksumMismatch) {
+                downloadFileSuccess = downloadFileResult
+                if (mismatches <= 0) {
+                    break@checksumMismatchRetryLoop
+                } else if (downloadTry == 0) {
+                    // This was the last try
+                    if (repository.tolerateChecksumMismatch) {
                         LOG.warn("Settling on download with {} mismatched checksum(s)", mismatches)
                     } else {
                         LOG.warn("Download failed due to {} mismatched checksum(s)", mismatches)
                         return Failable.failure("Checksum mismatch")
                     }
+                } else {
+                    LOG.warn("Retrying download after {} checksum(s) mismatched", mismatches)
                 }
-                downloadFileSuccess = downloadFileResult
             }
         }
     }

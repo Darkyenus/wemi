@@ -11,6 +11,7 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 
@@ -45,6 +46,8 @@ class BuiltinPluginsRegistry (private val pluginsDirectory: Path) {
 			}
 			return true
 		} catch (e:FileNotFoundException) {
+			return false
+		} catch (e:NoSuchFileException) {
 			return false
 		} catch (e:Exception) {
 			LOG.warn("Failed to read builtin plugin cache from {}", cache, e)

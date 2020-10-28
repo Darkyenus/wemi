@@ -9,10 +9,10 @@ import wemi.Value
 import wemi.WemiException
 import wemi.boot.WemiCacheFolder
 import wemi.boot.WemiSystemCacheFolder
-import wemi.dependency.Dependency
-import wemi.dependency.DependencyId
+import wemi.dependency
 import wemi.dependency.ProjectDependency
 import wemi.dependency.Repository
+import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.resolveDependencyArtifacts
 import wemi.util.absolutePath
 import wemi.util.div
@@ -30,6 +30,8 @@ import wemiplugin.intellij.utils.getFirstElement
 import wemiplugin.intellij.utils.namedElements
 import wemiplugin.intellij.utils.parseXml
 import wemiplugin.intellij.utils.unZipIfNew
+import java.io.ByteArrayInputStream
+import java.io.InputStreamReader
 import java.net.MalformedURLException
 import java.net.URL
 import java.nio.file.Path
@@ -38,76 +40,17 @@ private val LOG = LoggerFactory.getLogger("ResolvePlugins")
 
 /** Represents a dependency on an IntelliJ plugin. */
 sealed class IntelliJPluginDependency {
-
 	/** Dependency on a bundled plugin */
-	class Bundled(val name: String):IntelliJPluginDependency() {
-		override fun equals(other: Any?): Boolean {
-			if (this === other) return true
-			if (other !is Bundled) return false
-
-			if (name != other.name) return false
-
-			return true
-		}
-
-		override fun hashCode(): Int {
-			return name.hashCode()
-		}
-	}
+	data class Bundled(val name: String):IntelliJPluginDependency()
 
 	/** Dependency on a plugin from the Jetbrains Plugin Repository */
-	class External(val pluginId: String, val version: String, val channel: String? = null):IntelliJPluginDependency() {
-		fun toDependency(): DependencyId = DependencyId((if (channel != null) "$channel." else "") + "com.jetbrains.plugins", pluginId, version)
-		override fun equals(other: Any?): Boolean {
-			if (this === other) return true
-			if (other !is External) return false
-
-			if (pluginId != other.pluginId) return false
-			if (version != other.version) return false
-			if (channel != other.channel) return false
-
-			return true
-		}
-
-		override fun hashCode(): Int {
-			var result = pluginId.hashCode()
-			result = 31 * result + version.hashCode()
-			result = 31 * result + (channel?.hashCode() ?: 0)
-			return result
-		}
-	}
+	data class External(val pluginId: String, val version: String, val channel: String? = null):IntelliJPluginDependency()
 
 	/** Locally downloaded plugin */
-	class Local(val zipPath: Path):IntelliJPluginDependency() {
-		override fun equals(other: Any?): Boolean {
-			if (this === other) return true
-			if (other !is Local) return false
-
-			if (zipPath != other.zipPath) return false
-
-			return true
-		}
-
-		override fun hashCode(): Int {
-			return zipPath.hashCode()
-		}
-	}
+	data class Local(val zipPath: Path):IntelliJPluginDependency()
 
 	/** A dependency on a local project which is also an IntelliJ plugin */
-	class Project(val projectDependency: ProjectDependency):IntelliJPluginDependency() {
-		override fun equals(other: Any?): Boolean {
-			if (this === other) return true
-			if (other !is Project) return false
-
-			if (projectDependency != other.projectDependency) return false
-
-			return true
-		}
-
-		override fun hashCode(): Int {
-			return projectDependency.hashCode()
-		}
-	}
+	data class Project(val projectDependency: ProjectDependency):IntelliJPluginDependency()
 }
 
 /** A resolved dependency on an IDE plugin. */
@@ -141,6 +84,10 @@ class ResolvedIntelliJPluginDependency(val dependency:IntelliJPluginDependency, 
 
 		return classpath
 	}
+
+	override fun toString(): String {
+		return "ResolvedIntelliJPluginDependency(dependency=$dependency, artifact=$artifact, sinceIdeVersion=$sinceIdeVersion, untilIdeVersion=$untilIdeVersion)"
+	}
 }
 
 /** A repository for IntelliJ Platform plugins. */
@@ -149,9 +96,14 @@ sealed class IntelliJPluginRepository {
 	/** A maven repository with plugins */
 	data class Maven(val repo: Repository):IntelliJPluginRepository() {
 		override fun resolve(dep: IntelliJPluginDependency.External, progressListener: ActivityListener?):Path? {
-			// TODO(jp): There might be a massive problem here: some plugins are distributed as zip, some as jars, and we have to know it before attempting resolution
-			//  This is really a hole in maven system, probably. Maybe gradle does not suffer it? dunno.
-			return resolveDependencyArtifacts(listOf(Dependency(dep.toDependency())), listOf(repo), progressListener)?.firstOrNull()
+			val dependency = dependency(
+					(if (dep.channel != null) "${dep.channel}." else "") + "com.jetbrains.plugins",
+					dep.pluginId,
+					dep.version,
+					type = TypeChooseByPackaging
+			)
+
+			return resolveDependencyArtifacts(listOf(dependency), listOf(repo), progressListener)?.firstOrNull()
 		}
 	}
 
@@ -196,7 +148,7 @@ sealed class IntelliJPluginRepository {
 				return@lazy null
 			}
 			val document = try {
-				parseXml(response)
+				parseXml(InputStreamReader(ByteArrayInputStream(response), Charsets.UTF_8))
 			} catch (e:Exception) {
 				LOG.warn("Failed to parse {}", pluginsXmlUrl, e)
 				return@lazy null
@@ -231,8 +183,6 @@ sealed class IntelliJPluginRepository {
 				LOG.warn("Unrecognized structure of {}: {}", pluginsXmlUrl, rootNode)
 				return@lazy null
 			}
-
-
 		}
 
 		override fun resolve(dep: IntelliJPluginDependency.External, progressListener: ActivityListener?):Path? {

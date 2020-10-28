@@ -41,9 +41,9 @@ val DefaultIntelliJPluginXmlPatches : Value<Iterable<Patch>> = {
 	val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
 
 	val sinceBuildPatch = Patch("idea-version", attribute = "since-build", content = "${ideVersion.baselineVersion}.${ideVersion.build}")
-	val untilBuildPatch = Patch("idea-version", attribute = "since-build", content = "${ideVersion.baselineVersion}.*")
+	val untilBuildPatch = Patch("idea-version", attribute = "until-build", content = "${ideVersion.baselineVersion}.*")
 
-	// TODO(jp): Also handle module dependencies
+	// TODO(jp): Also handle module dependencies?
 
 	arrayOf(namePatch, idPatch, versionPatch, sinceBuildPatch, untilBuildPatch).filterNotNull()
 }

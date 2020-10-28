@@ -40,7 +40,6 @@ object IntelliJ {
 	const val BUILD_SEARCHABLE_OPTIONS_TASK_NAME = "buildSearchableOptions"
 	const val SEARCHABLE_OPTIONS_DIR_NAME = "searchableOptions"
 	const val JAR_SEARCHABLE_OPTIONS_TASK_NAME = "jarSearchableOptions"
-	const val BUILD_PLUGIN_TASK_NAME = "buildPlugin"
 
 	val intellijPluginName by key<String>("Name of the plugin")
 
@@ -77,28 +76,73 @@ object IntelliJ {
 }
 
 val JetBrainsAnnotationsDependency = dependency("org.jetbrains", "annotations", "20.1.0", scope = ScopeProvided)
-val IntelliJPluginsRepo = IntelliJPluginRepository.Maven(Repository("intellij-plugins-repo", "https://cache-redirector.jetbrains.com/plugins.jetbrains.com/maven"))
+val IntelliJPluginsRepo = IntelliJPluginRepository.Maven(Repository("intellij-plugins-repo", URL("https://cache-redirector.jetbrains.com/plugins.jetbrains.com/maven"), authoritative = true, verifyChecksums = false))
 val IntelliJThirdPartyRepo = Repository("intellij-third-party-dependencies", "https://jetbrains.bintray.com/intellij-third-party-dependencies")
 val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugin", "0.9.35", type = TypeChooseByPackaging)
 
+val uiTesting by configuration("IDE UI Testing (launch the IDE in UI testing mode through ${Keys.run} key)", Configurations.running) {}
 
 /** A layer over [wemi.Archetypes.JVMBase] which turns the project into an IntelliJ platform plugin. */
 val IntelliJPluginLayer by archetype {
 
+	// Project input info
 	IntelliJ.intellijPluginName set { Keys.projectName.get() }
-
 	Keys.libraryDependencies add { JetBrainsAnnotationsDependency }
 
+	// Project dependencies
+	extend(Configurations.compiling) {
+		Keys.externalClasspath modify { cp ->
+			val mcp = cp.toMutable()
+			for (path in IntelliJ.resolvedIntellijIdeDependency.get().jarFiles) {
+				mcp.add(LocatedPath(path))
+			}
+			for (dependency in IntelliJ.resolvedIntellijPluginDependencies.get()) {
+				for (it in dependency.classpath()) {
+					mcp.add(LocatedPath(it))
+				}
+			}
+			mcp
+		}
+	}
+	IntelliJ.resolvedIntellijPluginDependencies set DefaultResolvedIntellijPluginDependencies
+
+	// Project compilation, archival and publishing
+	IntelliJ.intellijPluginFolder set DefaultIntelliJPluginFolder
+	IntelliJ.intellijPluginArchive set DefaultIntelliJPluginArchive
+	IntelliJ.intellijPluginSearchableOptions set DefaultIntelliJSearchableOptions // TODO This is broken ATM
+	IntelliJ.intellijPublishPluginToRepository set DefaultIntellijPublishPluginToRepository // TODO(jp): Test this
+
+	// plugin.xml
+	IntelliJ.intelliJPluginXmlPatches addAll DefaultIntelliJPluginXmlPatches
+	IntelliJ.intelliJPatchedPluginXmlFiles set PatchedPluginXmlFiles
+	Keys.resources modify {
+		// Add the patched xml files into resources
+		it + IntelliJ.intelliJPatchedPluginXmlFiles.get().fold(null as FileSet?) { left, next -> left + FileSet(next) }
+	}
+
+	// IntelliJ SDK resolution
+	IntelliJ.intellijIdeDependency set { IntelliJIDE.External() }
+	IntelliJ.resolvedIntellijIdeDependency set defaultIdeDependency(false)
 	IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox() }
+	extend(Configurations.retrievingSources) {
+		IntelliJ.resolvedIntellijIdeDependency set defaultIdeDependency(true)
+		Keys.externalClasspath addAll {
+			IntelliJ.resolvedIntellijIdeDependency.get().sources.map { LocatedPath(it) }
+		}
+	}
 
-	IntelliJ.intellijRobotServerDependency set { RobotServerDependency to IntelliJThirdPartyRepo }
-
+	// IntelliJ SDK launch
 	Keys.runSystemProperties modify DefaultModifySystemProperties
 	Keys.runOptions modify DefaultModifyRunOptions
 	Keys.javaExecutable set DefaultJavaExecutable
+	Keys.mainClass set { "com.intellij.idea.Main" }
+	Keys.run set {
+		runIde()
+	}
 
+	// Unit testing
 	extend(Configurations.testing) {
-		IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox(testSuffix = "-test") }
+		IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox(testSuffix = "-test") } // TODO(jp): Test tests
 
 		Keys.externalClasspath modify {
 			val ec = it.toMutable()
@@ -125,6 +169,13 @@ val IntelliJPluginLayer by archetype {
 		}
 	}
 
+	// UI Testing
+	// Since I can't find any documentation about the robot thing, and since
+	// https://jetbrains.org/intellij/sdk/docs/basics/testing_plugins/testing_plugins.html
+	// mentions no UI testing (and actually discourages it, as of time of this writing),
+	// this part of the plugin remains untested and a direct port from the gradle plugin.
+	// If you are interested in making this work (or know how it works), feel free to get in touch.
+	IntelliJ.intellijRobotServerDependency set { RobotServerDependency to IntelliJThirdPartyRepo }
 	extend(uiTesting) {
 		IntelliJ.preparedIntellijIdeSandbox set {
 			val (dep, repo) = IntelliJ.intellijRobotServerDependency.get()
@@ -137,74 +188,4 @@ val IntelliJPluginLayer by archetype {
 			prepareIntelliJIDESandbox(testSuffix = "-uiTest", extraPluginDirectories = *arrayOf(robotFolder))
 		}
 	}
-
-	extend(Configurations.publishing) {
-		// TODO(jp): Implement
-		/*
-        def prepareSandboxTask = project.tasks.findByName(PREPARE_SANDBOX_TASK_NAME) as PrepareSandboxTask
-        def jarSearchableOptionsTask = project.tasks.findByName(JAR_SEARCHABLE_OPTIONS_TASK_NAME) as Jar
-        Zip zip = project.tasks.create(BUILD_PLUGIN_TASK_NAME, Zip).with {
-            description = "Bundles the project as a distribution."
-            from { "${prepareSandboxTask.getDestinationDir()}/${prepareSandboxTask.getPluginName()}" }
-            into { prepareSandboxTask.getPluginName() }
-
-            def searchableOptionsJar = VersionNumber.parse(project.gradle.gradleVersion) >= VersionNumber.parse("5.1")
-                    ? jarSearchableOptionsTask.archiveFile : { jarSearchableOptionsTask.archivePath }
-            from(searchableOptionsJar) { into 'lib' }
-            dependsOn(JAR_SEARCHABLE_OPTIONS_TASK_NAME)
-            if (VersionNumber.parse(project.gradle.gradleVersion) >= VersionNumber.parse("5.1")) {
-                archiveBaseName.set(project.provider { prepareSandboxTask.getPluginName() })
-            } else {
-                conventionMapping('baseName', { prepareSandboxTask.getPluginName() })
-            }
-            it
-        }
-        Configuration archivesConfiguration = project.configurations.getByName(Dependency.ARCHIVES_CONFIGURATION)
-        if (archivesConfiguration) {
-            ArchivePublishArtifact zipArtifact = new ArchivePublishArtifact(zip)
-            archivesConfiguration.getArtifacts().add(zipArtifact)
-            project.getExtensions().getByType(DefaultArtifactPublicationSet.class).addCandidate(zipArtifact)
-            project.getComponents().add(new IntelliJPluginLibrary())
-        }
-		 */
-	}
-
-	extend(Configurations.compiling) {
-		Keys.externalClasspath modify { cp ->
-			val mcp = cp.toMutable()
-			for (path in IntelliJ.resolvedIntellijIdeDependency.get().jarFiles) {
-				mcp.add(LocatedPath(path))
-			}
-			for (dependency in IntelliJ.resolvedIntellijPluginDependencies.get()) {
-				for (it in dependency.classpath()) {
-					mcp.add(LocatedPath(it))
-				}
-			}
-			mcp
-		}
-	}
-
-	IntelliJ.intellijIdeDependency set { IntelliJIDE.External() }
-	IntelliJ.resolvedIntellijIdeDependency set defaultIdeDependency(false)
-
-	extend(Configurations.retrievingSources) {
-		IntelliJ.resolvedIntellijIdeDependency set defaultIdeDependency(true)
-		Keys.externalClasspath addAll {
-			IntelliJ.resolvedIntellijIdeDependency.get().sources.map { LocatedPath(it) }
-		}
-	}
-
-	IntelliJ.intellijPluginFolder set DefaultIntelliJPluginFolder
-	IntelliJ.intellijPluginSearchableOptions set DefaultIntelliJSearchableOptions
-	IntelliJ.intellijPluginArchive set DefaultIntelliJPluginArchive
-	IntelliJ.resolvedIntellijPluginDependencies set DefaultResolvedIntellijPluginDependencies
-
-	IntelliJ.intelliJPluginXmlPatches addAll  DefaultIntelliJPluginXmlPatches
-	IntelliJ.intelliJPatchedPluginXmlFiles set PatchedPluginXmlFiles
-	IntelliJ.intellijPublishPluginToRepository set DefaultIntellijPublishPluginToRepository
-
-	// Add the patched xml files into resources
-	Keys.resources modify { it + IntelliJ.intelliJPatchedPluginXmlFiles.get().fold(null as FileSet?) { left, next -> left + FileSet(next) } }
 }
-
-val uiTesting by configuration("IDE UI Testing", Configurations.testing) {}

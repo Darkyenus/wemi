@@ -44,4 +44,24 @@ class ProjectDependency(val project: Project, val aggregate:Boolean, vararg val 
 
         return sb.toString()
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ProjectDependency) return false
+
+        if (project != other.project) return false
+        if (aggregate != other.aggregate) return false
+        if (!configurations.contentEquals(other.configurations)) return false
+        if (scope != other.scope) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = project.hashCode()
+        result = 31 * result + aggregate.hashCode()
+        result = 31 * result + configurations.contentHashCode()
+        result = 31 * result + scope.hashCode()
+        return result
+    }
 }

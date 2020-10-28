@@ -95,6 +95,7 @@ val DefaultModifyRunOptions : ValueModifier<List<String>> = {
 fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
 	val ideDirectory = IntelliJ.resolvedIntellijIdeDependency.get().homeDir
 	val executable = Keys.javaExecutable.get()
+	val mainClass = Keys.mainClass.get()
 
 	val classpath = ArrayList<Path>()
 	// Apparently the IDE needs to have the tools.jar on classpath
@@ -118,7 +119,7 @@ fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
 
 	val processBuilder = wemi.run.prepareJavaProcess(
 			executable, ideDirectory / "bin", classpath,
-			"com.intellij.idea.Main", Keys.runOptions.get(), extraArguments)
+			mainClass, Keys.runOptions.get(), extraArguments)
 
 	return runForegroundProcess(processBuilder)
 }
