@@ -14,11 +14,6 @@ private val LOG = LoggerFactory.getLogger("Input")
 internal val NO_INPUT = emptyArray<Pair<String,String>>()
 
 /**
- * Convenience method, calls [read] with [StringValidator].
- */
-fun EvalScope.read(key: String, description: String): String? = read(key, description, StringValidator)
-
-/**
  * Read a [V] from the input.
  * The value is first searched for using the [key] from explicit input pairs.
  * Then, free input strings (without explicit [key]s) are considered. Both are considered from top

@@ -35,12 +35,6 @@ private val LOG = LoggerFactory.getLogger("IntelliJPlugin")
 /** All related keys. */
 object IntelliJ {
 
-	// TODO(jp): Remove unused elements
-	const val PREPARE_SANDBOX_TASK_NAME = "prepareSandbox"
-	const val BUILD_SEARCHABLE_OPTIONS_TASK_NAME = "buildSearchableOptions"
-	const val SEARCHABLE_OPTIONS_DIR_NAME = "searchableOptions"
-	const val JAR_SEARCHABLE_OPTIONS_TASK_NAME = "jarSearchableOptions"
-
 	val intellijPluginName by key<String>("Name of the plugin")
 
 	val intellijPluginDependencies by key<List<IntelliJPluginDependency>>("Dependencies on another plugins", emptyList())
@@ -82,6 +76,9 @@ val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugi
 
 val uiTesting by configuration("IDE UI Testing (launch the IDE in UI testing mode through ${Keys.run} key)", Configurations.running) {}
 
+val withoutSearchableOptions by configuration("Do not build IntelliJ plugin searchable options") {}
+val withSearchableOptions by configuration("Do not build IntelliJ plugin searchable options", withoutSearchableOptions) {}
+
 /** A layer over [wemi.Archetypes.JVMBase] which turns the project into an IntelliJ platform plugin. */
 val IntelliJPluginLayer by archetype {
 
@@ -109,7 +106,10 @@ val IntelliJPluginLayer by archetype {
 	// Project compilation, archival and publishing
 	IntelliJ.intellijPluginFolder set DefaultIntelliJPluginFolder
 	IntelliJ.intellijPluginArchive set DefaultIntelliJPluginArchive
-	IntelliJ.intellijPluginSearchableOptions set DefaultIntelliJSearchableOptions // TODO This is broken ATM
+	IntelliJ.intellijPluginSearchableOptions set { null }
+	extend(withSearchableOptions) {
+		IntelliJ.intellijPluginSearchableOptions set DefaultIntelliJSearchableOptions
+	}
 	IntelliJ.intellijPublishPluginToRepository set DefaultIntellijPublishPluginToRepository // TODO(jp): Test this
 
 	// plugin.xml

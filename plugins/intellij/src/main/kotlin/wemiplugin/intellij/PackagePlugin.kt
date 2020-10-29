@@ -13,20 +13,24 @@ import wemi.WemiException
 import wemi.assembly.AssemblyOperation
 import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.DefaultRenameFunction
+import wemi.assembly.MergeStrategy
 import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
 import wemi.util.FileSet
-import wemi.util.LocatedPath
 import wemi.util.absolutePath
 import wemi.util.div
 import wemi.util.ensureEmptyDirectory
+import wemi.util.include
 import wemi.util.isRegularFile
 import wemi.util.linkOrCopyRecursively
+import wemi.util.matchingFiles
 import wemi.util.matchingLocatedFiles
 import wemi.util.name
 import wemi.util.pathHasExtension
 import wemi.util.toSafeFileName
+import wemiplugin.intellij.utils.Utils
 import java.nio.file.Path
+import java.util.stream.Collectors
 
 
 private val LOG = LoggerFactory.getLogger("PackagePlugin")
@@ -61,6 +65,9 @@ val DefaultIntelliJPluginFolder : Value<Path> = {
 		path.linkOrCopyRecursively(pluginLibDir / path.name)
 	}
 
+	val searchableOptions = IntelliJ.intellijPluginSearchableOptions.get()
+	searchableOptions?.linkOrCopyRecursively(pluginLibDir / searchableOptions.name)
+
 	val strictness = IntelliJ.intellijVerifyPluginStrictness.get()
 	when (val creationResult = IdePluginManager.createManager().createPlugin(pluginDir)) {
 		is PluginCreationSuccess -> {
@@ -90,86 +97,49 @@ val DefaultIntelliJPluginFolder : Value<Path> = {
 	pluginDir
 }
 
-val DefaultIntelliJSearchableOptions : Value<Path?> = v@{
-	val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
-	if (ideVersion.baselineVersion < 191 || (ideVersion.baselineVersion == 191 && ideVersion.build < 2752)) {
-		return@v null
-	}
-
-	val cacheDir = Keys.cacheDirectory.get()
-	val outputDir = cacheDir / "-intellij-searchable-options"
-	outputDir.ensureEmptyDirectory()
-	runIde(listOf("traverseUI", outputDir.absolutePath, "true"))
-
-	// Now package it
-	val jar = outputDir / "searchableOptions.jar"
-	AssemblyOperation().use {
-		// TODO(jp): This is probably a bit more complicated
-		for (file in FileSet(outputDir).matchingLocatedFiles()) {
-			it.addSource(file, true)
+val DefaultIntelliJSearchableOptions : Value<Path?> = {
+	// The trouble here is that runIde requires plugin folder, which in turn requires searchable options
+	// By explicitly using withoutSearchableOptions, it kicks out withSearchableOptions configuration,
+	// which defines this, so it calls stub and not an infinite loop
+	using(withoutSearchableOptions) {
+		val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
+		if (ideVersion.baselineVersion < 191 || (ideVersion.baselineVersion == 191 && ideVersion.build < 2752)) {
+			return@using null
 		}
-		it.assembly(NoConflictStrategyChooser, DefaultRenameFunction, DefaultAssemblyMapFilter, jar, NoPrependData, true)
-	}
-	jar
 
-	// TODO(jp): ???
-	/*private static void configureJarSearchableOptionsTask(@NotNull Project project) {
-		Utils.info(project, "Configuring jar searchable options task")
-		project.tasks.create(JAR_SEARCHABLE_OPTIONS_TASK_NAME, JarSearchableOptionsTask).with {
-			description = "Jars searchable options."
-			if (VersionNumber.parse(project.gradle.gradleVersion) >= VersionNumber.parse("5.1")) {
-				archiveBaseName.set('lib/searchableOptions')
-				destinationDirectory.set(project.layout.buildDirectory.dir("libsSearchableOptions"))
-			} else {
-				conventionMapping('baseName', { 'lib/searchableOptions' })
-				destinationDir = new File(project.buildDir, "libsSearchableOptions")
+		val cacheDir = Keys.cacheDirectory.get()
+		val outputDir = cacheDir / "-intellij-searchable-options"
+		outputDir.ensureEmptyDirectory()
+		LOG.info("Starting IDE for searchable option collection")
+		runIde(listOf("traverseUI", outputDir.absolutePath, "true"))
+
+		// Collect
+		val searchableOptionsSuffix = ".searchableOptions.xml"
+		val searchXMLs = Utils.collectJars(IntelliJ.intellijPluginFolder.get() / "lib")
+				.flatMap {
+					FileSet(outputDir / it.name / "search", include("*$searchableOptionsSuffix")).matchingFiles().stream()
+				}.collect(Collectors.toList())
+
+		// Now package it
+		val jar = outputDir / "searchableOptions.jar"
+		AssemblyOperation().use {
+			for (xml in searchXMLs) {
+				val content = Files.readAllBytes(xml)
+				it.addSource("search/${xml.name}", content, true)
 			}
-
-			dependsOn(BUILD_SEARCHABLE_OPTIONS_TASK_NAME)
-			onlyIf { new File(project.buildDir, SEARCHABLE_OPTIONS_DIR_NAME).isDirectory() }
+			it.assembly({ MergeStrategy.RenameDeduplicate }, DefaultRenameFunction, DefaultAssemblyMapFilter, jar, NoPrependData, true)
 		}
-	}*/
-
-	/*class JarSearchableOptionsTask extends Jar {
-		JarSearchableOptionsTask() {
-			def pluginJarFiles = null
-			from {
-				include { FileTreeElement element ->
-					if (element.directory) {
-						return true
-					}
-					def suffix = ".searchableOptions.xml"
-					if (element.name.endsWith(suffix)) {
-						if (pluginJarFiles == null) {
-							def prepareSandboxTask = project.tasks.findByName(IntelliJPlugin.PREPARE_SANDBOX_TASK_NAME) as PrepareSandboxTask
-							def lib = "${prepareSandboxTask.getPluginName()}/lib"
-							def files = new File(prepareSandboxTask.getDestinationDir(), lib).list()
-							pluginJarFiles = files != null ? files as Set : []
-						}
-						def jarName = element.name.replace(suffix, "")
-						pluginJarFiles.contains(jarName)
-					}
-				}
-				"$project.buildDir/$IntelliJPlugin.SEARCHABLE_OPTIONS_DIR_NAME"
-			}
-			eachFile { path = "search/$name" }
-			includeEmptyDirs = false
-		}
-	}*/
+		jar
+	}
 }
 
 val DefaultIntelliJPluginArchive : Value<Path> = {
-	val folder = IntelliJ.intellijPluginFolder.get()
-	val searchableOptions = IntelliJ.intellijPluginSearchableOptions.get()
+	val folder = using(withSearchableOptions) { IntelliJ.intellijPluginFolder.get() }
 
 	val zip = folder.parent / "${folder.name}.zip"
 	AssemblyOperation().use {
 		for (file in FileSet(folder).matchingLocatedFiles()) {
 			it.addSource(file, true, extractJarEntries = false)
-		}
-		if (searchableOptions != null) {
-			// TODO(jp): This path is probably wrong
-			it.addSource(LocatedPath(searchableOptions), true, extractJarEntries = false)
 		}
 		it.assembly(NoConflictStrategyChooser, DefaultRenameFunction, DefaultAssemblyMapFilter, zip, NoPrependData, true)
 	}
