@@ -238,6 +238,14 @@ class BuildScriptInfo internal constructor(
 
                 _unmanagedDependencies.add(path)
             }
+            BuildDependencyPlugin::class.java -> {
+                val (name, group) = fields
+
+                _repositories.add(Jitpack)
+                _repositories.add(JCenter)
+                val version = if (WemiVersion.endsWith("-SNAPSHOT")) WemiBuildCommit else WemiVersion
+                _dependencies.add(Dependency(DependencyId(group, name, version), exclusions = WemiBundledLibrariesExclude))
+            }
             else -> {
                 throw AssertionError(annotation)//Not possible
             }

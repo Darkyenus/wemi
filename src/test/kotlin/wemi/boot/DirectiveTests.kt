@@ -20,7 +20,9 @@ class DirectiveTests {
                 BuildDependency::class.java to arrayOf("G", "N", "V"),
                 BuildDependency::class.java to arrayOf("G", "N", "V"),
                 BuildDependency::class.java to arrayOf("G", "N", "V"),
-                BuildDependencyRepository::class.java to arrayOf("NAME", "\tCRAZY:U\\R\"L\t")
+                BuildDependencyRepository::class.java to arrayOf("NAME", "\tCRAZY:U\\R\"L\t"),
+                BuildDependencyPlugin::class.java to arrayOf("wemi-plugin-foo", "com.darkyen.wemi"),
+                BuildDependencyPlugin::class.java to arrayOf("wemi-plugin-bar", "com.example.group")
         )
         val expectedIterator = expected.iterator()
 
@@ -28,16 +30,16 @@ class DirectiveTests {
         val result = InputStreamReader(DirectiveFields::class.java.getResourceAsStream("directivesOk.txt"), Charsets.UTF_8).use {
             parseFileDirectives(it.buffered(), SupportedDirectives) {annotation, arguments ->
                 directiveIndex++
-                Assertions.assertTrue(expectedIterator.hasNext())
+                assertTrue(expectedIterator.hasNext())
                 val (eClass, eArguments) = expectedIterator.next()
 
-                assertEquals(eClass, annotation) {"Directive $directiveIndex $eClass -> ${Arrays.toString(eArguments)}"}
-                assertArrayEquals(eArguments, arguments) {"Directive $directiveIndex $eClass -> ${Arrays.toString(eArguments)}"}
+                assertEquals(eClass, annotation) {"Directive $directiveIndex $eClass -> ${eArguments.contentToString()}"}
+                assertArrayEquals(eArguments, arguments) {"Directive $directiveIndex $eClass -> ${eArguments.contentToString()}"}
             }
         }
 
-        Assertions.assertFalse(expectedIterator.hasNext())
-        Assertions.assertTrue(result)
+        assertFalse(expectedIterator.hasNext())
+        assertTrue(result)
     }
 
 }

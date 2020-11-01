@@ -183,8 +183,10 @@ val core:Project by project {
 
     projectVersion set { using(wemi) { projectVersion.get() } }
     generateSources("core-version") {
-        generateKotlinConstantsFile(it, "wemi.boot.Version",
-                mapOf("WemiVersion" to Constant.StringConstant(projectVersion.get(), "Version of Wemi build system")))
+        generateKotlinConstantsFile(it, "wemi.boot.Version", mapOf(
+                "WemiVersion" to Constant.StringConstant(projectVersion.get(), "Version of Wemi build system"),
+                "WemiBuildCommit" to Constant.StringConstant(lastGitCommit() ?: "", "Git commit out of which this build was built")
+        ))
     }
 
     repositories add { Jitpack }
@@ -247,7 +249,7 @@ fun createKotlinCompilerProject(version:String):Project {
         }
     }
 
-    return createProject(projectName.toString(), path("src/main-kotlinc/$version"), Archetypes.JavaKotlinProject, Archetypes.JUnitProject) {
+    return createProject(projectName.toString(), path("src/main-kotlinc/$version"), Archetypes.JavaKotlinProject, Archetypes.JUnitLayer) {
         sources set { FileSet(projectRoot.get() / "src") }
 
         compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
@@ -271,7 +273,7 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
 
     projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
 
-    /* Used only in wemi.document.DokkaInterface */
+    /* Used only in wemi.document.DokkaInterface */
     libraryDependencies add { dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", scope=ScopeProvided) }
 
     repositories set { setOf(JCenter) }
@@ -279,10 +281,14 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
 
 private val SYSTEM_LOG = LoggerFactory.getLogger("system")
 
+fun lastGitCommit():String? {
+    return system("git", "rev-list", "--max-count=1", "master", timeoutMs = 60_000) { code, _ -> SYSTEM_LOG.warn("Could not get the latest commit ({})", code); null }
+}
+
 fun versionAccordingToGit():String? {
     val lastWemiVersionTag = system("git", "describe", "--tags", "--match=v*", "--abbrev=0", timeoutMs = 60_000) { code, _ -> SYSTEM_LOG.warn("Could not find Wemi version ({})", code); null } ?: return null
     val lastVersionCommit = system("git", "rev-list", "--max-count=1", lastWemiVersionTag, timeoutMs = 60_000) { code, _ -> SYSTEM_LOG.warn("Could not get version_commit ({})", code); null } ?: return null
-    val latestCommit = system("git", "rev-list", "--max-count=1", "master", timeoutMs = 60_000) { code, _ -> SYSTEM_LOG.warn("Could not get the latest commit ({})", code); null } ?: return null
+    val latestCommit = lastGitCommit() ?: return null
 
     val matcher = Pattern.compile("v([0-9]+)\\.([0-9]+).*").matcher(lastWemiVersionTag)
     if (!matcher.matches()) {

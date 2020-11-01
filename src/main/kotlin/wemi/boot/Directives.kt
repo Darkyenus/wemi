@@ -72,12 +72,30 @@ annotation class BuildDependencyRepository(val name:String, val url:String)
 annotation class BuildClasspathDependency(val file:String)
 
 /**
+ * Build script file annotation, request a plugin dependency.
+ * This is functionally equivalent to [BuildDependency], but the version is automatically set to
+ * [WemiVersion] or [WemiBuildCommit], if a snapshot version is used.
+ * The group is for convenience set by default to "com.darkyen.wemi", which is the group of official plugins.
+ * This also automatically adds the repository in which the official plugins are published
+ * (like [BuildDependencyRepository] does). This repository is currently [wemi.dependency.Jitpack].
+ * (It also sneakily adds [wemi.dependency.JCenter] because IntelliJ plugin needs it.)
+ */
+@Target(AnnotationTarget.FILE)
+@Retention(AnnotationRetention.SOURCE)
+@Repeatable
+@DirectiveFields(["name", "group"])
+annotation class BuildDependencyPlugin(val name:String, val group:String = "com.darkyen.wemi")
+
+/**
  * Directives supported in build-scripts.
  */
 internal val SupportedDirectives = arrayOf(
+        // When adding more, remember to add the appropriate typealias to AutoImport
         BuildDependency::class.java,
         BuildDependencyRepository::class.java,
-        BuildClasspathDependency::class.java)
+        BuildClasspathDependency::class.java,
+        BuildDependencyPlugin::class.java
+)
 
 private val LOG = LoggerFactory.getLogger("Directives")
 

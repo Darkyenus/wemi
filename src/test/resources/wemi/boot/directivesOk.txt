@@ -11,6 +11,9 @@
 
 @file:BuildDependencyRepository("NAME", url=    "\tCRAZY:U\\R\"L\t")
 
+@file:BuildDependencyPlugin("wemi-plugin-foo")
+@file:BuildDependencyPlugin("wemi-plugin-bar", "com.example.group")
+
 import wemi.Keys.runOptions
 import wemi.dependency.Repository
 import wemi.util.executable

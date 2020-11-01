@@ -240,3 +240,4 @@ val assembly
 typealias BuildDependency = wemi.boot.BuildDependency
 typealias BuildDependencyRepository = wemi.boot.BuildDependencyRepository
 typealias BuildClasspathDependency = wemi.boot.BuildClasspathDependency
+typealias BuildDependencyPlugin = wemi.boot.BuildDependencyPlugin
