@@ -6,6 +6,7 @@ import Path
 import org.slf4j.LoggerFactory
 import wemi.Configurations
 import wemi.Key
+import wemi.StringValidator
 import wemi.WemiException
 import wemi.archetype
 import wemi.collections.toMutable
@@ -17,6 +18,7 @@ import wemi.dependency.ScopeProvided
 import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.resolveDependencyArtifacts
 import wemi.key
+import wemi.readSecret
 import wemi.util.FileSet
 import wemi.util.LocatedPath
 import wemi.util.absolutePath
@@ -102,6 +104,8 @@ val IntelliJPluginLayer by archetype {
 		}
 	}
 	IntelliJ.resolvedIntellijPluginDependencies set DefaultResolvedIntellijPluginDependencies
+	// Gradle plugin does something like this, but I don't think we need it
+	//Keys.repositories addAll { IntelliJ.intellijPluginRepositories.get().mapNotNull { (it as? IntelliJPluginRepository.Maven)?.repo } }
 
 	// Project compilation, archival and publishing
 	IntelliJ.intellijPluginFolder set DefaultIntelliJPluginFolder
@@ -110,7 +114,12 @@ val IntelliJPluginLayer by archetype {
 	extend(withSearchableOptions) {
 		IntelliJ.intellijPluginSearchableOptions set DefaultIntelliJSearchableOptions
 	}
-	IntelliJ.intellijPublishPluginToRepository set DefaultIntellijPublishPluginToRepository // TODO(jp): Test this
+	IntelliJ.intellijPublishPluginToken set {
+		val pluginName = IntelliJ.intellijPluginName.get()
+		readSecret("intellij-plugin-publish-token-$pluginName", "Publish token for plugin $pluginName. You can get one at https://plugins.jetbrains.com", StringValidator)
+				?: throw WemiException("IntelliJ publish token for plugin $pluginName must be specified")
+	}
+	IntelliJ.intellijPublishPluginToRepository set DefaultIntellijPublishPluginToRepository
 
 	// plugin.xml
 	IntelliJ.intelliJPluginXmlPatches addAll DefaultIntelliJPluginXmlPatches

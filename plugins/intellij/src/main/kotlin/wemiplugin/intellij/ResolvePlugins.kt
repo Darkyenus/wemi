@@ -55,7 +55,8 @@ sealed class IntelliJPluginDependency {
 
 /** A resolved dependency on an IDE plugin. */
 class ResolvedIntelliJPluginDependency(val dependency:IntelliJPluginDependency, val artifact:Path,
-                                       val sinceIdeVersion:IdeVersion? = null, val untilIdeVersion:IdeVersion? = null) {
+                                       private val sinceIdeVersion:IdeVersion? = null,
+                                       private val untilIdeVersion:IdeVersion? = null) {
 
 	val isBuiltin:Boolean
 		get() = dependency is IntelliJPluginDependency.Bundled
@@ -238,9 +239,6 @@ val DefaultResolvedIntellijPluginDependencies : Value<List<ResolvedIntelliJPlugi
 		pluginDependencies.add(resolved)
 	}
 
-	// TODO(jp): Add all Maven plugin repositories which were used to resolve something to Keys.repositories (original plugin does this, for some reason)
-
-	// TODO(jp): Maybe there is a better way to do this? I.e. managing dependencies from Wemi directly and patching xml?
 	if (!pluginDependencyIds.any { it is IntelliJPluginDependency.Bundled && it.name == "java" } && (ideaDependency.homeDir / "plugins/java").exists()) {
 		for (file in sourcePluginXmlFiles(false)) {
 			val pluginXml = parseXml(file.file) ?: continue
@@ -248,7 +246,7 @@ val DefaultResolvedIntellijPluginDependencies : Value<List<ResolvedIntelliJPlugi
 			for (depend in depends) {
 				if (depend.textContent == "com.intellij.modules.java") {
 					throw WemiException("The project depends on `com.intellij.modules.java` module but doesn't declare a compile dependency on it.\n" +
-							"Please delete `depends` tag from ${file.file.absolutePath} or add `java` plugin to Wemi dependencies")// TODO(jp): How it should look
+							"Please delete `depends` tag from ${file.file.absolutePath} or add `java` plugin to Wemi dependencies: 'IntelliJ.intellijPluginDependencies add {IntelliJPluginDependency.Bundled(\"java\")}'")
 				}
 			}
 		}

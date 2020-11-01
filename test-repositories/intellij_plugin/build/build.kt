@@ -1,4 +1,5 @@
-@file:BuildDependencyPlugin("wemi-plugin-intellij")
+@file:BuildDependency("com.darkyen.wemi", "wemi-plugin-intellij", "0.14-SNAPSHOT")
+//@file:BuildDependencyPlugin("wemi-plugin-intellij")
 @file:BuildDependencyRepository("jcenter", "https://jcenter.bintray.com/")
 
 import wemi.*

@@ -4,10 +4,13 @@ import org.jline.reader.EndOfFileException
 import org.jline.reader.UserInterruptException
 import org.slf4j.LoggerFactory
 import wemi.boot.CLI
+import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiRunningInInteractiveMode
 import wemi.util.*
 import wemi.util.CliStatusDisplay.Companion.withStatus
+import java.nio.file.NoSuchFileException
 import java.util.*
+import java.util.regex.Pattern
 
 private val LOG = LoggerFactory.getLogger("Input")
 
@@ -79,6 +82,109 @@ fun <V> EvalScope.read(key: String, description: String, validator: Validator<V>
                 val previousHistory = history
                 try {
                     history = SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key))
+                    CLI.MessageDisplay.withStatus(false) {
+                        readLine("${format(description, format = Format.Bold)} (${format(key, Color.White)}): ")
+                    }
+                } finally {
+                    history = previousHistory
+                }
+            }
+            val value = validator(line)
+            value.use({
+                return it
+            }, {
+                print(format("Invalid input: ", format = Format.Bold))
+                println(format(it, foreground = Color.Red))
+            })
+        }
+    } catch (e: UserInterruptException) {
+        return null
+    } catch (e: EndOfFileException) {
+        return null
+    }
+}
+
+private val SECRET_KEY_VALUE_REGEX = Pattern.compile("^([a-zA-Z0-9-_.]+)[\\s]*:[\\s]*(.*?)[\\s]*\$")
+
+/**
+ * Read a secret key. This is different from normal [read] in several ways:
+ * 1. Read token is not saved to autocomplete history and there is no autocomplete
+ * 2. Before asking, secret is first searched for in a "build/wemi-secrets.txt" file, which is an UTF-8 encoded file,
+ *      where each line that matches regex ^([a-zA-Z0-9-_.]+)[\s]*:[\s]*(.*?)[\s]*$ is considered a key-value pair.
+ *      For example, one such line may look like this:
+ *      my-secret: 1234567890
+ *      If you do have such file, remember to not push it to version control system!
+ *      Keys taken from file are not case sensitive.
+ */
+fun <V> EvalScope.readSecret(key:String, description:String, validator:Validator<V>):V? {
+    val input = this.input
+
+    // Search in prepared by key
+    for ((preparedKey, preparedValue) in input) {
+        if (!preparedKey.equals(key, ignoreCase = true)) {
+            continue
+        }
+
+        validator(preparedValue).use<Unit>({
+            return it
+        }, {
+            LOG.info("Can't use specified value for input key '{}': {}", key, it.replace(preparedValue, "<secret>"))
+        })
+    }
+
+    // Search in prepared for free
+    // Move nextFreeInput to a valid index of free input
+    while (nextFreeInput < input.size && input[nextFreeInput].first.isNotEmpty()) {
+        nextFreeInput++
+    }
+    // Try to use it
+    if (nextFreeInput < input.size) {
+        val freeInput = input[nextFreeInput].second
+        validator(freeInput).use({
+            // We will use this free input
+            nextFreeInput++
+            return it
+        }, {
+            LOG.info("Can't use specified free input value for input key '{}': {}", key, it.replace(freeInput, "<secret>"))
+        })
+    }
+
+    // Read file
+    val secretsFile = WemiBuildFolder / "wemi-secrets.txt"
+    val secretFromFile = try {
+        Files.lines(secretsFile).map { line ->
+            val matcher = SECRET_KEY_VALUE_REGEX.matcher(line)
+            if (matcher.matches() && matcher.group(1).equals(key, ignoreCase = true)) {
+                matcher.group(2)
+            } else null
+        }.filter { it != null }.findFirst().orElse(null)
+    } catch (e:NoSuchFileException) {
+        LOG.info("Not reading secret {} from {} - file does not exist")
+        null
+    } catch (e:Exception) {
+        LOG.warn("Failed to read {} to obtain {}", secretsFile, key, e)
+        null
+    }
+    if (secretFromFile != null) {
+        validator(secretFromFile).use({ success ->
+            return success
+        }, {
+            LOG.warn("Can't use value of secret key {} from {}, because the value does not pass validation: {}", key, secretsFile, it.replace(secretFromFile, "<secret>"))
+        })
+    }
+
+    // Still no hit, read interactively
+    if (!WemiRunningInInteractiveMode) {
+        LOG.info("Not asking for secret {} - '{}', not interactive", key, description)
+        return null
+    }
+
+    try {
+        while (true) {
+            val line = CLI.InputLineReader.run {
+                val previousHistory = history
+                try {
+                    history = SimpleHistory(null)
                     CLI.MessageDisplay.withStatus(false) {
                         readLine("${format(description, format = Format.Bold)} (${format(key, Color.White)}): ")
                     }
