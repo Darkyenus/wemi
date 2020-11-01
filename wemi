@@ -40,7 +40,7 @@
 #			--print-java-exe	- Print path to java executable that would be used and exit
 #			--print-wemi-home	- Print path to directory with Wemi jars and exit
 
-readonly wemi_version='0.13'
+readonly wemi_version='0.14-SNAPSHOT'
 readonly java_min_version='8'
 
 log() { echo "$@" 1>&2; }
@@ -248,7 +248,7 @@ readonly jdk_release="${WEMI_JDK_RELEASE:-latest}"
 readonly jdk_os="$(detect_os)" || fail "Failed to detect OS, specify it manually"
 readonly jdk_arch="$(detect_arch)" || fail "Failed to detect architecture, specify it manually"
 
-if [ "$WEMI_USE_SYMLINKS" = "false" ] || { [ "$(detect_os)" = "windows" ] && [ ! "$WEMI_USE_SYMLINKS" = "true" ]; }; then
+if [ "$WEMI_USE_SYMLINKS" = "false" ] || { [ "$jdk_os" = "windows" ] && [ ! "$WEMI_USE_SYMLINKS" = "true" ]; }; then
 	readonly use_symlinks="false"
 else
 	readonly use_symlinks="true"
@@ -413,8 +413,17 @@ can_use_java_from_path() {
 		return 1
 	fi
 
-	if [ "$java_version_forced" = 'true' ] && ! command_exists javac; then
-		log "Not using java on PATH, because javac is not on PATH and explicit version has been specified"
+	if [ "$jdk_os" = 'mac' ] && command_exists '/usr/libexec/java_home' && [ -z "$JAVA_HOME" ]; then
+		# Java on macOS always exists on PATH, but that is just a proxy to the real JVM.
+		# Which JVM installation is used is controlled by either java_home command or JAVA_HOME env var.
+		# If JAVA_HOME is set, trust it, otherwise check that java_home returns a valid path.
+		# We also try to exec javac, to also check that it is a JDK.
+		if ! /usr/libexec/java_home --exec javac -version > /dev/null 2>&1; then
+			# No JDK installed (through java_home)
+			return 1
+		fi
+	elif [ "$java_version_forced" = 'true' ] && ! command_exists javac; then
+		# Not using java on PATH, because javac is not on PATH and explicit version has been specified
 		return 1
 	fi
 

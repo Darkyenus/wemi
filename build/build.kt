@@ -133,6 +133,18 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
         )
     }
 
+    // When publishing on jitpack, automatically publish all plugins as well
+    extend(Configurations.jitpack) {
+        publish modify {
+            for (p in arrayOf(pluginJvmHotswap, pluginTeaVM, pluginIntellij)) {
+                using(p) {
+                    publish.get()
+                }
+            }
+            it
+        }
+    }
+
     extend(archivingSources) {
         archive set {
             using(Configurations.archiving) {

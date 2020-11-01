@@ -7,6 +7,7 @@ import wemi.boot.CLI
 import wemi.boot.WemiRunningInInteractiveMode
 import wemi.util.*
 import wemi.util.CliStatusDisplay.Companion.withStatus
+import java.util.*
 
 private val LOG = LoggerFactory.getLogger("Input")
 
@@ -122,7 +123,7 @@ val IntValidator: Validator<Int> = {
     } else if (trimmed.equals("max", ignoreCase=true)) {
         Failable.success(Int.MAX_VALUE)
     } else {
-        Failable.failNull(it.trim().toIntOrNull(), "Integer expected")
+        Failable.failNull(trimmed.toIntOrNull(), "Integer expected")
     }
 }
 
@@ -131,7 +132,7 @@ val IntValidator: Validator<Int> = {
  */
 @Suppress("unused")
 val BooleanValidator: Validator<Boolean> = {
-    when (it.toLowerCase()) {
+    when (it.toLowerCase(Locale.ROOT).trim()) {
         "true", "yes", "1", "y", "on" ->
             Failable.success(true)
         "false", "no", "0", "n", "off" ->

@@ -97,7 +97,7 @@ private fun retrieveFileLocally(repository: Repository, path: String, snapshot:B
             }
             LOG.debug("Using local artifact: {}", localFile)
             return Failable.success(ArtifactPath(localFile, null, repository, repositoryArtifactUrl,false))
-        } catch (fileDoesNotExist: java.nio.file.NoSuchFileException) {
+        } catch (fileDoesNotExist: NoSuchFileException) {
             LOG.trace("A local artifact does not exist: {}", localFile)
             return Failable.failure(null)
         } catch (ioProblem: IOException) {
@@ -133,7 +133,7 @@ private fun retrieveFileLocally(repository: Repository, path: String, snapshot:B
 
         cacheFileExists = true
         cacheControlMs = modified
-    } catch (fileDoesNotExist: java.nio.file.NoSuchFileException) {
+    } catch (fileDoesNotExist: NoSuchFileException) {
         LOG.trace("Local artifact cache does not exist: {}", cacheFile)
     } catch (io: IOException) {
         LOG.warn("Failed to check local artifact cache: {}", cacheFile, io)
