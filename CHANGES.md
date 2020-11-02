@@ -8,7 +8,10 @@
 - Maven dependency resolver now checks `WEMI_MAVEN_OS_NAME`, `WEMI_MAVEN_OS_ARCH`, `WEMI_MAVEN_OS_VERSION` and `WEMI_MAVEN_OS_FAMILY`
     environment variables to detect relevant profile activation properties
 - Added a new `Dependency` type, `TypeChooseByPackaging`, which allows Wemi to choose the artifact automatically
-- Added `SystemInfo` for all operating system and processor architecture detection needs 
+- Added `SystemInfo` for all operating system and processor architecture detection needs
+- Removed `archivingDocs` and `archivingSources` configurations, their purpose is now fulfilled through `archiveDocs` and `archiveSources` keys
+- Removed `archiveOutput` key, modify the target file location through explicit move
+- Removed `publishing` configuration
 
 # 0.13 2020-06-23
 - Add utility functions for source file and classpath generation, see the `wemi.generation` package

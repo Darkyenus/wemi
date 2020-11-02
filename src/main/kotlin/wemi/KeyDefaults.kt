@@ -75,7 +75,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.ZonedDateTime
 import java.util.*
-import java.util.logging.Level
 import javax.tools.DocumentationTool
 import javax.tools.StandardLocation
 import javax.tools.ToolProvider
