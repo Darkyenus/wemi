@@ -83,11 +83,12 @@ object Keys {
     val testParameters by key<TestParameters>("Parameters for the test key. By default, discovers all tests in the test sources", inputKeys = arrayOf("class" to "Include classes, whose fully classified name match this regex"))
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it, _ -> it.prettyPrint() })
 
-    val archiveOutputFile by key<Path>("File to which archive should be saved to")
     val archiveJavadocOptions by key<List<String>>("Options when archiving Javadoc")
     val archiveDokkaOptions by key<DokkaOptions>("Options when archiving Dokka")
     val archiveDokkaInterface by key<DokkaInterface>("Dokka instance used when creating documentation")
     val archive by key<Path?>("Archive project's output and return path to the created file, if any")
+    val archiveSources by key<Path>("Archive project's sources and return path to the created file")
+    val archiveDocs by key<Path>("Archive project's documentation and return path to the created file")
 
     val publishMetadata by key<InfoNode>("Meta-information that should be published together with archives by 'publish'")
     val publishRepository by key<Repository>("Repository to which the archives are published")

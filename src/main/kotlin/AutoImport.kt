@@ -117,10 +117,6 @@ val testing
     inline get() = Configurations.testing
 val archiving
     inline get() = Configurations.archiving
-val archivingDocs
-    inline get() = Configurations.archivingDocs
-val archivingSources
-    inline get() = Configurations.archivingSources
 val publishing
     inline get() = Configurations.publishing
 
@@ -203,8 +199,6 @@ val testParameters
 val test
     inline get() = Keys.test
 
-val archiveOutputFile
-    inline get() = Keys.archiveOutputFile
 val archiveJavadocOptions
     inline get() = Keys.archiveJavadocOptions
 val archiveDokkaOptions
@@ -213,6 +207,10 @@ val archiveDokkaInterface
     inline get() = Keys.archiveDokkaInterface
 val archive
     inline get() = Keys.archive
+val archiveSources
+    inline get() = Keys.archiveSources
+val archiveDocs
+    inline get() = Keys.archiveDocs
 
 val publishMetadata
     inline get() = Keys.publishMetadata

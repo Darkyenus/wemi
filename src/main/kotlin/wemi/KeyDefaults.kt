@@ -552,6 +552,14 @@ object KeyDefaults {
         resultReport
     }
 
+    fun EvalScope.defaultArchiveFileName(suffix:String? = null, extension:String = "zip"):Path {
+        val projectName = Keys.projectName.get().toSafeFileName()
+        val projectVersion = Keys.projectVersion.get().toSafeFileName()
+        val result = Keys.cacheDirectory.get() / "-archive/$projectName-$projectVersion${if (suffix == null) "" else "-$suffix"}.$extension"
+        Files.createDirectories(result.parent)
+        return result
+    }
+
     val Archive: Value<Path> = {
         using(Configurations.archiving) {
             AssemblyOperation().use { assemblyOperation ->
@@ -560,7 +568,7 @@ object KeyDefaults {
                     assemblyOperation.addSource(file, true)
                 }
 
-                val outputFile = Keys.archiveOutputFile.get()
+                val outputFile = defaultArchiveFileName(extension = "jar")
                 assemblyOperation.assembly(
                         NoConflictStrategyChooser,
                         DefaultRenameFunction,
@@ -576,31 +584,29 @@ object KeyDefaults {
     }
 
     val ArchiveSources: Value<Path> = {
-        using(Configurations.archivingSources) {
-            AssemblyOperation().use { assemblyOperation ->
-                // Load data
+        AssemblyOperation().use { assemblyOperation ->
+            // Load data
+            for (file in Keys.sources.getLocatedPaths()) {
+                assemblyOperation.addSource(file, true, extractJarEntries = false)
+            }
+
+            inProjectDependencies(true) {
                 for (file in Keys.sources.getLocatedPaths()) {
                     assemblyOperation.addSource(file, true, extractJarEntries = false)
                 }
-
-                inProjectDependencies(true) {
-                    for (file in Keys.sources.getLocatedPaths()) {
-                        assemblyOperation.addSource(file, true, extractJarEntries = false)
-                    }
-                }
-
-                val outputFile = Keys.archiveOutputFile.get()
-                assemblyOperation.assembly(
-                        NoConflictStrategyChooser,
-                        DefaultRenameFunction,
-                        DefaultAssemblyMapFilter,
-                        outputFile,
-                        NoPrependData,
-                        compress = true)
-
-                expiresWith(outputFile)
-                outputFile
             }
+
+            val outputFile = defaultArchiveFileName("sources", "zip")
+            assemblyOperation.assembly(
+                    NoConflictStrategyChooser,
+                    DefaultRenameFunction,
+                    DefaultAssemblyMapFilter,
+                    outputFile,
+                    NoPrependData,
+                    compress = true)
+
+            expiresWith(outputFile)
+            outputFile
         }
     }
 
@@ -608,91 +614,87 @@ object KeyDefaults {
      * Binding for [Keys.archive] to use when archiving documentation and no documentation is available.
      */
     val ArchiveDummyDocumentation: Value<Path> = {
-        using(Configurations.archivingDocs) {
-            AssemblyOperation().use { assemblyOperation ->
+        AssemblyOperation().use { assemblyOperation ->
 
-                /*
-                # No documentation available
+            /*
+            # No documentation available
 
-                |Group        | Name | Version |
-                |:-----------:|:----:|:-------:|
-                |com.whatever | Pear | 1.3     |
+            |Group        | Name | Version |
+            |:-----------:|:----:|:-------:|
+            |com.whatever | Pear | 1.3     |
 
-                *Built by Wemi 1.2*
-                *Current date*
-                 */
+            *Built by Wemi 1.2*
+            *Current date*
+             */
 
-                val groupHeading = "Group"
-                val projectGroup = Keys.projectGroup.getOrElse("-")
-                val groupWidth = maxOf(groupHeading.length, projectGroup.length) + 2
+            val groupHeading = "Group"
+            val projectGroup = Keys.projectGroup.getOrElse("-")
+            val groupWidth = maxOf(groupHeading.length, projectGroup.length) + 2
 
-                val nameHeading = "Name"
-                val projectName = Keys.projectName.getOrElse("-")
-                val nameWidth = maxOf(nameHeading.length, projectName.length) + 2
+            val nameHeading = "Name"
+            val projectName = Keys.projectName.getOrElse("-")
+            val nameWidth = maxOf(nameHeading.length, projectName.length) + 2
 
-                val versionHeading = "Version"
-                val projectVersion = Keys.projectVersion.getOrElse("-")
-                val versionWidth = maxOf(versionHeading.length, projectVersion.length) + 2
+            val versionHeading = "Version"
+            val projectVersion = Keys.projectVersion.getOrElse("-")
+            val versionWidth = maxOf(versionHeading.length, projectVersion.length) + 2
 
-                val md = StringBuilder()
-                md.append("# No documentation available\n\n")
-                md.append('|').appendCentered(groupHeading, groupWidth, ' ')
-                        .append('|').appendCentered(nameHeading, nameWidth, ' ')
-                        .append('|').appendCentered(versionHeading, versionWidth, ' ').append("|\n")
+            val md = StringBuilder()
+            md.append("# No documentation available\n\n")
+            md.append('|').appendCentered(groupHeading, groupWidth, ' ')
+                    .append('|').appendCentered(nameHeading, nameWidth, ' ')
+                    .append('|').appendCentered(versionHeading, versionWidth, ' ').append("|\n")
 
-                md.append("|:").appendTimes('-', groupWidth - 2)
-                        .append(":|:").appendTimes('-', nameWidth - 2)
-                        .append(":|:").appendTimes('-', versionWidth - 2).append(":|\n")
+            md.append("|:").appendTimes('-', groupWidth - 2)
+                    .append(":|:").appendTimes('-', nameWidth - 2)
+                    .append(":|:").appendTimes('-', versionWidth - 2).append(":|\n")
 
-                md.append('|').appendCentered(projectGroup, groupWidth, ' ')
-                        .append('|').appendCentered(projectName, nameWidth, ' ')
-                        .append('|').appendCentered(projectVersion, versionWidth, ' ').append("|\n")
+            md.append('|').appendCentered(projectGroup, groupWidth, ' ')
+                    .append('|').appendCentered(projectName, nameWidth, ' ')
+                    .append('|').appendCentered(projectVersion, versionWidth, ' ').append("|\n")
 
-                md.append("\n*Built by Wemi $WemiVersion*\n")
-                md.append("*").append(ZonedDateTime.now()).append("*\n")
+            md.append("\n*Built by Wemi $WemiVersion*\n")
+            md.append("*").append(ZonedDateTime.now()).append("*\n")
 
-                assemblyOperation.addSource(
-                        "DOCUMENTATION.MD",
-                        md.toString().toByteArray(Charsets.UTF_8),
-                        true)
+            assemblyOperation.addSource(
+                    "DOCUMENTATION.MD",
+                    md.toString().toByteArray(Charsets.UTF_8),
+                    true)
 
-                val outputFile = Keys.archiveOutputFile.get()
-                assemblyOperation.assembly(
-                        NoConflictStrategyChooser,
-                        DefaultRenameFunction,
-                        DefaultAssemblyMapFilter,
-                        outputFile,
-                        NoPrependData,
-                        compress = true)
+            val outputFile = defaultArchiveFileName("docs", "zip")
+            assemblyOperation.assembly(
+                    NoConflictStrategyChooser,
+                    DefaultRenameFunction,
+                    DefaultAssemblyMapFilter,
+                    outputFile,
+                    NoPrependData,
+                    compress = true)
 
-                expiresWith(outputFile)
-                outputFile
-            }
+            expiresWith(outputFile)
+            outputFile
         }
     }
 
     val ArchiveJavadocOptions: Value<List<String>> = {
-        using(Configurations.archivingDocs) {
-            val options = WMutableList<String>()
+        val options = WMutableList<String>()
 
-            val compilerFlags = Keys.compilerOptions.get()
-            var javaVersionString:String? = null
-            compilerFlags.use(JavaCompilerFlags.sourceVersion) {
-                options.add("-source")
-                options.add(it)
-                javaVersionString = it
-            }
-            if (javaVersionString == null) {
-                javaVersionString = compilerFlags.getOrNull(JavaCompilerFlags.targetVersion)
-            }
-
-            val javaVersion = parseJavaVersion(javaVersionString)
-
-            options.add("-link")
-            options.add(javadocUrl(javaVersion))
-
-            options
+        val compilerFlags = Keys.compilerOptions.get()
+        var javaVersionString:String? = null
+        compilerFlags.use(JavaCompilerFlags.sourceVersion) {
+            options.add("-source")
+            options.add(it)
+            javaVersionString = it
         }
+        if (javaVersionString == null) {
+            javaVersionString = compilerFlags.getOrNull(JavaCompilerFlags.targetVersion)
+        }
+
+        val javaVersion = parseJavaVersion(javaVersionString)
+
+        options.add("-link")
+        options.add(javadocUrl(javaVersion))
+
+        options
     }
 
     private val ARCHIVE_JAVADOC_LOG = LoggerFactory.getLogger("ArchiveJavadoc")
@@ -703,79 +705,77 @@ object KeyDefaults {
         }
     }
 
-    val ArchiveJavadoc: Value<Path> = {
-        using(Configurations.archivingDocs) {
-            val sourceFiles = Keys.sources.getLocatedPaths(*JavaSourceFileExtensions)
+    val ArchiveJavadoc: Value<Path> = archive@{
+        val sourceFiles = Keys.sources.getLocatedPaths(*JavaSourceFileExtensions)
 
-            if (sourceFiles.isEmpty()) {
-                ARCHIVE_JAVADOC_LOG.info("No source files for Javadoc, creating dummy documentation instead")
-                return@using ArchiveDummyDocumentation()
+        if (sourceFiles.isEmpty()) {
+            ARCHIVE_JAVADOC_LOG.info("No source files for Javadoc, creating dummy documentation instead")
+            return@archive ArchiveDummyDocumentation()
+        }
+
+        val documentationTool = ToolProvider.getSystemDocumentationTool()!!
+        val fileManager = documentationTool.getStandardFileManager(ARCHIVE_JAVADOC_DIAGNOSTIC_LISTENER, Locale.ROOT, Charsets.UTF_8)
+        val sourceRoots = HashSet<File>()
+        sourceFiles.mapNotNullTo(sourceRoots) { it.root?.toFile() }
+        fileManager.setLocation(StandardLocation.SOURCE_PATH, sourceRoots)
+        val javadocOutput = Keys.cacheDirectory.get() / "javadoc-${Keys.projectName.get().toSafeFileName('_')}"
+        javadocOutput.ensureEmptyDirectory()
+        fileManager.setLocation(DocumentationTool.Location.DOCUMENTATION_OUTPUT, listOf(javadocOutput.toFile()))
+
+        // Setup classpath
+        fileManager.setLocation(StandardLocation.CLASS_PATH, Keys.externalClasspath.get().map { it.classpathEntry.toFile() })
+
+        // Try to specify doclet path explicitly
+        val toolsJar = jdkToolsJar(Keys.javaHome.get())
+        if (toolsJar != null) {
+            fileManager.setLocation(DocumentationTool.Location.DOCLET_PATH, listOf(toolsJar.toFile()))
+        }
+
+        var failOnError = false
+        val options = Keys.archiveJavadocOptions.get().filter {
+            if (it == "-Wemi-fail-on-error") {
+                failOnError = true
+                false
+            } else true
+        }
+
+        val docTask = documentationTool.getTask(
+                ARCHIVE_JAVADOC_OUTPUT_READER, fileManager,
+                ARCHIVE_JAVADOC_DIAGNOSTIC_LISTENER, null,
+                options, fileManager.getJavaFileObjectsFromFiles(sourceFiles.map { it.file.toFile() }))
+
+        docTask.setLocale(Locale.ROOT)
+        val result = docTask.call()
+        ARCHIVE_JAVADOC_OUTPUT_READER.close()
+
+        if (!result) {
+            if (failOnError) {
+                throw WemiException("Failed to package javadoc", showStacktrace = false)
+            } else {
+                ARCHIVE_JAVADOC_LOG.warn("There were errors when building Javadoc")
+            }
+        }
+
+        val locatedFiles = ArrayList<LocatedPath>()
+        constructLocatedFiles(javadocOutput, locatedFiles)
+
+        AssemblyOperation().use { assemblyOperation ->
+            // Load data
+            for (file in locatedFiles) {
+                assemblyOperation.addSource(file, own = true, extractJarEntries = false)
             }
 
-            val documentationTool = ToolProvider.getSystemDocumentationTool()!!
-            val fileManager = documentationTool.getStandardFileManager(ARCHIVE_JAVADOC_DIAGNOSTIC_LISTENER, Locale.ROOT, Charsets.UTF_8)
-            val sourceRoots = HashSet<File>()
-            sourceFiles.mapNotNullTo(sourceRoots) { it.root?.toFile() }
-            fileManager.setLocation(StandardLocation.SOURCE_PATH, sourceRoots)
-            val javadocOutput = Keys.cacheDirectory.get() / "javadoc-${Keys.projectName.get().toSafeFileName('_')}"
-            javadocOutput.ensureEmptyDirectory()
-            fileManager.setLocation(DocumentationTool.Location.DOCUMENTATION_OUTPUT, listOf(javadocOutput.toFile()))
+            val outputFile = defaultArchiveFileName("docs", "jar")
+            assemblyOperation.assembly(
+                    NoConflictStrategyChooser,
+                    DefaultRenameFunction,
+                    DefaultAssemblyMapFilter,
+                    outputFile,
+                    NoPrependData,
+                    compress = true)
 
-            // Setup classpath
-            fileManager.setLocation(StandardLocation.CLASS_PATH, Keys.externalClasspath.get().map { it.classpathEntry.toFile() })
-
-            // Try to specify doclet path explicitly
-            val toolsJar = jdkToolsJar(Keys.javaHome.get())
-            if (toolsJar != null) {
-                fileManager.setLocation(DocumentationTool.Location.DOCLET_PATH, listOf(toolsJar.toFile()))
-            }
-
-            var failOnError = false
-            val options = Keys.archiveJavadocOptions.get().filter {
-                if (it == "-Wemi-fail-on-error") {
-                    failOnError = true
-                    false
-                } else true
-            }
-
-            val docTask = documentationTool.getTask(
-                    ARCHIVE_JAVADOC_OUTPUT_READER, fileManager,
-                    ARCHIVE_JAVADOC_DIAGNOSTIC_LISTENER, null,
-                    options, fileManager.getJavaFileObjectsFromFiles(sourceFiles.map { it.file.toFile() }))
-
-            docTask.setLocale(Locale.ROOT)
-            val result = docTask.call()
-            ARCHIVE_JAVADOC_OUTPUT_READER.close()
-
-            if (!result) {
-                if (failOnError) {
-                    throw WemiException("Failed to package javadoc", showStacktrace = false)
-                } else {
-                    ARCHIVE_JAVADOC_LOG.warn("There were errors when building Javadoc")
-                }
-            }
-
-            val locatedFiles = ArrayList<LocatedPath>()
-            constructLocatedFiles(javadocOutput, locatedFiles)
-
-            AssemblyOperation().use { assemblyOperation ->
-                // Load data
-                for (file in locatedFiles) {
-                    assemblyOperation.addSource(file, own = true, extractJarEntries = false)
-                }
-
-                val outputFile = Keys.archiveOutputFile.get()
-                assemblyOperation.assembly(
-                        NoConflictStrategyChooser,
-                        DefaultRenameFunction,
-                        DefaultAssemblyMapFilter,
-                        outputFile,
-                        NoPrependData,
-                        compress = true)
-
-                expiresWith(outputFile)
-                outputFile
-            }
+            expiresWith(outputFile)
+            outputFile
         }
     }
 
@@ -828,48 +828,46 @@ object KeyDefaults {
     }
 
     private val ARCHIVE_DOKKA_LOG = LoggerFactory.getLogger("ArchiveDokka")
-    val ArchiveDokka: Value<Path> = {
-        using(Configurations.archivingDocs) {
-            val options = Keys.archiveDokkaOptions.get()
+    val ArchiveDokka: Value<Path> = archive@{
+        val options = Keys.archiveDokkaOptions.get()
 
-            if (options.sourceRoots.isEmpty()) {
-                ARCHIVE_DOKKA_LOG.info("No source files for Dokka, creating dummy documentation instead")
-                return@using ArchiveDummyDocumentation()
+        if (options.sourceRoots.isEmpty()) {
+            ARCHIVE_DOKKA_LOG.info("No source files for Dokka, creating dummy documentation instead")
+            return@archive ArchiveDummyDocumentation()
+        }
+
+        val cacheDirectory = Keys.cacheDirectory.get()
+        val dokkaOutput = cacheDirectory / "dokka-${Keys.projectName.get().toSafeFileName('_')}"
+        dokkaOutput.ensureEmptyDirectory()
+
+        val packageListCacheFolder = cacheDirectory / "dokka-package-list-cache"
+
+        val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
+
+        val dokka = Keys.archiveDokkaInterface.get()
+
+        dokka.execute(externalClasspath, dokkaOutput, packageListCacheFolder, options, ARCHIVE_DOKKA_LOG)
+
+        val locatedFiles = ArrayList<LocatedPath>()
+        constructLocatedFiles(dokkaOutput, locatedFiles)
+
+        AssemblyOperation().use { assemblyOperation ->
+            // Load data
+            for (file in locatedFiles) {
+                assemblyOperation.addSource(file, own = true, extractJarEntries = false)
             }
 
-            val cacheDirectory = Keys.cacheDirectory.get()
-            val dokkaOutput = cacheDirectory / "dokka-${Keys.projectName.get().toSafeFileName('_')}"
-            dokkaOutput.ensureEmptyDirectory()
+            val outputFile = defaultArchiveFileName("docs", "jar")
+            assemblyOperation.assembly(
+                    NoConflictStrategyChooser,
+                    DefaultRenameFunction,
+                    DefaultAssemblyMapFilter,
+                    outputFile,
+                    NoPrependData,
+                    compress = true)
 
-            val packageListCacheFolder = cacheDirectory / "dokka-package-list-cache"
-
-            val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
-
-            val dokka = Keys.archiveDokkaInterface.get()
-
-            dokka.execute(externalClasspath, dokkaOutput, packageListCacheFolder, options, ARCHIVE_DOKKA_LOG)
-
-            val locatedFiles = ArrayList<LocatedPath>()
-            constructLocatedFiles(dokkaOutput, locatedFiles)
-
-            AssemblyOperation().use { assemblyOperation ->
-                // Load data
-                for (file in locatedFiles) {
-                    assemblyOperation.addSource(file, own = true, extractJarEntries = false)
-                }
-
-                val outputFile = Keys.archiveOutputFile.get()
-                assemblyOperation.assembly(
-                        NoConflictStrategyChooser,
-                        DefaultRenameFunction,
-                        DefaultAssemblyMapFilter,
-                        outputFile,
-                        NoPrependData,
-                        compress = true)
-
-                expiresWith(outputFile)
-                outputFile
-            }
+            expiresWith(outputFile)
+            outputFile
         }
     }
 

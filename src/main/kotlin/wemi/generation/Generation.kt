@@ -1,6 +1,7 @@
 package wemi.generation
 
 import Files
+import Keys
 import LocatedPath
 import div
 import org.slf4j.LoggerFactory
@@ -18,13 +19,13 @@ import wemi.util.isHidden
 import wemi.util.name
 import wemi.util.pathHasExtension
 import wemi.util.plus
+import wemi.util.toSafeFileName
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.time.Instant
-import java.util.*
 
 /*
- * Source (etc.) generation utilities.
+ * Source, resource and classpath generation utilities.
  */
 
 private val LOG = LoggerFactory.getLogger("Generation")
@@ -32,11 +33,11 @@ private val LOG = LoggerFactory.getLogger("Generation")
 /**
  * Create a new source directory ([root]) for generated sources and add it to [wemi.Keys.sources].
  * On each invocation of [wemi.Keys.sources], the directory is emptied and [generate] should generate necessary files.
+ * @param name unique name of the generated sources directory
  */
-inline fun BindingHolder.generateSources(name:String = "", crossinline generate:EvalScope.(root:Path)->Unit) {
-	val rootName = if (name.isBlank()) "%08x".format(Arrays.hashCode(Thread.currentThread().stackTrace).toLong() and 0xFFFF_FFFFL) else name
-	val sourceDir = WemiCacheFolder / "-generated-sources-$rootName"
+inline fun BindingHolder.generateSources(name:String, crossinline generate:EvalScope.(root:Path)->Unit) {
 	Keys.sources modify {
+		val sourceDir = WemiCacheFolder / "-generated-sources-${Keys.projectName.get().toSafeFileName()}-$name"
 		sourceDir.ensureEmptyDirectory()
 		generate(sourceDir)
 		it + FileSet(sourceDir)
@@ -46,11 +47,11 @@ inline fun BindingHolder.generateSources(name:String = "", crossinline generate:
 /**
  * Create a new resource directory ([root]) for generated resources and add it to [wemi.Keys.resources].
  * On each invocation of [wemi.Keys.resources], the directory is emptied and [generate] should generate necessary files.
+ * @param name unique name of the generated sources directory
  */
-inline fun BindingHolder.generateResources(name:String = "", crossinline generate:EvalScope.(root:Path)->Unit) {
-	val rootName = if (name.isBlank()) "%08x".format(Arrays.hashCode(Thread.currentThread().stackTrace).toLong() and 0xFFFF_FFFFL) else name
-	val resourceDir = WemiCacheFolder / "-generated-resources-$rootName"
+inline fun BindingHolder.generateResources(name:String, crossinline generate:EvalScope.(root:Path)->Unit) {
 	Keys.resources modify {
+		val resourceDir = WemiCacheFolder / "-generated-resources-${Keys.projectName.get().toSafeFileName()}-$name"
 		resourceDir.ensureEmptyDirectory()
 		generate(resourceDir)
 		it + FileSet(resourceDir)
@@ -63,10 +64,9 @@ inline fun BindingHolder.generateResources(name:String = "", crossinline generat
  *
  * Jar files in the [root] directory will be automatically added directly.
  */
-inline fun BindingHolder.generateClasspath(name:String = "", crossinline generate:EvalScope.(root:Path)->Unit) {
-	val rootName = if (name.isBlank()) "%08x".format(Arrays.hashCode(Thread.currentThread().stackTrace).toLong() and 0xFFFF_FFFFL) else name
-	val cpDir = WemiCacheFolder / "-generated-classpath-$rootName"
+inline fun BindingHolder.generateClasspath(name:String, crossinline generate:EvalScope.(root:Path)->Unit) {
 	Keys.generatedClasspath modify {
+		val cpDir = WemiCacheFolder / "-generated-classpath-${Keys.projectName.get().toSafeFileName()}-$name"
 		cpDir.ensureEmptyDirectory()
 		generate(cpDir)
 		val classpath = it.toMutable()

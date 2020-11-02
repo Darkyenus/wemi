@@ -4,14 +4,12 @@ package wemi
 
 import Files
 import org.slf4j.LoggerFactory
-import wemi.KeyDefaults.ArchiveDummyDocumentation
 import wemi.KeyDefaults.classifierAppendingClasspathModifier
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.KeyDefaults.inProjectDependencies
 import wemi.boot.WemiCacheFolder
 import wemi.collections.WMutableSet
 import wemi.collections.toMutable
-import wemi.dependency.Dependency
 import wemi.dependency.JavadocClassifier
 import wemi.dependency.LocalM2Repository
 import wemi.dependency.Repository
@@ -20,12 +18,8 @@ import wemi.dependency.ScopeProvided
 import wemi.dependency.ScopeRuntime
 import wemi.dependency.ScopeTest
 import wemi.dependency.SourcesClassifier
-import wemi.test.JUnitPlatformLauncher
 import wemi.util.copyRecursively
 import wemi.util.div
-import wemi.util.name
-import wemi.util.pathExtension
-import wemi.util.pathWithoutExtension
 import wemi.util.toPath
 
 /** All default configurations */
@@ -63,29 +57,6 @@ object Configurations {
     /** Used by [Keys.archive] */
     val archiving by configuration("Used when archiving", stageAxis) {
         Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
-    }
-
-    /** Use this configuration to obtain sources archived in [Keys.archive]. */
-    val archivingSources by configuration("Used when archiving sources", archiving) {
-        Keys.archiveOutputFile modify { original ->
-            val originalName = original.name
-            val withoutExtension = originalName.pathWithoutExtension()
-            val extension = originalName.pathExtension()
-            original.resolveSibling("$withoutExtension-sources.$extension")
-        }
-        Keys.archive set KeyDefaults.ArchiveSources
-    }
-
-    /** Use this configuration to obtain documentation archived in [Keys.archive]. */
-    val archivingDocs by configuration("Used when archiving documentation", archiving) {
-        Keys.archiveOutputFile modify { original ->
-            val originalName = original.name
-            val withoutExtension = originalName.pathWithoutExtension()
-            val extension = originalName.pathExtension()
-            original.resolveSibling("$withoutExtension-docs.$extension")
-        }
-        // Dummy archival
-        Keys.archive set ArchiveDummyDocumentation
     }
 
     val publishing by configuration("Used when publishing archived outputs", archiving) {}

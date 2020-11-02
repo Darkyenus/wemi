@@ -55,7 +55,7 @@ val basics by project {
     //libraryDependencies add { dependency("junit:junit:4.12") }
     //libraryDependencies add { Dependency(JUnit4Engine, scope=ScopeTest) }
 
-    generateSources { root ->
+    generateSources("random-stuff") { root ->
         val version = projectVersion.get()
         println("Version: $version")
 
@@ -71,7 +71,7 @@ val basics by project {
         ))
     }
 
-    generateClasspath { root ->
+    generateClasspath("pre-compiled") { root ->
         val classFile = root / "generated" / "Generated.class"
         Files.createDirectories(classFile.parent)
         /*
@@ -95,23 +95,21 @@ val basics by project {
         metadata
     }
 
-    extend (archivingDocs) {
-        archiveDokkaOptions modify { options ->
-            options.outputFormat = wemi.documentation.DokkaOptions.FORMAT_HTML
+    archiveDokkaOptions modify { options ->
+        options.outputFormat = wemi.documentation.DokkaOptions.FORMAT_HTML
 
-            val root = projectRoot.get()
-            var sourceRootFileSet = sources.get()
-            while (sourceRootFileSet != null) {
-                options.sourceLinks.add(SourceLinkMapItem(
-                        sourceRootFileSet!!.root,
-                        "https://github.com/Darkyenus/WEMI/tree/master/test%20repositories/basics/${root.relativize(sourceRootFileSet!!.root).toString()}",
-                        "#L"
-                ))
-                sourceRootFileSet = sourceRootFileSet?.next
-            }
-
-            options
+        val root = projectRoot.get()
+        var sourceRootFileSet = sources.get()
+        while (sourceRootFileSet != null) {
+            options.sourceLinks.add(SourceLinkMapItem(
+                    sourceRootFileSet!!.root,
+                    "https://github.com/Darkyenus/WEMI/tree/master/test%20repositories/basics/${root.relativize(sourceRootFileSet!!.root).toString()}",
+                    "#L"
+            ))
+            sourceRootFileSet = sourceRootFileSet?.next
         }
+
+        options
     }
 
     // Test of build-script dependencies

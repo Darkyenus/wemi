@@ -374,6 +374,22 @@ fun String.pathHasExtension(extensions: Iterable<String>): Boolean {
     return false
 }
 
+/** Given [this] [Path], change its extension and move the underlying file to match.
+ * Does not move the file if it does not exist. Other problems cause an exception to be thrown.
+ * If the file with changed extension already exists, it is replaced.
+ * @return [this] path with different extension */
+fun Path.changeExtensionAndMove(newExtension:String):Path {
+    val name = this.name
+    if (name.pathHasExtension(newExtension)) {
+        return this
+    }
+    val newPath = this.resolveSibling("${name.pathWithoutExtension()}.$newExtension")
+    try {
+        Files.move(this, newPath, StandardCopyOption.REPLACE_EXISTING)
+    } catch (e:NoSuchFileException) {}
+    return newPath
+}
+
 /**
  * @return absolute path to this Path
  */

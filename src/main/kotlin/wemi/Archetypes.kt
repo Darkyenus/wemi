@@ -21,6 +21,7 @@ import wemi.test.JUnitAPI
 import wemi.test.JUnitEngine
 import wemi.test.JUnitPlatformLauncher
 import wemi.util.FileSet
+import wemi.util.changeExtensionAndMove
 import wemi.util.div
 import wemi.util.plus
 import wemi.util.toValidIdentifier
@@ -65,8 +66,9 @@ object Archetypes {
 
         Keys.runDirectory set { Keys.projectRoot.get() }
 
-        Keys.archiveOutputFile set { Keys.buildDirectory.get() / "${Keys.projectName.get()}-${Keys.projectVersion.get()}.zip" }
         Keys.archive set KeyDefaults.Archive
+        Keys.archiveSources set KeyDefaults.ArchiveSources
+        Keys.archiveDocs set KeyDefaults.ArchiveDummyDocumentation
     }
 
     /**
@@ -91,7 +93,7 @@ object Archetypes {
         Keys.run set KeyDefaults.Run
         Keys.runMain set KeyDefaults.RunMain
 
-        Keys.archiveOutputFile set { Keys.buildDirectory.get() / "${Keys.projectName.get()}-${Keys.projectVersion.get()}.jar" }
+        Keys.archiveSources modify { it.changeExtensionAndMove("jar") }
 
         Keys.publishMetadata set KeyDefaults.PublishModelM2
         Keys.publishRepository set Static(LocalM2Repository)
@@ -139,10 +141,7 @@ object Archetypes {
         Keys.compile set KeyDefaults.CompileJava
 
         Keys.archiveJavadocOptions set KeyDefaults.ArchiveJavadocOptions
-
-        extend(Configurations.archivingDocs) {
-            Keys.archive set KeyDefaults.ArchiveJavadoc
-        }
+        Keys.archiveDocs set KeyDefaults.ArchiveJavadoc
     }
 
     /** A primary archetype for projects that use Java and Kotlin. */
@@ -173,10 +172,7 @@ object Archetypes {
 
         Keys.archiveDokkaOptions set KeyDefaults.ArchiveDokkaOptions
         Keys.archiveDokkaInterface set KeyDefaults.ArchiveDokkaInterface
-
-        extend(Configurations.archivingDocs) {
-            Keys.archive set KeyDefaults.ArchiveDokka
-        }
+        Keys.archiveDocs set KeyDefaults.ArchiveDokka
     }
 
     /** Primary archetype for projects that produce JavaScript source files as output */
