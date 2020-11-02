@@ -71,9 +71,7 @@ class ResolvedIntelliJIDE(
 }
 
 fun defaultIdeDependency(downloadSources:Boolean): Value<ResolvedIntelliJIDE> = {
-	val withKotlin = using(Configurations.running) {
-		!Keys.libraryDependencies.get().any { it.dependencyId.group == "org.jetbrains.kotlin" && isKotlinRuntime(it.dependencyId.name) }
-	}
+	val withKotlin = !Keys.libraryDependencies.get().any { it.dependencyId.group == "org.jetbrains.kotlin" && isKotlinRuntime(it.dependencyId.name) }
 
 	val result = when (val dependency = IntelliJ.intellijIdeDependency.get()) {
 		is IntelliJIDE.Local -> resolveLocalIDE(dependency.path, dependency.sources, withKotlin)

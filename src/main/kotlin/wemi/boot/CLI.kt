@@ -438,7 +438,7 @@ object CLI {
                     print(formatLabel("Configuration Name: "))
                     println(formatValue(configuration.name))
                     println("  \"${format(configuration.description, Color.Black)}\"")
-                    if (configuration.axis != null) {
+                    if (configuration.axis.name != configuration.name) {
                         print(formatLabel("  Axis: "))
                         println(formatValue(configuration.axis.name))
                     }

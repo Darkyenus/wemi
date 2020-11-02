@@ -18,6 +18,7 @@
 - Removed resolvedLibraryScopes and the significance of compiling/running/archiving/etc. configurations
     in favor of dedicated scopesCompile, scopesRun and scopesTest keys along with scoping information directly inside externalClasspath
 - Introduced aggregate scope to implement aggregate project dependency more cleanly
+- Removed `running`, `compiling`, `assembling` and `archiving` configurations, they are not necessary anymore
 
 # 0.13 2020-06-23
 - Add utility functions for source file and classpath generation, see the `wemi.generation` package

@@ -37,7 +37,6 @@ val configurationWhichBindsKey by configuration("")  {
     keyWhichIsSetThenExtended modify { it + "a" }
     keyWhichIsSetInArchetypeThenExtended modify { it + "a" }
 }
-val configurationWhichExtendsTheOneWhichBindsKey by configuration("", configurationWhichBindsKey) {}
 val keySetInConfigurationAndThenExtendedTest by key<Unit>("")
 
 val evaluationTest by project(archetypes = *arrayOf(keyExtensionArchetype)) {
@@ -84,9 +83,6 @@ val evaluationTest by project(archetypes = *arrayOf(keyExtensionArchetype)) {
         assertThat(using(configurationWhichBindsKey) { keyWhichIsExtended.get() }, equalTo("ab"))
         assertThat(using(configurationWhichBindsKey) { keyWhichIsSetThenExtended.get() }, equalTo("ab"))
         assertThat(using(configurationWhichBindsKey) { keyWhichIsSetInArchetypeThenExtended.get() }, equalTo("ab"))
-        assertThat(using(configurationWhichExtendsTheOneWhichBindsKey) { keyWhichIsExtended.get() }, equalTo("ab"))
-        assertThat(using(configurationWhichExtendsTheOneWhichBindsKey) { keyWhichIsSetThenExtended.get() }, equalTo("ab"))
-        assertThat(using(configurationWhichExtendsTheOneWhichBindsKey) { keyWhichIsSetInArchetypeThenExtended.get() }, equalTo("ab"))
     }
     autoRun(keySetInConfigurationAndThenExtendedTest)
 }
@@ -109,7 +105,18 @@ var classpathAssertionsFailed = 0
 
 fun EvalScope.assertClasspathContains(vararg items:String) {
     classpathAssertions++
-    val got = externalClasspath.get().map { Files.readAllBytes(it.file).toString(Charsets.UTF_8) }.toSet()
+    val got = externalClasspath.get().map { Files.readAllBytes(it.value.file).toString(Charsets.UTF_8) }.toSet()
+    val expected = items.toSet()
+    if (got != expected) {
+        classpathAssertionsFailed++
+        //System.err.println("\n\n\nERROR: Got $got, expected $expected")
+        assertThat(got, equalTo(expected))
+    }
+}
+
+fun EvalScope.assertClasspathContainsInScope(scope:String, vararg items:String) {
+    classpathAssertions++
+    val got = externalClasspath.getLocatedPathsForScope(setOf(scope)).map { Files.readAllBytes(it.file).toString(Charsets.UTF_8) }.toSet()
     val expected = items.toSet()
     if (got != expected) {
         classpathAssertionsFailed++
@@ -120,7 +127,7 @@ fun EvalScope.assertClasspathContains(vararg items:String) {
 
 fun EvalScope.assertClasspathContainsFiles(vararg items:String) {
     classpathAssertions++
-    val got = externalClasspath.get().map { it.file.name }.toSet()
+    val got = externalClasspath.get().map { it.value.file.name }.toSet()
     val expected = items.toSet()
     if (got != expected) {
         classpathAssertionsFailed++
@@ -131,7 +138,7 @@ fun EvalScope.assertClasspathContainsFiles(vararg items:String) {
 
 fun EvalScope.assertClasspathContainsAlsoFiles(vararg items:String) {
     classpathAssertions++
-    val got = externalClasspath.get().map { it.file.name }.toSet()
+    val got = externalClasspath.get().map { it.value.file.name }.toSet()
     for (item in items) {
         if (item !in got) {
             classpathAssertionsFailed++
@@ -142,7 +149,7 @@ fun EvalScope.assertClasspathContainsAlsoFiles(vararg items:String) {
 
 fun EvalScope.assertClasspathDoesNotContainFiles(vararg items:String) {
     classpathAssertions++
-    val got = externalClasspath.get().map { it.file.name }.toSet()
+    val got = externalClasspath.get().map { it.value.file.name }.toSet()
     for (item in items) {
         if (item in got) {
             classpathAssertionsFailed++
@@ -472,19 +479,10 @@ val mavenScopeFiltering by configuration("") {
         // Must not resolve to testing jars which jline uses
         assertClasspathContains("magnum-opus 1", "some-implementation 1", "frothy-chocolate 1", "run-like-hell 2", "testing-attention-please 1")
 
-        using(compiling) {
-            // When compiling, runtime dependencies should be ommited
-            assertClasspathContains("magnum-opus 1", "frothy-chocolate 1")
-        }
-
-        using(running) {
-            // When running, provided dependencies should be ommited
-            assertClasspathContains("magnum-opus 1", "some-implementation 1", "run-like-hell 2")
-        }
-
-        using(testing) {
-            assertClasspathContains("magnum-opus 1", "some-implementation 1", "frothy-chocolate 1", "run-like-hell 2", "testing-attention-please 1")
-        }
+        assertClasspathContainsInScope("compile", "magnum-opus 1")
+        assertClasspathContainsInScope("runtime", "some-implementation 1", "run-like-hell 2")
+        assertClasspathContainsInScope("provided", "frothy-chocolate 1")
+        assertClasspathContainsInScope("test", "testing-attention-please 1")
     }
 }
 
@@ -506,14 +504,8 @@ val mavenScopeResolution_1 by configuration("") {
 
     checkResolution set {
         assertClasspathContains("first 1", "second 1", "end 1")
-
-        using(compiling) {
-            assertClasspathContains("second 1", "end 1")
-        }
-
-        using(testing) {
-            assertClasspathContains("first 1", "second 1", "end 1")
-        }
+        assertClasspathContainsInScope("compile", "second 1", "end 1")
+        assertClasspathContainsInScope("test", "first 1")
     }
 
 }

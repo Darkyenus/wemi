@@ -42,7 +42,7 @@ object JvmHotswap {
 
         val RunHotswap:Value<Int> = {
             expiresNow()
-            using(Configurations.running, hotswapping) {
+            using(hotswapping) {
                 val javaExecutable = Keys.javaExecutable.get()
                 val sources = Keys.sources.get().let {
                     var result = it

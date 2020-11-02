@@ -43,10 +43,6 @@ val basics by project {
     compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xno-optimize" } // (example, not needed)
     compilerOptions[KotlinCompilerFlags.incremental] = { true }
 
-    extend(running) {
-        projectName set { "Greeting Simulator $startYear" }
-    }
-
     // JUnit 5
     libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
     libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
@@ -190,6 +186,8 @@ val bar:Configuration by configuration("") {
  */
 val basicsFromRepository by project(Archetypes.AggregateJVMProject) {
     libraryDependencies add { dependency("com.darkyen:basics:1.0-SNAPSHOT") }
+    // Needed because of the special dependency there
+    repositories add { Repository("spigot-snapshots", "https://hub.spigotmc.org/nexus/content/repositories/snapshots", releases = false) }
 
     mainClass set { "basics.GreeterMainKt" }
 }

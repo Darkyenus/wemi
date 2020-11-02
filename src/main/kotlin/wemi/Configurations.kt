@@ -22,28 +22,6 @@ import wemi.util.toPath
 /** All default configurations */
 object Configurations {
 
-    //region Stage configurations
-    /** Axis for stage configurations */
-    val stageAxis = Axis("stageAxis")
-
-    /** @see Keys.compile */
-    val compiling by configuration("Configuration used when compiling", stageAxis) {
-    }
-
-    /** @see Keys.run */
-    val running by configuration("Configuration used when running, sources are resources", stageAxis) {
-    }
-
-    /** @see Keys.assembly */
-    val assembling by configuration("Configuration used when assembling Jar with dependencies", stageAxis) {
-    }
-
-    /** Used by [Keys.archive] */
-    val archiving by configuration("Used when archiving", stageAxis) {
-    }
-    //endregion
-
-    //region Testing
     /** @see Keys.test */
     val testing by configuration("Used when testing") {
         Keys.sources modify { it + Keys.testSources.get() }
@@ -54,7 +32,6 @@ object Configurations {
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
         Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
     }
-    //endregion
 
     //region IDE configurations
     /** Used when called from IDE */

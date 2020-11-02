@@ -217,238 +217,232 @@ object KeyDefaults {
     private val JavaDiagnosticListener = createJavaObjectFileDiagnosticLogger(JavacLOG)
 
     val CompileJava: Value<Path> = {
-        using(Configurations.compiling) {
-            val output = Keys.outputClassesDirectory.get()
-            output.ensureEmptyDirectory()
+        val output = Keys.outputClassesDirectory.get()
+        output.ensureEmptyDirectory()
 
-            val javaSources = Keys.sources.getPaths(*JavaSourceFileExtensions)
+        val javaSources = Keys.sources.getPaths(*JavaSourceFileExtensions)
 
-            val externalClasspath = LinkedHashSet<String>()
-            for (path in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get())) {
-                    externalClasspath.add(path.classpathEntry.absolutePath)
-            }
-            for (path in Keys.generatedClasspath.get()) {
+        val externalClasspath = LinkedHashSet<String>()
+        for (path in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get())) {
                 externalClasspath.add(path.classpathEntry.absolutePath)
-            }
-
-            // Compile Java
-            if (javaSources.isNotEmpty()) {
-                val compiler = Keys.javaCompiler.get()
-                val fileManager = compiler.getStandardFileManager(JavaDiagnosticListener, Locale.getDefault(), StandardCharsets.UTF_8) ?: throw WemiException("No standardFileManager")
-                val writerSb = StringBuilder()
-                val writer = StringBuilderWriter(writerSb)
-                val compilerFlags = Keys.compilerOptions.get()
-
-                val sourcesOut = Keys.outputSourcesDirectory.get()
-                sourcesOut.ensureEmptyDirectory()
-                val headersOut = Keys.outputHeadersDirectory.get()
-                headersOut.ensureEmptyDirectory()
-
-                val pathSeparator = System.getProperty("path.separator", ":")
-                val compilerOptions = ArrayList<String>()
-                compilerFlags.use(JavaCompilerFlags.customFlags) {
-                    compilerOptions.addAll(it)
-                }
-                compilerFlags.use(JavaCompilerFlags.sourceVersion) {
-                    if (it.isNotEmpty()) {
-                        compilerOptions.add("-source")
-                        compilerOptions.add(it)
-                    }
-                }
-                compilerFlags.use(JavaCompilerFlags.targetVersion) {
-                    if (it.isNotEmpty()) {
-                        compilerOptions.add("-target")
-                        compilerOptions.add(it)
-                    }
-                }
-                compilerFlags.use(JavaCompilerFlags.encoding) {
-                    if (it.isNotEmpty()) {
-                        compilerOptions.add("-encoding")
-                        compilerOptions.add(it)
-                    }
-                }
-                compilerOptions.add("-classpath")
-                val classpathString = externalClasspath.joinToString(pathSeparator)
-                compilerOptions.add(classpathString)
-                compilerOptions.add("-d")
-                compilerOptions.add(output.absolutePath)
-                compilerOptions.add("-s")
-                compilerOptions.add(sourcesOut.absolutePath)
-                compilerOptions.add("-h")
-                compilerOptions.add(headersOut.absolutePath)
-
-                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.toFile() })
-
-                val success = compiler.getTask(
-                        writer,
-                        fileManager,
-                        JavaDiagnosticListener,
-                        compilerOptions,
-                        null,
-                        javaFiles
-                ).call()
-
-                if (!writerSb.isBlank()) {
-                    val format = if (writerSb.contains('\n')) "\n{}" else "{}"
-                    if (success) {
-                        JavacLOG.info(format, writerSb)
-                    } else {
-                        JavacLOG.warn(format, writerSb)
-                    }
-                }
-
-                if (!success) {
-                    throw WemiException.CompilationException("Java compilation failed")
-                }
-            }
-
-            output
         }
+        for (path in Keys.generatedClasspath.get()) {
+            externalClasspath.add(path.classpathEntry.absolutePath)
+        }
+
+        // Compile Java
+        if (javaSources.isNotEmpty()) {
+            val compiler = Keys.javaCompiler.get()
+            val fileManager = compiler.getStandardFileManager(JavaDiagnosticListener, Locale.getDefault(), StandardCharsets.UTF_8) ?: throw WemiException("No standardFileManager")
+            val writerSb = StringBuilder()
+            val writer = StringBuilderWriter(writerSb)
+            val compilerFlags = Keys.compilerOptions.get()
+
+            val sourcesOut = Keys.outputSourcesDirectory.get()
+            sourcesOut.ensureEmptyDirectory()
+            val headersOut = Keys.outputHeadersDirectory.get()
+            headersOut.ensureEmptyDirectory()
+
+            val pathSeparator = System.getProperty("path.separator", ":")
+            val compilerOptions = ArrayList<String>()
+            compilerFlags.use(JavaCompilerFlags.customFlags) {
+                compilerOptions.addAll(it)
+            }
+            compilerFlags.use(JavaCompilerFlags.sourceVersion) {
+                if (it.isNotEmpty()) {
+                    compilerOptions.add("-source")
+                    compilerOptions.add(it)
+                }
+            }
+            compilerFlags.use(JavaCompilerFlags.targetVersion) {
+                if (it.isNotEmpty()) {
+                    compilerOptions.add("-target")
+                    compilerOptions.add(it)
+                }
+            }
+            compilerFlags.use(JavaCompilerFlags.encoding) {
+                if (it.isNotEmpty()) {
+                    compilerOptions.add("-encoding")
+                    compilerOptions.add(it)
+                }
+            }
+            compilerOptions.add("-classpath")
+            val classpathString = externalClasspath.joinToString(pathSeparator)
+            compilerOptions.add(classpathString)
+            compilerOptions.add("-d")
+            compilerOptions.add(output.absolutePath)
+            compilerOptions.add("-s")
+            compilerOptions.add(sourcesOut.absolutePath)
+            compilerOptions.add("-h")
+            compilerOptions.add(headersOut.absolutePath)
+
+            val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.toFile() })
+
+            val success = compiler.getTask(
+                    writer,
+                    fileManager,
+                    JavaDiagnosticListener,
+                    compilerOptions,
+                    null,
+                    javaFiles
+            ).call()
+
+            if (!writerSb.isBlank()) {
+                val format = if (writerSb.contains('\n')) "\n{}" else "{}"
+                if (success) {
+                    JavacLOG.info(format, writerSb)
+                } else {
+                    JavacLOG.warn(format, writerSb)
+                }
+            }
+
+            if (!success) {
+                throw WemiException.CompilationException("Java compilation failed")
+            }
+        }
+
+        output
     }
 
     val CompileJavaKotlin: Value<Path> = {
-        using(Configurations.compiling) {
-            val output = Keys.outputClassesDirectory.get()
-            output.ensureEmptyDirectory()
+        val output = Keys.outputClassesDirectory.get()
+        output.ensureEmptyDirectory()
 
-            val compilerFlags = Keys.compilerOptions.get()
-            val javaSources = Keys.sources.getLocatedPaths(*JavaSourceFileExtensions)
-            val kotlinSources = Keys.sources.getLocatedPaths(*KotlinSourceFileExtensions)
+        val compilerFlags = Keys.compilerOptions.get()
+        val javaSources = Keys.sources.getLocatedPaths(*JavaSourceFileExtensions)
+        val kotlinSources = Keys.sources.getLocatedPaths(*KotlinSourceFileExtensions)
 
-            val externalClasspath = LinkedHashSet<Path>()
-            for (path in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get())) {
-                externalClasspath.add(path.classpathEntry)
-            }
-            for (path in Keys.generatedClasspath.get()) {
-                externalClasspath.add(path.classpathEntry)
-            }
-
-            // Compile Kotlin
-            if (kotlinSources.isNotEmpty()) {
-                val compiler = Keys.kotlinCompiler.get()
-
-                val cacheFolder = output.resolveSibling(output.name + "-kotlin-cache")
-                Files.createDirectories(cacheFolder)
-
-                val compileResult = compiler.compileJVM(javaSources + kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, KotlincLOG, null)
-                when (compileResult) {
-                    KotlinCompiler.CompileExitStatus.OK -> {}
-                    KotlinCompiler.CompileExitStatus.CANCELLED -> throw WemiException.CompilationException("Kotlin compilation has been cancelled")
-                    KotlinCompiler.CompileExitStatus.COMPILATION_ERROR -> throw WemiException.CompilationException("Kotlin compilation failed")
-                    else -> throw WemiException.CompilationException("Kotlin compilation failed: $compileResult")
-                }
-            }
-
-            // Compile Java
-            if (javaSources.isNotEmpty()) {
-                val compiler = Keys.javaCompiler.get()
-                val fileManager = compiler.getStandardFileManager(null, Locale.getDefault(), StandardCharsets.UTF_8) ?: throw WemiException("No standardFileManager")
-                val writerSb = StringBuilder()
-                val writer = StringBuilderWriter(writerSb)
-
-                val sourcesOut = Keys.outputSourcesDirectory.get()
-                sourcesOut.ensureEmptyDirectory()
-                val headersOut = Keys.outputHeadersDirectory.get()
-                headersOut.ensureEmptyDirectory()
-
-                val pathSeparator = System.getProperty("path.separator", ":")
-                val compilerOptions = ArrayList<String>()
-                compilerFlags.use(JavaCompilerFlags.customFlags) {
-                    compilerOptions.addAll(it)
-                }
-                compilerFlags.use(JavaCompilerFlags.sourceVersion) {
-                    if (it.isNotEmpty()) {
-                        compilerOptions.add("-source")
-                        compilerOptions.add(it)
-                    }
-                }
-                compilerFlags.use(JavaCompilerFlags.targetVersion) {
-                    if (it.isNotEmpty()) {
-                        compilerOptions.add("-target")
-                        compilerOptions.add(it)
-                    }
-                }
-                compilerFlags.use(JavaCompilerFlags.encoding) {
-                    if (it.isNotEmpty()) {
-                        compilerOptions.add("-encoding")
-                        compilerOptions.add(it)
-                    }
-                }
-                compilerOptions.add("-classpath")
-                val classpathString = externalClasspath.joinToString(pathSeparator) { it.absolutePath }
-                if (kotlinSources.isNotEmpty()) {
-                    compilerOptions.add(classpathString + pathSeparator + output.absolutePath)
-                } else {
-                    compilerOptions.add(classpathString)
-                }
-                compilerOptions.add("-d")
-                compilerOptions.add(output.absolutePath)
-                compilerOptions.add("-s")
-                compilerOptions.add(sourcesOut.absolutePath)
-                compilerOptions.add("-h")
-                compilerOptions.add(headersOut.absolutePath)
-
-                val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.file.toFile() })
-
-                val success = compiler.getTask(
-                        writer,
-                        fileManager,
-                        JavaDiagnosticListener,
-                        compilerOptions,
-                        null,
-                        javaFiles
-                ).call()
-
-                if (!writerSb.isBlank()) {
-                    val format = if (writerSb.contains('\n')) "\n{}" else "{}"
-                    if (success) {
-                        JavacLOG.info(format, writerSb)
-                    } else {
-                        JavacLOG.warn(format, writerSb)
-                    }
-                }
-
-                if (!success) {
-                    throw WemiException.CompilationException("Java compilation failed")
-                }
-            }
-
-            output
+        val externalClasspath = LinkedHashSet<Path>()
+        for (path in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get())) {
+            externalClasspath.add(path.classpathEntry)
         }
+        for (path in Keys.generatedClasspath.get()) {
+            externalClasspath.add(path.classpathEntry)
+        }
+
+        // Compile Kotlin
+        if (kotlinSources.isNotEmpty()) {
+            val compiler = Keys.kotlinCompiler.get()
+
+            val cacheFolder = output.resolveSibling(output.name + "-kotlin-cache")
+            Files.createDirectories(cacheFolder)
+
+            val compileResult = compiler.compileJVM(javaSources + kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, KotlincLOG, null)
+            when (compileResult) {
+                KotlinCompiler.CompileExitStatus.OK -> {}
+                KotlinCompiler.CompileExitStatus.CANCELLED -> throw WemiException.CompilationException("Kotlin compilation has been cancelled")
+                KotlinCompiler.CompileExitStatus.COMPILATION_ERROR -> throw WemiException.CompilationException("Kotlin compilation failed")
+                else -> throw WemiException.CompilationException("Kotlin compilation failed: $compileResult")
+            }
+        }
+
+        // Compile Java
+        if (javaSources.isNotEmpty()) {
+            val compiler = Keys.javaCompiler.get()
+            val fileManager = compiler.getStandardFileManager(null, Locale.getDefault(), StandardCharsets.UTF_8) ?: throw WemiException("No standardFileManager")
+            val writerSb = StringBuilder()
+            val writer = StringBuilderWriter(writerSb)
+
+            val sourcesOut = Keys.outputSourcesDirectory.get()
+            sourcesOut.ensureEmptyDirectory()
+            val headersOut = Keys.outputHeadersDirectory.get()
+            headersOut.ensureEmptyDirectory()
+
+            val pathSeparator = System.getProperty("path.separator", ":")
+            val compilerOptions = ArrayList<String>()
+            compilerFlags.use(JavaCompilerFlags.customFlags) {
+                compilerOptions.addAll(it)
+            }
+            compilerFlags.use(JavaCompilerFlags.sourceVersion) {
+                if (it.isNotEmpty()) {
+                    compilerOptions.add("-source")
+                    compilerOptions.add(it)
+                }
+            }
+            compilerFlags.use(JavaCompilerFlags.targetVersion) {
+                if (it.isNotEmpty()) {
+                    compilerOptions.add("-target")
+                    compilerOptions.add(it)
+                }
+            }
+            compilerFlags.use(JavaCompilerFlags.encoding) {
+                if (it.isNotEmpty()) {
+                    compilerOptions.add("-encoding")
+                    compilerOptions.add(it)
+                }
+            }
+            compilerOptions.add("-classpath")
+            val classpathString = externalClasspath.joinToString(pathSeparator) { it.absolutePath }
+            if (kotlinSources.isNotEmpty()) {
+                compilerOptions.add(classpathString + pathSeparator + output.absolutePath)
+            } else {
+                compilerOptions.add(classpathString)
+            }
+            compilerOptions.add("-d")
+            compilerOptions.add(output.absolutePath)
+            compilerOptions.add("-s")
+            compilerOptions.add(sourcesOut.absolutePath)
+            compilerOptions.add("-h")
+            compilerOptions.add(headersOut.absolutePath)
+
+            val javaFiles = fileManager.getJavaFileObjectsFromFiles(javaSources.map { it.file.toFile() })
+
+            val success = compiler.getTask(
+                    writer,
+                    fileManager,
+                    JavaDiagnosticListener,
+                    compilerOptions,
+                    null,
+                    javaFiles
+            ).call()
+
+            if (!writerSb.isBlank()) {
+                val format = if (writerSb.contains('\n')) "\n{}" else "{}"
+                if (success) {
+                    JavacLOG.info(format, writerSb)
+                } else {
+                    JavacLOG.warn(format, writerSb)
+                }
+            }
+
+            if (!success) {
+                throw WemiException.CompilationException("Java compilation failed")
+            }
+        }
+
+        output
     }
 
     val CompileKotlinJS: Value<Path> = {
-        using(Configurations.compiling) {
-            val output = Keys.outputJavascriptDirectory.get()
-            output.ensureEmptyDirectory()
+        val output = Keys.outputJavascriptDirectory.get()
+        output.ensureEmptyDirectory()
 
-            val compilerFlags = Keys.compilerOptions.get()
-            val kotlinSources = Keys.sources.getLocatedPaths(*KotlinSourceFileExtensions)
+        val compilerFlags = Keys.compilerOptions.get()
+        val kotlinSources = Keys.sources.getLocatedPaths(*KotlinSourceFileExtensions)
 
-            val externalClasspath = LinkedHashSet<Path>()
-            for (path in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get())) {
-                externalClasspath.add(path.classpathEntry)
-            }
-            for (path in Keys.generatedClasspath.get()) {
-                externalClasspath.add(path.classpathEntry)
-            }
-
-            if (kotlinSources.isNotEmpty()) {
-                val compiler = Keys.kotlinCompiler.get()
-
-                val cacheFolder = output.resolveSibling(output.name + "-kotlin-js-cache")
-                Files.createDirectories(cacheFolder)
-
-                when (val compileResult = compiler.compile(KotlinCompiler.CompilationType.JS, kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, KotlincLOG, null)) {
-                    KotlinCompiler.CompileExitStatus.OK -> {}
-                    KotlinCompiler.CompileExitStatus.CANCELLED -> throw WemiException.CompilationException("Kotlin compilation has been cancelled")
-                    KotlinCompiler.CompileExitStatus.COMPILATION_ERROR -> throw WemiException.CompilationException("Kotlin compilation failed")
-                    else -> throw WemiException.CompilationException("Kotlin compilation failed: $compileResult")
-                }
-            }
-
-            output
+        val externalClasspath = LinkedHashSet<Path>()
+        for (path in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get())) {
+            externalClasspath.add(path.classpathEntry)
         }
+        for (path in Keys.generatedClasspath.get()) {
+            externalClasspath.add(path.classpathEntry)
+        }
+
+        if (kotlinSources.isNotEmpty()) {
+            val compiler = Keys.kotlinCompiler.get()
+
+            val cacheFolder = output.resolveSibling(output.name + "-kotlin-js-cache")
+            Files.createDirectories(cacheFolder)
+
+            when (val compileResult = compiler.compile(KotlinCompiler.CompilationType.JS, kotlinSources, externalClasspath, output, cacheFolder, compilerFlags, KotlincLOG, null)) {
+                KotlinCompiler.CompileExitStatus.OK -> {}
+                KotlinCompiler.CompileExitStatus.CANCELLED -> throw WemiException.CompilationException("Kotlin compilation has been cancelled")
+                KotlinCompiler.CompileExitStatus.COMPILATION_ERROR -> throw WemiException.CompilationException("Kotlin compilation failed")
+                else -> throw WemiException.CompilationException("Kotlin compilation failed: $compileResult")
+            }
+        }
+
+        output
     }
 
     val RunOptions: Value<List<String>> = {
@@ -490,19 +484,15 @@ object KeyDefaults {
     }
 
     val Run: Value<Int> = {
-        using(Configurations.running) {
-            expiresNow()
-            doRun(Keys.mainClass.get())
-        }
+        expiresNow()
+        doRun(Keys.mainClass.get())
     }
 
     val RunMain: Value<Int> = {
-        using(Configurations.running) {
-            val mainClass = read("main", "Main class to start", ClassNameValidator)
-                    ?: throw WemiException("Main class not specified", showStacktrace = false)
-            expiresNow()
-            doRun(mainClass)
-        }
+        val mainClass = read("main", "Main class to start", ClassNameValidator)
+                ?: throw WemiException("Main class not specified", showStacktrace = false)
+        expiresNow()
+        doRun(mainClass)
     }
 
     val TestParameters: Value<TestParameters> = {
@@ -570,28 +560,26 @@ object KeyDefaults {
     }
 
     val Archive: Value<Path> = {
-        using(Configurations.archiving) {
-            AssemblyOperation().use { assemblyOperation ->
-                // Load data
-                for (file in Keys.internalClasspath.get()) {
-                    assemblyOperation.addSource(file, true)
-                }
-                for (file in Keys.externalClasspath.getLocatedPathsForScope(setOf(ScopeAggregate))) {
-                    assemblyOperation.addSource(file, true)
-                }
-
-                val outputFile = defaultArchiveFileName(extension = "jar")
-                assemblyOperation.assembly(
-                        NoConflictStrategyChooser,
-                        DefaultRenameFunction,
-                        Keys.assemblyMapFilter.get(),
-                        outputFile,
-                        NoPrependData,
-                        compress = true)
-
-                expiresWith(outputFile)
-                outputFile
+        AssemblyOperation().use { assemblyOperation ->
+            // Load data
+            for (file in Keys.internalClasspath.get()) {
+                assemblyOperation.addSource(file, true)
             }
+            for (file in Keys.externalClasspath.getLocatedPathsForScope(setOf(ScopeAggregate))) {
+                assemblyOperation.addSource(file, true)
+            }
+
+            val outputFile = defaultArchiveFileName(extension = "jar")
+            assemblyOperation.assembly(
+                    NoConflictStrategyChooser,
+                    DefaultRenameFunction,
+                    Keys.assemblyMapFilter.get(),
+                    outputFile,
+                    NoPrependData,
+                    compress = true)
+
+            expiresWith(outputFile)
+            outputFile
         }
     }
 
@@ -1059,32 +1047,30 @@ object KeyDefaults {
     }
 
     val Assembly: Value<Path> = {
-        using(Configurations.assembling) {
-            AssemblyOperation().use { assemblyOperation ->
-                // Load data
-                for (file in Keys.internalClasspath.get()) {
-                    assemblyOperation.addSource(file, true, extractJarEntries = false)
-                }
-                ext@for ((file, scope) in Keys.externalClasspath.get()) {
-                    val runScopes = Keys.scopesRun.get()
-                    assemblyOperation.addSource(file, when (scope) {
-                        in runScopes -> scope == ScopeAggregate
-                        else -> continue@ext
-                    }, extractJarEntries = true)
-                }
-
-                val outputFile = Keys.assemblyOutputFile.get()
-                assemblyOperation.assembly(Keys.assemblyMergeStrategy.get(),
-                        Keys.assemblyRenameFunction.get(),
-                        Keys.assemblyMapFilter.get(),
-                        outputFile,
-                        Keys.assemblyPrependData.get(),
-                        compress = true)
-
-                expiresWith(outputFile)
-
-                outputFile
+        AssemblyOperation().use { assemblyOperation ->
+            // Load data
+            for (file in Keys.internalClasspath.get()) {
+                assemblyOperation.addSource(file, true, extractJarEntries = false)
             }
+            ext@for ((file, scope) in Keys.externalClasspath.get()) {
+                val runScopes = Keys.scopesRun.get()
+                assemblyOperation.addSource(file, when (scope) {
+                    in runScopes -> scope == ScopeAggregate
+                    else -> continue@ext
+                }, extractJarEntries = true)
+            }
+
+            val outputFile = Keys.assemblyOutputFile.get()
+            assemblyOperation.assembly(Keys.assemblyMergeStrategy.get(),
+                    Keys.assemblyRenameFunction.get(),
+                    Keys.assemblyMapFilter.get(),
+                    outputFile,
+                    Keys.assemblyPrependData.get(),
+                    compress = true)
+
+            expiresWith(outputFile)
+
+            outputFile
         }
     }
 }

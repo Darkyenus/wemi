@@ -30,7 +30,7 @@ val lwjgl3 by project(path("lwjgl3")) {
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-backend-lwjgl3", gdxVersion) }
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-platform", gdxVersion, classifier = "natives-desktop") }
 
-    projectDependencies add { ProjectDependency(core, true) }
+    projectDependencies add { ProjectDependency(core, scope = ScopeAggregate) }
 
     mainClass set {"game.Main"}
 
@@ -67,7 +67,7 @@ val lwjgl2 by project(path("./lwjgl2/")) {
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-backend-lwjgl", gdxVersion) }
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-platform", gdxVersion, classifier = "natives-desktop") }
 
-    projectDependencies add { ProjectDependency(core, true) }
+    projectDependencies add { ProjectDependency(core, scope = ScopeAggregate) }
 
     mainClass set {"game.Main"}
 

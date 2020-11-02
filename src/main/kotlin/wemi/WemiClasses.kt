@@ -110,11 +110,7 @@ private val nextConfigDimensionID = AtomicInteger(0)
 /**
  * Configuration is a layer of bindings that can be added to the [Scope].
  *
- * Configuration's bound values is the sum of it's [parent]'s values and own values, where own ones override
- * parent ones, if any.
- *
- * A tree formed by a [Configuration].[parent] hierarchy is called a "configuration axis".
- * In [Scope], each configuration axis can appear only once - layering in new configurations from the same
+ * In [Scope], each configuration [axis] can appear only once - layering in new configurations from the same
  * axis will replace the previous configuration.
  *
  * @param name of the configuration. Specified by the variable name this configuration was declared at.
@@ -127,7 +123,7 @@ private val nextConfigDimensionID = AtomicInteger(0)
 @WemiDsl
 class Configuration internal constructor(val name: String,
                                          val description: String,
-                                         val axis: Axis?)
+                                         val axis: Axis)
     : BindingHolder(), JsonWritable {
 
     /** @return [name] */
@@ -228,9 +224,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
              */
 
             val holderLength = holders.size
-            if (configuration is BindingHolder) {
-                holders.add(configuration)
-            }
+            holders.add(configuration)
             for (i in 0 until holderLength) {
                 val holder = holders[i]
                 holders.add(holder.configurationExtensions[configuration] ?: continue)
@@ -252,9 +246,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         for (i in parts.indices.reversed()) {
             val part = parts[i]
             val axis = part.axis
-            if (axis == null) {
-                filteredParts.add(part)
-            } else if (!usedAxes[axis.id]) {
+            if (!usedAxes[axis.id]) {
                 filteredParts.add(part)
                 usedAxes[axis.id] = true
             }

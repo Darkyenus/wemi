@@ -1,6 +1,5 @@
 package wemiplugin.intellij
 
-import Configurations
 import Files
 import Keys
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationFail
@@ -16,6 +15,8 @@ import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.MergeStrategy
 import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
+import wemi.dependency.ScopeCompile
+import wemi.dependency.ScopeRuntime
 import wemi.util.FileSet
 import wemi.util.absolutePath
 import wemi.util.div
@@ -51,9 +52,7 @@ val DefaultIntelliJPluginFolder : Value<Path> = {
 	val pluginLibDir = pluginDir / "lib"
 	Files.createDirectories(pluginLibDir)
 
-	val externalClasspath = using(Configurations.running) {
-		Keys.externalClasspath.get().map { it.classpathEntry }
-	}
+	val externalClasspath = Keys.externalClasspath.getLocatedPathsForScope(setOf(ScopeCompile, ScopeRuntime)).map { it.classpathEntry }
 
 	val pluginJar = Keys.archive.get()
 	if (pluginJar == null || !pluginJar.isRegularFile() || !pluginJar.name.pathHasExtension("jar")) {

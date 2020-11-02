@@ -235,7 +235,7 @@ class ConfigurationDelegate internal constructor(
  * @param initializer to populate the configuration's [BindingHolder] with bindings (null is used only internally)
  */
 fun createConfiguration(name:String, description: String, axis: Axis?, initializer: (Configuration.() -> Unit)?):Configuration {
-    val configuration = Configuration(name, description, axis)
+    val configuration = Configuration(name, description, axis ?: Axis(name))
     synchronized(BuildScriptData.AllConfigurations) {
         val existing = BuildScriptData.AllConfigurations[configuration.name]
         if (existing != null) {
