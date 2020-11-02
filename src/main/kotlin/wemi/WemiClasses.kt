@@ -29,6 +29,13 @@ typealias InputKeyDescription = String
  * Of the object is a collection which makes sense truncated, show only `maxElements` amount of elements. */
 typealias PrettyPrinter<V> = ((V, maxElements:Int) -> CharSequence)
 
+/** An axis identifier. See [Configuration.axis] for more info. */
+class Axis(val name:String) {
+    internal val id:Int = nextAxisID.getAndIncrement()
+}
+
+private val nextAxisID = AtomicInteger(0)
+
 /** Key which can have value of type [V] assigned, through [Project] or [Configuration]. */
 class Key<V> internal constructor(
         /**
@@ -112,17 +119,16 @@ private val nextConfigDimensionID = AtomicInteger(0)
  *
  * @param name of the configuration. Specified by the variable name this configuration was declared at.
  * @param description to be displayed in the CLI as help
- * @param parent of the [Configuration]
+ * @param axis There can be only one scope part per axis in a scope. Extending a scope by adding a new part
+ * of the same axis that already exists in the scope will remove the old part. Null is the same as returning
+ * a unique axis.
  * @see BindingHolder for info about how the values are bound
  */
 @WemiDsl
 class Configuration internal constructor(val name: String,
                                          val description: String,
-                                         val parent: Configuration?)
+                                         val axis: Axis?)
     : BindingHolder(), JsonWritable {
-
-    /** Top-most parent. Just a cache for easier lookup. */
-    internal val axis:Int = parent?.axis ?: nextConfigDimensionID.getAndIncrement()
 
     /** @return [name] */
     override fun toString(): String {
@@ -143,8 +149,7 @@ class Configuration internal constructor(val name: String,
 
 /**
  * Holds information about configuration extensions made by [BindingHolder.extend].
- * Values bound to this take precedence over the values [extending],
- * like values in [Configuration] take precedence over those in [Configuration.parent].
+ * Values bound to this take precedence over the values [extending].
  *
  * @param extending which configuration is being extended by this extension
  * @param from which this extension has been created, mostly for debugging
@@ -209,31 +214,6 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         reverse()
     }
 
-    private fun filterConfigurations(configurations:List<Configuration>):List<Configuration> {
-        val result = ArrayList<Configuration>(configurations.size)
-        val usedAxes = BitSet()
-        for (i in configurations.indices.reversed()) {
-            val config = configurations[i]
-            if (!usedAxes[config.axis]) {
-                result.add(config)
-                usedAxes[config.axis] = true
-            }
-        }
-        result.reverse()
-        return result
-    }
-
-    private fun addScopeHolderElementsFor(configuration:Configuration, addTo:MutableList<BindingHolder>, existingChain:List<BindingHolder>) {
-        if (configuration.parent != null) {
-            addScopeHolderElementsFor(configuration.parent, addTo, existingChain)
-        }
-
-        addTo.add(configuration)
-        for (holder in existingChain) {
-            addTo.add(holder.configurationExtensions[configuration] ?: continue)
-        }
-    }
-
     private fun createScope(configurations:List<Configuration>):Scope {
         val holders = ArrayList<BindingHolder>()
         holders.addAll(baseHolders)
@@ -247,9 +227,14 @@ class Project internal constructor(val name: String, internal val projectRoot: P
                 2. If any holder which already exists extends it, add it on top
              */
 
-            val newHolders = ArrayList<BindingHolder>()
-            addScopeHolderElementsFor(configuration, newHolders, holders)
-            holders.addAll(newHolders)
+            val holderLength = holders.size
+            if (configuration is BindingHolder) {
+                holders.add(configuration)
+            }
+            for (i in 0 until holderLength) {
+                val holder = holders[i]
+                holders.add(holder.configurationExtensions[configuration] ?: continue)
+            }
         }
         holders.reverse()
 
@@ -260,9 +245,23 @@ class Project internal constructor(val name: String, internal val projectRoot: P
 
     /** Create base [Scope] in which evaluation tree for this [Project] can start. */
     @PublishedApi
-    internal fun scopeFor(configurations:List<Configuration>):Scope {
-        val filteredConfigurations = filterConfigurations(configurations)
-        return scopeCache.getOrPut(filteredConfigurations) { createScope(filteredConfigurations) }
+    internal fun scopeFor(parts:List<Configuration>):Scope {
+        // Filter it
+        val filteredParts = ArrayList<Configuration>(parts.size)
+        val usedAxes = BitSet()
+        for (i in parts.indices.reversed()) {
+            val part = parts[i]
+            val axis = part.axis
+            if (axis == null) {
+                filteredParts.add(part)
+            } else if (!usedAxes[axis.id]) {
+                filteredParts.add(part)
+                usedAxes[axis.id] = true
+            }
+        }
+        filteredParts.reverse()
+
+        return scopeCache.getOrPut(filteredParts) { createScope(filteredParts) }
     }
 
     /**

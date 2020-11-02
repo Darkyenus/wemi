@@ -438,9 +438,9 @@ object CLI {
                     print(formatLabel("Configuration Name: "))
                     println(formatValue(configuration.name))
                     println("  \"${format(configuration.description, Color.Black)}\"")
-                    if (configuration.parent != null) {
-                        print(formatLabel("  Parent: "))
-                        println(formatValue(configuration.parent.name))
+                    if (configuration.axis != null) {
+                        print(formatLabel("  Axis: "))
+                        println(formatValue(configuration.axis.name))
                     }
                 } else if (type == "key" || (type.isEmpty() && name.isNotEmpty() && name.last().isJavaIdentifierPart())) {
                     val key = AllKeys.findCaseInsensitive(name)
@@ -508,7 +508,6 @@ object CLI {
                             print(sb)
                             sb.setLength(0)
                         }
-
                     }
 
                     if (bindingHolders.isEmpty()) {

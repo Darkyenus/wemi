@@ -140,11 +140,6 @@ val wonderland by configuration("When in wonderland") {
     }
 }
 
-val heaven by configuration("Like wonderland, but better", wonderland) {
-    foxColor set { "Octarine" }
-}
-
-
 //region Full Querying order example
 val queryingExample by key<StringBuilder>("String builder that is used to demonstrate querying order, see below")
 

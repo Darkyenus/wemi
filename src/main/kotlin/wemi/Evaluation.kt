@@ -1,5 +1,6 @@
 package wemi
 
+import wemi.dependency.ProjectDependency
 import wemi.util.ALL_EXTENSIONS
 import wemi.util.FileSet
 import wemi.util.LOCATED_PATH_COMPARATOR_WITH_TOTAL_ORDERING
@@ -151,8 +152,8 @@ class EvalScope @PublishedApi internal constructor(
     }
 
     /** Run the [action] in a scope, which is created by replacing the project with [scope]. */
-    inline fun <Result> using(scope:Scope, action: EvalScope.() -> Result): Result {
-        return deriveEvalScope(scope).use { it.action() }
+    inline fun <Result> using(projectDep: ProjectDependency, action: EvalScope.() -> Result): Result {
+        return deriveEvalScope(projectDep.project.scopeFor(projectDep.configurations.toList() + scope.configurations)).use { it.action() }
     }
 
     private fun <V : Output, Output> getKeyValue(key: Key<V>, otherwise: Output, useOtherwise: Boolean, input:Array<out Pair<String, String>>): Output {

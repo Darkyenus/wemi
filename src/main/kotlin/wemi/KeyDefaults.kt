@@ -159,7 +159,7 @@ object KeyDefaults {
                 }
 
                 // Enter a different scope and perform the operation
-                using(projectDependency.project.scopeFor(projectDependency.configurations.toList() + scope.configurations)) {
+                using(projectDependency) {
                     operation(projectDependency)
                 }
             }

@@ -27,7 +27,8 @@ import wemi.util.toPath
 object Configurations {
 
     //region Stage configurations
-    val stageAxis by configuration("Base for stage configurations") {}
+    /** Axis for stage configurations */
+    val stageAxis = Axis("stageAxis")
 
     /** @see Keys.compile */
     val compiling by configuration("Configuration used when compiling", stageAxis) {
@@ -79,7 +80,8 @@ object Configurations {
     //endregion
 
     //region IDE configurations
-    val ideAxis by configuration("Used when called from IDE") {}
+    /** Used when called from IDE */
+    val ideAxis = Axis("ideAxis")
 
     val retrievingSources by configuration("Used to retrieve sources", ideAxis) {
         val mapper = classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier)

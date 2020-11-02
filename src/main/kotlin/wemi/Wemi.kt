@@ -103,11 +103,11 @@ fun <V> key(description: String, inputKeys: Array<Pair<InputKey, InputKeyDescrip
  * configuration delegate is created by. (Configuration in example would be called `myConfiguration`.)
  *
  * @param description of the configuration, to be shown in help UI
- * @param parent of the new configuration, none (null) by default
+ * @param axis of the new configuration, none (null) by default
  * @param initializer function which creates key value bindings for the [Configuration]
  */
-fun configuration(description: String, parent: Configuration? = null, initializer: Configuration.() -> Unit): ConfigurationDelegate {
-    return ConfigurationDelegate(description, parent, initializer)
+fun configuration(description: String, axis: Axis? = null, initializer: Configuration.() -> Unit): ConfigurationDelegate {
+    return ConfigurationDelegate(description, axis, initializer)
 }
 
 /**

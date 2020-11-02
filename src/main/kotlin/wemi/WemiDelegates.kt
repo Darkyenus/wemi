@@ -197,7 +197,7 @@ class KeyDelegate<V> internal constructor(
  */
 class ConfigurationDelegate internal constructor(
         private val description: String,
-        private val parent: Configuration?,
+        private val axis: Axis?,
         private var initializer: (Configuration.() -> Unit)?)
     : ReadOnlyProperty<Any?, Configuration>, BindingHolderInitializer {
 
@@ -215,7 +215,7 @@ class ConfigurationDelegate internal constructor(
     }
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): ConfigurationDelegate {
-        this.configuration = createConfiguration(property.name, description, parent, null)
+        this.configuration = createConfiguration(property.name, description, axis, null)
         BuildScriptData.PendingInitializers?.add(this) ?: this()
         return this
     }
@@ -231,11 +231,11 @@ class ConfigurationDelegate internal constructor(
  *
  * @param name of the configuration, must be unique and valid Java-like identifier
  * @param description of the configuration
- * @param parent of the configuration
+ * @param axis of the configuration
  * @param initializer to populate the configuration's [BindingHolder] with bindings (null is used only internally)
  */
-fun createConfiguration(name:String, description: String, parent: Configuration?, initializer: (Configuration.() -> Unit)?):Configuration {
-    val configuration = Configuration(name, description, parent)
+fun createConfiguration(name:String, description: String, axis: Axis?, initializer: (Configuration.() -> Unit)?):Configuration {
+    val configuration = Configuration(name, description, axis)
     synchronized(BuildScriptData.AllConfigurations) {
         val existing = BuildScriptData.AllConfigurations[configuration.name]
         if (existing != null) {
