@@ -137,6 +137,10 @@ val sources
     inline get() = Keys.sources
 val resources
     inline get() = Keys.resources
+val testSources
+    inline get() = Keys.testSources
+val testResources
+    inline get() = Keys.testResources
 
 val repositories
     inline get() = Keys.repositories

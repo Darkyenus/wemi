@@ -12,6 +12,7 @@
 - Removed `archivingDocs` and `archivingSources` configurations, their purpose is now fulfilled through `archiveDocs` and `archiveSources` keys
 - Removed `archiveOutput` key, modify the target file location through explicit move
 - Removed `publishing` configuration
+- Added `testSources` and `testResources` to simplify setting of these properties
 
 # 0.13 2020-06-23
 - Add utility functions for source file and classpath generation, see the `wemi.generation` package

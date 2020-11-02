@@ -43,6 +43,8 @@ object Keys {
      */
     val sources by key<FileSet?>("Source files of the project (compiled, part of internal classpath)", defaultValue = null, prettyPrinter = FILE_SET_PRETTY_PRINTER)
     val resources by key<FileSet?>("Resource files of the project (not compiled, part of internal classpath)", defaultValue = null, prettyPrinter = FILE_SET_PRETTY_PRINTER)
+    val testSources by key<FileSet?>("Extra source files of the project for testing (compiled, part of internal classpath)", defaultValue = null, prettyPrinter = FILE_SET_PRETTY_PRINTER)
+    val testResources by key<FileSet?>("Extra resource files of the project for testing (not compiled, part of internal classpath)", defaultValue = null, prettyPrinter = FILE_SET_PRETTY_PRINTER)
 
     val repositories by key<Set<Repository>>("Repositories to be used when resolving dependencies", defaultValue = emptySet())
     val libraryDependencies by key<Set<Dependency>>("Libraries that the project depends on", defaultValue = emptySet())

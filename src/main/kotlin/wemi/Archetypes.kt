@@ -23,7 +23,6 @@ import wemi.test.JUnitPlatformLauncher
 import wemi.util.FileSet
 import wemi.util.changeExtensionAndMove
 import wemi.util.div
-import wemi.util.plus
 import wemi.util.toValidIdentifier
 import javax.tools.ToolProvider
 
@@ -126,13 +125,9 @@ object Archetypes {
     /** A primary archetype for projects that use pure Java. */
     val JavaProject by archetype(::JVMBase) {
         Keys.sources set { FileSet(Keys.projectRoot.get() / "src/main/java") }
-        extend (Configurations.testing) {
-            Keys.sources modify { FileSet(Keys.projectRoot.get() / "src/test/java", next = it) }
-        }
+        Keys.testSources set { FileSet(Keys.projectRoot.get() / "src/test/java") }
         Keys.resources set { FileSet(Keys.projectRoot.get() / "src/main/resources") }
-        extend (Configurations.testing) {
-            Keys.resources modify { it + FileSet(Keys.projectRoot.get() / "src/test/resources") }
-        }
+        Keys.testResources set { FileSet(Keys.projectRoot.get() / "src/test/resources") }
 
         Keys.compilerOptions[JavaCompilerFlags.customFlags] = { it + "-g" }
         Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = { "1.8" }
@@ -151,13 +146,11 @@ object Archetypes {
             FileSet(root / "src/main/java", next = FileSet(root / "src/main/kotlin"))
         }
         Keys.resources set { FileSet(Keys.projectRoot.get() / "src/main/resources") }
-        extend (Configurations.testing) {
-            Keys.sources modify {
-                val root = Keys.projectRoot.get()
-                FileSet(root / "src/test/java", next = FileSet(root / "src/test/kotlin", next = it))
-            }
-            Keys.resources modify { it + FileSet(Keys.projectRoot.get() / "src/test/resources") }
+        Keys.testSources set {
+            val root = Keys.projectRoot.get()
+            FileSet(root / "src/test/java", next = FileSet(root / "src/test/kotlin"))
         }
+        Keys.testResources set { FileSet(Keys.projectRoot.get() / "src/test/resources") }
 
         Keys.libraryDependencies add { kotlinDependency("stdlib") }
 
@@ -180,13 +173,9 @@ object Archetypes {
         Keys.repositories set Static(DefaultRepositories)
 
         Keys.sources set { FileSet(Keys.projectRoot.get() / "src/main/kotlin") }
-        extend (Configurations.testing) {
-            Keys.sources modify { FileSet(Keys.projectRoot.get() / "src/test/kotlin", next = it) }
-        }
+        Keys.testSources set { FileSet(Keys.projectRoot.get() / "src/test/kotlin") }
         Keys.resources set { FileSet(Keys.projectRoot.get() / "src/main/resources") }
-        extend (Configurations.testing) {
-            Keys.resources modify { it + FileSet(Keys.projectRoot.get() / "src/test/resources") }
-        }
+        Keys.testResources set { FileSet(Keys.projectRoot.get() / "src/test/resources") }
 
         Keys.libraryDependencies add { kotlinDependency("stdlib-js") }
 

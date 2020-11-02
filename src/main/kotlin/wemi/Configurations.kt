@@ -20,6 +20,7 @@ import wemi.dependency.ScopeTest
 import wemi.dependency.SourcesClassifier
 import wemi.util.copyRecursively
 import wemi.util.div
+import wemi.util.plus
 import wemi.util.toPath
 
 /** All default configurations */
@@ -63,6 +64,9 @@ object Configurations {
     //region Testing
     /** @see Keys.test */
     val testing by configuration("Used when testing") {
+        Keys.sources modify { it + Keys.testSources.get() }
+        Keys.resources modify { it + Keys.testResources.get() }
+
         // Testing classpath indeed contains all of these
         // (It is needed for example when there are two dependencies, one with provided scope, another with test scope.
         //  Combined, they have the provided scope, which therefore must be available on the test classpath.)
