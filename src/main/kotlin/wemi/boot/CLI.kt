@@ -23,6 +23,7 @@ import wemi.Key
 import wemi.Project
 import wemi.WemiException
 import wemi.WemiKotlinVersion
+import wemi.generation.WemiGeneratedFolder
 import wemi.util.CliStatusDisplay
 import wemi.util.CliStatusDisplay.Companion.withStatus
 import wemi.util.Color
@@ -583,6 +584,14 @@ object CLI {
                         cacheEntry.deleteRecursively()
                         folders++
                     }
+                }
+            }
+            // Delete all generated files
+            if (WemiGeneratedFolder.isDirectory()) {
+                for (generated in Files.list(WemiGeneratedFolder)) {
+                    LOG.debug("Deleting {}", generated)
+                    generated.deleteRecursively()
+                    folders++
                 }
             }
 
