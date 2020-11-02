@@ -58,8 +58,6 @@ object Configurations {
     val archiving by configuration("Used when archiving", stageAxis) {
         Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
     }
-
-    val publishing by configuration("Used when publishing archived outputs", archiving) {}
     //endregion
 
     //region Testing

@@ -874,8 +874,6 @@ object KeyDefaults {
     private val PUBLISH_MODEL_LOG = LoggerFactory.getLogger("PublishModelM2")
     /**
      * Creates Maven2 compatible pom.xml-like [InfoNode].
-     * 
-     * [Configurations.publishing] scope is applied at [Keys.publish], so this does not handle it.
      */
     val PublishModelM2: Value<InfoNode> = {
         /*
@@ -1037,15 +1035,13 @@ object KeyDefaults {
     }
 
     val PublishM2: Value<Path> = {
-        using(Configurations.publishing) {
-            val repository = Keys.publishRepository.get()
-            val metadata = Keys.publishMetadata.get()
-            val artifacts = Keys.publishArtifacts.get()
+        val repository = Keys.publishRepository.get()
+        val metadata = Keys.publishMetadata.get()
+        val artifacts = Keys.publishArtifacts.get()
 
-            val result = publish(repository, metadata, artifacts)
-            expiresWith(result)
-            result
-        }
+        val result = publish(repository, metadata, artifacts)
+        expiresWith(result)
+        result
     }
 
     val Assembly: Value<Path> = {

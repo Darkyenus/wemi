@@ -11,7 +11,7 @@ import java.nio.file.Path
 private val LOG = LoggerFactory.getLogger("PublishPlugin")
 
 val DefaultIntellijPublishPluginToRepository: Value<Unit> = {
-	val distributionFile: Path = using(Configurations.publishing) { IntelliJ.intellijPluginArchive.get() }
+	val distributionFile: Path = IntelliJ.intellijPluginArchive.get()
 	val host = IntelliJ.intellijPublishPluginRepository.get()
 	val token: String = IntelliJ.intellijPublishPluginToken.get()
 	val channels = IntelliJ.intellijPublishPluginChannels.get()

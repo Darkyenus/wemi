@@ -117,8 +117,6 @@ val testing
     inline get() = Configurations.testing
 val archiving
     inline get() = Configurations.archiving
-val publishing
-    inline get() = Configurations.publishing
 
 // Keys
 val projectGroup
