@@ -91,7 +91,7 @@ val TeaVMCompileDefault: Value<TeaVMResult> = {
 
 		val classpath = LinkedHashSet<Path>()
 		Keys.internalClasspath.get().mapTo(classpath) { it.classpathEntry }
-		Keys.externalClasspath.get().mapTo(classpath) { it.classpathEntry }
+		Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get()).mapTo(classpath) { it.classpathEntry }
 
 		val tool = TeaVMTool()
 		tool.setProgressListener(object : TeaVMProgressListener {
@@ -191,7 +191,7 @@ val TeaVMCompileDefault: Value<TeaVMResult> = {
 					Keys.externalClasspath.get()
 				}
 				for (path in paths) {
-					val classpathEntry = path.classpathEntry
+					val classpathEntry = path.value.classpathEntry
 					if (classpathEntry.isDirectory()) {
 						directories.add(classpathEntry)
 					} else {
@@ -207,7 +207,7 @@ val TeaVMCompileDefault: Value<TeaVMResult> = {
 				}
 
 				internalSources.addAll(Keys.sources.get().matchingLocatedFiles())
-				inProjectDependencies(null) {
+				inProjectDependencies {
 					internalSources.addAll(Keys.sources.get().matchingLocatedFiles())
 				}
 			}

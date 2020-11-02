@@ -5,6 +5,7 @@ import Keys
 import Path
 import org.slf4j.LoggerFactory
 import wemi.Archetypes
+import wemi.Axis
 import wemi.Configurations
 import wemi.Key
 import wemi.StringValidator
@@ -19,7 +20,6 @@ import wemi.dependency.ScopeProvided
 import wemi.dependency.ScopeTest
 import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.resolveDependencyArtifacts
-import wemi.dependency.scopeIn
 import wemi.key
 import wemi.readSecret
 import wemi.test.JUnit4Engine
@@ -30,6 +30,7 @@ import wemi.util.div
 import wemi.util.name
 import wemi.util.pathWithoutExtension
 import wemi.util.plus
+import wemi.util.scoped
 import wemiplugin.intellij.utils.Patch
 import wemiplugin.intellij.utils.unZipIfNew
 import java.io.File
@@ -82,10 +83,11 @@ val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugi
 // TODO(jp): What does this do?
 const val DEFAULT_INTELLIJ_PLUGIN_SERVICE = "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service"
 
-val uiTesting by configuration("IDE UI Testing (launch the IDE in UI testing mode through ${Keys.run} key)", Configurations.running) {}
+val uiTesting by configuration("IDE UI Testing (launch the IDE in UI testing mode through ${Keys.run} key)") {}
 
-val withoutSearchableOptions by configuration("Do not build IntelliJ plugin searchable options") {}
-val withSearchableOptions by configuration("Do not build IntelliJ plugin searchable options", withoutSearchableOptions) {}
+val searchableOptionsAxis = Axis("searchableOptions")
+val withoutSearchableOptions by configuration("Do not build IntelliJ plugin searchable options", searchableOptionsAxis) {}
+val withSearchableOptions by configuration("Do not build IntelliJ plugin searchable options", searchableOptionsAxis) {}
 
 /** A layer over [wemi.Archetypes.JVMBase] which turns the project into an IntelliJ platform plugin. */
 val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
@@ -96,22 +98,16 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 
 	// Project dependencies
 	Keys.externalClasspath modify  { cp ->
-		val scopes = Keys.resolvedLibraryScopes.get()
-		// We don't want these classpath entries here when a classpath for runtime is requested,
-		// because it is provided. We can't check for provided instead, TODO WHY AND WHAT
-		// TODO(jp): This does not really work
-		if (ScopeProvided scopeIn scopes) {
-			val mcp = cp.toMutable()
-			for (path in IntelliJ.resolvedIntellijIdeDependency.get().jarFiles) {
-				mcp.add(LocatedPath(path))
+		val mcp = cp.toMutable()
+		for (path in IntelliJ.resolvedIntellijIdeDependency.get().jarFiles) {
+			mcp.add(LocatedPath(path).scoped(ScopeProvided))
+		}
+		for (dependency in IntelliJ.resolvedIntellijPluginDependencies.get()) {
+			for (it in dependency.classpath()) {
+				mcp.add(LocatedPath(it).scoped(ScopeProvided))
 			}
-			for (dependency in IntelliJ.resolvedIntellijPluginDependencies.get()) {
-				for (it in dependency.classpath()) {
-					mcp.add(LocatedPath(it))
-				}
-			}
-			mcp
-		} else cp
+		}
+		mcp
 	}
 	IntelliJ.resolvedIntellijPluginDependencies set DefaultResolvedIntellijPluginDependencies
 	// Gradle plugin does something like this, but I don't think we need it
@@ -146,7 +142,7 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	extend(Configurations.retrievingSources) {
 		IntelliJ.resolvedIntellijIdeDependency set defaultIdeDependency(true)
 		Keys.externalClasspath addAll {
-			IntelliJ.resolvedIntellijIdeDependency.get().sources.map { LocatedPath(it) }
+			IntelliJ.resolvedIntellijIdeDependency.get().sources.map { LocatedPath(it).scoped() }
 		}
 	}
 

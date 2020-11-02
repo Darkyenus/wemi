@@ -3,7 +3,6 @@ package wemiplugin.jvmhotswap
 import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.KeyDefaults.inProjectDependencies
-import wemi.collections.toMutable
 import wemi.util.*
 import java.io.DataOutputStream
 import java.io.IOException
@@ -47,14 +46,14 @@ object JvmHotswap {
                 val javaExecutable = Keys.javaExecutable.get()
                 val sources = Keys.sources.get().let {
                     var result = it
-                    inProjectDependencies(null) {
+                    inProjectDependencies {
                         result += Keys.sources.get()
                     }
                     result
                 }
 
                 val classpathEntries = LinkedHashSet<Path>()
-                for (locatedFile in Keys.externalClasspath.get()) {
+                for (locatedFile in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesRun.get())) {
                     classpathEntries.add(locatedFile.classpathEntry)
                 }
                 val initialInternalClasspath = Keys.internalClasspath.get()

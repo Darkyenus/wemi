@@ -1,11 +1,13 @@
 package wemi
 
+import wemi.dependency.DepScope
 import wemi.dependency.ProjectDependency
 import wemi.util.ALL_EXTENSIONS
 import wemi.util.FileSet
 import wemi.util.LOCATED_PATH_COMPARATOR_WITH_TOTAL_ORDERING
 import wemi.util.LocatedPath
 import wemi.util.PATH_COMPARATOR_WITH_TOTAL_ORDERING
+import wemi.util.ScopedLocatedPath
 import wemi.util.filterByExtension
 import wemi.util.lastModifiedMillis
 import wemi.util.matchingFiles
@@ -309,6 +311,10 @@ class EvalScope @PublishedApi internal constructor(
             originalHash != newHash
         }
         return result
+    }
+
+    fun Key<List<ScopedLocatedPath>>.getLocatedPathsForScope(scopes:Set<DepScope>):List<LocatedPath> {
+        return this.get().mapNotNull { if (it.scope in scopes) it.value else null }
     }
 
     /** Force the binding of this key in this scope (if any exists) to expire, this same tick.

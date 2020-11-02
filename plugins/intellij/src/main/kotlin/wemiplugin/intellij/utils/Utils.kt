@@ -55,7 +55,7 @@ internal object Utils {
 	fun EvalScope.getPluginIds():List<String> {
 		val result = ArrayList<String>()
 		getProjectPluginIds(result)
-		inProjectDependencies(null) {
+		inProjectDependencies {
 			getProjectPluginIds(result)
 		}
 		return result

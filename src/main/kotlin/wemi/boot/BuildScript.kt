@@ -149,12 +149,12 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
             }
             Keys.sources set Static(buildScriptInfo.sourceSet)
             Keys.externalClasspath set LazyStatic {
-                val result = ArrayList<LocatedPath>(buildScriptInfo.unmanagedDependencies.size + buildScriptInfo.managedDependencies.size)
+                val result = ArrayList<ScopedLocatedPath>(buildScriptInfo.unmanagedDependencies.size + buildScriptInfo.managedDependencies.size)
                 for (dependency in buildScriptInfo.unmanagedDependencies) {
-                    result.add(LocatedPath(dependency))
+                    result.add(LocatedPath(dependency).scoped(ScopeCompile))
                 }
                 for (dependency in buildScriptInfo.managedDependencies) {
-                    result.add(LocatedPath(dependency))
+                    result.add(LocatedPath(dependency).scoped(ScopeCompile))
                 }
                 result
             }

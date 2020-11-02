@@ -148,8 +148,6 @@ val libraryDependencies
     inline get() = Keys.libraryDependencies
 val libraryDependencyMapper
     inline get() = Keys.libraryDependencyMapper
-val resolvedLibraryScopes
-    inline get() = Keys.resolvedLibraryScopes
 val resolvedLibraryDependencies
     inline get() = Keys.resolvedLibraryDependencies
 val unmanagedDependencies

@@ -23,15 +23,6 @@ typealias Classifier = String
  * See https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope */
 typealias DepScope = String
 
-/** Check whether [this] is in [scopeSet]. Empty [scopeSet] contains all scopes.
- * See [wemi.Keys.resolvedLibraryScopes] */
-infix fun DepScope.scopeIn(scopeSet:Set<DepScope>):Boolean {
-    if (scopeSet.isEmpty()) {
-        return true
-    }
-    return this in scopeSet
-}
-
 /** Concatenate two classifiers. */
 fun joinClassifiers(first:Classifier, second:Classifier):Classifier {
     return when {
@@ -57,6 +48,11 @@ const val ScopeProvided: DepScope = "provided"
 const val ScopeRuntime: DepScope = "runtime"
 /** Available for testing only. */
 const val ScopeTest: DepScope = "test"
+/** A special non-standard scope for aggregate classpath entries.
+ * This works like [ScopeCompile], but forces the classpath entry to be treated like on an internal classpath.
+ * The ultimate effect is then that such classpath entry will appear inside archive.
+ * The primary intended use for this scope are aggregate [ProjectDependency]ies. */
+const val ScopeAggregate: DepScope = "aggregate"
 
 /** A special [DependencyId.type] value that lets Wemi choose the appropriate type by the packaging indicated in POM. */
 const val TypeChooseByPackaging:String = ""

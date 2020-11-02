@@ -6,16 +6,12 @@ import Files
 import org.slf4j.LoggerFactory
 import wemi.KeyDefaults.classifierAppendingClasspathModifier
 import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
-import wemi.KeyDefaults.inProjectDependencies
 import wemi.boot.WemiCacheFolder
 import wemi.collections.WMutableSet
 import wemi.collections.toMutable
 import wemi.dependency.JavadocClassifier
 import wemi.dependency.LocalM2Repository
 import wemi.dependency.Repository
-import wemi.dependency.ScopeCompile
-import wemi.dependency.ScopeProvided
-import wemi.dependency.ScopeRuntime
 import wemi.dependency.ScopeTest
 import wemi.dependency.SourcesClassifier
 import wemi.util.copyRecursively
@@ -32,33 +28,18 @@ object Configurations {
 
     /** @see Keys.compile */
     val compiling by configuration("Configuration used when compiling", stageAxis) {
-        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeProvided) }
-
-        Keys.externalClasspath modify { classpath ->
-            // Internal classpath of aggregate projects is not included in standard external classpath.
-            // But it is needed for the compilation, so we add it explicitly.
-
-            val result = classpath.toMutable()
-            inProjectDependencies(true, Keys.resolvedLibraryScopes.get()) {
-                result.addAll(Keys.internalClasspath.get())
-            }
-            result
-        }
     }
 
     /** @see Keys.run */
     val running by configuration("Configuration used when running, sources are resources", stageAxis) {
-        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
     }
 
     /** @see Keys.assembly */
     val assembling by configuration("Configuration used when assembling Jar with dependencies", stageAxis) {
-        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
     }
 
     /** Used by [Keys.archive] */
     val archiving by configuration("Used when archiving", stageAxis) {
-        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime) }
     }
     //endregion
 
@@ -67,11 +48,7 @@ object Configurations {
     val testing by configuration("Used when testing") {
         Keys.sources modify { it + Keys.testSources.get() }
         Keys.resources modify { it + Keys.testResources.get() }
-
-        // Testing classpath indeed contains all of these
-        // (It is needed for example when there are two dependencies, one with provided scope, another with test scope.
-        //  Combined, they have the provided scope, which therefore must be available on the test classpath.)
-        Keys.resolvedLibraryScopes addAll { listOf(ScopeCompile, ScopeRuntime, ScopeProvided, ScopeTest) }
+        Keys.scopesCompile add { ScopeTest }
 
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes-test")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")

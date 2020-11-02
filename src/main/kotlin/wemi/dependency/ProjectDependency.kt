@@ -11,17 +11,19 @@ import wemi.util.*
  * Dependency pulls [project]s [wemi.Keys.internalClasspath] and [wemi.Keys.externalClasspath] into
  * this project's external classpath.
  *
- * @param aggregate if `true`, [project]'s internal classpath will be considered a part of this project's
- *          internal classpath when creating artifact archive. If `false`, this dependency will have to be
- *          represented through metadata and both projects will have to be archived separately.
+ * To create an aggregate project dependency, set [scope] to [ScopeAggregate].
+ * Aggregated project's internal classpath will end up in this projects archive, as if it was on its internal classpath.
+ * Non-aggregate projects behave like normal libraries, archived separately.
  */
-class ProjectDependency(val project: Project, val aggregate:Boolean, vararg val configurations: Configuration, val scope:DepScope = DEFAULT_SCOPE)
+class ProjectDependency(val project: Project, vararg val configurations: Configuration, val scope:DepScope = DEFAULT_SCOPE)
     : JsonWritable {
+
+    @Deprecated("Use ScopeAggregate instead")
+    constructor(project: Project, aggregate:Boolean, vararg configurations: Configuration, scope:DepScope = DEFAULT_SCOPE) : this(project, *configurations, scope = if (aggregate) ScopeAggregate else scope)
 
     override fun JsonWriter.write() {
         writeObject {
             field("project", project.name)
-            field("aggregate", aggregate)
             field("scope", scope)
             name("configurations").writeArray {
                 for (configuration in configurations) {
@@ -37,9 +39,6 @@ class ProjectDependency(val project: Project, val aggregate:Boolean, vararg val 
         for (c in configurations) {
             sb.append(c.name).append(':')
         }
-        if (aggregate) {
-            sb.append(" aggregate")
-        }
         sb.append(" scope=").append(scope)
 
         return sb.toString()
@@ -50,7 +49,6 @@ class ProjectDependency(val project: Project, val aggregate:Boolean, vararg val 
         if (other !is ProjectDependency) return false
 
         if (project != other.project) return false
-        if (aggregate != other.aggregate) return false
         if (!configurations.contentEquals(other.configurations)) return false
         if (scope != other.scope) return false
 
@@ -59,7 +57,6 @@ class ProjectDependency(val project: Project, val aggregate:Boolean, vararg val 
 
     override fun hashCode(): Int {
         var result = project.hashCode()
-        result = 31 * result + aggregate.hashCode()
         result = 31 * result + configurations.contentHashCode()
         result = 31 * result + scope.hashCode()
         return result

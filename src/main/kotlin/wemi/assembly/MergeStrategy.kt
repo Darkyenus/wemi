@@ -8,7 +8,7 @@ enum class MergeStrategy {
     First,
     /** Only the last copy is kept */
     Last,
-    /** Only own copy (the from [wemi.Keys.internalClasspath]) is used, others are discarded, error if multiple own */
+    /** Only own copy (the from [wemi.Keys.internalClasspath] or aggregate) is used, others are discarded, error if multiple own */
     SingleOwn,
     /** Only one copy is expected, error if multiple */
     SingleOrError,

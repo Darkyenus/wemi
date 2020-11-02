@@ -15,6 +15,9 @@
 - Added `testSources` and `testResources` to simplify setting of these properties
 - Generated files are now stored in a separate directory in ./build/generated
 - Configurations can no longer have parents
+- Removed resolvedLibraryScopes and the significance of compiling/running/archiving/etc. configurations
+    in favor of dedicated scopesCompile, scopesRun and scopesTest keys along with scoping information directly inside externalClasspath
+- Introduced aggregate scope to implement aggregate project dependency more cleanly
 
 # 0.13 2020-06-23
 - Add utility functions for source file and classpath generation, see the `wemi.generation` package

@@ -13,7 +13,7 @@ class AssemblySource private constructor(
         val sourceFile: Path?,
         /** Time of last modification. -1 if unknown */
         val lastModifiedMs: Long,
-        /** Is this from the [wemi.Keys.internalClasspath]? */
+        /** Is this from the [wemi.Keys.internalClasspath] or aggregate? */
         val own: Boolean) {
 
     constructor(name:String, sourceFile:Path?, lastModifiedMs:Long, own:Boolean, data:ByteArray)

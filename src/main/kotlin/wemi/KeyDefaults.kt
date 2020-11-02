@@ -30,11 +30,12 @@ import wemi.dependency.NoClassifier
 import wemi.dependency.ProjectDependency
 import wemi.dependency.Repository
 import wemi.dependency.ResolvedDependencies
+import wemi.dependency.ScopeAggregate
+import wemi.dependency.ScopeCompile
 import wemi.dependency.internal.publish
 import wemi.dependency.joinClassifiers
 import wemi.dependency.resolveDependencies
 import wemi.dependency.resolveDependencyArtifacts
-import wemi.dependency.scopeIn
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
@@ -51,6 +52,7 @@ import wemi.util.LineReadingWriter
 import wemi.util.LocatedPath
 import wemi.util.Magic
 import wemi.util.Partial
+import wemi.util.ScopedLocatedPath
 import wemi.util.absolutePath
 import wemi.util.appendCentered
 import wemi.util.appendTimes
@@ -67,6 +69,7 @@ import wemi.util.parseJavaVersion
 import wemi.util.pathExtension
 import wemi.util.pathWithoutExtension
 import wemi.util.prettyPrint
+import wemi.util.scoped
 import wemi.util.toSafeFileName
 import java.io.File
 import java.net.URLClassLoader
@@ -143,21 +146,13 @@ object KeyDefaults {
     }
 
     private val inProjectDependencies_CircularDependencyProtection = CycleChecker<Scope>()
-    fun EvalScope.inProjectDependencies(aggregate:Boolean?, withScope:Set<wemi.dependency.DepScope> = emptySet(), operation:EvalScope.(dep:ProjectDependency)->Unit) {
+    fun EvalScope.inProjectDependencies(operation: EvalScope.(dep: ProjectDependency) -> Unit) {
         inProjectDependencies_CircularDependencyProtection.block(this.scope, failure = { loop ->
             throw WemiException("Cyclic dependencies in projectDependencies are not allowed (${loop.joinToString(" -> ")})", showStacktrace = false)
         }, action = {
             val projectDependencies = Keys.projectDependencies.get()
 
             for (projectDependency in projectDependencies) {
-                if (aggregate != null && aggregate != projectDependency.aggregate) {
-                    continue
-                }
-
-                if (!(projectDependency.scope scopeIn withScope)) {
-                    continue
-                }
-
                 // Enter a different scope and perform the operation
                 using(projectDependency) {
                     operation(projectDependency)
@@ -167,11 +162,11 @@ object KeyDefaults {
     }
 
     private val ClasspathResolution_LOG = LoggerFactory.getLogger("ClasspathResolution")
-    val ExternalClasspath: Value<List<LocatedPath>> = {
-        val result = LinkedHashSet<LocatedPath>()
+    val ExternalClasspath: Value<List<ScopedLocatedPath>> = {
+        val result = LinkedHashSet<ScopedLocatedPath>()
 
         val resolved = Keys.resolvedLibraryDependencies.get()
-        if (!resolved.complete) { // TODO(jp): Do not check if complete yet, allow incomplete dependency resolution if the errors are in un-needed dependencies (due to scope)
+        if (!resolved.complete) {
             val message = StringBuilder()
             message.append("Failed to resolve all artifacts")
                     .format() // Required, because printing it with pre-set color would bleed into the pretty-printed values
@@ -180,23 +175,22 @@ object KeyDefaults {
             throw WemiException(message.toString(), showStacktrace = false)
         }
 
-        val scopes = Keys.resolvedLibraryScopes.get()
         for ((_, resolvedDependency) in resolved.value) {
-            if (resolvedDependency.scope scopeIn scopes) {
-                result.add(LocatedPath(resolvedDependency.artifact?.path ?: continue))
-            }
+            result.add(LocatedPath(resolvedDependency.artifact?.path ?: continue).scoped(resolvedDependency.scope))
         }
 
-        inProjectDependencies(null, scopes) { projectDependency ->
+        inProjectDependencies { projectDependency ->
             ClasspathResolution_LOG.debug("Resolving project dependency on {}", this)
             result.addAll(Keys.externalClasspath.get())
-            if (!projectDependency.aggregate) {
-                result.addAll(Keys.internalClasspath.get())
+            for (path in Keys.internalClasspath.get()) {
+                result.add(path.scoped(projectDependency.scope))
             }
         }
 
         val unmanaged = Keys.unmanagedDependencies.get()
-        result.addAll(unmanaged)
+        for (path in unmanaged) {
+            result.add(path.scoped(ScopeCompile))
+        }
 
         WMutableList(result)
     }
@@ -208,11 +202,6 @@ object KeyDefaults {
             constructLocatedFiles(Keys.compile.get(), classpath)
         }
         classpath.addAll(Keys.resources.getLocatedPaths())
-
-        inProjectDependencies(true, Keys.resolvedLibraryScopes.get()) {
-            ClasspathResolution_LOG.debug("Resolving internal project dependency on {}", this)
-            classpath.addAll(Keys.internalClasspath.get())
-        }
 
         WMutableList(classpath)
     }
@@ -234,8 +223,13 @@ object KeyDefaults {
 
             val javaSources = Keys.sources.getPaths(*JavaSourceFileExtensions)
 
-            val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
-            externalClasspath.addAll(Keys.generatedClasspath.get().map { it.classpathEntry })
+            val externalClasspath = LinkedHashSet<String>()
+            for (path in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get())) {
+                    externalClasspath.add(path.classpathEntry.absolutePath)
+            }
+            for (path in Keys.generatedClasspath.get()) {
+                externalClasspath.add(path.classpathEntry.absolutePath)
+            }
 
             // Compile Java
             if (javaSources.isNotEmpty()) {
@@ -274,7 +268,7 @@ object KeyDefaults {
                     }
                 }
                 compilerOptions.add("-classpath")
-                val classpathString = externalClasspath.joinToString(pathSeparator) { it.absolutePath }
+                val classpathString = externalClasspath.joinToString(pathSeparator)
                 compilerOptions.add(classpathString)
                 compilerOptions.add("-d")
                 compilerOptions.add(output.absolutePath)
@@ -321,8 +315,13 @@ object KeyDefaults {
             val javaSources = Keys.sources.getLocatedPaths(*JavaSourceFileExtensions)
             val kotlinSources = Keys.sources.getLocatedPaths(*KotlinSourceFileExtensions)
 
-            val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
-            externalClasspath.addAll(Keys.generatedClasspath.get().map { it.classpathEntry })
+            val externalClasspath = LinkedHashSet<Path>()
+            for (path in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get())) {
+                externalClasspath.add(path.classpathEntry)
+            }
+            for (path in Keys.generatedClasspath.get()) {
+                externalClasspath.add(path.classpathEntry)
+            }
 
             // Compile Kotlin
             if (kotlinSources.isNotEmpty()) {
@@ -426,8 +425,13 @@ object KeyDefaults {
             val compilerFlags = Keys.compilerOptions.get()
             val kotlinSources = Keys.sources.getLocatedPaths(*KotlinSourceFileExtensions)
 
-            val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
-            externalClasspath.addAll(Keys.generatedClasspath.get().map { it.classpathEntry })
+            val externalClasspath = LinkedHashSet<Path>()
+            for (path in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get())) {
+                externalClasspath.add(path.classpathEntry)
+            }
+            for (path in Keys.generatedClasspath.get()) {
+                externalClasspath.add(path.classpathEntry)
+            }
 
             if (kotlinSources.isNotEmpty()) {
                 val compiler = Keys.kotlinCompiler.get()
@@ -464,7 +468,7 @@ object KeyDefaults {
     private fun EvalScope.doRun(mainClass:String):Int {
         val javaExecutable = Keys.javaExecutable.get()
         val classpathEntries = LinkedHashSet<Path>()
-        for (locatedFile in Keys.externalClasspath.get()) {
+        for (locatedFile in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesRun.get())) {
             classpathEntries.add(locatedFile.classpathEntry)
         }
         for (locatedFile in Keys.internalClasspath.get()) {
@@ -513,13 +517,17 @@ object KeyDefaults {
     }
 
     val Test: Value<TestReport> = {
-        using(Configurations.running, Configurations.testing) {
+        using(Configurations.testing) {
             val javaExecutable = Keys.javaExecutable.get()
             val directory = Keys.runDirectory.get()
             val options = Keys.runOptions.get()
 
-            val externalClasspath = Keys.externalClasspath.get().asSequence().map { it.classpathEntry }.distinct().toList()
-            val internalClasspath = Keys.internalClasspath.get().asSequence().map { it.classpathEntry }.distinct().toList()
+            // Testing classpath indeed contains all of these
+            // (It is needed for example when there are two dependencies, one with provided scope, another with test scope.
+            //  Combined, they have the provided scope, which therefore must be available on the test classpath.)
+            val scopes = Keys.scopesTest.get()
+            val externalClasspath = Keys.externalClasspath.getLocatedPathsForScope(scopes).mapTo(LinkedHashSet()){ it.classpathEntry }
+            val internalClasspath = Keys.internalClasspath.get().mapTo(LinkedHashSet()){ it.classpathEntry }
 
             val classpathEntries = ArrayList<Path>(internalClasspath.size + externalClasspath.size + 1)
             classpathEntries.addAll(internalClasspath)
@@ -542,10 +550,12 @@ object KeyDefaults {
 
     val TestOfAggregateProject: Value<TestReport> = {
         val resultReport = TestReport()
-        inProjectDependencies(true) {
-            val report = Keys.test.getOrElse(null)
-            if (report != null) {
-                resultReport.putAll(report)
+        inProjectDependencies { dep ->
+            if (dep.scope == ScopeAggregate) {
+                val report = Keys.test.getOrElse(null)
+                if (report != null) {
+                    resultReport.putAll(report)
+                }
             }
         }
         resultReport
@@ -564,6 +574,9 @@ object KeyDefaults {
             AssemblyOperation().use { assemblyOperation ->
                 // Load data
                 for (file in Keys.internalClasspath.get()) {
+                    assemblyOperation.addSource(file, true)
+                }
+                for (file in Keys.externalClasspath.getLocatedPathsForScope(setOf(ScopeAggregate))) {
                     assemblyOperation.addSource(file, true)
                 }
 
@@ -589,9 +602,11 @@ object KeyDefaults {
                 assemblyOperation.addSource(file, true, extractJarEntries = false)
             }
 
-            inProjectDependencies(true) {
-                for (file in Keys.sources.getLocatedPaths()) {
-                    assemblyOperation.addSource(file, true, extractJarEntries = false)
+            inProjectDependencies { dep ->
+                if (dep.scope == ScopeAggregate) {
+                    for (file in Keys.sources.getLocatedPaths()) {
+                        assemblyOperation.addSource(file, true, extractJarEntries = false)
+                    }
                 }
             }
 
@@ -722,7 +737,7 @@ object KeyDefaults {
         fileManager.setLocation(DocumentationTool.Location.DOCUMENTATION_OUTPUT, listOf(javadocOutput.toFile()))
 
         // Setup classpath
-        fileManager.setLocation(StandardLocation.CLASS_PATH, Keys.externalClasspath.get().map { it.classpathEntry.toFile() })
+        fileManager.setLocation(StandardLocation.CLASS_PATH, Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get()).map { it.classpathEntry.toFile() })
 
         // Try to specify doclet path explicitly
         val toolsJar = jdkToolsJar(Keys.javaHome.get())
@@ -841,7 +856,7 @@ object KeyDefaults {
 
         val packageListCacheFolder = cacheDirectory / "dokka-package-list-cache"
 
-        val externalClasspath = LinkedHashSet(Keys.externalClasspath.get().map { it.classpathEntry })
+        val externalClasspath = Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get()).mapTo(LinkedHashSet()) { it.classpathEntry }
 
         val dokka = Keys.archiveDokkaInterface.get()
 
@@ -1050,8 +1065,12 @@ object KeyDefaults {
                 for (file in Keys.internalClasspath.get()) {
                     assemblyOperation.addSource(file, true, extractJarEntries = false)
                 }
-                for (file in Keys.externalClasspath.get()) {
-                    assemblyOperation.addSource(file, false, extractJarEntries = true)
+                ext@for ((file, scope) in Keys.externalClasspath.get()) {
+                    val runScopes = Keys.scopesRun.get()
+                    assemblyOperation.addSource(file, when (scope) {
+                        in runScopes -> scope == ScopeAggregate
+                        else -> continue@ext
+                    }, extractJarEntries = true)
                 }
 
                 val outputFile = Keys.assemblyOutputFile.get()

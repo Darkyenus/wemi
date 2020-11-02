@@ -49,7 +49,6 @@ object Keys {
     val repositories by key<Set<Repository>>("Repositories to be used when resolving dependencies", defaultValue = emptySet())
     val libraryDependencies by key<Set<Dependency>>("Libraries that the project depends on", defaultValue = emptySet())
     val libraryDependencyMapper by key<(Dependency) -> Dependency>("Function applied to transitive Dependency-ies encountered while resolving. Used for example when retrieving sources.", defaultValue = { it })
-    val resolvedLibraryScopes by key<Set<DepScope>>("Allowed scopes of libraries returned by resolvedLibraryDependencies. Empty = all.", defaultValue = emptySet())
     val resolvedLibraryDependencies by key<Partial<ResolvedDependencies>>("Libraries that the project depends on and were resolved. Resolution may not have been successful.", prettyPrinter = { resolved, _ ->
         resolved.value.prettyPrint()
     })
@@ -59,8 +58,12 @@ object Keys {
     /** @see wemi.generation.generateClasspath */
     val generatedClasspath by key<List<LocatedPath>>("Eventually of internalClasspath, but generated before compilation", defaultValue = emptyList())
 
-    val externalClasspath by key<List<LocatedPath>>("Classpath, externally obtained elements from external sources, i.e. library dependencies, external classpath of all project dependencies and internal classpath of non-aggregate project dependencies", defaultValue = emptyList())
+    val externalClasspath by key<List<ScopedLocatedPath>>("Classpath, externally obtained elements from external sources, i.e. library dependencies, external classpath of all project dependencies and internal classpath of non-aggregate project dependencies", defaultValue = emptyList())
     val internalClasspath by key<List<LocatedPath>>("Classpath, internally created elements, i.e. compiled sources and resources, including those of aggregate project dependencies", defaultValue = emptyList())
+
+    val scopesCompile by key<Set<DepScope>>("Which dependency scopes should be used for compilation classpath", setOf(ScopeCompile, ScopeProvided, ScopeAggregate))
+    val scopesRun by key<Set<DepScope>>("Which dependency scopes should be used for runtime classpath", setOf(ScopeCompile, ScopeRuntime, ScopeAggregate))
+    val scopesTest by key<Set<DepScope>>("Which dependency scopes should be used for testing classpath", setOf(ScopeCompile, ScopeRuntime, ScopeProvided, ScopeTest, ScopeAggregate))
 
     val javaHome by key<Path>("Java home to use for compilation/running etc.")
     val javaExecutable by key<Path>("Java executable, used for running the project")
