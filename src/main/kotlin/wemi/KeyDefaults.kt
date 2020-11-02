@@ -9,7 +9,6 @@ import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
-import wemi.boot.CLI
 import wemi.boot.WemiBundledLibrariesExclude
 import wemi.boot.WemiVersion
 import wemi.collections.WMutableList
@@ -46,7 +45,6 @@ import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
-import wemi.util.CliStatusDisplay.Companion.withStatus
 import wemi.util.CycleChecker
 import wemi.util.EnclaveClassLoader
 import wemi.util.LineReadingWriter
@@ -77,6 +75,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.ZonedDateTime
 import java.util.*
+import java.util.logging.Level
 import javax.tools.DocumentationTool
 import javax.tools.StandardLocation
 import javax.tools.ToolProvider
@@ -528,7 +527,7 @@ object KeyDefaults {
             classpathEntries.addAll(externalClasspath)
             classpathEntries.add(Magic.classpathFileOf(TEST_LAUNCHER_MAIN_CLASS)!!)
 
-            val processBuilder = wemi.run.prepareJavaProcess(
+            val processBuilder = prepareJavaProcess(
                     javaExecutable, directory, classpathEntries,
                     TEST_LAUNCHER_MAIN_CLASS.name, options, emptyList())
 

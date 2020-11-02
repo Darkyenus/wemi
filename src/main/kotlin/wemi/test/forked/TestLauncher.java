@@ -16,11 +16,17 @@ import wemi.test.TestReport;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 /**
  * Launched by the test task in a forked process.
@@ -55,6 +61,7 @@ public final class TestLauncher {
 			try (DataInputStream in = new DataInputStream(System.in)) {
 				testParameters.readFrom(in);
 			}
+			setupLogging(testParameters.javaLoggingLevel);
 
 			final Launcher launcher = LauncherFactory.create();
 			ReportBuildingListener reportBuilder = new ReportBuildingListener(testParameters.filterStackTraces);
@@ -146,6 +153,46 @@ public final class TestLauncher {
 		}
 
 		System.exit(exitCode);
+	}
+
+	private static void setupLogging(Level level) {
+		try {
+			final Logger rootLogger = Logger.getLogger("");
+			for (Handler handler : rootLogger.getHandlers()) {
+				rootLogger.removeHandler(handler);
+			}
+			rootLogger.addHandler(new Handler() {
+				@Override
+				public void publish(LogRecord record) {
+					final Object[] parameters = record.getParameters();
+					final Throwable thrown = record.getThrown();
+					final StringWriter sw = new StringWriter();
+					sw.append('[').append(record.getLoggerName()).append(' ').append(record.getLevel().getName()).append("] ").append(record.getMessage());
+					if (parameters != null) {
+						for (Object parameter : parameters) {
+							sw.append(" | ");
+							try {
+								sw.append(parameter == null ? "null" : parameter.toString());
+							} catch (Exception ignored) {}
+						}
+					}
+					if (thrown != null) {
+						sw.append('\n');
+						thrown.printStackTrace(new PrintWriter(sw));
+					}
+					System.err.print(sw.getBuffer());
+				}
+
+				@Override
+				public void flush() {}
+
+				@Override
+				public void close() throws SecurityException {
+				}
+			});
+
+			rootLogger.setLevel(level);
+		} catch (Exception ignored) {}
 	}
 }
 

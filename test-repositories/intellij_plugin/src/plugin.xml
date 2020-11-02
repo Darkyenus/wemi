@@ -23,4 +23,14 @@ Nothing to see here! <b>Just some bold text!</b>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>
+
+    <application-components>
+        <component>
+            <implementation-class>com.darkyen.example.DemoComponent</implementation-class>
+        </component>
+    </application-components>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.darkyen.example.DemoService"/>
+    </extensions>
 </idea-plugin>

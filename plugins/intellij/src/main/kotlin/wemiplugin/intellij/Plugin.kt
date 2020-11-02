@@ -4,6 +4,7 @@ import Files
 import Keys
 import Path
 import org.slf4j.LoggerFactory
+import wemi.Archetypes
 import wemi.Configurations
 import wemi.Key
 import wemi.StringValidator
@@ -15,10 +16,13 @@ import wemi.dependency
 import wemi.dependency.Dependency
 import wemi.dependency.Repository
 import wemi.dependency.ScopeProvided
+import wemi.dependency.ScopeTest
 import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.resolveDependencyArtifacts
+import wemi.dependency.scopeIn
 import wemi.key
 import wemi.readSecret
+import wemi.test.JUnit4Engine
 import wemi.util.FileSet
 import wemi.util.LocatedPath
 import wemi.util.absolutePath
@@ -74,7 +78,9 @@ object IntelliJ {
 val JetBrainsAnnotationsDependency = dependency("org.jetbrains", "annotations", "20.1.0", scope = ScopeProvided)
 val IntelliJPluginsRepo = IntelliJPluginRepository.Maven(Repository("intellij-plugins-repo", URL("https://cache-redirector.jetbrains.com/plugins.jetbrains.com/maven"), authoritative = true, verifyChecksums = false))
 val IntelliJThirdPartyRepo = Repository("intellij-third-party-dependencies", "https://jetbrains.bintray.com/intellij-third-party-dependencies")
-val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugin", "0.9.35", type = TypeChooseByPackaging)
+val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugin", "0.10.0", type = TypeChooseByPackaging)
+// TODO(jp): What does this do?
+const val DEFAULT_INTELLIJ_PLUGIN_SERVICE = "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service"
 
 val uiTesting by configuration("IDE UI Testing (launch the IDE in UI testing mode through ${Keys.run} key)", Configurations.running) {}
 
@@ -82,15 +88,19 @@ val withoutSearchableOptions by configuration("Do not build IntelliJ plugin sear
 val withSearchableOptions by configuration("Do not build IntelliJ plugin searchable options", withoutSearchableOptions) {}
 
 /** A layer over [wemi.Archetypes.JVMBase] which turns the project into an IntelliJ platform plugin. */
-val IntelliJPluginLayer by archetype {
+val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 
 	// Project input info
 	IntelliJ.intellijPluginName set { Keys.projectName.get() }
 	Keys.libraryDependencies add { JetBrainsAnnotationsDependency }
 
 	// Project dependencies
-	extend(Configurations.compiling) {
-		Keys.externalClasspath modify { cp ->
+	Keys.externalClasspath modify  { cp ->
+		val scopes = Keys.resolvedLibraryScopes.get()
+		// We don't want these classpath entries here when a classpath for runtime is requested,
+		// because it is provided. We can't check for provided instead, TODO WHY AND WHAT
+		// TODO(jp): This does not really work
+		if (ScopeProvided scopeIn scopes) {
 			val mcp = cp.toMutable()
 			for (path in IntelliJ.resolvedIntellijIdeDependency.get().jarFiles) {
 				mcp.add(LocatedPath(path))
@@ -101,7 +111,7 @@ val IntelliJPluginLayer by archetype {
 				}
 			}
 			mcp
-		}
+		} else cp
 	}
 	IntelliJ.resolvedIntellijPluginDependencies set DefaultResolvedIntellijPluginDependencies
 	// Gradle plugin does something like this, but I don't think we need it
@@ -153,13 +163,8 @@ val IntelliJPluginLayer by archetype {
 	extend(Configurations.testing) {
 		IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox(testSuffix = "-test") } // TODO(jp): Test tests
 
-		Keys.externalClasspath modify {
-			val ec = it.toMutable()
-			val ideaDependency = IntelliJ.resolvedIntellijIdeDependency.get()
-			ec.add(LocatedPath(ideaDependency.homeDir / "lib/resources.jar"))
-			ec.add(LocatedPath(ideaDependency.homeDir / "lib/idea.jar"))
-			ec
-		}
+		// IntelliJ test fixtures use JUnit4 API
+		Keys.libraryDependencies add { Dependency(JUnit4Engine, scope= ScopeTest) }
 
 		Keys.runSystemProperties modify {
 			val sp = it.toMutableMap()

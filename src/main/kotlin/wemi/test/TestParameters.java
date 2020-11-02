@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 /** Parameters for the test run, using JUnit Platform.
  * Has no dependencies - pure Java. */
@@ -79,6 +80,8 @@ public final class TestParameters {
 		}
 	}
 
+	public Level javaLoggingLevel = Level.INFO;
+
 	public void writeTo(DataOutputStream out) throws IOException {
 		ForkSerialization.writeTo(out, configuration);
 		out.writeBoolean(filterStackTraces);
@@ -93,6 +96,7 @@ public final class TestParameters {
 		filterClassNamePatterns.writeTo(out);
 		filterPackages.writeTo(out);
 		filterTags.writeTo(out);
+		out.writeInt(javaLoggingLevel.intValue());
 	}
 
 	public void readFrom(DataInputStream in) throws IOException {
@@ -109,5 +113,6 @@ public final class TestParameters {
 		filterClassNamePatterns.readFrom(in);
 		filterPackages.readFrom(in);
 		filterTags.readFrom(in);
+		javaLoggingLevel = Level.parse(Integer.toString(in.readInt()));
 	}
 }
