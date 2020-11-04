@@ -420,6 +420,9 @@ class ResolvedDependency private constructor(
     override fun JsonWriter.write() {
         writeObject {
             field("id", id)
+            if (scope != DEFAULT_SCOPE) {
+                field("scope", scope)
+            }
             fieldCollection("dependencies", dependencies)
             field("resolvedFrom", resolvedFrom)
             field("hasError", hasError)
@@ -435,6 +438,7 @@ class ResolvedDependency private constructor(
     override fun toString(): String {
         val result = StringBuilder()
         result.append("ResolvedDependency(id=").append(id)
+        result.append(", scope=").append(scope)
         result.append(", dependencies=").append(dependencies)
         result.append(", resolvedFrom=").append(resolvedFrom)
         result.append(", hasError=").append(hasError)

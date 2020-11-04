@@ -94,7 +94,7 @@ class WemiProjectOpenProcessor : ProjectOpenProcessor() {
 			closePreviousProject(projectToClose)
 		}
 		ProjectUtil.updateLastProjectLocation(pathToOpen)
-		ProjectManagerEx.getInstanceEx().openProject(projectToOpen)
+		ProjectManagerEx.getInstanceEx().openProject(projectToOpen)// TODO(jp): Assertion fails here
 
 		if (importToProject) {
 			projectToOpen.save()

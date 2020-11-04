@@ -266,6 +266,7 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
                 }
             }
 
+            // TODO(jp): This is now wrong!!!
             if (DependencyScope.COMPILE in moduleDependencies
                     || DependencyScope.COMPILE in jarDependencies
                     || DependencyScope.COMPILE in libraryDependencies) {

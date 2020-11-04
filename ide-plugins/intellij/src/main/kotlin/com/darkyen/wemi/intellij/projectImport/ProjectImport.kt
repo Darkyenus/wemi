@@ -422,24 +422,12 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 		projectModules[project.projectName] = ideModuleNode
 
 		// Collect dependencies
-		val compileDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "compiling", downloadDocumentation, downloadSources)
-		val runtimeDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "running", downloadDocumentation, downloadSources)
-		val testDependencies = createWemiProjectCombinedDependencies(session, project.projectName, "testing", downloadDocumentation, downloadSources)
+		val dependencies = createWemiProjectCombinedDependencies(session, project.projectName, downloadDocumentation, downloadSources)
 
-		for ((hash, dep) in compileDependencies) {
-			val inRuntime = runtimeDependencies.remove(hash) != null
-			val inTest = testDependencies.remove(hash) != null
-
-			libraryBank.projectUsesLibrary(project.projectName, dep, true, inRuntime, inTest)
-		}
-
-		for ((hash, dep) in runtimeDependencies) {
-			val inTest = testDependencies.remove(hash) != null
-			libraryBank.projectUsesLibrary(project.projectName, dep, inCompile = false, inRuntime = true, inTest = inTest)
-		}
-
-		for ((_, dep) in testDependencies) {
-			libraryBank.projectUsesLibrary(project.projectName, dep, inCompile = false, inRuntime = false, inTest = true)
+		for ((dep, scopes) in dependencies) {
+			for (scope in scopes) {
+				libraryBank.projectUsesLibrary(project.projectName, dep, scope)
+			}
 		}
 	}
 
@@ -447,29 +435,23 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 	tracker.stageProgress(4, TOP_LEVEL_STAGE_COUNT)
 	tracker.stagesFor("Resolving project dependencies", wemiProjects.values, {"Resolving project dependencies of ${it.projectName}"}) { project ->
 		// We currently only process projects and ignore configurations because there is no way to map that
-		val compiling = session.task(project.projectName, "compiling", task = "projectDependencies")
-				.data(JsonValue.ValueType.array).map { it.getString("project")!! }
-		val running = session.task(project.projectName, "running", task = "projectDependencies")
-				.data(JsonValue.ValueType.array).map { it.getString("project")!! }
-		val testing = session.task(project.projectName, "testing", task = "projectDependencies")
-				.data(JsonValue.ValueType.array).map { it.getString("project")!! }
+		val projectDependencies = session.task(project.projectName, task = "projectDependencies")
+				.data(JsonValue.ValueType.array).map { it.getString("project")!! to (it.getString("scope") ?: "compile") }
 
-		val all = LinkedHashSet<String>(compiling)
-		all.addAll(running)
-		all.addAll(testing)
-
-		for (depProjectName in all) {
-			if (depProjectName == project.projectName) {
+		for ((projectDep, scopeStr) in projectDependencies) {
+			if (projectDep == project.projectName) {
 				continue
 			}
-			val inCompiling = compiling.contains(depProjectName)
-			val inRunning = running.contains(depProjectName)
-			val inTesting = testing.contains(depProjectName)
+			val scope = when (scopeStr.toLowerCase()) {// TODO(jp): Refactor
+				"provided" -> DependencyScope.PROVIDED
+				"runtime" -> DependencyScope.RUNTIME
+				"test" -> DependencyScope.TEST
+				else -> DependencyScope.COMPILE
+			}
 
-			val scope = toDependencyScope(inCompiling, inRunning, inTesting, depProjectName)
 			val myModule = projectModules[project.projectName]!!
 			myModule.moduleDependencies.add(ModuleDependencyNode(
-					depProjectName,
+					projectDep,
 					scope,
 					scope.exported
 			))
@@ -586,13 +568,6 @@ private enum class SourcesDocs {
 	Docs
 }
 private fun createWemiProjectSourcesDocs(session: WemiLauncherSession, projectName: String, sourcesDocs:SourcesDocs): List<Path> {
-	if (session.wemiVersion < Version.WEMI_0_14) {
-		return createWemiProjectDependencies(session, projectName, when (sourcesDocs) {
-			SourcesDocs.Sources -> "retrievingSources"
-			SourcesDocs.Docs -> "retrievingDocs"
-		}).values.flatMap { it.map { d -> d.artifact } }
-	}
-
 	try {
 		return session.jsonArray(projectName, task = when (sourcesDocs) {
 			SourcesDocs.Sources -> "externalSources"
@@ -604,15 +579,21 @@ private fun createWemiProjectSourcesDocs(session: WemiLauncherSession, projectNa
 	return emptyList()
 }
 
-private fun createWemiProjectDependencies(session: WemiLauncherSession, projectName: String, vararg config: String): Map<String, List<WemiDependency>> {
-	val dependencies = LinkedHashMap<String, MutableList<WemiDependency>>()
+private fun createWemiProjectDependencies(session: WemiLauncherSession, projectName: String): Map<WemiDependency, Set<DependencyScope>> {
+	val dependencies = LinkedHashMap<WemiDependency, MutableSet<DependencyScope>>()// TODO(jp): Check that WemiDependency can be used as a key safely
 
-	fun add(id:String, dep:WemiDependency) {
-		dependencies.getOrPut(id) { mutableListOf() }.add(dep)
+	fun add(dep:WemiDependency, scopeStr:String) {
+		val scope = when (scopeStr.toLowerCase()) {
+			"provided" -> DependencyScope.PROVIDED
+			"runtime" -> DependencyScope.RUNTIME
+			"test" -> DependencyScope.TEST
+			else -> DependencyScope.COMPILE
+		}
+		dependencies.getOrPut(dep) { mutableSetOf() }.add(scope)
 	}
 
 	try {
-		session.jsonObject(projectName, *config, task = "resolvedLibraryDependencies?", orNull = true).get("value")?.forEach { resolvedValue ->
+		session.jsonObject(projectName, task = "resolvedLibraryDependencies?", orNull = true).get("value")?.forEach { resolvedValue ->
 			val projectId = resolvedValue.get("key")
 			val group = projectId.getString("group")!!
 			val name = projectId.getString("name")!!
@@ -620,45 +601,48 @@ private fun createWemiProjectDependencies(session: WemiLauncherSession, projectN
 			val classifier = projectId.getString("classifier", "")!!
 
 			val artifact = resolvedValue.get("value")?.getString("artifact", null) ?: return@forEach
+			val scope = resolvedValue.get("value")?.getString("scope", null) ?: "compile"
 
-			add("$group:$name:$version",
-					WemiDependency.Library(
+			add(WemiDependency.Library(
 							"$group:$name:$version${if (classifier.isBlank()) "" else "-$classifier"}",
-							Paths.get(artifact).toAbsolutePath().normalize()))
+							Paths.get(artifact).toAbsolutePath().normalize()), scope)
 		}
 
-		session.jsonArray(projectName, *config, task = "unmanagedDependencies?", orNull = true).forEach {
+		session.jsonArray(projectName, task = "unmanagedDependencies?", orNull = true).forEach {
 			val file = it.locatedFileOrPathClasspathEntry()
 
-			add(file.toString(), WemiDependency.JarOrFolder(file))
+			add(WemiDependency.JarOrFolder(file), "compile")
 		}
 
 		// Collect generated dependencies
-		val generated = session.jsonArray(projectName, *config, task="generatedClasspath?", orNull = true).mapNotNull { it?.locatedFileOrPathClasspathEntry() }
+		val generated = session.jsonArray(projectName, task="generatedClasspath?", orNull = true).mapNotNull { it?.locatedFileOrPathClasspathEntry() }
 		for (path in generated) {
-			add(path.toString(), WemiDependency.JarOrFolder(path))
+			add(WemiDependency.JarOrFolder(path), "compile")
 		}
 	} catch (e: InvalidTaskResultException) {
-		LOG.warn("Failed to resolve dependencies for ${config.joinToString("") { "$it:" }}$projectName", e)
+		LOG.warn("Failed to resolve dependencies for $projectName", e)
 	}
 
 	return dependencies
 }
 
-private fun createWemiProjectCombinedDependencies(session: WemiLauncherSession, projectName: String, stage:String, withDocs:Boolean, withSources:Boolean):MutableMap<String, WemiLibraryCombinedDependency> {
-	val artifacts = createWemiProjectDependencies(session, projectName, stage)
+private fun createWemiProjectCombinedDependencies(session: WemiLauncherSession, projectName: String, withDocs:Boolean, withSources:Boolean):MutableMap<WemiLibraryCombinedDependency, Set<DependencyScope>> {
+	val artifacts = createWemiProjectDependencies(session, projectName)
 	val sources = if (withSources) createWemiProjectSourcesDocs(session, projectName, SourcesDocs.Sources) else emptyList()
 	val docs = if (withDocs) createWemiProjectSourcesDocs(session, projectName, SourcesDocs.Docs) else emptyList()
 
-	val combined = HashMap<String, WemiLibraryCombinedDependency>()
-	for ((artifactId, artifactDependency) in artifacts) {
-		val dep = WemiLibraryCombinedDependency(artifactDependency.mapNotNull { (it as? WemiDependency.Library)?.name }.joinToString(", ").takeUnless { it.isBlank() } ?: artifactDependency.joinToString(", ") { it.artifact.name },
-				artifactDependency.map { it.artifact },
+	val combined = HashMap<WemiLibraryCombinedDependency, Set<DependencyScope>>()
+	for ((dependency, scopes) in artifacts) {
+		val artifact = dependency.artifact
+		val name = (dependency as? WemiDependency.Library)?.name ?: artifact.name
+
+		val dep = WemiLibraryCombinedDependency(name,
+				listOf(artifact),
 				// TODO(jp): This mapping must be constructed differently!
 				/*sources[artifactId]?.map { it.artifact } ?:*/ emptyList(),
 				/*docs[artifactId]?.map { it.artifact } ?:*/ emptyList()
 		)
-		combined[dep.hash] = dep
+		combined[dep] = scopes
 	}
 
 	return combined
@@ -688,30 +672,21 @@ private class WemiLibraryCombinedDependency(val name:String,
 	}
 
 	override fun toString(): String = name
+
+	// TODO(jp): Generate equals and hash code!!!!!
 }
 
 private class WemiLibraryDependencyBank {
-	private val hashToDependencyAndProjects
-			= HashMap<String, // Hash
-			Pair<
-					WemiLibraryCombinedDependency, // Dependency for hash
-					MutableMap<
-							String, // Project name
-							DependencyScope // Scope for project
-							>
-					>
-			>()
+	private val bank = HashMap<WemiLibraryCombinedDependency, HashSet<Pair<String /* project */, DependencyScope>>>()
 
-	fun projectUsesLibrary(project: String, library:WemiLibraryCombinedDependency, inCompile:Boolean, inRuntime:Boolean, inTest:Boolean) {
-		val projectMap = hashToDependencyAndProjects.getOrPut(library.hash) { Pair(library, mutableMapOf()) }.second
-
-		projectMap[project] = toDependencyScope(inCompile, inRuntime, inTest, library)
+	fun projectUsesLibrary(project: String, library:WemiLibraryCombinedDependency, scope:DependencyScope) {
+		bank.getOrPut(library) { HashSet() }.add(project to scope)
 	}
 
 	fun apply(project: ProjectNode, modules:Map<String, ModuleNode>) {
 		val projectToDependenciesMap = HashMap<ModuleNode, ArrayList<LibraryDependencyNode>>()
 
-		for ((library, projects) in hashToDependencyAndProjects.values) {
+		for ((library, projects) in bank) {
 			val ideLibraryNode = LibraryNode(library.name)
 			ideLibraryNode.artifacts = library.artifacts
 			ideLibraryNode.sources = library.sourceArtifacts
