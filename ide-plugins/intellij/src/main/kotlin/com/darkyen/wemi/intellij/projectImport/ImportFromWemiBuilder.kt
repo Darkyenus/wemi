@@ -85,7 +85,7 @@ class ImportFromWemiBuilder : ProjectImportBuilder<ProjectNode>() {
         this.projectNode = projectNode
 
         wizardContext.projectName = projectNode.name
-        wizardContext.setProjectFileDirectory(projectNode.root.toAbsolutePath(), true)
+        wizardContext.setProjectFileDirectory(projectNode.root.toAbsolutePath().toString(), true)// TODO(jp): Check first argument
         wizardContext.compilerOutputDirectory = projectNode.compileOutputPath?.toAbsolutePath()?.toString()
         getWemiCompatibleSdk(projectNode.javaTargetVersion)?.let { wizardContext.projectJdk = it }
     }

@@ -117,8 +117,8 @@ fun Project.withWemiLauncher(operation:String, action:(WemiLauncher) -> Unit) {
 }
 
 fun reinstallWemiLauncher(projectBasePath:Path, failNotificationTitle:String, project:Project?):Pair<Path, WemiLauncher>? {
-	val wemiLauncherStream = InstallWemiLauncherAction::class.java.classLoader.getResourceAsStream("wemi-launcher.sh")
-			?: throw IllegalStateException("Corrupted Wemi plugin: wemi-launcher.sh resource does not exist")
+	val wemiLauncherStream = InstallWemiLauncherAction::class.java.classLoader.getResourceAsStream("wemi")
+			?: throw IllegalStateException("Corrupted Wemi plugin: wemi resource does not exist")
 
 	val wemiLauncherPath = projectBasePath.resolve(WemiLauncherFileName)
 

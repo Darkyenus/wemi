@@ -21,7 +21,7 @@ import java.nio.file.StandardOpenOption
 class BuiltinPluginsRegistry (private val pluginsDirectory: Path) {
 
 	private val pluginsById = HashMap<String, Plugin>()
-	private val directoryNameMapping = HashMap<String, String>()
+	private val pluginsByFileName = HashMap<String, Plugin>()
 
 	private fun cacheFile():Path {
 		return pluginsDirectory / "builtinRegistry.bin"
@@ -41,7 +41,11 @@ class BuiltinPluginsRegistry (private val pluginsDirectory: Path) {
 					for (d in 0 until dependenciesSize) {
 						dependencies.add(inp.readUTF())
 					}
-					pluginsById[id] = Plugin(id, directoryName, dependencies)
+					val plugin = Plugin(id, directoryName, dependencies)
+					pluginsById[plugin.id] = plugin
+					if (plugin.directoryName != plugin.id) {
+						pluginsByFileName[plugin.directoryName] = plugin
+					}
 				}
 			}
 			return true
@@ -89,7 +93,7 @@ class BuiltinPluginsRegistry (private val pluginsDirectory: Path) {
 	}
 
 	fun findPlugin(name:String):Path? {
-		val plugin = pluginsById[name] ?: pluginsById[directoryNameMapping[name]]
+		val plugin = pluginsById[name] ?: pluginsByFileName[name]
 		if (plugin != null) {
 			val result = pluginsDirectory / plugin.directoryName
 			return if (result.isDirectory()) result else null
@@ -102,7 +106,7 @@ class BuiltinPluginsRegistry (private val pluginsDirectory: Path) {
 		val result = HashSet<String>()
 		while (idsToProcess.isNotEmpty()) {
 			val id = idsToProcess.removeAt(0)
-			val plugin = pluginsById[id] ?: pluginsById[directoryNameMapping[id]]
+			val plugin = pluginsById[id] ?: pluginsById[id]
 			if (plugin != null && result.add(id)) {
 				idsToProcess.addAll(plugin.dependencies - result)
 			}
@@ -117,7 +121,7 @@ class BuiltinPluginsRegistry (private val pluginsDirectory: Path) {
 		val plugin = Plugin(intellijPlugin.pluginId!!, artifact.name, dependencies)
 		pluginsById[plugin.id] = plugin
 		if (plugin.directoryName != plugin.id) {
-			directoryNameMapping[plugin.directoryName] = plugin.id
+			pluginsByFileName[plugin.directoryName] = plugin
 		}
 	}
 

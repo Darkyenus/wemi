@@ -136,6 +136,7 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	}
 
 	// IntelliJ SDK resolution
+	/** To find exact release version, try https://confluence.jetbrains.com/display/IDEADEV/IDEA+2020.1+latest+builds and related pages. */
 	IntelliJ.intellijIdeDependency set { IntelliJIDE.External() }
 	IntelliJ.resolvedIntellijIdeDependency set ResolveIdeDependency
 	IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox() }

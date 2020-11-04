@@ -648,7 +648,7 @@ private fun createWemiProjectDependencies(session: WemiLauncherSession, projectN
 private fun createWemiProjectCombinedDependencies(session: WemiLauncherSession, projectName: String, stage:String, withDocs:Boolean, withSources:Boolean):MutableMap<String, WemiLibraryCombinedDependency> {
 	val artifacts = createWemiProjectDependencies(session, projectName, stage)
 	val sources = if (withSources) createWemiProjectSourcesDocs(session, projectName, SourcesDocs.Sources) else emptyList()
-	val docs = if (withDocs) createWemiProjectSourcesDocs(session, projectName, SourcesDocs.Docs) else emptyMap()
+	val docs = if (withDocs) createWemiProjectSourcesDocs(session, projectName, SourcesDocs.Docs) else emptyList()
 
 	val combined = HashMap<String, WemiLibraryCombinedDependency>()
 	for ((artifactId, artifactDependency) in artifacts) {

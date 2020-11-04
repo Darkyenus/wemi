@@ -11,6 +11,7 @@ import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
+import wemi.boot.WemiCacheFolder
 import wemi.boot.WemiRootFolder
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompilerFlags
@@ -40,6 +41,7 @@ import wemi.util.executable
 import wemi.util.forEachLine
 import wemi.util.name
 import wemi.util.writeText
+import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoField
@@ -58,6 +60,7 @@ const val WemiGroup = "com.darkyen.wemi"
 
 val distributionArchiveContent by key<Path>("Create a distribution archive content for Wemi (required for test repositories)")
 val distributionArchive by key<Path>("Create a distribution archive for Wemi (for final distribution)")
+val wemiLauncher by key<Path>("Create a launcher script")
 
 val wemi:Project by project(Archetypes.AggregateJVMProject) {
 
@@ -70,6 +73,21 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
     projectDependencies add { ProjectDependency(core, scope = ScopeAggregate) }
     projectDependencies addAll { CompilerProjects.map { ProjectDependency(it, scope = ScopeAggregate) } }
     projectDependencies add { ProjectDependency(dokkaInterfaceImplementation, scope = ScopeAggregate) }
+
+    wemiLauncher set {
+        val wemiVersion = projectVersion.get()
+        val launcherScriptTemplatePath = WemiRootFolder / "src/launcher-template.sh"
+        val launcherScriptPath = WemiCacheFolder / "-launcher-script/wemi"
+        Files.createDirectories(launcherScriptPath.parent)
+        Files.newBufferedWriter(launcherScriptPath, Charsets.UTF_8).use { out ->
+            launcherScriptTemplatePath.forEachLine { line ->
+                out.write(line.replace("<<<WEMI_VERSION>>>", wemiVersion))
+                out.write("\n")
+            }
+        }
+        launcherScriptPath.executable = true
+        launcherScriptPath
+    }
 
     distributionArchiveContent set {
         val distFolder = Files.createDirectories(cacheDirectory.get() / "-distribution-archive")
@@ -102,15 +120,8 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
         expiresWith(distFolder)
 
         // Prepare launcher script
-        val wemiVersion = projectVersion.get()
-        val launcherScriptTemplatePath = WemiRootFolder / "src/launcher-template.sh"
         val launcherScriptPath = distFolder / "wemi"
-        Files.newBufferedWriter(launcherScriptPath, Charsets.UTF_8).use { out ->
-            launcherScriptTemplatePath.forEachLine { line ->
-                out.write(line.replace("<<<WEMI_VERSION>>>", wemiVersion))
-                out.write("\n")
-            }
-        }
+        Files.copy(wemiLauncher.get(), launcherScriptPath)
         launcherScriptPath.executable = true
 
         // Pack tar archive
@@ -119,7 +130,7 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
         // Create build info document
         val buildInfo = distFolder / "build-info.txt"
         buildInfo.writeText(StringBuilder().apply {
-            append("Wemi ").append(wemiVersion).append('\n')
+            append("Wemi ").append(projectVersion.get()).append('\n')
             append("Git: ").append(system("git", "rev-parse", "HEAD", timeoutMs = 60_000)).append('\n')
             append("Date: ").append(DateTimeFormatter.ISO_INSTANT.format(Instant.now().with(ChronoField.NANO_OF_SECOND, 0L))).append('\n')
         })

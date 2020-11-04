@@ -14,7 +14,6 @@ import wemi.dependency.ProjectDependency
 import wemi.dependency.Repository
 import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.resolveDependencyArtifacts
-import wemi.util.absolutePath
 import wemi.util.div
 import wemi.util.exists
 import wemi.util.httpGet
@@ -245,8 +244,8 @@ val DefaultResolvedIntellijPluginDependencies : Value<List<ResolvedIntelliJPlugi
 			val depends = pluginXml.documentElement?.namedElements("depends") ?: continue
 			for (depend in depends) {
 				if (depend.textContent == "com.intellij.modules.java") {
-					throw WemiException("The project depends on `com.intellij.modules.java` module but doesn't declare a compile dependency on it.\n" +
-							"Please delete `depends` tag from ${file.file.absolutePath} or add `java` plugin to Wemi dependencies: 'IntelliJ.intellijPluginDependencies add {IntelliJPluginDependency.Bundled(\"java\")}'")
+					LOG.warn("The project depends on `com.intellij.modules.java` module but doesn't declare a compile dependency on it.\n" +
+							"Please delete `depends` tag from {} or add `java` plugin to Wemi dependencies: 'IntelliJ.intellijPluginDependencies add {IntelliJPluginDependency.Bundled(\"java\")}'", file)
 				}
 			}
 		}
@@ -258,7 +257,7 @@ val DefaultResolvedIntellijPluginDependencies : Value<List<ResolvedIntelliJPlugi
 fun EvalScope.resolveIntelliJPlugin(dependency: IntelliJPluginDependency, resolvedIntelliJIDE: ResolvedIntelliJIDE, repositories: List<IntelliJPluginRepository>) : ResolvedIntelliJPluginDependency {
 	return when (dependency) {
 		is IntelliJPluginDependency.Bundled -> {
-			LOG.info("Looking for builtin {} in {}", dependency.name, resolvedIntelliJIDE.homeDir)
+			LOG.debug("Looking for builtin {} in {}", dependency.name, resolvedIntelliJIDE.homeDir)
 			val pluginDirectory = resolvedIntelliJIDE.pluginsRegistry.findPlugin(dependency.name)
 			if (pluginDirectory != null) {
 				ResolvedIntelliJPluginDependency(dependency, pluginDirectory)

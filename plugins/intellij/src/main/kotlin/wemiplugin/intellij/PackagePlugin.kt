@@ -135,7 +135,7 @@ val DefaultIntelliJSearchableOptions : Value<Path?> = {
 val DefaultIntelliJPluginArchive : Value<Path> = {
 	val folder = using(withSearchableOptions) { IntelliJ.intellijPluginFolder.get() }
 
-	val zip = folder.parent / "${folder.name}.zip"
+	val zip = folder.parent / "${folder.name}-${Keys.projectVersion.get()}.zip"
 	AssemblyOperation().use {
 		for (file in FileSet(folder).matchingLocatedFiles()) {
 			it.addSource(file, true, extractJarEntries = false)
