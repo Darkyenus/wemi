@@ -5,7 +5,6 @@ import com.jetbrains.plugin.structure.intellij.version.IdeVersion
 import com.jetbrains.plugin.structure.intellij.version.IdeVersionImpl
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
-import wemi.Configurations
 import wemi.Value
 import wemi.WemiException
 import wemi.boot.WemiCacheFolder
@@ -54,7 +53,6 @@ sealed class IntelliJIDE {
 class ResolvedIntelliJIDE(
 		buildNumber:String,
 		val homeDir: Path,
-		val sources:List<Path>,
 		val pluginsRegistry : BuiltinPluginsRegistry,
 		val jarFiles:Collection<Path>) {
 
@@ -66,21 +64,39 @@ class ResolvedIntelliJIDE(
 	}
 
 	override fun toString(): String {
-		return "ResolvedIntelliJIDE(classes=$homeDir, sources=$sources)"
+		return "ResolvedIntelliJIDE($homeDir)"
 	}
 }
 
-fun defaultIdeDependency(downloadSources:Boolean): Value<ResolvedIntelliJIDE> = {
+val ResolveIdeDependency: Value<ResolvedIntelliJIDE> = {
 	val withKotlin = !Keys.libraryDependencies.get().any { it.dependencyId.group == "org.jetbrains.kotlin" && isKotlinRuntime(it.dependencyId.name) }
 
 	val result = when (val dependency = IntelliJ.intellijIdeDependency.get()) {
-		is IntelliJIDE.Local -> resolveLocalIDE(dependency.path, dependency.sources, withKotlin)
+		is IntelliJIDE.Local -> resolveLocalIDE(dependency.path, withKotlin)
 		is IntelliJIDE.External -> {
-			resolveRemoteIDE(IntelliJ.intellijIdeRepository.get(), dependency.version, dependency.type, downloadSources, withKotlin, progressListener)
+			resolveRemoteIDE(IntelliJ.intellijIdeRepository.get(), dependency.version, dependency.type, withKotlin, progressListener)
 		}
 	}
 
 	result
+}
+
+val ResolveIdeDependencySources: Value<List<Path>> = {
+	when (val dependency = IntelliJ.intellijIdeDependency.get()) {
+		is IntelliJIDE.Local -> dependency.sources
+		is IntelliJIDE.External -> {
+			// Original code checked here whether this is a dependency.type == "RD" (Rider)
+			// and Utils.relaseType(version) == "snapshots", and refused to download sources with warning:
+			// "IDE sources are not available for Rider SNAPSHOTS"
+			// However, this is not necessary:
+			// 1. The code after it does not even differentiate between IDE types and always downloads ideaIC sources
+			// 2. We should not care whether something is or is not available, we can just check and return nothing if it isn't
+			// Therefore, that code is not reproduced here
+
+			val repoUrl = IntelliJ.intellijIdeRepository.get()
+			resolveSources(dependency.version, intellijIDERepository(repoUrl, dependency.version), progressListener) ?: emptyList()
+		}
+	}
 }
 
 fun intellijIDERepository(baseRepoUrl:URL, version:String?):Repository {
@@ -89,10 +105,9 @@ fun intellijIDERepository(baseRepoUrl:URL, version:String?):Repository {
 }
 
 /** Resolve IDE from remote repository. */
-fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Boolean, withKotlin: Boolean, progressListener: ActivityListener?): ResolvedIntelliJIDE {
+fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, withKotlin: Boolean, progressListener: ActivityListener?): ResolvedIntelliJIDE {
 	var dependencyGroup = "com.jetbrains.intellij.idea"
 	var dependencyName = "ideaIC"
-	var sources = sources_
 	if (type == "IU") {
 		dependencyName = "ideaIU"
 	} else if (type == "CL") {
@@ -104,10 +119,6 @@ fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Bool
 	} else if (type == "RD") {
 		dependencyGroup = "com.jetbrains.intellij.rider"
 		dependencyName = "riderRD"
-		if (sources && Utils.releaseType(version) == "snapshots") {
-			LOG.warn("IDE sources are not available for Rider SNAPSHOTS")
-			sources = false
-		}
 	}
 
 	val repository = intellijIDERepository(repoUrl, version)
@@ -119,14 +130,13 @@ fun resolveRemoteIDE(repoUrl: URL, version: String, type: String, sources_: Bool
 
 	val homeDir = unzipDependencyFile(getZipCacheDirectory(ideZipFile, type), ideZipFile, type, version.endsWith("-SNAPSHOT"))
 	LOG.debug("IDE dependency cache directory: {}", homeDir)
-	val sourceDirs = if (sources) resolveSources(version, repository, progressListener) else null
-	return createDependency(type, homeDir, sourceDirs ?: emptyList(), withKotlin)
+	return createDependency(type, homeDir, withKotlin)
 }
 
 /**
  * Resolve IDE from local installation.
  */
-fun resolveLocalIDE(localPath: Path, localPathSources: List<Path>, withKotlin: Boolean): ResolvedIntelliJIDE {
+fun resolveLocalIDE(localPath: Path, withKotlin: Boolean): ResolvedIntelliJIDE {
 	LOG.debug("Adding local IDE dependency")
 	val homeDir = if (localPath.name.pathHasExtension("app")) {
 		localPath.resolve("Contents")
@@ -135,7 +145,7 @@ fun resolveLocalIDE(localPath: Path, localPathSources: List<Path>, withKotlin: B
 	if (!homeDir.exists() || !homeDir.isDirectory()) {
 		throw WemiException("Specified localPath '$localPath' doesn't exist or is not a directory", false)
 	}
-	return createDependency(null, homeDir, localPathSources, withKotlin)
+	return createDependency(null, homeDir, withKotlin)
 }
 
 private val mainDependencies = arrayOf("ideaIC", "ideaIU", "riderRD", "riderRS")
@@ -146,7 +156,7 @@ fun isKotlinRuntime(name:String):Boolean {
 
 private val ALLOWED_JPS_JAR_NAMES = arrayOf("jps-builders.jar", "jps-model.jar", "util.jar")
 
-private fun createDependency(type: String?, homeDir: Path, sourceDirs: List<Path>, withKotlin: Boolean): ResolvedIntelliJIDE {
+private fun createDependency(type: String?, homeDir: Path, withKotlin: Boolean): ResolvedIntelliJIDE {
 	val lib = homeDir / "lib"
 	var jars = Utils.collectJars(lib).filter {
 		val libName = it.name
@@ -173,7 +183,7 @@ private fun createDependency(type: String?, homeDir: Path, sourceDirs: List<Path
 	}
 	val buildNumber = String(Files.readAllBytes(buildTxt), Charsets.UTF_8).trim()
 
-	return ResolvedIntelliJIDE(buildNumber, homeDir, sourceDirs, pluginsRegistry, jars.collect(Collectors.toList()))
+	return ResolvedIntelliJIDE(buildNumber, homeDir, pluginsRegistry, jars.collect(Collectors.toList()))
 }
 
 private fun resolveSources(version: String, repository: Repository, progressListener: ActivityListener?): List<Path>? {

@@ -13,8 +13,8 @@ import java.util.concurrent.TimeUnit
  *
  * If any dependency fails to resolve, returns null.
  */
-fun resolveDependencyArtifacts(dependencies: Collection<Dependency>, repositories: Collection<Repository>, progressListener:ActivityListener?): List<Path>? {
-    val (resolved, ok ) = resolveDependencies(dependencies, repositories, progressListener = progressListener)
+fun resolveDependencyArtifacts(dependencies: Collection<Dependency>, repositories: Collection<Repository>, progressListener:ActivityListener?, mapper: ((Dependency) -> Dependency) = { it }, allowErrors:Boolean = false): List<Path>? {
+    val (resolved, ok ) = resolveDependencies(dependencies, repositories, progressListener = progressListener, mapper = mapper)
 
     if (!ok) {
         for (value in resolved.values) {
@@ -26,7 +26,9 @@ fun resolveDependencyArtifacts(dependencies: Collection<Dependency>, repositorie
                 LOG.warn("Artifact resolution failure in {} from {}: {}", value.id, repo, log)
             }
         }
-        return null
+        if (!allowErrors) {
+            return null
+        }
     }
 
     return resolved.artifacts()

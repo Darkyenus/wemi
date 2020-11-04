@@ -69,6 +69,7 @@ object Keys {
     val javaExecutable by key<Path>("Java executable, used for running the project")
     val kotlinVersion by key<KotlinCompilerVersion>("Kotlin version used for compilation and standard libraries", WemiKotlinVersion)
     val compilerOptions by key<CompilerFlags>("Options passed to the compiler")
+    // These directories must stay here to be accessible from IDE
     val outputClassesDirectory by key<Path>("Directory for compiler created classes")
     val outputSourcesDirectory by key<Path>("Directory for compiler created sources")
     val outputHeadersDirectory by key<Path>("Directory for compiler created headers")
@@ -100,6 +101,9 @@ object Keys {
     /** @see wemi.publish.artifacts preferred method for adding to this list. */
     val publishArtifacts by key<List<ArtifactEntry>>("Artifacts that should get published", defaultValue = emptyList())
     val publish by key<Path>("Publish archives to 'publishRepository' and return the URI to where it was published")
+
+    val externalSources by key<List<Path>>("Sources of the external classpath, useful for IDE integration")
+    val externalDocs by key<List<Path>>("Documentation for the external classpath, useful for IDE integration")
 
     val assemblyMergeStrategy by key<MergeStrategyChooser>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
     val assemblyRenameFunction by key<RenameFunction>("Function for renaming assembled duplicate files for which merge strategy is Rename. Paths after rename must not conflict, rules are not recursive.")

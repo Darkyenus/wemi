@@ -539,16 +539,10 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 		// Sources and docs
 		tracker.stageProgress(3, BUILD_SCRIPT_MODULE_PART_COUNT)
 		if (downloadSources) {
-			libraryNode.sources = createWemiProjectDependencies(session, WemiBuildScriptProjectName, "retrievingSources").flatMap {
-				(_, dependencies) ->
-				dependencies.map { it.artifact }
-			}
+			libraryNode.sources = createWemiProjectSourcesDocs(session, WemiBuildScriptProjectName, SourcesDocs.Sources)
 		}
 		if (downloadDocumentation) {
-			libraryNode.documentation = createWemiProjectDependencies(session, WemiBuildScriptProjectName, "retrievingDocs").flatMap {
-				(_, dependencies) ->
-				dependencies.map { it.artifact }
-			}
+			libraryNode.documentation = createWemiProjectSourcesDocs(session, WemiBuildScriptProjectName, SourcesDocs.Docs)
 		}
 
 		// Wemi sources
@@ -585,6 +579,29 @@ private fun createWemiProjectData(session: WemiLauncherSession, projectName:Stri
 			sourceRootsTesting,
 			resourceRootsTesting
 	)
+}
+
+private enum class SourcesDocs {
+	Sources,
+	Docs
+}
+private fun createWemiProjectSourcesDocs(session: WemiLauncherSession, projectName: String, sourcesDocs:SourcesDocs): List<Path> {
+	if (session.wemiVersion < Version.WEMI_0_14) {
+		return createWemiProjectDependencies(session, projectName, when (sourcesDocs) {
+			SourcesDocs.Sources -> "retrievingSources"
+			SourcesDocs.Docs -> "retrievingDocs"
+		}).values.flatMap { it.map { d -> d.artifact } }
+	}
+
+	try {
+		return session.jsonArray(projectName, task = when (sourcesDocs) {
+			SourcesDocs.Sources -> "externalSources"
+			SourcesDocs.Docs -> "externalDocs"
+		}, orNull = true).map { it.locatedFileOrPathClasspathEntry() }
+	} catch (e: InvalidTaskResultException) {
+		LOG.warn("Failed to resolve $sourcesDocs for $projectName", e)
+	}
+	return emptyList()
 }
 
 private fun createWemiProjectDependencies(session: WemiLauncherSession, projectName: String, vararg config: String): Map<String, List<WemiDependency>> {
@@ -630,15 +647,16 @@ private fun createWemiProjectDependencies(session: WemiLauncherSession, projectN
 
 private fun createWemiProjectCombinedDependencies(session: WemiLauncherSession, projectName: String, stage:String, withDocs:Boolean, withSources:Boolean):MutableMap<String, WemiLibraryCombinedDependency> {
 	val artifacts = createWemiProjectDependencies(session, projectName, stage)
-	val sources = if (withSources) createWemiProjectDependencies(session, projectName, stage, "retrievingSources") else emptyMap()
-	val docs = if (withDocs) createWemiProjectDependencies(session, projectName, stage, "retrievingDocs") else emptyMap()
+	val sources = if (withSources) createWemiProjectSourcesDocs(session, projectName, SourcesDocs.Sources) else emptyList()
+	val docs = if (withDocs) createWemiProjectSourcesDocs(session, projectName, SourcesDocs.Docs) else emptyMap()
 
 	val combined = HashMap<String, WemiLibraryCombinedDependency>()
 	for ((artifactId, artifactDependency) in artifacts) {
 		val dep = WemiLibraryCombinedDependency(artifactDependency.mapNotNull { (it as? WemiDependency.Library)?.name }.joinToString(", ").takeUnless { it.isBlank() } ?: artifactDependency.joinToString(", ") { it.artifact.name },
 				artifactDependency.map { it.artifact },
-				sources[artifactId]?.map { it.artifact } ?: emptyList(),
-				docs[artifactId]?.map { it.artifact } ?: emptyList()
+				// TODO(jp): This mapping must be constructed differently!
+				/*sources[artifactId]?.map { it.artifact } ?:*/ emptyList(),
+				/*docs[artifactId]?.map { it.artifact } ?:*/ emptyList()
 		)
 		combined[dep.hash] = dep
 	}
@@ -812,7 +830,11 @@ private fun JsonValue.locatedFileOrPathClasspathEntry(): Path {
 	return if (this.type() == JsonValue.ValueType.stringValue) {
 		return Paths.get(asString())
 	} else {
-		Paths.get(get("root")?.asString() ?: getString("file")!!)
+		var locatedPath = this
+		if (!locatedPath.has("root") && !locatedPath.has("file")) {
+			locatedPath = locatedPath.get("value")!! // Scoped<LocatedPath>
+		}
+		Paths.get(locatedPath.get("root")?.asString() ?: locatedPath.getString("file")!!)
 	}.toAbsolutePath()
 }
 

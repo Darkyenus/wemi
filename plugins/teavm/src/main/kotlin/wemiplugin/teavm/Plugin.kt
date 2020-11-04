@@ -186,11 +186,7 @@ val TeaVMCompileDefault: Value<TeaVMResult> = {
 		val internalSources = ArrayList<LocatedPath>()
 
 		override fun open() {
-			val paths = using(Configurations.retrievingSources) {
-				Keys.externalClasspath.get()
-			}
-			for (path in paths) {
-				val classpathEntry = path.value.classpathEntry
+			for (classpathEntry in Keys.externalSources.get()) {
 				if (classpathEntry.isDirectory()) {
 					directories.add(classpathEntry)
 				} else {

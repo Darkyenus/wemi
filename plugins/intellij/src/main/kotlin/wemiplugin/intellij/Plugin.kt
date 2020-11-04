@@ -137,13 +137,12 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 
 	// IntelliJ SDK resolution
 	IntelliJ.intellijIdeDependency set { IntelliJIDE.External() }
-	IntelliJ.resolvedIntellijIdeDependency set defaultIdeDependency(false)
+	IntelliJ.resolvedIntellijIdeDependency set ResolveIdeDependency
 	IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox() }
-	extend(Configurations.retrievingSources) {
-		IntelliJ.resolvedIntellijIdeDependency set defaultIdeDependency(true)
-		Keys.externalClasspath addAll {
-			IntelliJ.resolvedIntellijIdeDependency.get().sources.map { LocatedPath(it).scoped() }
-		}
+	Keys.externalSources modify { es ->
+		val sources = es.toMutable()
+		sources.addAll(ResolveIdeDependencySources.invoke(this))
+		sources
 	}
 
 	// IntelliJ SDK launch

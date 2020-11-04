@@ -49,5 +49,6 @@ class Version private constructor(private val parts:List<Int>) : Comparable<Vers
         val NONE = Version(emptyList())
 
         val WEMI_0_11 = Version("0.11")
+        val WEMI_0_14 = Version("0.14")
     }
 }

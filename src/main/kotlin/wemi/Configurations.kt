@@ -4,16 +4,12 @@ package wemi
 
 import Files
 import org.slf4j.LoggerFactory
-import wemi.KeyDefaults.classifierAppendingClasspathModifier
-import wemi.KeyDefaults.classifierAppendingLibraryDependencyProjectMapper
 import wemi.boot.WemiCacheFolder
 import wemi.collections.WMutableSet
 import wemi.collections.toMutable
-import wemi.dependency.JavadocClassifier
 import wemi.dependency.LocalM2Repository
 import wemi.dependency.Repository
 import wemi.dependency.ScopeTest
-import wemi.dependency.SourcesClassifier
 import wemi.util.copyRecursively
 import wemi.util.div
 import wemi.util.plus
@@ -32,27 +28,6 @@ object Configurations {
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources-test")
         Keys.outputHeadersDirectory set KeyDefaults.outputClassesDirectory("headers-test")
     }
-
-    //region IDE configurations
-    /** Used when called from IDE */
-    val ideAxis = Axis("ideAxis")
-
-    val retrievingSources by configuration("Used to retrieve sources", ideAxis) {
-        val mapper = classifierAppendingLibraryDependencyProjectMapper(SourcesClassifier)
-        Keys.libraryDependencies modify { it.map(mapper).toSet() }
-        Keys.libraryDependencyMapper set Static(mapper)
-        Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(SourcesClassifier)
-        Keys.repositories modify KeyDefaults.MakeAllRepositoriesAuthoritative
-    }
-
-    val retrievingDocs by configuration("Used to retrieve documentation", ideAxis) {
-        val mapper = classifierAppendingLibraryDependencyProjectMapper(JavadocClassifier)
-        Keys.libraryDependencies modify { it.map(mapper).toSet() }
-        Keys.libraryDependencyMapper set Static(mapper)
-        Keys.unmanagedDependencies modify classifierAppendingClasspathModifier(JavadocClassifier)
-        Keys.repositories modify KeyDefaults.MakeAllRepositoriesAuthoritative
-    }
-    //endregion
 
     /**
      * Attempts to disable all features that would fail while offline.

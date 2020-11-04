@@ -1,6 +1,7 @@
 package wemi.util
 
 import com.darkyen.tproll.util.PrettyPrinter
+import com.esotericsoftware.jsonbeans.JsonWriter
 import wemi.dependency.DEFAULT_SCOPE
 
 /**
@@ -11,9 +12,17 @@ import wemi.dependency.DEFAULT_SCOPE
  * @see wemi.dependency.ScopeProvided
  * @see wemi.dependency.ScopeTest
  */
-class Scoped<T:Any>(val value:T, val scope:String = DEFAULT_SCOPE) : WithDescriptiveString {
+class Scoped<T:Any>(val value:T, val scope:String = DEFAULT_SCOPE) : WithDescriptiveString, JsonWritable {
 	operator fun component1():T = value
 	operator fun component2():String = scope
+
+	override fun JsonWriter.write() {
+		writeObject {
+			@Suppress("UNCHECKED_CAST")
+			name("value").writeValue<T>(value, value::class.java as Class<T>)
+			field("scope", scope)
+		}
+	}
 
 	override fun toDescriptiveAnsiString(): String {
 		val sb = StringBuilder(120)

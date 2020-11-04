@@ -1046,6 +1046,21 @@ object KeyDefaults {
         result
     }
 
+    /**
+     * Creates a default value for [Keys.externalSources] and [Keys.externalDocs]
+     */
+    fun externalClasspathWithClassifier(classifier:String):Value<List<Path>> = {
+        // Authoritative repositories, so the search stops as soon as one value is found - malicious sources are not a problem, this is only for reference
+        val repositories = Keys.repositories.get().mapTo(HashSet()) { if (!it.authoritative) it.copy(authoritative = true) else it }
+        val mapper = classifierAppendingLibraryDependencyProjectMapper(classifier)
+
+        val libraryDependencies = Keys.libraryDependencies.get().map(mapper)
+        val resolved = resolveDependencyArtifacts(libraryDependencies, repositories, progressListener, mapper, allowErrors = true) ?: emptyList()
+        val unmanaged = classifierAppendingClasspathModifier(classifier).invoke(this, Keys.unmanagedDependencies.get())
+
+        resolved.map { it } + unmanaged.map { it.classpathEntry }
+    }
+
     val Assembly: Value<Path> = {
         AssemblyOperation().use { assemblyOperation ->
             // Load data

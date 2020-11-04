@@ -2,6 +2,7 @@
 
 package wemi
 
+import wemi.KeyDefaults.externalClasspathWithClassifier
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.JarMergeStrategyChooser
 import wemi.boot.WemiBuildFolder
@@ -12,9 +13,11 @@ import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.dependency.DefaultRepositories
 import wemi.dependency.Dependency
+import wemi.dependency.JavadocClassifier
 import wemi.dependency.LocalM2Repository
 import wemi.dependency.NoClassifier
 import wemi.dependency.ScopeTest
+import wemi.dependency.SourcesClassifier
 import wemi.publish.artifacts
 import wemi.run.javaExecutable
 import wemi.test.JUnitAPI
@@ -68,6 +71,9 @@ object Archetypes {
         Keys.archive set KeyDefaults.Archive
         Keys.archiveSources set KeyDefaults.ArchiveSources
         Keys.archiveDocs set KeyDefaults.ArchiveDummyDocumentation
+
+        Keys.externalSources set externalClasspathWithClassifier(SourcesClassifier)
+        Keys.externalDocs set externalClasspathWithClassifier(JavadocClassifier)
     }
 
     /**
