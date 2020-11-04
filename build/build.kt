@@ -2,6 +2,8 @@ import org.slf4j.LoggerFactory
 import wemi.Archetypes
 import wemi.BooleanValidator
 import wemi.KeyDefaults.inProjectDependencies
+import wemi.KeyDefaults.defaultArchiveFileName
+import wemi.Keys
 import wemi.Keys.cacheDirectory
 import wemi.WemiException
 import wemi.assembly.AssemblyOperation
@@ -18,6 +20,7 @@ import wemi.dependency
 import wemi.dependency.JCenter
 import wemi.dependency.Jitpack
 import wemi.dependency.ProjectDependency
+import wemi.dependency.ScopeAggregate
 import wemi.expiresWith
 import wemi.generation.Constant
 import wemi.generation.generateKotlinConstantsFile
@@ -64,9 +67,9 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
         versionAccordingToGit() ?: "dev-${DateTimeFormatter.ISO_INSTANT.format(Instant.now())}"
     }
 
-    projectDependencies add { ProjectDependency(core, true) }
-    projectDependencies addAll { CompilerProjects.map { ProjectDependency(it, true) } }
-    projectDependencies add { ProjectDependency(dokkaInterfaceImplementation, true) }
+    projectDependencies add { ProjectDependency(core, scope = ScopeAggregate) }
+    projectDependencies addAll { CompilerProjects.map { ProjectDependency(it, scope = ScopeAggregate) } }
+    projectDependencies add { ProjectDependency(dokkaInterfaceImplementation, scope = ScopeAggregate) }
 
     distributionArchiveContent set {
         val distFolder = Files.createDirectories(cacheDirectory.get() / "-distribution-archive")
@@ -75,8 +78,8 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
         val distSourceFolder = Files.createDirectories(distFolder / "sources")
 
         Files.copy(archive.get()!!, distFolder / "wemi.jar")
-        Files.copy(using(archivingSources) { archive.get()!! }, distSourceFolder / "wemi.jar")
-        for (path in using(running) { externalClasspath.get() }) {
+        Files.copy(archiveSources.get(), distSourceFolder / "wemi.jar")
+        for (path in externalClasspath.getLocatedPathsForScope(Keys.scopesRun.get())) {
             Files.copy(path.file, distFolder / path.file.name)
         }
 
@@ -145,34 +148,32 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
         }
     }
 
-    extend(archivingSources) {
-        archive set {
-            using(Configurations.archiving) {
-                AssemblyOperation().use { assemblyOperation ->
-                    // Load data
+    archiveSources set {
+        AssemblyOperation().use { assemblyOperation ->
+            // Load data
+            for (file in sources.getLocatedPaths()) {
+                assemblyOperation.addSource(file, true, extractJarEntries = false)
+            }
+
+            inProjectDependencies { dep ->
+                if (dep.scope == ScopeAggregate) {
                     for (file in sources.getLocatedPaths()) {
                         assemblyOperation.addSource(file, true, extractJarEntries = false)
                     }
-
-                    inProjectDependencies(true) {
-                        for (file in sources.getLocatedPaths()) {
-                            assemblyOperation.addSource(file, true, extractJarEntries = false)
-                        }
-                    }
-
-                    val outputFile = archiveOutputFile.get()
-                    assemblyOperation.assembly(
-                            NoConflictStrategyChooser,
-                            DefaultRenameFunction,
-                            DefaultAssemblyMapFilter,
-                            outputFile,
-                            NoPrependData,
-                            compress = true)
-
-                    expiresWith(outputFile)
-                    outputFile
                 }
             }
+
+            val outputFile = defaultArchiveFileName("sources", extension = "jar")
+            assemblyOperation.assembly(
+                    NoConflictStrategyChooser,
+                    DefaultRenameFunction,
+                    DefaultAssemblyMapFilter,
+                    outputFile,
+                    NoPrependData,
+                    compress = true)
+
+            expiresWith(outputFile)
+            outputFile
         }
     }
     // end remove
@@ -254,7 +255,7 @@ fun createKotlinCompilerProject(version:String):Project {
 
         compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
 
-        projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
+        projectDependencies add { ProjectDependency(core, scope=ScopeProvided) }
         // Disable default kotlin stdlib
         libraryDependencies set { setOf(
                 dependency("org.jetbrains.kotlin", "kotlin-compiler", version, scope=ScopeProvided)
@@ -271,7 +272,7 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
 
     libraryDependencies set { emptySet() } // Disable default kotlin stdlib
 
-    projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
+    projectDependencies add { ProjectDependency(core, scope=ScopeProvided) }
 
     /* Used only in wemi.document.DokkaInterface */
     libraryDependencies add { dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", scope=ScopeProvided) }

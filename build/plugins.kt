@@ -10,7 +10,7 @@ val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
     projectName set { "wemi-plugin-jvm-hotswap" }
     projectVersion set { using(wemi) { projectVersion.get() } }
 
-    projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
+    projectDependencies add { ProjectDependency(core, scope=ScopeProvided) }
     libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
     libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
 
@@ -38,7 +38,7 @@ val pluginTeaVM by project(path("plugins/teavm")) {
                 mapOf("TEAVM_VERSION" to Constant.StringConstant(TEAVM_VERSION, "The version of TeaVM to be used")))
     }
 
-    projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
+    projectDependencies add { ProjectDependency(core, scope=ScopeProvided) }
     libraryDependencies add { dependency("org.teavm", "teavm-tooling", TEAVM_VERSION) }
     libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
     libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
@@ -60,7 +60,7 @@ val pluginIntellij by project(path("plugins/intellij")) {
     projectName set { "wemi-plugin-intellij" }
     projectVersion set { using(wemi) { projectVersion.get() } }
 
-    projectDependencies add { ProjectDependency(core, false, scope=ScopeProvided) }
+    projectDependencies add { ProjectDependency(core, scope=ScopeProvided) }
     libraryDependencies add { dependency("org.apache.commons:commons-compress:1.20") }
 
     repositories add { JCenter }
