@@ -599,7 +599,7 @@ private fun createWemiProjectDependencies(session: WemiLauncherSession, projectN
 			if (path != null) {
 				add(path, scope)
 			} else {
-				LOG.warn("Failed to import externalClasspath element {}", scopedLocatedPath)
+				LOG.warn("Failed to import externalClasspath element " + scopedLocatedPath)
 			}
 		}
 

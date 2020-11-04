@@ -46,6 +46,7 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoField
 import java.util.regex.Pattern
+import wemiplugin.intellij.IntelliJ.intellijPluginArchive
 
 val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.61"),
@@ -97,7 +98,7 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
 
         Files.copy(archive.get()!!, distFolder / "wemi.jar")
         Files.copy(archiveSources.get(), distSourceFolder / "wemi.jar")
-        for (path in externalClasspath.getLocatedPathsForScope(Keys.scopesRun.get())) {
+        for (path in externalClasspath.getLocatedPathsForScope(setOf(ScopeCompile, ScopeRuntime /* no aggregate! */))) {
             Files.copy(path.file, distFolder / path.file.name)
         }
 
@@ -134,6 +135,10 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
             append("Git: ").append(system("git", "rev-parse", "HEAD", timeoutMs = 60_000)).append('\n')
             append("Date: ").append(DateTimeFormatter.ISO_INSTANT.format(Instant.now().with(ChronoField.NANO_OF_SECOND, 0L))).append('\n')
         })
+
+        // Add IDE plugins
+        val pluginArchive = using(ideIntelliJ) { intellijPluginArchive.get() }
+        Files.copy(pluginArchive, distFolder / "WemiForIntelliJ.zip")
 
         distFolder
     }

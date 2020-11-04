@@ -7,9 +7,12 @@ import wemi.util.CliStatusDisplay.Companion.withStatus
 import wemi.util.SystemInfo
 import wemi.util.absolutePath
 import wemi.util.div
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.concurrent.ForkJoinPool
 
 private val LOG = LoggerFactory.getLogger("Run")
 
@@ -81,15 +84,40 @@ fun prepareJavaProcess(javaExecutable: Path, workingDirectory: Path, classpath: 
             .inheritIO()
 }
 
+private val LOG_STDOUT = LoggerFactory.getLogger("stdout")
+private val LOG_STDERR = LoggerFactory.getLogger("stderr")
+
 /**
  * Create a process from [builder] and run it to completion on CLI foreground.
  * Signals are forwarded to the process as well.
+ * @param controlOutput if false, input/output/error will be logged instead of inherited
  */
-fun runForegroundProcess(builder:ProcessBuilder, separateOutputByNewlines:Boolean = true):Int {
+fun runForegroundProcess(builder:ProcessBuilder, separateOutputByNewlines:Boolean = true, controlOutput:Boolean = true):Int {
     // Separate process output from Wemi output
     return CLI.MessageDisplay.withStatus(false) {
         if (separateOutputByNewlines) println()
+        if (controlOutput) {
+            builder.redirectError(ProcessBuilder.Redirect.PIPE)
+            builder.redirectOutput(ProcessBuilder.Redirect.PIPE)
+        }
         val process = builder.start()
+        if (controlOutput) {
+            val commonPool = ForkJoinPool.commonPool()
+            commonPool.submit {
+                BufferedReader(InputStreamReader(process.errorStream, Charsets.UTF_8)).use {
+                    while (true) {
+                        LOG_STDERR.info("{}", it.readLine() ?: break)
+                    }
+                }
+            }
+            commonPool.submit {
+                BufferedReader(InputStreamReader(process.inputStream, Charsets.UTF_8)).use {
+                    while (true) {
+                        LOG_STDOUT.info("{}", it.readLine() ?: break)
+                    }
+                }
+            }
+        }
         val result = CLI.forwardSignalsTo(process) { process.waitFor() }
         if (separateOutputByNewlines) println()
         result

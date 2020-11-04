@@ -510,7 +510,7 @@ object KeyDefaults {
         }
 
         return runForegroundProcess(prepareJavaProcess(
-                javaExecutable, directory, classpathEntries, mainClass, options, arguments))
+                javaExecutable, directory, classpathEntries, mainClass, options, arguments), controlOutput = false)
     }
 
     val Run: Value<Int> = {
