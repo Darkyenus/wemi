@@ -1,6 +1,7 @@
 
 # Wemi supporting folders
 **/build/*/
+**/build-generated/
 
 # Wemi result jars
 **/build/*.jar
