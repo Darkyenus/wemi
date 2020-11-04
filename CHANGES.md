@@ -1,4 +1,5 @@
-# 0.14
+# 0.14 2020-11-04
+- **Do not upgrade to this version**
 - Fix aggregate project's test attempting to test untestable subprojects
 - Improved `java` detection on macOS
 - Initial and work-in-progress support for Kotlin JavaScript backend and [TeaVM](http://teavm.org/)
