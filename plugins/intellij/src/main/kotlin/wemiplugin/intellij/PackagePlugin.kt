@@ -138,7 +138,7 @@ val DefaultIntelliJPluginArchive : Value<Path> = {
 	val zip = folder.parent / "${folder.name}-${Keys.projectVersion.get()}.zip"
 	AssemblyOperation().use {
 		for (file in FileSet(folder).matchingLocatedFiles()) {
-			it.addSource(file, true, extractJarEntries = false)
+			it.addSource("${folder.name}/${file.path}", file.file, true)
 		}
 		it.assembly(NoConflictStrategyChooser, DefaultRenameFunction, DefaultAssemblyMapFilter, zip, NoPrependData, true)
 	}

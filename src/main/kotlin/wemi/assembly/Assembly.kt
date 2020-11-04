@@ -121,11 +121,15 @@ class AssemblyOperation : Closeable {
                         })
             }
         } else {
-            // Add file entry
-            loadedSources.getOrPut(normalizeZipPath(locatedPath.path)) { ArrayList() }.add(AssemblySource(locatedPath.toString(), file, file.lastModified.toMillis(), own) {
-                Files.readAllBytes(file)
-            })
+            addSource(locatedPath.path, locatedPath.file, own)
         }
+    }
+
+    fun addSource(path:String, file:Path, own:Boolean) {
+        // Add file entry
+        loadedSources.getOrPut(normalizeZipPath(path)) { ArrayList() }.add(AssemblySource(file.toString(), file, file.lastModified.toMillis(), own) {
+            Files.readAllBytes(file)
+        })
     }
 
     fun addSource(path: String, data: ByteArray, own: Boolean) {

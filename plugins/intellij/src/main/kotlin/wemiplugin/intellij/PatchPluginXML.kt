@@ -40,11 +40,15 @@ val DefaultIntelliJPluginXmlPatches : Value<Iterable<Patch>> = {
 	val versionPatch = Keys.projectVersion.getOrElse(null)?.let { Patch("version", content = it) }
 	val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
 
-	val sinceBuildPatch = Patch("idea-version", attribute = "since-build", content = "${ideVersion.baselineVersion}.${ideVersion.build}")
-	val untilBuildPatch = Patch("idea-version", attribute = "until-build", content = "${ideVersion.baselineVersion}.*")
+	val sinceBuildPatch = pluginXmlSinceBuildPatch("${ideVersion.baselineVersion}.${ideVersion.build}")
+	// Not added automatically, because smaller/less maintained plugins are generally better without it
+	//val untilBuildPatch = pluginXmlUntilBuildPatch("${ideVersion.baselineVersion}.*")
 
 	// TODO(jp): Also handle module dependencies?
 
-	arrayOf(namePatch, idPatch, versionPatch, sinceBuildPatch, untilBuildPatch).filterNotNull()
+	arrayOf(namePatch, idPatch, versionPatch, sinceBuildPatch).filterNotNull()
 }
+
+fun pluginXmlSinceBuildPatch(sinceBuildVersion:String):Patch = Patch("idea-version", attribute = "since-build", content = sinceBuildVersion)
+fun pluginXmlUntilBuildPatch(untilBuildVersion:String):Patch = Patch("idea-version", attribute = "until-build", content = untilBuildVersion)
 
