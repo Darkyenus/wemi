@@ -161,8 +161,8 @@ object KeyDefaults {
         })
     }
 
-    private val ClasspathResolution_LOG = LoggerFactory.getLogger("ClasspathResolution")
-    val ExternalClasspath: Value<List<ScopedLocatedPath>> = {
+    private val ExternalClasspath_LOG = LoggerFactory.getLogger("ExternalClasspath")
+    fun externalClasspath(skipErrors:Boolean): Value<List<ScopedLocatedPath>> = {
         val result = LinkedHashSet<ScopedLocatedPath>()
 
         val resolved = Keys.resolvedLibraryDependencies.get()
@@ -172,7 +172,11 @@ object KeyDefaults {
                     .format() // Required, because printing it with pre-set color would bleed into the pretty-printed values
                     .append('\n')
                     .append(resolved.value.prettyPrint())
-            throw WemiException(message.toString(), showStacktrace = false)
+            if (skipErrors) {
+                ExternalClasspath_LOG.warn("{}", message)
+            } else {
+                throw WemiException(message.toString(), showStacktrace = false)
+            }
         }
 
         for ((_, resolvedDependency) in resolved.value) {
@@ -180,7 +184,7 @@ object KeyDefaults {
         }
 
         inProjectDependencies { projectDependency ->
-            ClasspathResolution_LOG.debug("Resolving project dependency on {}", this)
+            ExternalClasspath_LOG.debug("Resolving project dependency on {}", this)
             result.addAll(Keys.externalClasspath.get())
             for (path in Keys.internalClasspath.get()) {
                 result.add(path.scoped(projectDependency.scope))
@@ -195,13 +199,39 @@ object KeyDefaults {
         WMutableList(result)
     }
 
-    fun internalClasspath(compile:Boolean): Value<List<LocatedPath>> = {
+    private val InternalClasspath_LOG = LoggerFactory.getLogger("InternalClasspath")
+    private fun internalClasspathCaught(e:Exception, message:String, skipErrors:Boolean) {
+        if (skipErrors) {
+            if (e is WemiException && !e.showStacktrace) {
+                InternalClasspath_LOG.warn("{}: {}", message, e.message)
+                InternalClasspath_LOG.debug("Suppressed stacktrace for '{}'", message, e)
+            } else {
+                InternalClasspath_LOG.warn("{}", message, e)
+            }
+        } else {
+            throw e
+        }
+    }
+    fun internalClasspath(compile:Boolean, skipErrors:Boolean): Value<List<LocatedPath>> = {
         val classpath = LinkedHashSet<LocatedPath>()
         if (compile) {
-            classpath.addAll(Keys.generatedClasspath.get())
-            constructLocatedFiles(Keys.compile.get(), classpath)
+            try {
+                classpath.addAll(Keys.generatedClasspath.get())
+            } catch (e:Exception) {
+                internalClasspathCaught(e, "Failed to evaluate generated classpath", skipErrors)
+            }
+            try {
+                constructLocatedFiles(Keys.compile.get(), classpath)
+            } catch (e:Exception) {
+                internalClasspathCaught(e, "Failed to compile and gather results", skipErrors)
+            }
         }
-        classpath.addAll(Keys.resources.getLocatedPaths())
+
+        try {
+            classpath.addAll(Keys.resources.getLocatedPaths())
+        } catch (e:Exception) {
+            internalClasspathCaught(e, "Failed to evaluate and gather resources", skipErrors)
+        }
 
         WMutableList(classpath)
     }

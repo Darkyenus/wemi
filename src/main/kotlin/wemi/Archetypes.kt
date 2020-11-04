@@ -57,8 +57,12 @@ object Archetypes {
         Keys.cacheDirectory set Static(WemiCacheFolder)
 
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
-        Keys.internalClasspath set KeyDefaults.internalClasspath(true)
-        Keys.externalClasspath set KeyDefaults.ExternalClasspath
+        Keys.internalClasspath set KeyDefaults.internalClasspath(compile = true, skipErrors = false)
+        Keys.externalClasspath set KeyDefaults.externalClasspath(false)
+        extend(Configurations.bestEffort) {
+            Keys.internalClasspath set KeyDefaults.internalClasspath(compile = true, skipErrors = true)
+            Keys.externalClasspath set KeyDefaults.externalClasspath(true)
+        }
 
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources")
@@ -123,7 +127,10 @@ object Archetypes {
 
     /** An archetype for projects that have no sources of their own, but are aggregation of their dependencies. */
     val AggregateJVMProject by archetype(::JVMBase) {
-        Keys.internalClasspath set KeyDefaults.internalClasspath(false)
+        Keys.internalClasspath set KeyDefaults.internalClasspath(compile = false, skipErrors = false)
+        extend(Configurations.bestEffort) {
+            Keys.internalClasspath set KeyDefaults.internalClasspath(compile = false, skipErrors = true)
+        }
 
         Keys.test set KeyDefaults.TestOfAggregateProject
     }

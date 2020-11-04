@@ -597,37 +597,28 @@ private fun buildScriptsBadAskIfReload(problem:String):Boolean {
  * Find what should be the default project, assuming Wemi is launched from the given [root] path
  */
 internal fun findDefaultProject(root: Path): Project? {
+    val absRoot = root.toAbsolutePath().normalize()
     val allProjects = AllProjects
-    when {
-        allProjects.isEmpty() -> return null
-        else -> {
-            var closest: Project? = null
-            var closestDist = -1
-            projects@for (project in allProjects.values) {
-                when {
-                    project === WemiBuildScriptProject ||
-                            project.projectRoot == null -> continue@projects
-                    project.projectRoot == root -> return project
-                    closest == null -> closest = project
-                    else -> // Compare how close they are!
-                        try {
-                            if (closestDist == -1) {
-                                closestDist = root.relativize(closest.projectRoot!!).nameCount
-                            }
-                            val projectDist = root.relativize(project.projectRoot).nameCount
-                            if (projectDist < closestDist) {
-                                closest = project
-                                closestDist = projectDist
-                            }
-                        } catch (_: IllegalArgumentException) {
-                            //May happen if projects are on different roots, but lets not deal with that.
-                        }
+    var closest: Project? = null
+    var closestDist = Int.MAX_VALUE
+    projects@for (project in allProjects.values) {
+        val absProject = project.projectRoot?.toAbsolutePath()?.normalize()
+        when {
+            project === WemiBuildScriptProject ||
+                    absProject == null -> continue@projects
+            absProject == absRoot -> return project
+            else -> {// Compare how close they are!
+                // IllegalArgumentException may happen if projects are on different filesystems
+                val projectDist = try { absRoot.relativize(absProject).nameCount } catch (_:IllegalArgumentException) { 10000 + absRoot.nameCount }
+                if (projectDist < closestDist) {
+                    closest = project
+                    closestDist = projectDist
                 }
             }
-            LOG.trace("findDefaultProject({}) = {}", root, closest)
-            return closest
         }
     }
+    LOG.trace("findDefaultProject({}) = {}", root, closest)
+    return closest
 }
 
 internal class ExitWemi(val reload:Boolean) : Exception(null, null, false, false)

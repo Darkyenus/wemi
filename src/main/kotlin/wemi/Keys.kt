@@ -102,8 +102,8 @@ object Keys {
     val publishArtifacts by key<List<ArtifactEntry>>("Artifacts that should get published", defaultValue = emptyList())
     val publish by key<Path>("Publish archives to 'publishRepository' and return the URI to where it was published")
 
-    val externalSources by key<List<Path>>("Sources of the external classpath, useful for IDE integration")
-    val externalDocs by key<List<Path>>("Documentation for the external classpath, useful for IDE integration")
+    val externalSources by key<List<Path>>("Sources of the external classpath, useful for IDE integration", emptyList())
+    val externalDocs by key<List<Path>>("Documentation for the external classpath, useful for IDE integration", emptyList())
 
     val assemblyMergeStrategy by key<MergeStrategyChooser>("Function for determining which merge strategy should be used when multiple files at the same path are encountered during assembly")
     val assemblyRenameFunction by key<RenameFunction>("Function for renaming assembled duplicate files for which merge strategy is Rename. Paths after rename must not conflict, rules are not recursive.")

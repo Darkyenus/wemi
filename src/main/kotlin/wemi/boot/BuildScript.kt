@@ -159,10 +159,8 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
                 result
             }
             Keys.internalClasspath set Static(listOf(LocatedPath(buildScriptInfo.scriptJar)))
-        } else {
-            Keys.internalClasspath set Static(emptyList())
-            Keys.run set Static(0)
         }
+        Keys.run set Static(0)
 
         locked = true
     }

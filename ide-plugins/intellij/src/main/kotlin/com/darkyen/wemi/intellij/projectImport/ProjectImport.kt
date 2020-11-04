@@ -341,8 +341,8 @@ private fun gatherWemiProjectData(launcher:WemiLauncher, options: ProjectImportO
 			val wemiVersion = session.string(project = null, task = "#version", includeUserConfigurations = false)
 			LOG.info("Wemi version is $wemiVersion")
 			session.wemiVersion = Version(wemiVersion)
-			if (session.wemiVersion < Version.WEMI_0_11) {
-				LOG.warn("Wemi versions older than 0.11 are not supported")
+			if (session.wemiVersion < Version.WEMI_0_14) {
+				LOG.warn("Wemi versions older than 0.14 are not supported")
 			}
 		}
 
@@ -579,10 +579,10 @@ private fun createWemiProjectSourcesDocs(session: WemiLauncherSession, projectNa
 	return emptyList()
 }
 
-private fun createWemiProjectDependencies(session: WemiLauncherSession, projectName: String): Map<WemiDependency, Set<DependencyScope>> {
-	val dependencies = LinkedHashMap<WemiDependency, MutableSet<DependencyScope>>()// TODO(jp): Check that WemiDependency can be used as a key safely
+private fun createWemiProjectDependencies(session: WemiLauncherSession, projectName: String): Map<Path, Set<DependencyScope>> {
+	val dependencies = LinkedHashMap<Path, MutableSet<DependencyScope>>()// TODO(jp): Check that Path can be used as a key safely
 
-	fun add(dep:WemiDependency, scopeStr:String) {
+	fun add(dep:Path, scopeStr:String) {
 		val scope = when (scopeStr.toLowerCase()) {
 			"provided" -> DependencyScope.PROVIDED
 			"runtime" -> DependencyScope.RUNTIME
@@ -593,31 +593,20 @@ private fun createWemiProjectDependencies(session: WemiLauncherSession, projectN
 	}
 
 	try {
-		session.jsonObject(projectName, task = "resolvedLibraryDependencies?", orNull = true).get("value")?.forEach { resolvedValue ->
-			val projectId = resolvedValue.get("key")
-			val group = projectId.getString("group")!!
-			val name = projectId.getString("name")!!
-			val version = projectId.getString("version")!!
-			val classifier = projectId.getString("classifier", "")!!
-
-			val artifact = resolvedValue.get("value")?.getString("artifact", null) ?: return@forEach
-			val scope = resolvedValue.get("value")?.getString("scope", null) ?: "compile"
-
-			add(WemiDependency.Library(
-							"$group:$name:$version${if (classifier.isBlank()) "" else "-$classifier"}",
-							Paths.get(artifact).toAbsolutePath().normalize()), scope)
-		}
-
-		session.jsonArray(projectName, task = "unmanagedDependencies?", orNull = true).forEach {
-			val file = it.locatedFileOrPathClasspathEntry()
-
-			add(WemiDependency.JarOrFolder(file), "compile")
+		session.jsonArray(projectName, task = "externalClasspath?", orNull = true)?.forEach { scopedLocatedPath ->
+			val scope = scopedLocatedPath.getString("scope", null) ?: "compile"
+			val path = scopedLocatedPath.get("value")?.locatedFileOrPathClasspathEntry()
+			if (path != null) {
+				add(path, scope)
+			} else {
+				LOG.warn("Failed to import externalClasspath element {}", scopedLocatedPath)
+			}
 		}
 
 		// Collect generated dependencies
 		val generated = session.jsonArray(projectName, task="generatedClasspath?", orNull = true).mapNotNull { it?.locatedFileOrPathClasspathEntry() }
 		for (path in generated) {
-			add(WemiDependency.JarOrFolder(path), "compile")
+			add(path, "compile")
 		}
 	} catch (e: InvalidTaskResultException) {
 		LOG.warn("Failed to resolve dependencies for $projectName", e)
@@ -632,9 +621,8 @@ private fun createWemiProjectCombinedDependencies(session: WemiLauncherSession, 
 	val docs = if (withDocs) createWemiProjectSourcesDocs(session, projectName, SourcesDocs.Docs) else emptyList()
 
 	val combined = HashMap<WemiLibraryCombinedDependency, Set<DependencyScope>>()
-	for ((dependency, scopes) in artifacts) {
-		val artifact = dependency.artifact
-		val name = (dependency as? WemiDependency.Library)?.name ?: artifact.name
+	for ((artifact, scopes) in artifacts) {
+		val name = artifact.name // TODO(jp): Detect a better name for the dependency!
 
 		val dep = WemiLibraryCombinedDependency(name,
 				listOf(artifact),
@@ -646,11 +634,6 @@ private fun createWemiProjectCombinedDependencies(session: WemiLauncherSession, 
 	}
 
 	return combined
-}
-
-private sealed class WemiDependency(val artifact: Path) {
-	class Library(val name:String, artifact: Path): WemiDependency(artifact)
-	class JarOrFolder(artifact: Path): WemiDependency(artifact)
 }
 
 private class WemiLibraryCombinedDependency(val name:String,

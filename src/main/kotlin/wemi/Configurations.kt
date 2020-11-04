@@ -103,6 +103,12 @@ object Configurations {
         }
     }
 
+    /**
+     * Do tasks on a best effort basis, classpath resolution in particular.
+     * This is mostly intended for IDE import, where incomplete classpath is better than no classpath.
+     */
+    val bestEffort by configuration("Do tasks on a best effort basis, classpath resolution in particular") {}
+
     /** To be used when publishing on [jitpack.io](https://jitpack.io). For full build setup, create `jitpack.yml`
      * in the project's root with following content:
      * ```yml
@@ -139,6 +145,5 @@ object Configurations {
 
             publishedResult
         }
-
     }
 }
