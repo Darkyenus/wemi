@@ -1,25 +1,27 @@
 package wemiplugin.intellij
 
 import org.slf4j.LoggerFactory
+import wemi.EvalScope
 import wemi.KeyDefaults
 import wemi.Value
+import wemi.generation.WemiGeneratedFolder
 import wemi.util.LocatedPath
 import wemi.util.div
 import wemiplugin.intellij.utils.Patch
 import wemiplugin.intellij.utils.parseXml
 import wemiplugin.intellij.utils.patchInPlace
 import wemiplugin.intellij.utils.saveXml
+import java.nio.file.Path
 
 private val LOG = LoggerFactory.getLogger("PatchPluginXML")
 
 // See https://jetbrains.org/intellij/sdk/docs/basics/plugin_structure/plugin_configuration_file.html
 
-val PatchedPluginXmlFiles : Value<List<LocatedPath>> = v@{
+fun EvalScope.generatePatchedPluginXmlFiles(root: Path) {
 	val filesToPatch = IntelliJ.intelliJPluginXmlFiles.get()
 	if (filesToPatch.isEmpty()) {
-		return@v emptyList()
+		return
 	}
-	val root = KeyDefaults.outputClassesDirectory("patched-plugin-xml")()
 	val patchedPaths = ArrayList<LocatedPath>()
 	for (unpatched in filesToPatch) {
 		val pluginXml = parseXml(unpatched.file) ?: continue
@@ -31,7 +33,6 @@ val PatchedPluginXmlFiles : Value<List<LocatedPath>> = v@{
 			patchedPaths.add(LocatedPath(root, patchedPath))
 		}
 	}
-	patchedPaths
 }
 
 val DefaultIntelliJPluginXmlPatches : Value<Iterable<Patch>> = {

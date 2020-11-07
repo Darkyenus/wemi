@@ -579,34 +579,43 @@ private fun createWemiProjectSourcesDocs(session: WemiLauncherSession, projectNa
 	return emptyList()
 }
 
+private fun MutableSet<DependencyScope>.addScope(scope:String?) {
+	val scopeV = when (scope?.toLowerCase()) {
+		"provided" -> DependencyScope.PROVIDED
+		"runtime" -> DependencyScope.RUNTIME
+		"test" -> DependencyScope.TEST
+		else -> DependencyScope.COMPILE
+	}
+	this.add(scopeV)
+	// Compile scope automatically encompasses all other scopes
+	if (DependencyScope.COMPILE in this) {
+		this.clear()
+		this.add(DependencyScope.COMPILE)
+	}
+}
+
 private fun createWemiProjectDependencies(session: WemiLauncherSession, projectName: String): Map<Path, Set<DependencyScope>> {
 	val dependencies = LinkedHashMap<Path, MutableSet<DependencyScope>>()// TODO(jp): Check that Path can be used as a key safely
 
-	fun add(dep:Path, scopeStr:String) {
-		val scope = when (scopeStr.toLowerCase()) {
-			"provided" -> DependencyScope.PROVIDED
-			"runtime" -> DependencyScope.RUNTIME
-			"test" -> DependencyScope.TEST
-			else -> DependencyScope.COMPILE
-		}
-		dependencies.getOrPut(dep) { mutableSetOf() }.add(scope)
+	fun add(dep:Path, scope:String? = null) {
+		dependencies.getOrPut(dep) { HashSet() }.addScope(scope)
 	}
 
 	try {
-		session.jsonArray(projectName, task = "externalClasspath?", orNull = true)?.forEach { scopedLocatedPath ->
+		session.jsonArray(projectName, task = "externalClasspath?", orNull = true).forEach { scopedLocatedPath ->
 			val scope = scopedLocatedPath.getString("scope", null) ?: "compile"
 			val path = scopedLocatedPath.get("value")?.locatedFileOrPathClasspathEntry()
 			if (path != null) {
 				add(path, scope)
 			} else {
-				LOG.warn("Failed to import externalClasspath element " + scopedLocatedPath)
+				LOG.warn("Failed to import externalClasspath element $scopedLocatedPath")
 			}
 		}
 
 		// Collect generated dependencies
 		val generated = session.jsonArray(projectName, task="generatedClasspath?", orNull = true).mapNotNull { it?.locatedFileOrPathClasspathEntry() }
 		for (path in generated) {
-			add(path, "compile")
+			add(path)
 		}
 	} catch (e: InvalidTaskResultException) {
 		LOG.warn("Failed to resolve dependencies for $projectName", e)
@@ -828,30 +837,8 @@ private fun WemiLauncherSession.Companion.Result.data(type: JsonValue.ValueType?
 	return data
 }
 
-private fun toDependencyScope(inCompile:Boolean, inRuntime:Boolean, inTest:Boolean, dependencyLogInfo:Any): DependencyScope {
-	if (inCompile && inRuntime) {
-		if (!inTest) {
-			LOG.warn("Dependency $dependencyLogInfo will be included in test configurations, but shouldn't be")
-		}
-		return DependencyScope.COMPILE
-	} else if (inCompile && !inRuntime) {
-		if (!inTest) {
-			LOG.warn("Dependency $dependencyLogInfo will be included in test configurations, but shouldn't be")
-		}
-		return DependencyScope.PROVIDED
-	} else if (!inCompile && inRuntime) {
-		if (!inTest) {
-			LOG.warn("Dependency $dependencyLogInfo will be included in test configurations, but shouldn't be")
-		}
-		return DependencyScope.RUNTIME
-	} else {
-		assert(inTest)
-		return DependencyScope.TEST
-	}
-}
-
 private val DependencyScope.exported:Boolean
-	get() = DependencyScope.COMPILE == this
+	get() = DependencyScope.TEST != this
 
 private fun artifactCriteriaPriority(dependency: LibraryDependencyNode):Int {
 	return when {

@@ -20,16 +20,15 @@ import wemi.dependency.ScopeProvided
 import wemi.dependency.ScopeTest
 import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.resolveDependencyArtifacts
+import wemi.generation.generateResources
 import wemi.key
 import wemi.readSecret
 import wemi.test.JUnit4Engine
-import wemi.util.FileSet
 import wemi.util.LocatedPath
 import wemi.util.absolutePath
 import wemi.util.div
 import wemi.util.name
 import wemi.util.pathWithoutExtension
-import wemi.util.plus
 import wemi.util.scoped
 import wemiplugin.intellij.utils.Patch
 import wemiplugin.intellij.utils.unZipIfNew
@@ -61,7 +60,6 @@ object IntelliJ {
 
 	val intelliJPluginXmlFiles by key<List<LocatedPath>>("plugin.xml files that should be patched and added to classpath", emptyList())
 	val intelliJPluginXmlPatches by key<List<Patch>>("Values to change in plugin.xml. Later added values override previous patches, unless using the ADD mode.", emptyList())
-	val intelliJPatchedPluginXmlFiles by key<List<LocatedPath>>("Patched variants of intelliJPluginXmlFiles")
 
 	val preparedIntellijIdeSandbox by key<IntelliJIDESandbox>("Prepare and return a sandbox directory that can be used for running an IDE along with the developed plugin")
 
@@ -129,11 +127,7 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 
 	// plugin.xml
 	IntelliJ.intelliJPluginXmlPatches addAll DefaultIntelliJPluginXmlPatches
-	IntelliJ.intelliJPatchedPluginXmlFiles set PatchedPluginXmlFiles
-	Keys.resources modify {
-		// Add the patched xml files into resources
-		it + IntelliJ.intelliJPatchedPluginXmlFiles.get().fold(null as FileSet?) { left, next -> left + FileSet(next) }
-	}
+	generateResources("patched-plugin-xml-files") { generatePatchedPluginXmlFiles(it) }
 
 	// IntelliJ SDK resolution
 	/** To find exact release version, try https://confluence.jetbrains.com/display/IDEADEV/IDEA+2020.1+latest+builds and related pages. */
