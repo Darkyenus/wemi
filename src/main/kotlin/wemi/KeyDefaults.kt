@@ -162,7 +162,7 @@ object KeyDefaults {
     }
 
     private val ExternalClasspath_LOG = LoggerFactory.getLogger("ExternalClasspath")
-    fun externalClasspath(skipErrors:Boolean): Value<List<ScopedLocatedPath>> = {
+    val ExternalClasspath: Value<List<ScopedLocatedPath>> = {
         val result = LinkedHashSet<ScopedLocatedPath>()
 
         val resolved = Keys.resolvedLibraryDependencies.get()
@@ -172,11 +172,7 @@ object KeyDefaults {
                     .format() // Required, because printing it with pre-set color would bleed into the pretty-printed values
                     .append('\n')
                     .append(resolved.value.prettyPrint())
-            if (skipErrors) {
-                ExternalClasspath_LOG.warn("{}", message)
-            } else {
-                throw WemiException(message.toString(), showStacktrace = false)
-            }
+            throw WemiException(message.toString(), showStacktrace = false)
         }
 
         for ((_, resolvedDependency) in resolved.value) {
@@ -199,41 +195,51 @@ object KeyDefaults {
         WMutableList(result)
     }
 
-    private val InternalClasspath_LOG = LoggerFactory.getLogger("InternalClasspath")
-    private fun internalClasspathCaught(e:Exception, message:String, skipErrors:Boolean) {
-        if (skipErrors) {
-            if (e is WemiException && !e.showStacktrace) {
-                InternalClasspath_LOG.warn("{}: {}", message, e.message)
-                InternalClasspath_LOG.debug("Suppressed stacktrace for '{}'", message, e)
-            } else {
-                InternalClasspath_LOG.warn("{}", message, e)
-            }
-        } else {
-            throw e
+    /** Modified [ExternalClasspath] for [Configurations.ideImport] */
+    val ExternalClasspathForIdeImport:Value<List<ScopedLocatedPath>> = {
+        val result = LinkedHashSet<ScopedLocatedPath>()
+
+        val resolved = Keys.resolvedLibraryDependencies.get()
+        if (!resolved.complete) {
+            val message = StringBuilder()
+            message.append("Failed to resolve all artifacts")
+                    .format() // Required, because printing it with pre-set color would bleed into the pretty-printed values
+                    .append('\n')
+                    .append(resolved.value.prettyPrint())
+            // No throw on incomplete resolution
+            ExternalClasspath_LOG.warn("{}", message)
         }
+
+        for ((_, resolvedDependency) in resolved.value) {
+            result.add(LocatedPath(resolvedDependency.artifact?.path ?: continue).scoped(resolvedDependency.scope))
+        }
+
+        // No project dependencies
+
+        val unmanaged = Keys.unmanagedDependencies.get()
+        for (path in unmanaged) {
+            result.add(path.scoped(ScopeCompile))
+        }
+
+        WMutableList(result)
     }
-    fun internalClasspath(compile:Boolean, skipErrors:Boolean): Value<List<LocatedPath>> = {
+
+    fun internalClasspath(compile:Boolean): Value<List<LocatedPath>> = {
         val classpath = LinkedHashSet<LocatedPath>()
         if (compile) {
-            try {
-                classpath.addAll(Keys.generatedClasspath.get())
-            } catch (e:Exception) {
-                internalClasspathCaught(e, "Failed to evaluate generated classpath", skipErrors)
-            }
-            try {
-                constructLocatedFiles(Keys.compile.get(), classpath)
-            } catch (e:Exception) {
-                internalClasspathCaught(e, "Failed to compile and gather results", skipErrors)
-            }
+            constructLocatedFiles(Keys.compile.get(), classpath)
         }
 
-        try {
-            classpath.addAll(Keys.resources.getLocatedPaths())
-        } catch (e:Exception) {
-            internalClasspathCaught(e, "Failed to evaluate and gather resources", skipErrors)
-        }
+        classpath.addAll(Keys.generatedClasspath.get())
+        classpath.addAll(Keys.resources.getLocatedPaths())
 
         WMutableList(classpath)
+    }
+
+    /** Modified [internalClasspath] for IDE import. Does not include [Keys.compile] nor [Keys.resources],
+     * as those are handled separately. */
+    val InternalClasspathForIdeImport: Value<List<LocatedPath>> = {
+        Keys.generatedClasspath.get()
     }
 
     fun outputClassesDirectory(tag: String): Value<Path> = {

@@ -5,34 +5,31 @@ import com.esotericsoftware.jsonbeans.JsonWriter
 import wemi.dependency.DEFAULT_SCOPE
 
 /**
- * A [T] that is a part of classpath and carries a (Maven) scope information when that is.
+ * A [LocatedPath] that is a part of classpath and carries a (Maven) scope information when that is.
  * Scope determines when exactly is the value a part of the classpath.
  * @see wemi.dependency.ScopeCompile (default)
  * @see wemi.dependency.ScopeRuntime
  * @see wemi.dependency.ScopeProvided
  * @see wemi.dependency.ScopeTest
  */
-class Scoped<T:Any>(val value:T, val scope:String = DEFAULT_SCOPE) : WithDescriptiveString, JsonWritable {
-	operator fun component1():T = value
+class ScopedLocatedPath(val value:LocatedPath, val scope:String = DEFAULT_SCOPE) : WithDescriptiveString, JsonWritable {
+	operator fun component1():LocatedPath = value
 	operator fun component2():String = scope
 
 	override fun JsonWriter.write() {
 		writeObject {
-			@Suppress("UNCHECKED_CAST")
-			name("value").writeValue<T>(value, value::class.java as Class<T>)
+			// Copies LocatedPath write, to get nicer structure
+			field("root", value.root)
+			field("file", value.file)
 			field("scope", scope)
 		}
 	}
 
 	override fun toDescriptiveAnsiString(): String {
 		val sb = StringBuilder(120)
-		if (value is WithDescriptiveString) {
-			sb.append(value.toDescriptiveAnsiString())
-		} else {
-			sb.format(Color.Blue)
-			PrettyPrinter.append(sb, value)
-			sb.format()
-		}
+		sb.format(Color.Blue)
+		PrettyPrinter.append(sb, value)
+		sb.format()
 		if (scope != DEFAULT_SCOPE) {
 			sb.format(Color.White).append(" $").format(Color.Black).append(scope).format()
 		}
@@ -49,7 +46,7 @@ class Scoped<T:Any>(val value:T, val scope:String = DEFAULT_SCOPE) : WithDescrip
 
 	override fun equals(other: Any?): Boolean {
 		if (this === other) return true
-		if (other !is Scoped<*>) return false
+		if (other !is ScopedLocatedPath) return false
 
 		if (value != other.value) return false
 		if (scope != other.scope) return false
@@ -64,9 +61,7 @@ class Scoped<T:Any>(val value:T, val scope:String = DEFAULT_SCOPE) : WithDescrip
 	}
 }
 
-typealias ScopedLocatedPath = Scoped<LocatedPath>
-
 /** Give [this] a Maven [scope]. */
-fun <T:Any> T.scoped(scope:String = DEFAULT_SCOPE):Scoped<T> {
-	return Scoped(this, scope)
+fun LocatedPath.scoped(scope:String = DEFAULT_SCOPE): ScopedLocatedPath {
+	return ScopedLocatedPath(this, scope)
 }

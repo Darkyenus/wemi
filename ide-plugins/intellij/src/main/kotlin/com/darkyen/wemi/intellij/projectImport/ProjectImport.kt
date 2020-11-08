@@ -16,12 +16,11 @@ import com.darkyen.wemi.intellij.util.SessionActivityTracker
 import com.darkyen.wemi.intellij.util.SessionState
 import com.darkyen.wemi.intellij.util.Version
 import com.darkyen.wemi.intellij.util.deleteRecursively
-import com.darkyen.wemi.intellij.util.digestToHexString
 import com.darkyen.wemi.intellij.util.div
 import com.darkyen.wemi.intellij.util.name
+import com.darkyen.wemi.intellij.util.pathWithoutExtension
 import com.darkyen.wemi.intellij.util.stage
 import com.darkyen.wemi.intellij.util.stagesFor
-import com.darkyen.wemi.intellij.util.update
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.build.BuildContentManager
 import com.intellij.build.DefaultBuildDescriptor
@@ -63,13 +62,23 @@ import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.pom.java.LanguageLevel
 import com.intellij.util.IncorrectOperationException
 import com.intellij.util.concurrency.EdtExecutorService
+import java.io.IOError
 import java.io.OutputStream
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.nio.file.Files
+import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.ZipFile
+import kotlin.Comparator
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
+import kotlin.collections.HashSet
+import kotlin.collections.LinkedHashMap
+import kotlin.math.abs
 
 private val refreshProjectVisualizationTreeRootNextId = AtomicInteger(1)
 
@@ -436,18 +445,13 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 	tracker.stagesFor("Resolving project dependencies", wemiProjects.values, {"Resolving project dependencies of ${it.projectName}"}) { project ->
 		// We currently only process projects and ignore configurations because there is no way to map that
 		val projectDependencies = session.task(project.projectName, task = "projectDependencies")
-				.data(JsonValue.ValueType.array).map { it.getString("project")!! to (it.getString("scope") ?: "compile") }
+				.data(JsonValue.ValueType.array).map { it.getString("project")!! to (it.getString("scope", null)) }
 
 		for ((projectDep, scopeStr) in projectDependencies) {
 			if (projectDep == project.projectName) {
 				continue
 			}
-			val scope = when (scopeStr.toLowerCase()) {// TODO(jp): Refactor
-				"provided" -> DependencyScope.PROVIDED
-				"runtime" -> DependencyScope.RUNTIME
-				"test" -> DependencyScope.TEST
-				else -> DependencyScope.COMPILE
-			}
+			val scope = scopeStr.stringToScope("dependency of ${project.projectName} on $projectDep")
 
 			val myModule = projectModules[project.projectName]!!
 			myModule.moduleDependencies.add(ModuleDependencyNode(
@@ -475,7 +479,7 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 		tracker.stageProgress(0, BUILD_SCRIPT_MODULE_PART_COUNT)
 		val buildFolder = session.path(project = WemiBuildScriptProjectName, task = "projectRoot", includeUserConfigurations = false)
 
-		val classpath = session.jsonArray(project = WemiBuildScriptProjectName, task = "externalClasspath").map { it.locatedFileOrPathClasspathEntry() }
+		val classpath = session.classpath(WemiBuildScriptProjectName).map { (path, _) -> path }
 		val cacheFolder = session.path(project = WemiBuildScriptProjectName, task = "cacheDirectory")
 		val libFolderPath = cacheFolder.resolve("wemi-libs-ide")
 		// Ensure that it is empty so that we don't accumulate old libs
@@ -568,76 +572,219 @@ private enum class SourcesDocs {
 	Docs
 }
 private fun createWemiProjectSourcesDocs(session: WemiLauncherSession, projectName: String, sourcesDocs:SourcesDocs): List<Path> {
+	val task = when (sourcesDocs) {
+		SourcesDocs.Sources -> "externalSources"
+		SourcesDocs.Docs -> "externalDocs"
+	}
+
 	try {
-		return session.jsonArray(projectName, task = when (sourcesDocs) {
-			SourcesDocs.Sources -> "externalSources"
-			SourcesDocs.Docs -> "externalDocs"
-		}, orNull = true).map { it.locatedFileOrPathClasspathEntry() }
+		return session.jsonArray(projectName, task = task, orNull = true).mapNotNull {
+			it.locatedPathToClasspathEntry("$task of $projectName")
+		}
 	} catch (e: InvalidTaskResultException) {
 		LOG.warn("Failed to resolve $sourcesDocs for $projectName", e)
 	}
 	return emptyList()
 }
 
-private fun MutableSet<DependencyScope>.addScope(scope:String?) {
-	val scopeV = when (scope?.toLowerCase()) {
-		"provided" -> DependencyScope.PROVIDED
-		"runtime" -> DependencyScope.RUNTIME
-		"test" -> DependencyScope.TEST
-		else -> DependencyScope.COMPILE
-	}
-	this.add(scopeV)
-	// Compile scope automatically encompasses all other scopes
-	if (DependencyScope.COMPILE in this) {
-		this.clear()
-		this.add(DependencyScope.COMPILE)
-	}
-}
-
 private fun createWemiProjectDependencies(session: WemiLauncherSession, projectName: String): Map<Path, Set<DependencyScope>> {
-	val dependencies = LinkedHashMap<Path, MutableSet<DependencyScope>>()// TODO(jp): Check that Path can be used as a key safely
+	val dependencies = LinkedHashMap<Path, MutableSet<DependencyScope>>()
 
-	fun add(dep:Path, scope:String? = null) {
-		dependencies.getOrPut(dep) { HashSet() }.addScope(scope)
+	for ((path, scope) in session.classpath(projectName)) {
+		dependencies.getOrPut(path) { HashSet() }.add(scope)
 	}
 
-	try {
-		session.jsonArray(projectName, task = "externalClasspath?", orNull = true).forEach { scopedLocatedPath ->
-			val scope = scopedLocatedPath.getString("scope", null) ?: "compile"
-			val path = scopedLocatedPath.get("value")?.locatedFileOrPathClasspathEntry()
-			if (path != null) {
-				add(path, scope)
-			} else {
-				LOG.warn("Failed to import externalClasspath element $scopedLocatedPath")
-			}
+	for (scopeSet in dependencies.values) {
+		// Compile scope automatically encompasses all other scopes, so there is no need to have them
+		if (scopeSet.size > 1 && DependencyScope.COMPILE in scopeSet) {
+			scopeSet.clear()
+			scopeSet.add(DependencyScope.COMPILE)
 		}
-
-		// Collect generated dependencies
-		val generated = session.jsonArray(projectName, task="generatedClasspath?", orNull = true).mapNotNull { it?.locatedFileOrPathClasspathEntry() }
-		for (path in generated) {
-			add(path)
-		}
-	} catch (e: InvalidTaskResultException) {
-		LOG.warn("Failed to resolve dependencies for $projectName", e)
 	}
 
 	return dependencies
+}
+
+/**
+ * Collection of functions that measure the goodness of a fit with increasing granularity.
+ * The returned number is a distance, smaller means better.
+ */
+private val AUX_MATCH_FIT_GOODNESS:Array<(aux:Path, artifact:Path) -> Int> = arrayOf(
+		{ aux, artifact ->
+			// Find files that are closer together in the filesystem, ideally in the same directory
+			aux.parent.relativize(artifact.parent).nameCount
+		},
+		{ aux, artifact ->
+			// Find files that share name
+			val auxName = aux.name.pathWithoutExtension()
+			val artifactName = artifact.name.pathWithoutExtension()
+			if (auxName.equals(artifactName, ignoreCase = false)) {
+				0
+			} else if (auxName.equals(artifactName, ignoreCase = true)) {
+				1
+			} else if (auxName.contains(artifactName, ignoreCase = true)) {
+				2
+			} else if (artifactName.contains(auxName, ignoreCase = true)) {
+				3
+			} else {
+				Int.MAX_VALUE
+			}
+		},
+		{ aux, artifact ->
+			// Find files with similar file name length, not much else we can do here
+			abs(aux.name.length - artifact.name.length)
+		}
+)
+
+private fun assignAuxiliaryFilesArtifacts(auxFiles:List<Path>, artifacts:Collection<Path>):Map</*artifact*/Path, /*aux*/List<Path>> {
+	if (auxFiles.isEmpty() || artifacts.isEmpty()) {
+		return emptyMap()
+	}
+
+	val result = HashMap<Path, ArrayList<Path>>()
+
+	aux@for (aux in auxFiles) {
+		var previousBest = artifacts
+		for (fitFunction in AUX_MATCH_FIT_GOODNESS) {
+			val currentBest = ArrayList<Path>()
+			var currentBestDistance = Int.MAX_VALUE
+
+			for (artifact in previousBest) {
+				val distance = try {
+					fitFunction(aux, artifact)
+				} catch (e:Exception) {
+					LOG.warn("Failed to evaluate fitFunction $fitFunction on ($aux, $artifact)", e)
+					Int.MAX_VALUE
+				}
+
+				if (distance < currentBestDistance) {
+					currentBestDistance = distance
+					currentBest.clear()
+					currentBest.add(artifact)
+				} else if (distance == currentBestDistance) {
+					currentBest.add(artifact)
+				}
+			}
+
+
+			if (currentBest.size == 1) {
+				// Best match found, assign and move on
+				result.getOrPut(currentBest[0]) { ArrayList() }.add(aux)
+				continue@aux
+			} else if (currentBest.isEmpty()) {
+				// Can not find the best match, assign to all previous best fits
+				break
+			}
+			previousBest = currentBest
+		}
+
+		// Out of fit functions
+		LOG.info("Failed to find a single best fit for auxiliary file $aux - assigning it to multiple artifacts: $previousBest")
+		for (path in previousBest) {
+			result.getOrPut(path) { ArrayList() }.add(aux)
+		}
+	}
+
+	return result
+}
+
+private fun jarRootPackageNames(artifact:Path):Set<String> {
+	try {
+		return ZipFile(artifact.toFile(), ZipFile.OPEN_READ, Charsets.UTF_8).entries().asSequence().map {
+			val parts = it.name.split('/').dropWhile { p -> p.isEmpty() }
+			if (parts.size > 1 || (parts.size == 1 && it.isDirectory)) {
+				parts[0].toLowerCase(Locale.ROOT)
+			} else null
+		}.filterNotNullTo(HashSet())
+	} catch (e:Exception) {
+		LOG.debug("Failed to extract package root names from $artifact", e)
+		return emptySet()
+	}
+}
+
+private fun createArtifactLibraryName(artifact:Path, groupStart:Int, groupEnd:Int, name:String, versionWithClassifier:String):String {
+	val result = StringBuilder()
+	for (i in groupStart until groupEnd) {
+		if (i != 0) {
+			result.append('.')
+		}
+		result.append(artifact.getName(i))
+	}
+	result.append(':').append(name).append(':').append(versionWithClassifier)
+	return result.toString()
+}
+
+private fun indexOfGroupStartInMavenArtifact(artifact:Path):Int {
+	val m2Index = artifact.indexOfLast { it.toString().equals(".m2", ignoreCase = true) }
+	if (m2Index >= 0) {
+		return m2Index + 2 // .m2/repository
+	}
+
+	val wemiIndex = artifact.indexOfLast { it.toString().equals(".wemi", ignoreCase = true) }
+	if (wemiIndex >= 0) {
+		return wemiIndex + 3 // .wemi/maven-cache/<repo-name>
+	}
+
+	return -1
+}
+
+private fun detectArtifactLibraryName(artifact:Path):String {
+	// First try checking whether this is a maven library
+	val plainName = artifact.name.pathWithoutExtension()
+	val maybeVersionDir = artifact.parent
+	val maybeVersion = maybeVersionDir?.name
+	val maybeArtifactNameDir = maybeVersionDir?.parent
+	val maybeArtifactName = maybeArtifactNameDir?.name
+	if (maybeVersion != null && maybeArtifactName != null
+			&& maybeVersion in plainName && maybeArtifactName in plainName
+			&& plainName.indexOf(maybeArtifactName) < plainName.indexOf(maybeVersion)) {
+		// This looks very much like a Maven artifact in a repository!
+		// Determine classifier, if any
+		val versionWithClassifier = plainName.substring(plainName.indexOf(maybeVersion))
+
+		val groupEndIndex = maybeArtifactNameDir.nameCount - 1
+		val groupStartIndex = indexOfGroupStartInMavenArtifact(artifact)
+		if (groupStartIndex >= 0 && groupStartIndex < groupEndIndex) {
+			// It is in a known repository!
+			// Reconstruct the group
+			return createArtifactLibraryName(artifact, groupStartIndex, groupEndIndex, maybeArtifactName, versionWithClassifier)
+		}
+
+		// Repository root not known
+		// If the file is a zip, then we can find packages inside and at least one of them should appear in the path
+		val rootPackageNames = jarRootPackageNames(artifact)
+		var i = groupEndIndex
+		while (i >= 0) {
+			if (artifact.getName(i).toString().toLowerCase(Locale.ROOT) in rootPackageNames) {
+				// Looks good
+				return createArtifactLibraryName(artifact, i, groupEndIndex, maybeArtifactName, versionWithClassifier)
+			}
+			i--
+		}
+
+		// Still not known, just do it without any group
+		return createArtifactLibraryName(artifact, 0, 0, maybeArtifactName, versionWithClassifier)
+	}
+
+	// Not a maven artifact, probably, return dummy name
+	return plainName
 }
 
 private fun createWemiProjectCombinedDependencies(session: WemiLauncherSession, projectName: String, withDocs:Boolean, withSources:Boolean):MutableMap<WemiLibraryCombinedDependency, Set<DependencyScope>> {
 	val artifacts = createWemiProjectDependencies(session, projectName)
 	val sources = if (withSources) createWemiProjectSourcesDocs(session, projectName, SourcesDocs.Sources) else emptyList()
 	val docs = if (withDocs) createWemiProjectSourcesDocs(session, projectName, SourcesDocs.Docs) else emptyList()
+	val sourcesByArtifact = assignAuxiliaryFilesArtifacts(sources, artifacts.keys)
+	val docsByArtifact = assignAuxiliaryFilesArtifacts(docs, artifacts.keys)
 
 	val combined = HashMap<WemiLibraryCombinedDependency, Set<DependencyScope>>()
 	for ((artifact, scopes) in artifacts) {
-		val name = artifact.name // TODO(jp): Detect a better name for the dependency!
+		val name = detectArtifactLibraryName(artifact)
 
 		val dep = WemiLibraryCombinedDependency(name,
 				listOf(artifact),
-				// TODO(jp): This mapping must be constructed differently!
-				/*sources[artifactId]?.map { it.artifact } ?:*/ emptyList(),
-				/*docs[artifactId]?.map { it.artifact } ?:*/ emptyList()
+				sourcesByArtifact.getOrDefault(artifact, emptyList()),
+				docsByArtifact.getOrDefault(artifact, emptyList())
 		)
 		combined[dep] = scopes
 	}
@@ -654,14 +801,6 @@ private class WemiLibraryCombinedDependency(val name:String,
 	val artifacts = artifactFiles.sortedBy { it.toAbsolutePath() }
 	val sourceArtifacts = sourceArtifactFiles.sortedBy { it.toAbsolutePath() }
 	val docArtifacts = docArtifactFiles.sortedBy { it.toAbsolutePath() }
-
-	val hash: String by lazy(LazyThreadSafetyMode.NONE) {
-		digestToHexString {
-			update(artifacts) { update(it) }
-			update(sourceArtifacts) { update(it) }
-			update(docArtifacts) { update(it) }
-		}
-	}
 
 	override fun toString(): String = name
 
@@ -784,6 +923,72 @@ private fun WemiLauncherSession.jsonArray(project:String?, vararg configurations
 			.data(JsonValue.ValueType.array, orNull)
 }
 
+private fun String?.stringToScope(debugContext:String):DependencyScope {
+	return when (this?.toLowerCase()) {
+		"provided" -> DependencyScope.PROVIDED
+		"runtime" -> DependencyScope.RUNTIME
+		"test" -> DependencyScope.TEST
+		"compile", "aggregate" -> DependencyScope.COMPILE
+		else -> {
+			LOG.warn("Unrecognized scope of $debugContext: '$this' - falling back to compile scope")
+			DependencyScope.COMPILE
+		}
+	}
+}
+
+private fun JsonValue.locatedPathToClasspathEntry(debugContext:String):Path? {
+	val classpathPath = getString("root", null) ?: getString("file", null)
+	if (classpathPath == null) {
+		LOG.warn("Failed to resolve classpath entry of $debugContext from $this")
+		return null
+	}
+
+	val path = try {
+		Paths.get(classpathPath)
+	} catch (e: InvalidPathException) {
+		LOG.warn("Failed to resolve path of classpath entry of $debugContext from $classpathPath", e)
+		return null
+	}
+
+	val absPath = try {
+		path.toAbsolutePath()
+	} catch (e: IOError) {
+		LOG.debug("Failed to make $path absolute for classpath entry of $debugContext", e)
+		path
+	}
+
+	return absPath.normalize()
+}
+
+private fun WemiLauncherSession.classpath(project:String):List<Pair<Path, DependencyScope>> {
+	val result = ArrayList<Pair<Path, DependencyScope>>()
+	try {
+		for (scopedLocatedPath in jsonArray(project, task = "externalClasspath?", orNull = true)) {
+			val path = scopedLocatedPath.locatedPathToClasspathEntry("externalClasspath of $project")
+					?: continue
+
+			val scope = scopedLocatedPath.getString("scope", null)
+					.stringToScope("'$path' of project $project")
+			result.add(path to scope)
+		}
+	} catch (e:InvalidTaskResultException) {
+		LOG.warn("Failed to evaluate externalClasspath of project $project", e)
+	}
+
+	// Collect internal dependencies (due to ideImport configuration, it collects only generated classpath by default)
+	try {
+		for (locatedPath in jsonArray(project, task = "internalClasspath?", orNull = true)) {
+			val path = locatedPath.locatedPathToClasspathEntry("internalClasspath of $project")
+					?: continue
+			result.add(path to DependencyScope.COMPILE)
+		}
+	} catch (e:InvalidTaskResultException) {
+		LOG.warn("Failed to evaluate internalClasspath of project $project", e)
+	}
+
+	return result
+}
+
 private fun JsonValue.arrayToMap():Map<String, JsonValue> {
 	val result = HashMap<String, JsonValue>()
 	for (child in this) {
@@ -791,18 +996,6 @@ private fun JsonValue.arrayToMap():Map<String, JsonValue> {
 		result[key] = child.get("value") ?: continue
 	}
 	return result
-}
-
-private fun JsonValue.locatedFileOrPathClasspathEntry(): Path {
-	return if (this.type() == JsonValue.ValueType.stringValue) {
-		return Paths.get(asString())
-	} else {
-		var locatedPath = this
-		if (!locatedPath.has("root") && !locatedPath.has("file")) {
-			locatedPath = locatedPath.get("value")!! // Scoped<LocatedPath>
-		}
-		Paths.get(locatedPath.get("root")?.asString() ?: locatedPath.getString("file")!!)
-	}.toAbsolutePath()
 }
 
 private fun JsonValue.fileSetRoots():Array<Path> {

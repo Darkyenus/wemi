@@ -18,7 +18,7 @@
 
     <change-notes><![CDATA[
       <ul>
-        <li>Compatibility with Wemi 0.14 (down to 0.11)</li>
+        <li>Compatibility with Wemi 0.15</li>
         <li>Run with Wemi is no longer offered on non Wemi modules and projects</li>
         <li>Improved handling of unusual directory structures</li>
       </ul>

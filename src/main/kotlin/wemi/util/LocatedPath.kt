@@ -56,6 +56,7 @@ class LocatedPath(
     }
 
     override fun JsonWriter.write() {
+        // ScopedLocatedPath duplicates this code
         writeObject {
             field("root", root)
             field("file", file)

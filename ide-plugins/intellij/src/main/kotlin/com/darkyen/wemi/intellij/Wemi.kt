@@ -236,7 +236,7 @@ class WemiLauncherSession(
             taskPath.append(project).append('/')
         }
         if (includeUserConfigurations) {
-            taskPath.append("bestEffort:")
+            taskPath.append("ideImport:")
             for (configuration in prefixConfigurations) {
                 taskPath.append(configuration).append(':')
             }

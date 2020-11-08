@@ -104,10 +104,26 @@ object Configurations {
     }
 
     /**
-     * Do tasks on a best effort basis, classpath resolution in particular.
-     * This is mostly intended for IDE import, where incomplete classpath is better than no classpath.
+     * Used when importing project into IDE.
+     * Tasks are done on a best effort basis, especially classpath resolution,
+     * since incomplete classpath is better than no classpath.
+     * Compilation is skipped and [Keys.externalClasspath] does not include [wemi.dependency.ProjectDependency]
+     * derived dependencies.
      */
-    val bestEffort by configuration("Do tasks on a best effort basis, classpath resolution in particular") {}
+    val ideImport by configuration("Configuration which omits some tasks and makes other tasks tolerate failures, to make IDE import easier") {
+        /*
+        Rationale:
+        Users expect that modifying externalClasspath will just work, but externalClasspath fails on any error
+        and it includes project dependencies, which IDEs track differently, so we would have to differentiate them,
+        which is hard.
+
+        Similarly, internalClasspath contains resources and compile output, which IDEs handle differently,
+        but it may also contain generated classpath any any other stuff users might add by modification,
+        and that should be imported properly.
+         */
+        Keys.internalClasspath set KeyDefaults.InternalClasspathForIdeImport
+        Keys.externalClasspath set KeyDefaults.ExternalClasspathForIdeImport
+    }
 
     /** To be used when publishing on [jitpack.io](https://jitpack.io). For full build setup, create `jitpack.yml`
      * in the project's root with following content:
