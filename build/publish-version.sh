@@ -20,6 +20,9 @@ fi
 # Build the archive files in Wemi
 wemi_dist_dir=$(./wemi --machine-readable-output=shell "$task") || fail "wemi ($?) (archive)"
 
+# Build IDE plugins
+./ide-plugins/wemi "ideIntellij/ideArchiveDist" || fail "wemi ($?) IDE Intellij"
+
 if [ "$1" = "--skipTest" ]; then
 	exit 0
 fi

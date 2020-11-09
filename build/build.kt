@@ -3,7 +3,6 @@ import wemi.Archetypes
 import wemi.BooleanValidator
 import wemi.KeyDefaults.inProjectDependencies
 import wemi.KeyDefaults.defaultArchiveFileName
-import wemi.Keys
 import wemi.Keys.cacheDirectory
 import wemi.WemiException
 import wemi.assembly.AssemblyOperation
@@ -41,12 +40,10 @@ import wemi.util.executable
 import wemi.util.forEachLine
 import wemi.util.name
 import wemi.util.writeText
-import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoField
 import java.util.regex.Pattern
-import wemiplugin.intellij.IntelliJ.intellijPluginArchive
 
 val CompilerProjects = listOf(
         createKotlinCompilerProject("1.1.61"),
@@ -135,10 +132,6 @@ val wemi:Project by project(Archetypes.AggregateJVMProject) {
             append("Git: ").append(system("git", "rev-parse", "HEAD", timeoutMs = 60_000)).append('\n')
             append("Date: ").append(DateTimeFormatter.ISO_INSTANT.format(Instant.now().with(ChronoField.NANO_OF_SECOND, 0L))).append('\n')
         })
-
-        // Add IDE plugins
-        val pluginArchive = using(ideIntelliJ) { intellijPluginArchive.get() }
-        Files.copy(pluginArchive, distFolder / "WemiForIntelliJ.zip")
 
         distFolder
     }
