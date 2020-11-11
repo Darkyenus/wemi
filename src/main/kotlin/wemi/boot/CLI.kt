@@ -18,6 +18,7 @@ import wemi.BindingHolder
 import wemi.BooleanValidator
 import wemi.EvaluationListener
 import wemi.EvaluationListener.Companion.plus
+import wemi.ExtendableBindingHolder
 import wemi.IntValidator
 import wemi.Key
 import wemi.Project
@@ -466,21 +467,18 @@ object CLI {
                     val bindingHolders = LinkedHashSet<BindingHolder>()
                     val modifierHolders = LinkedHashSet<BindingHolder>()
 
-                    fun exploreForHolders(holder:BindingHolder) {
+                    fun exploreForHolders(holder: ExtendableBindingHolder) {
                         if (holder.binding.containsKey(key)) {
                             bindingHolders.add(holder)
                         }
                         if (holder.modifierBindings.containsKey(key)) {
                             modifierHolders.add(holder)
                         }
-
-                        for (extension in holder.configurationExtensions.values) {
-                            exploreForHolders(extension)
-                        }
                     }
 
                     for (project in AllProjects.values) {
                         for (holder in project.baseHolders) {
+
                             exploreForHolders(holder)
                         }
                     }

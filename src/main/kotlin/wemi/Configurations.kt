@@ -121,7 +121,10 @@ object Configurations {
         but it may also contain generated classpath any any other stuff users might add by modification,
         and that should be imported properly.
          */
-        // The actual changes are in Archetypes.Base, because this must have top priority
+        extend(Archetypes.Base) { // The change must be injected where the classpath is set originally
+            Keys.internalClasspath set KeyDefaults.InternalClasspathForIdeImport
+            Keys.externalClasspath set KeyDefaults.ExternalClasspathForIdeImport
+        }
     }
 
     /** To be used when publishing on [jitpack.io](https://jitpack.io). For full build setup, create `jitpack.yml`

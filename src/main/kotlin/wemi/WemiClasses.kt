@@ -124,7 +124,7 @@ private val nextConfigDimensionID = AtomicInteger(0)
 class Configuration internal constructor(val name: String,
                                          val description: String,
                                          val axis: Axis)
-    : BindingHolder(), JsonWritable {
+    : ExtendableBindingHolder(), JsonWritable {
 
     /** @return [name] */
     override fun toString(): String {
@@ -147,13 +147,13 @@ class Configuration internal constructor(val name: String,
  * Holds information about configuration extensions made by [BindingHolder.extend].
  * Values bound to this take precedence over the values [extending].
  *
- * @param extending which configuration is being extended by this extension
- * @param from which this extension has been created, mostly for debugging
+ * @param extending which configuration is being extended by this extension (for debugging)
+ * @param from which this extension has been created (for debugging)
  */
 @WemiDsl
-class ConfigurationExtension internal constructor(
+class BindingHolderExtension internal constructor(
         @Suppress("MemberVisibilityCanBePrivate")
-        val extending: Configuration,
+        val extending: ExtendableBindingHolder,
         val from: BindingHolder) : BindingHolder() {
 
     override fun toDescriptiveAnsiString(): String {
@@ -175,7 +175,7 @@ class ConfigurationExtension internal constructor(
  */
 @WemiDsl
 class Project internal constructor(val name: String, internal val projectRoot: Path?, archetypes:Array<out Archetype>)
-    : BindingHolder(), WithDescriptiveString, JsonWritable {
+    : ExtendableBindingHolder(), WithDescriptiveString, JsonWritable {
 
     /**
      * @return [name]
@@ -193,8 +193,10 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         writeValue(name, String::class.java)
     }
 
-    internal val baseHolders:List<BindingHolder> = ArrayList<BindingHolder>().apply {
-        add(this@Project)
+    /** Archetypes and their parents, from lowest archetype parent up to the project. */
+    internal val baseHolders:Array<ExtendableBindingHolder> = run {
+        val result = ArrayList<ExtendableBindingHolder>()
+        result.add(this@Project)
 
         // Iterate through archetypes, most important first
         var i = archetypes.lastIndex
@@ -202,35 +204,42 @@ class Project internal constructor(val name: String, internal val projectRoot: P
             var archetype = archetypes[i--]
 
             while (true) {
-                add(archetype)
+                result.add(archetype)
                 archetype = archetype.parent ?: break
             }
         }
 
-        reverse()
+        val size = result.size
+        Array<ExtendableBindingHolder>(size) { result[size - 1 - it] }
     }
 
     private fun createScope(configurations:List<Configuration>):Scope {
-        val holders = ArrayList<BindingHolder>()
-        holders.addAll(baseHolders)
+        @Suppress("UNCHECKED_CAST")
+        val rawHolders:Array<ExtendableBindingHolder> = run {
+            val baseHolders = baseHolders
+            val baseHoldersSize = baseHolders.size
+            val rawHolders = arrayOfNulls<BindingHolder>(baseHoldersSize + configurations.size)
+            System.arraycopy(baseHolders, 0, rawHolders, 0, baseHoldersSize)
+            for (i in configurations.indices) {
+                rawHolders[baseHoldersSize + i] = configurations[i]
+            }
+            rawHolders as Array<ExtendableBindingHolder>
+        }
 
-        for (configuration in configurations) {
-            /*
-            Scope for configuration consists of flattened BindingHolders, and a given parent scope.
-            Then the configuration's parents are layered on top:
-            1. From oldest ancestor of [configuration] to [configuration]
-                1. Take it (some configuration) and add it
-                2. If any holder which already exists extends it, add it on top
-             */
+        // rawHolders now contains all configurations without any extensions, in natural order (archetypes, project, configurations)
 
-            val holderLength = holders.size
-            holders.add(configuration)
-            for (i in 0 until holderLength) {
-                val holder = holders[i]
-                holders.add(holder.configurationExtensions[configuration] ?: continue)
+        // copy rawHolders to holders, this time with extensions
+        val holders = ArrayList<BindingHolder>(rawHolders.size * 2)
+        for (holder in rawHolders) {
+            holders.add(holder)
+            for (extendingHolder in rawHolders) {
+                if (extendingHolder === holder) {
+                    continue
+                }
+                val extension = extendingHolder.extensions[holder] ?: continue
+                holders.add(extension)
             }
         }
-        holders.reverse()
 
         return Scope(this, configurations, holders)
     }
@@ -319,7 +328,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
  * @see Archetypes for more info about this concept
  */
 @WemiDsl
-class Archetype internal constructor(val name: String, val parent:Archetype?) : BindingHolder() {
+class Archetype internal constructor(val name: String, val parent:Archetype?) : ExtendableBindingHolder() {
 
     override fun toDescriptiveAnsiString(): String {
         val sb = StringBuilder()
@@ -348,7 +357,7 @@ class Archetype internal constructor(val name: String, val parent:Archetype?) : 
  * Scope allows to query the values of bound [Keys].
  * Each scope is internally formed by an ordered list of [BindingHolder]s.
  *
- * @param bindingHolders list of holders contributing to the scope's holder stack. Most significant holders first.
+ * @param bindingHolders list of holders contributing to the scope's holder stack. Most significant holders last.
  */
 class Scope internal constructor(
         val project:Project,
@@ -368,7 +377,8 @@ class Scope internal constructor(
 
         searchForBoundValue@do {
             // Retrieve the holder
-            for (holder in bindingHolders) {
+            for (holderI in bindingHolders.indices.reversed()/* reverse iteration without allocation */) {
+                val holder = bindingHolders[holderI]
                 val holderModifiers = holder.modifierBindings[key]
                 if (holderModifiers != null && holderModifiers.isNotEmpty()) {
                     listener?.keyEvaluationHasModifiers(holder, holderModifiers.size)
@@ -455,10 +465,33 @@ class Scope internal constructor(
 
 private val LOG: Logger = LoggerFactory.getLogger("BindingHolder")
 
+sealed class ExtendableBindingHolder : BindingHolder() {
+    internal val extensions = HashMap<ExtendableBindingHolder, BindingHolderExtension>()
+
+    /**
+     * Extend given configuration so that when it is accessed with this [BindingHolder] in [Scope],
+     * given [BindingHolderExtension] will be queried for bindings first.
+     *
+     * @param bindingHolder to extend, a [Configuration] or an [Archetype]
+     * @param initializer that will be executed to populate the configuration
+     */
+    fun extend(bindingHolder: ExtendableBindingHolder, initializer: BindingHolderExtension.() -> Unit) {
+        if (this == bindingHolder) {
+            throw WemiException("Extending self is not allowed")
+        }
+        ensureUnlocked()
+        val extension = extensions.getOrPut(bindingHolder) {
+            BindingHolderExtension(bindingHolder, this) }
+        extension.locked = false
+        extension.initializer()
+        extension.locked = true
+    }
+}
+
 /**
  * Holds [Key] value bindings (through [Value]),
  * key modifiers (through [ValueModifier]),
- * and [ConfigurationExtension] extensions (through [ConfigurationExtension]).
+ * and [BindingHolderExtension] extensions (through [BindingHolderExtension]).
  *
  * Also provides ways to set them during the object's initialization.
  * After the initialization, the holder is locked and no further modifications are allowed.
@@ -469,10 +502,9 @@ sealed class BindingHolder : WithDescriptiveString {
 
     internal val binding = HashMap<Key<*>, Value<Any?>>()
     internal val modifierBindings = HashMap<Key<*>, ArrayList<ValueModifier<Any?>>>()
-    internal val configurationExtensions = HashMap<Configuration, ConfigurationExtension>()
     internal var locked = false
 
-    private fun ensureUnlocked() {
+    internal fun ensureUnlocked() {
         if (locked) throw IllegalStateException("Binding holder $this is already locked")
     }
 
@@ -512,23 +544,6 @@ sealed class BindingHolder : WithDescriptiveString {
         @Suppress("UNCHECKED_CAST")
         val modifiers = modifierBindings.getOrPut(this as Key<Any>) { ArrayList() } as ArrayList<ValueModifier<*>>
         modifiers.add(valueModifier)
-    }
-
-    /**
-     * Extend given configuration so that when it is accessed with this [BindingHolder] in [Scope],
-     * given [ConfigurationExtension] will be queried for bindings first.
-     *
-     * @param configuration to extend
-     * @param initializer that will be executed to populate the configuration
-     */
-    @Suppress("MemberVisibilityCanPrivate")
-    fun extend(configuration: Configuration, initializer: ConfigurationExtension.() -> Unit) {
-        ensureUnlocked()
-        val extensions = this@BindingHolder.configurationExtensions
-        val extension = extensions.getOrPut(configuration) { ConfigurationExtension(configuration, this) }
-        extension.locked = false
-        extension.initializer()
-        extension.locked = true
     }
 
     //region Modify utility methods
