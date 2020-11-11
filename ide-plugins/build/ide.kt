@@ -1,4 +1,5 @@
 @file:BuildDependencyPlugin("wemi-plugin-intellij")
+// TODO(jp): version.kt is currently added via symlink, add a Import directive to do it properly
 
 import wemi.boot.BuildDependencyPlugin
 import wemi.dependency.Jitpack
@@ -11,25 +12,14 @@ import wemiplugin.intellij.IntelliJ.intellijIdeDependency
 import wemiplugin.intellij.IntelliJ.intelliJPluginXmlFiles
 import wemiplugin.intellij.IntelliJ.intellijPluginDependencies
 import wemiplugin.intellij.IntelliJ.resolvedIntellijPluginDependencies
+import wemiplugin.intellij.IntelliJ.intellijPluginArchive
+import wemi.key
 
-val distFolder by key<Path>("Distribution folder")
-val ideArchiveDist by key<Path>("Build IDE plugin archive and put it into the distribution folder")
-
-private val IdeIntelliJRoot = path("intellij")// TODO(jp): Expose the root!
-val ideIntellij by project(IdeIntelliJRoot, Archetypes.JavaKotlinProject, IntelliJPluginLayer) {
+val ideIntellij by project(path("intellij"), Archetypes.JavaKotlinProject, IntelliJPluginLayer) {
 
 	projectGroup set { "com.darkyen.wemi.intellij" }
 	projectName set { "Wemi" }
-	projectVersion set {
-		// TODO(jp): Use system() to obtain it from parent project
-		/* core/projectVersion */
-		"0.15-SNAPSHOT"
-	}
-
-	distFolder set {
-		// TODO(jp): Use system() to get this out of the parent project
-		path("../build/dist")
-	}
+	projectVersion set { gatherProjectVersion() }
 
 	repositories add { Jitpack }
 	libraryDependencies add { dependency("com.github.EsotericSoftware", "jsonbeans", "0.9") }
@@ -44,10 +34,5 @@ val ideIntellij by project(IdeIntelliJRoot, Archetypes.JavaKotlinProject, Intell
 	intellijPluginDependencies add { IntelliJPluginDependency.Bundled("org.jetbrains.kotlin") }
 
 	intellijIdeDependency set { IntelliJIDE.External(version = "201.8743.12") }
-	intelliJPluginXmlFiles add { LocatedPath(IdeIntelliJRoot / "src/main/plugin.xml") }
-
-	ideArchiveDist set {
-		val pluginArchive = intellijPluginArchive.get()
-		Files.copy(pluginArchive, distFolder.get() / "WemiForIntelliJ.zip")
-	}
+	intelliJPluginXmlFiles add { LocatedPath(Keys.projectRoot.get() / "src/main/plugin.xml") }
 }

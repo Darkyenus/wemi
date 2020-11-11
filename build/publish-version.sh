@@ -1,7 +1,7 @@
 #!/bin/sh
 
 log() { echo "$@" 1>&2; }
-fail() { log "$@"; exit 1; }
+fail() { log "$@" " ($?)"; exit 1; }
 
 # Change directory to the main folder
 cd "$(dirname "$0")/.." || fail "Failed initial dir change"
@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.." || fail "Failed initial dir change"
 wemi_home="$(pwd)"
 log "Working from home: $wemi_home"
 
-wemi_version=$(./wemi --machine-readable-output=shell wemi/projectVersion) || fail "wemi ($?) (version)"
+wemi_version=$(./wemi --machine-readable-output=shell wemi/projectVersion) || fail "wemi (version)"
 log "Wemi version: $wemi_version"
 
 task="wemi/distributionArchive skipTest=false"
@@ -18,10 +18,11 @@ if [ "$1" = "--skipTest" ]; then
 fi
 
 # Build the archive files in Wemi
-wemi_dist_dir=$(./wemi --machine-readable-output=shell "$task") || fail "wemi ($?) (archive)"
+wemi_dist_dir=$(./wemi --machine-readable-output=shell "$task") || fail "wemi (archive)"
 
 # Build IDE plugins
-./ide-plugins/wemi "ideIntellij/ideArchiveDist" || fail "wemi ($?) IDE Intellij"
+wemi_intellij_plugin_zip=$(./ide-plugins/wemi --machine-readable-output=shell "ideIntellij/intellijPluginArchive") || fail "wemi IDE Intellij"
+cp "$wemi_intellij_plugin_zip" "$wemi_dist_dir/WemiForIntelliJ.zip" || fail "cp $wemi_intellij_plugin_zip -> $wemi_dist_dir"
 
 if [ "$1" = "--skipTest" ]; then
 	exit 0
