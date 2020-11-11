@@ -204,13 +204,11 @@ object Archetypes {
     val JUnitLayer by archetype {
         Keys.testParameters set KeyDefaults.TestParameters
         Keys.test set KeyDefaults.Test
-        extend(Configurations.testing) {
-            Keys.libraryDependencies addAll { listOf(
-                    Dependency(JUnitAPI, scope=ScopeTest),
-                    Dependency(JUnitEngine, scope=ScopeTest),
-                    Dependency(JUnitPlatformLauncher, scope=ScopeTest)
-            ) }
-        }
+        Keys.libraryDependencies addAll { listOf(
+                Dependency(JUnitAPI, scope=ScopeTest),
+                Dependency(JUnitEngine, scope=ScopeTest),
+                Dependency(JUnitPlatformLauncher, scope=ScopeTest)
+        ) }
     }
 
     @Deprecated("Use JUnitLayer instead", ReplaceWith("Archetypes.JUnitLayer", "wemi.Archetypes"))

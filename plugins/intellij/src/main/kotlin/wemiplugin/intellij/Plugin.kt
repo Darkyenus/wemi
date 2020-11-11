@@ -153,9 +153,6 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	extend(Configurations.testing) {
 		IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox(testSuffix = "-test") } // TODO(jp): Test tests
 
-		// IntelliJ test fixtures use JUnit4 API
-		Keys.libraryDependencies add { Dependency(JUnit4Engine, scope= ScopeTest) }
-
 		Keys.runSystemProperties modify {
 			val sp = it.toMutableMap()
 
@@ -172,6 +169,8 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 			sp
 		}
 	}
+	// IntelliJ test fixtures use JUnit4 API
+	Keys.libraryDependencies add { Dependency(JUnit4Engine, scope= ScopeTest) }
 
 	// UI Testing
 	// Since I can't find any documentation about the robot thing, and since
