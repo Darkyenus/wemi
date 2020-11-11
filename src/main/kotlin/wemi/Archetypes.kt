@@ -59,6 +59,10 @@ object Archetypes {
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
         Keys.internalClasspath set KeyDefaults.internalClasspath(compile = true)
         Keys.externalClasspath set KeyDefaults.ExternalClasspath
+        extend(Configurations.ideImport) {
+            Keys.internalClasspath set KeyDefaults.InternalClasspathForIdeImport
+            Keys.externalClasspath set KeyDefaults.ExternalClasspathForIdeImport
+        }
 
         Keys.outputClassesDirectory set KeyDefaults.outputClassesDirectory("classes")
         Keys.outputSourcesDirectory set KeyDefaults.outputClassesDirectory("sources")

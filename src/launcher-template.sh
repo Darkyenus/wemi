@@ -507,7 +507,7 @@ fetch_wemi() {
 
 	# List of mirrors in order of preference
 	wemi_url_darkyen_="https://darkyen.com/wemi/${wemi_version}/wemi.tar.gz"
-	wemi_url_github_="https://github.com/Darkyenus/wemi/releases/download/v${wemi_version}/wemi.tar.gz"
+	wemi_url_github_="https://github.com/Darkyenus/wemi/releases/download/${wemi_version}/wemi.tar.gz"
 
 	redownload_='false'
 	if [ "${wemi_version%-SNAPSHOT}" != "${wemi_version}" ]; then
