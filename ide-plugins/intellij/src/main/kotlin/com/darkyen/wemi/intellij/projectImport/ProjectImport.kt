@@ -705,7 +705,7 @@ private fun jarRootPackageNames(artifact:Path):Set<String> {
 private fun createArtifactLibraryName(artifact:Path, groupStart:Int, groupEnd:Int, name:String, versionWithClassifier:String):String {
 	val result = StringBuilder()
 	for (i in groupStart until groupEnd) {
-		if (i != 0) {
+		if (i != groupStart) {
 			result.append('.')
 		}
 		result.append(artifact.getName(i))
@@ -937,7 +937,7 @@ private fun String?.stringToScope(debugContext:String):DependencyScope {
 }
 
 private fun JsonValue.locatedPathToClasspathEntry(debugContext:String):Path? {
-	val classpathPath = getString("root", null) ?: getString("file", null)
+	val classpathPath = if (isString) asString() else getString("root", null) ?: getString("file", null)
 	if (classpathPath == null) {
 		LOG.warn("Failed to resolve classpath entry of $debugContext from $this")
 		return null
