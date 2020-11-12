@@ -33,10 +33,10 @@ private val TEST_OUTPUT_LOG = LoggerFactory.getLogger("TestOutput")
 internal val TEST_LAUNCHER_MAIN_CLASS = TestLauncher::class.java
 
 /** Default JUnit Platform version */
-const val JUnitPlatformVersion = "1.5.2"
+const val JUnitPlatformVersion = "1.7.0"
 
 /** Default JUnit Jupiter api/engine version */
-const val JUnitEngineVersion = "5.5.2"
+const val JUnitEngineVersion = "5.7.0"
 
 /**
  * Dependency on JUnit 5 API
