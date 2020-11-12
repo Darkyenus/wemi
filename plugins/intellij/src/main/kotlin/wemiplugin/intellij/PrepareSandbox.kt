@@ -7,6 +7,7 @@ import org.w3c.dom.Document
 import org.w3c.dom.Element
 import wemi.EvalScope
 import wemi.util.div
+import wemi.util.ensureEmptyDirectory
 import wemi.util.linkOrCopyRecursively
 import wemi.util.name
 import wemiplugin.intellij.utils.namedElements
@@ -25,6 +26,8 @@ class IntelliJIDESandbox(val base:Path, val config:Path, val plugins:Path, val s
 
 fun EvalScope.prepareIntelliJIDESandbox(sandboxDir: Path = Keys.cacheDirectory.get() / "idea-sandbox", testSuffix:String = "", vararg extraPluginDirectories: Path): IntelliJIDESandbox {
 	val destinationDir = sandboxDir / "plugins$testSuffix"
+	destinationDir.ensureEmptyDirectory()
+
 	val pluginJar = IntelliJ.intellijPluginFolder.get()
 	pluginJar.linkOrCopyRecursively(destinationDir / pluginJar.name)
 
