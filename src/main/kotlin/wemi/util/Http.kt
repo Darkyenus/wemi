@@ -6,6 +6,8 @@ import com.darkyen.dave.Response
 import com.darkyen.dave.ResponseTranslator
 import com.darkyen.dave.Webb
 import com.darkyen.dave.WebbException
+import com.esotericsoftware.jsonbeans.JsonReader
+import com.esotericsoftware.jsonbeans.JsonValue
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
 import wemi.boot.WemiUnicodeOutputSupported
@@ -199,4 +201,18 @@ fun httpGetFile(url:URL, file: Path, listener: ActivityListener?, useUnsafeTrans
 	}
 
 	return response.body == true
+}
+
+fun httpGetJson(url:URL, listener: ActivityListener?, useUnsafeTransport:Boolean = false):JsonValue? {
+	try {
+		val response = httpGet(url, useUnsafeTransport = useUnsafeTransport).execute(listener, ResponseTranslator.STRING_TRANSLATOR)
+		if (response.isSuccess) {
+			return JsonReader().parse(response.body)
+		} else {
+			LOG.warn("Failed to get json from {} - server responded with {}", url, response.statusMessage)
+		}
+	} catch (e:Exception) {
+		LOG.warn("Failed to get json from {}", url, e)
+	}
+	return null
 }

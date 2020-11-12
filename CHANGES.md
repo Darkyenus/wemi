@@ -1,6 +1,9 @@
 # 0.15
 - Housekeeping update
 - Generated sources are now in `/build-generated/` to prevent IDE conflicts
+- Changed what can be extended and what can extend (`ConfigurationExtension`s can no longer extend, but everything else can be extended, including projects and archetypes)
+- Removed `Keys.javaExecutable`, the information is now carried in `Keys.javaHome`
+- Added IntelliJ Plugin Verifier support to intellij ide plugin
 
 # 0.14 2020-11-04
 - **Do not upgrade to this version**

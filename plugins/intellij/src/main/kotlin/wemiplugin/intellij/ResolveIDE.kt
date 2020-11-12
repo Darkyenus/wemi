@@ -47,6 +47,7 @@ sealed class IntelliJIDE {
 	 * @param version of the IDE, see [version documentation](https://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html)
 	 * @param type of IDE distribution (IC, IU, CL, PY, PC, RD or JPS)
 	 */
+	// List of versions can also be found here: https://jb.gg/intellij-platform-builds-list
 	data class External(val type:String = "IC", val version:String = DEFAULT_INTELLIJ_IDE_VERSION) : IntelliJIDE()
 }
 

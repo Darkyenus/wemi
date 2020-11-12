@@ -496,7 +496,7 @@ object KeyDefaults {
 
     /** Implements the launch of JVM for [Run] and [RunMain]. */
     private fun EvalScope.doRun(mainClass:String):Int {
-        val javaExecutable = Keys.javaExecutable.get()
+        val javaExecutable = Keys.javaHome.get().javaExecutable
         val classpathEntries = LinkedHashSet<Path>()
         for (locatedFile in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesRun.get())) {
             classpathEntries.add(locatedFile.classpathEntry)
@@ -544,7 +544,7 @@ object KeyDefaults {
 
     val Test: Value<TestReport> = {
         using(Configurations.testing) {
-            val javaExecutable = Keys.javaExecutable.get()
+            val javaExecutable = Keys.javaHome.get().javaExecutable
             val directory = Keys.runDirectory.get()
             val options = Keys.runOptions.get()
 
@@ -764,7 +764,7 @@ object KeyDefaults {
         fileManager.setLocation(StandardLocation.CLASS_PATH, Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get()).map { it.classpathEntry.toFile() })
 
         // Try to specify doclet path explicitly
-        val toolsJar = jdkToolsJar(Keys.javaHome.get())
+        val toolsJar = Keys.javaHome.get().toolsJar
         if (toolsJar != null) {
             fileManager.setLocation(DocumentationTool.Location.DOCLET_PATH, listOf(toolsJar.toFile()))
         }
@@ -844,11 +844,10 @@ object KeyDefaults {
     private val DokkaFatJar = listOf(Dependency(DependencyId("org.jetbrains.dokka", "dokka-fatjar", "0.9.15"), exclusions = WemiBundledLibrariesExclude))
 
     val ArchiveDokkaInterface: Value<DokkaInterface> = {
-        val javaHome = Keys.javaHome.get()
         val artifacts = resolveDependencyArtifacts(DokkaFatJar, listOf(JCenter), progressListener)?.toMutableList()
                 ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
 
-        jdkToolsJar(javaHome)?.let { artifacts.add(it) }
+        Keys.javaHome.get().toolsJar?.let { artifacts.add(it) }
 
         ARCHIVE_DOKKA_LOG.trace("Classpath for Dokka: {}", artifacts)
 

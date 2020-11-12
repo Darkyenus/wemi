@@ -10,7 +10,6 @@ import wemi.util.SystemInfo
 import wemi.util.absolutePath
 import wemi.util.div
 import wemi.util.exists
-import wemi.util.jdkToolsJar
 import wemiplugin.intellij.utils.Utils
 import wemiplugin.intellij.utils.Utils.getPluginIds
 import java.nio.file.Path
@@ -94,16 +93,13 @@ val DefaultModifyRunOptions : ValueModifier<List<String>> = {
 
 fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
 	val ideDirectory = IntelliJ.resolvedIntellijIdeDependency.get().homeDir
-	val executable = Keys.javaExecutable.get()
+	val javaHome = Keys.javaHome.get()
+	val executable = javaHome.javaExecutable
 	val mainClass = Keys.mainClass.get()
 
 	val classpath = ArrayList<Path>()
 	// Apparently the IDE needs to have the tools.jar on classpath
-	val toolsJar = run {
-		val bin = executable.parent
-		val home = if (SystemInfo.IS_MAC_OS) bin.parent.parent else bin.parent
-		jdkToolsJar(home)
-	}
+	val toolsJar = javaHome.toolsJar
 	if (toolsJar != null) {
 		classpath.add(toolsJar)
 	}

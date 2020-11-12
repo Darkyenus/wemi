@@ -8,6 +8,7 @@ import java.io.IOException
 import java.io.OutputStreamWriter
 import java.net.URISyntaxException
 import java.net.URL
+import java.net.URLEncoder
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
@@ -87,6 +88,44 @@ operator fun URL.div(path: CharSequence): URL {
     }
     return URL(protocol, host, port, newFile.toString())
 }
+
+/** Return [this] [URL] with [parameters] added as query parameters */
+fun URL.withAdditionalQueryParameters(vararg parameters:Pair<String, String>):URL {
+    val params = StringBuilder()
+    params.append('?')
+    var first = true
+
+    val encodingName = Charsets.UTF_8.name()
+    for ((key, value) in parameters) {
+        if (key.isEmpty() && value.isEmpty()) {
+            continue
+        }
+
+        if (first) {
+            first = false
+        } else {
+            params.append('&')
+        }
+
+        if (key.isEmpty()) {
+            params.append(URLEncoder.encode(value, encodingName))
+        } else if (value.isEmpty()) {
+            params.append(URLEncoder.encode(key, encodingName))
+        } else {
+            params.append(URLEncoder.encode(key, encodingName))
+            params.append('=')
+            params.append(URLEncoder.encode(value, encodingName))
+        }
+    }
+
+    // If parameters was empty or full of garbage
+    if (first) {
+        return this
+    }
+
+    return URL(protocol, host, port, path)
+}
+
 /** Treating receiver as a filesystem path, remove the last file name, to get the path of its lexical parent. */
 fun String.pathParent():String {
     val path = this
@@ -394,7 +433,7 @@ fun Path.changeExtensionAndMove(newExtension:String):Path {
  * @return absolute path to this Path
  */
 inline val Path.absolutePath: String
-    get() = this.toAbsolutePath().toString()
+    get() = this.toAbsolutePath().normalize().toString()
 
 /**
  * Last modified time of the file denoted by the [Path], as specified by the filesystem.

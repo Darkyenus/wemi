@@ -238,15 +238,16 @@ val DefaultResolvedIntellijPluginDependencies : Value<List<ResolvedIntelliJPlugi
 		pluginDependencies.add(resolved)
 	}
 
-	if (!pluginDependencyIds.any { it is IntelliJPluginDependency.Bundled && it.name == "java" } && (ideaDependency.homeDir / "plugins/java").exists()) {
+	val hasJavaPluginDependency = pluginDependencyIds.any { it is IntelliJPluginDependency.Bundled && (it.name == "java" || it.name == "com.intellij.java") }
+	val ideHasJavaSupport = (ideaDependency.homeDir / "plugins/java").exists()
+	if (!hasJavaPluginDependency && ideHasJavaSupport) {
 		for (file in sourcePluginXmlFiles(false)) {
 			val pluginXml = parseXml(file.file) ?: continue
 			val depends = pluginXml.documentElement?.namedElements("depends") ?: continue
-			for (depend in depends) {
-				if (depend.textContent == "com.intellij.modules.java") {
-					LOG.warn("The project depends on `com.intellij.modules.java` module but doesn't declare a compile dependency on it.\n" +
-							"Please delete `depends` tag from {} or add `java` plugin to Wemi dependencies: 'IntelliJ.intellijPluginDependencies add {IntelliJPluginDependency.Bundled(\"java\")}'", file)
-				}
+			val pluginXmlDependsOnJava = depends.any { it.textContent == "com.intellij.modules.java" || it.textContent == "com.intellij.java" }
+			if (pluginXmlDependsOnJava) {
+				LOG.warn("The project depends on `com.intellij.modules.java` module but doesn't declare a compile dependency on it.\n" +
+						"Please delete `depends` tag from {} or add `java` plugin to Wemi dependencies: 'IntelliJ.intellijPluginDependencies add {IntelliJPluginDependency.Bundled(\"java\")}'", file)
 			}
 		}
 	}

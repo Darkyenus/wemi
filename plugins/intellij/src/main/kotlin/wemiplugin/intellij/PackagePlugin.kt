@@ -67,6 +67,7 @@ val DefaultIntelliJPluginFolder : Value<Path> = {
 	val searchableOptions = IntelliJ.intellijPluginSearchableOptions.get()
 	searchableOptions?.linkOrCopyRecursively(pluginLibDir / searchableOptions.name)
 
+	// Gradle plugin does this in a separate VerifyPluginTask
 	val strictness = IntelliJ.intellijVerifyPluginStrictness.get()
 	when (val creationResult = IdePluginManager.createManager().createPlugin(pluginDir)) {
 		is PluginCreationSuccess -> {

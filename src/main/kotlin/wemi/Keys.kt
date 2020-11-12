@@ -55,6 +55,8 @@ object Keys {
     val unmanagedDependencies by key<List<LocatedPath>>("Libraries that should be part of the external classpath but are not managed by project resolvers", defaultValue = emptyList())
     val projectDependencies by key<Set<ProjectDependency>>("Local projects that the project depends on. Project dependency pull in project's internal and external classpath into this project's external classpath", defaultValue = emptySet())
 
+    val automaticKotlinStdlib by key<Boolean>("Automatically add Kotlin stdlib for Kotlin projects", defaultValue = true)
+
     /** @see wemi.generation.generateClasspath */
     val generatedClasspath by key<List<LocatedPath>>("Eventually of internalClasspath, but generated before compilation", defaultValue = emptyList())
 
@@ -65,8 +67,7 @@ object Keys {
     val scopesRun by key<Set<DepScope>>("Which dependency scopes should be used for runtime classpath", setOf(ScopeCompile, ScopeRuntime, ScopeAggregate))
     val scopesTest by key<Set<DepScope>>("Which dependency scopes should be used for testing classpath", setOf(ScopeCompile, ScopeRuntime, ScopeProvided, ScopeTest, ScopeAggregate))
 
-    val javaHome by key<Path>("Java home to use for compilation/running etc.")
-    val javaExecutable by key<Path>("Java executable, used for running the project")
+    val javaHome by key<JavaHome>("Java home and executable to use for compilation/running etc.")
     val kotlinVersion by key<KotlinCompilerVersion>("Kotlin version used for compilation and standard libraries", WemiKotlinVersion)
     val compilerOptions by key<CompilerFlags>("Options passed to the compiler")
     // These directories must stay here to be accessible from IDE

@@ -1,11 +1,57 @@
 package wemi.util
 
+import wemi.WemiException
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.*
+
+
+/**
+ * Represents a combination of Java home directory
+ * and a path of corresponding java executable for the current platform.
+ */
+data class JavaHome(val home:Path, val javaExecutable: Path = javaExecutable(home), val toolsJar:Path? = jdkToolsJar(home))
+
+/**
+ * Java home, as set by the java.home property.
+ */
+val CurrentProcessJavaHome:JavaHome = JavaHome(Paths.get(
+		System.getProperty("java.home", null)
+				?: throw WemiException("java.home property is not set, can't find java executable")
+).toAbsolutePath())
+
+/**
+ * Retrieve path to the java executable (starter of JVM), assuming that [javaHome] is the path to a valid JAVA_HOME.
+ */
+fun javaExecutable(javaHome: Path): Path {
+	val windowsFile = (javaHome / "bin/java.exe").toAbsolutePath()
+	val unixFile = (javaHome / "bin/java").toAbsolutePath()
+	val winExists = Files.exists(windowsFile)
+	val unixExists = Files.exists(unixFile)
+
+	if (winExists && !unixExists) {
+		return windowsFile
+	} else if (!winExists && unixExists) {
+		return unixFile
+	} else if (!winExists && !unixExists) {
+		if (SystemInfo.IS_WINDOWS) {
+			throw WemiException("Java executable should be at $windowsFile, but it does not exist")
+		} else {
+			throw WemiException("Java executable should be at $unixFile, but it does not exist")
+		}
+	} else {
+		return if (SystemInfo.IS_WINDOWS) {
+			windowsFile
+		} else {
+			unixFile
+		}
+	}
+}
 
 /**
  * When java is run from "jre" part of the JDK install, "tools.jar" is not in the classpath by default.
- * This can locate the tools.jar in [wemi.Keys.javaHome] for explicit loading.
+ * This can locate the tools.jar in for standard Java homes for explicit loading.
  */
 fun jdkToolsJar(javaHome: Path): Path? {
 	// Gradle logic: https://github.com/gradle/gradle/blob/master/subprojects/base-services/src/main/java/org/gradle/internal/jvm/Jvm.java#L330

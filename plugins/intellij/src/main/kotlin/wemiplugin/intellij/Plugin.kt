@@ -31,6 +31,7 @@ import wemi.util.name
 import wemi.util.pathWithoutExtension
 import wemi.util.scoped
 import wemiplugin.intellij.utils.Patch
+import wemiplugin.intellij.utils.Utils.getPluginIds
 import wemiplugin.intellij.utils.unZipIfNew
 import java.io.File
 import java.net.URL
@@ -47,6 +48,7 @@ object IntelliJ {
 	val intellijPluginRepositories by key<List<IntelliJPluginRepository>>("Repositories in which plugin dependencies can be found", listOf(IntelliJPluginsRepo))
 	val resolvedIntellijPluginDependencies by key<List<ResolvedIntelliJPluginDependency>>("Resolved dependencies on another plugins")
 
+	/** See https://bintray.com/jetbrains/intellij-jbr for available versions. */
 	val intellijJbrVersion: Key<String?> by key("Explicitly set JBR version to use. null means use default for given IDE.", null as String?)
 	val intellijJbrRepository: Key<URL?> by key("URL of repository for downloading JetBrains Java Runtime. null means use default for given version.", null as URL?)
 
@@ -143,9 +145,10 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	// IntelliJ SDK launch
 	Keys.runSystemProperties modify DefaultModifySystemProperties
 	Keys.runOptions modify DefaultModifyRunOptions
-	Keys.javaExecutable set DefaultJavaExecutable
+	Keys.javaHome set DefaultJbrJavaHome
 	Keys.mainClass set { "com.intellij.idea.Main" }
 	Keys.run set {
+		expiresNow()
 		runIde()
 	}
 
@@ -166,8 +169,25 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 				sp["plugin.path"] = Files.list(sandboxDir.plugins).collect(Collectors.toList()).joinToString(File.pathSeparator+",") { p -> p.absolutePath }
 			}
 
+			// TODO: Review this in context of Wemi (https://github.com/JetBrains/gradle-intellij-plugin/commit/ce057092a952609254768517357756cec5de06db)
+			// appClassLoader should be used for user's plugins. Otherwise, classes it won't be possible to use
+			// its classes of application components or services in tests: class loaders will be different for
+			// classes references by test code and for classes loaded by the platform (pico container).
+			//
+			// The proper way to handle that is to substitute Gradle's test class-loader and teach it
+			// to understand PluginClassLoaders. Unfortunately, I couldn't find a way to do that.
+			sp["idea.use.core.classloader.for.plugin.path"] = "true"
+			// the same as previous – setting appClassLoader but outdated. Works for part of 203 builds.
+			sp["idea.use.core.classloader.for"] = getPluginIds().joinToString(",")
+
 			sp
 		}
+
+		// TODO(jp): This may be needed
+		// task.classpath += project.files(
+		//                        "$extension.ideaDependency.classes/lib/resources.jar",
+		//                        "$extension.ideaDependency.classes/lib/idea.jar"
+		//                )
 	}
 	// IntelliJ test fixtures use JUnit4 API
 	Keys.libraryDependencies add { Dependency(JUnit4Engine, scope= ScopeTest) }

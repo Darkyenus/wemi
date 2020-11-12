@@ -154,8 +154,6 @@ val internalClasspath
 
 val javaHome
     inline get() = Keys.javaHome
-val javaExecutable
-    inline get() = Keys.javaExecutable
 val kotlinVersion
     inline get() = Keys.kotlinVersion
 val compilerOptions

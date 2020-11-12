@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory
 import wemi.ActivityListener
 import wemi.Value
 import wemi.boot.WemiSystemCacheFolder
-import wemi.run.javaExecutable
+import wemi.util.JavaHome
 import wemi.util.SystemInfo
 import wemi.util.Version
 import wemi.util.deleteRecursively
@@ -14,6 +14,7 @@ import wemi.util.div
 import wemi.util.exists
 import wemi.util.httpGetFile
 import wemi.util.isDirectory
+import wemi.util.jdkToolsJar
 import wemi.util.name
 import wemi.util.toSafeFileName
 import wemiplugin.intellij.utils.Utils
@@ -27,18 +28,24 @@ private val LOG = LoggerFactory.getLogger("ResolveJbr")
  * JBR - JetBrains Runtime is a custom Java distribution by JetBrains to use with their IDEs.
  * [More info here.](https://confluence.jetbrains.com/display/JBR/JetBrains+Runtime)
  */
-class Jbr(val version:String, val javaHome:Path, val javaExecutable: Path)
+class Jbr(val version:String, val javaHome:Path, val javaExecutable: Path) {
+	fun toJavaHome():JavaHome {
+		val bin = javaExecutable.parent
+		val home = if (SystemInfo.IS_MAC_OS) bin.parent.parent else bin.parent
+		return JavaHome(javaHome, javaExecutable, jdkToolsJar(home))
+	}
+}
 
 /** JBR name and where to find it */
 private class JbrArtifact(val name:String, val defaultRepoUrl:URL)
 
-val DefaultJavaExecutable: Value<Path> = v@{
+val DefaultJbrJavaHome: Value<JavaHome> = v@{
 	val jbrRepo = IntelliJ.intellijJbrRepository.get()
 	val jbrVersion = IntelliJ.intellijJbrVersion.get()
 	if (jbrVersion != null) {
 		val jbr = resolveJbr(jbrVersion, jbrRepo, progressListener)
 		if (jbr != null) {
-			return@v jbr.javaExecutable
+			return@v jbr.toJavaHome()
 		}
 		LOG.warn("Cannot resolve JBR {}. Falling back to builtin JBR.", jbrVersion)
 	}
@@ -46,12 +53,12 @@ val DefaultJavaExecutable: Value<Path> = v@{
 	if (builtinJbrVersion != null) {
 		val builtinJbr = resolveJbr(builtinJbrVersion, jbrRepo, progressListener)
 		if (builtinJbr != null) {
-			return@v builtinJbr.javaExecutable
+			return@v builtinJbr.toJavaHome()
 		}
 		LOG.warn("Cannot resolve builtin JBR {}. Falling back to local Java.", builtinJbrVersion)
 	}
 
-	javaExecutable(Keys.javaHome.get())
+	Keys.javaHome.get()
 }
 
 private val JbrCacheFolder = WemiSystemCacheFolder / "intellij-jbr-cache"

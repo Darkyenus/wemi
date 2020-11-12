@@ -19,10 +19,10 @@ import wemi.dependency.NoClassifier
 import wemi.dependency.ScopeTest
 import wemi.dependency.SourcesClassifier
 import wemi.publish.artifacts
-import wemi.run.javaExecutable
 import wemi.test.JUnitAPI
 import wemi.test.JUnitEngine
 import wemi.test.JUnitPlatformLauncher
+import wemi.util.CurrentProcessJavaHome
 import wemi.util.FileSet
 import wemi.util.changeExtensionAndMove
 import wemi.util.div
@@ -85,8 +85,7 @@ object Archetypes {
     val JVMBase by archetype(::Base) {
         Keys.repositories set Static(DefaultRepositories)
 
-        Keys.javaHome set Static(wemi.run.JavaHome)
-        Keys.javaExecutable set { javaExecutable(Keys.javaHome.get()) }
+        Keys.javaHome set Static(CurrentProcessJavaHome)
         Keys.javaCompiler set LazyStatic {
             ToolProvider.getSystemJavaCompiler()
                 ?: throw WemiException("Could not find Java Compiler in the classpath, ensure that you are running Wemi from JDK-bundled JRE. " +
@@ -158,7 +157,7 @@ object Archetypes {
         }
         Keys.testResources set { FileSet(Keys.projectRoot.get() / "src/test/resources") }
 
-        Keys.libraryDependencies add { kotlinDependency("stdlib") }
+        Keys.libraryDependencies addAll { if (Keys.automaticKotlinStdlib.get()) listOf(kotlinDependency("stdlib")) else emptyList() }
 
         Keys.compilerOptions[JavaCompilerFlags.customFlags] = { it + "-g" }
         Keys.compilerOptions[JavaCompilerFlags.sourceVersion] = { "1.8" }
@@ -183,7 +182,7 @@ object Archetypes {
         Keys.resources set { FileSet(Keys.projectRoot.get() / "src/main/resources") }
         Keys.testResources set { FileSet(Keys.projectRoot.get() / "src/test/resources") }
 
-        Keys.libraryDependencies add { kotlinDependency("stdlib-js") }
+        Keys.libraryDependencies addAll { if (Keys.automaticKotlinStdlib.get()) listOf(kotlinDependency("stdlib-js")) else emptyList() }
 
         Keys.compilerOptions[KotlinCompilerFlags.moduleName] = { Keys.projectName.get().toValidIdentifier() ?: "myModule" }
 
