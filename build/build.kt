@@ -206,7 +206,7 @@ val core:Project by project {
             dependency("org.slf4j", "slf4j-api", "1.7.30"),
             dependency("com.darkyen", "tproll", "1.3.2"),
             dependency("com.darkyen", "DaveWebb", "v1.2"),
-            dependency("com.github.EsotericSoftware", "jsonbeans", "0.9"),
+            dependency("com.github.EsotericSoftware", "jsonbeans", "c3520fcc51"),
             dependency("org.jline", "jline-terminal", JLineVersion),
             dependency("org.jline", "jline-terminal-jansi", JLineVersion),
             dependency("org.jline", "jline-reader", JLineVersion)
