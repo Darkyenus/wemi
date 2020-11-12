@@ -218,7 +218,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         val rawHolders:Array<ExtendableBindingHolder> = run {
             val baseHolders = baseHolders
             val baseHoldersSize = baseHolders.size
-            val rawHolders = arrayOfNulls<BindingHolder>(baseHoldersSize + configurations.size)
+            val rawHolders = arrayOfNulls<ExtendableBindingHolder>(baseHoldersSize + configurations.size)
             System.arraycopy(baseHolders, 0, rawHolders, 0, baseHoldersSize)
             for (i in configurations.indices) {
                 rawHolders[baseHoldersSize + i] = configurations[i]
