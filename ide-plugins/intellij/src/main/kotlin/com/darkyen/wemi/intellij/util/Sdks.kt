@@ -1,11 +1,9 @@
 package com.darkyen.wemi.intellij.util
 
-import com.intellij.openapi.projectRoots.JavaSdk
-import com.intellij.openapi.projectRoots.JavaSdkVersion
-import com.intellij.openapi.projectRoots.ProjectJdkTable
-import com.intellij.openapi.projectRoots.Sdk
+import com.intellij.openapi.projectRoots.*
 import com.intellij.pom.java.LanguageLevel
 import org.jetbrains.kotlin.idea.util.projectStructure.version
+import java.nio.file.Path
 
 const val MIN_JAVA_VERSION_FOR_WEMI = 8
 val MIN_JAVA_SDK_VERSION_FOR_WEMI = JavaSdkVersion.JDK_1_8
@@ -29,4 +27,19 @@ fun getWemiCompatibleSdk(version:JavaSdkVersion? = null):Sdk? {
 
 	// Find first version that is same or smallest larger. If no such version, return the most recent version.
 	return list.find { it.version?.isAtLeast(targetVersion) ?: false } ?: list.lastOrNull()
+}
+
+fun createWemiCompatibleSdk(javaHome: Path):Sdk {
+	var home = javaHome
+	var jdk = JdkUtil.checkForJdk(home.toString())
+
+	// Sometimes JRE is inside JDK
+	if (!jdk && JdkUtil.checkForJdk(home.parent.toString())) {
+		home = home.parent
+		jdk = true
+	}
+
+	val sdk = SDK_TYPE_FOR_WEMI.createJdk(home.normalize().fileName.toString(), home.toString(), jdk)
+	ProjectJdkTable.getInstance().addJdk(sdk)
+	return sdk
 }

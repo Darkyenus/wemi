@@ -81,7 +81,7 @@ val DefaultModifySystemProperties : ValueModifier<Map<String, String>> = {
 val DefaultModifyRunOptions : ValueModifier<List<String>> = {
 	val runOptions = it.toMutable()
 	if (!runOptions.any { o -> o.startsWith("-Xmx") }) {
-		runOptions.add("-Xmx512m")
+		runOptions.add(/*"-Xmx512m" this is the gradle default, but it is not enough*/ "-Xmx1024m")
 	}
 	if (!runOptions.any { o -> o.startsWith("-Xms") }) {
 		runOptions.add("-Xms256m")

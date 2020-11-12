@@ -493,8 +493,8 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 				WemiBuildScriptProjectName, WemiModuleType.BUILD_SCRIPT,
 				buildFolder,
 				cacheFolder, null,
-				wemiJavaLanguageLevel, JavaSdkVersion.fromLanguageLevel(wemiJavaLanguageLevel)
-				)
+				wemiJavaLanguageLevel, JavaSdkVersion.fromLanguageLevel(wemiJavaLanguageLevel),
+				null)
 		ideProjectNode.modules.add(ideModuleNode)
 		ideModuleNode.roots.sourceRoots = listOf(buildFolder)
 		ideModuleNode.excludedRoots = setOf(buildFolder / "cache", buildFolder / "logs", buildFolder / "artifacts")
@@ -554,6 +554,14 @@ private fun createWemiProjectData(session: WemiLauncherSession, projectName:Stri
 	val sourceRootsTesting: Array<Path> = session.jsonArray(projectName, "testing", task = "sources", orNull = true).fileSetRoots()
 	val resourceRootsTesting: Array<Path> = session.jsonArray(projectName, "testing", task = "resources", orNull = true).fileSetRoots()
 
+	val javaHome:Path? = session.task(projectName, task="javaHome?").data?.let { javaHome ->
+		if (javaHome.isString) {
+			javaHome.asString()
+		} else if (javaHome.isObject) {
+			javaHome.getString("home", null)
+		} else null
+	}?.let { try { Paths.get(it) } catch (e:Exception) { null } }
+
 	return WemiProjectData(
 			projectName,
 			session.path(projectName, task = "projectRoot"),
@@ -563,7 +571,8 @@ private fun createWemiProjectData(session: WemiLauncherSession, projectName:Stri
 			sourceRoots,
 			resourceRoots,
 			sourceRootsTesting,
-			resourceRootsTesting
+			resourceRootsTesting,
+			javaHome
 	)
 }
 
@@ -616,24 +625,17 @@ private val AUX_MATCH_FIT_GOODNESS:Array<(aux:Path, artifact:Path) -> Int> = arr
 		},
 		{ aux, artifact ->
 			// Find files that share name
-			val auxName = aux.name.pathWithoutExtension()
+			val auxName = aux.name.pathWithoutExtension().removeSuffix("-sources").removeSuffix("-docs")
 			val artifactName = artifact.name.pathWithoutExtension()
 			if (auxName.equals(artifactName, ignoreCase = false)) {
 				0
 			} else if (auxName.equals(artifactName, ignoreCase = true)) {
 				1
-			} else if (auxName.contains(artifactName, ignoreCase = true)) {
-				2
-			} else if (artifactName.contains(auxName, ignoreCase = true)) {
-				3
 			} else {
 				Int.MAX_VALUE
 			}
-		},
-		{ aux, artifact ->
-			// Find files with similar file name length, not much else we can do here
-			abs(aux.name.length - artifact.name.length)
 		}
+		// Anything less precise leads to problems, for example in IntelliJ itself, where a single maven-sources file should apply to all IntelliJ's jars.
 )
 
 private fun assignAuxiliaryFilesArtifacts(auxFiles:List<Path>, artifacts:Collection<Path>):Map</*artifact*/Path, /*aux*/List<Path>> {
@@ -847,7 +849,8 @@ private class WemiProjectData constructor(
 		sourceRoots:Array<Path>,
 		resourceRoots:Array<Path>,
 		sourceRootsTesting:Array<Path>,
-		resourceRootsTesting:Array<Path>
+		resourceRootsTesting:Array<Path>,
+		val javaHome:Path?
 ) {
 
 	val javaSourceVersion:LanguageLevel? = LanguageLevel.parse(compilerOptions["javacSourceVersion"]?.asString())
@@ -863,7 +866,7 @@ private class WemiProjectData constructor(
 
 		return ModuleNode(projectName, type, rootPath,
 				classOutput, classOutputTesting,
-				javaSourceVersion, javaTargetVersion).also { node ->
+				javaSourceVersion, javaTargetVersion, javaHome).also { node ->
 
 			val (generatedSourceRoots, sourceRoots) = sourceRoots.partition { it.toAbsolutePath().startsWith(wemiCachePath) }
 			node.roots.sourceRoots = sourceRoots

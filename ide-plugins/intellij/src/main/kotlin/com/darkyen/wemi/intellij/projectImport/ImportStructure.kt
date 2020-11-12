@@ -4,9 +4,7 @@ import com.darkyen.wemi.intellij.settings.WemiModuleService
 import com.darkyen.wemi.intellij.settings.WemiModuleType
 import com.darkyen.wemi.intellij.settings.WemiProjectService
 import com.darkyen.wemi.intellij.settings.isWemiModule
-import com.darkyen.wemi.intellij.util.getWemiCompatibleSdk
-import com.darkyen.wemi.intellij.util.toClasspathUrl
-import com.darkyen.wemi.intellij.util.toUrl
+import com.darkyen.wemi.intellij.util.*
 import com.esotericsoftware.jsonbeans.JsonValue
 import com.intellij.compiler.CompilerConfiguration
 import com.intellij.ide.highlighter.ModuleFileType
@@ -17,6 +15,8 @@ import com.intellij.openapi.module.StdModuleTypes
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ex.ProjectEx
 import com.intellij.openapi.projectRoots.JavaSdkVersion
+import com.intellij.openapi.projectRoots.JdkUtil
+import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.roots.CompilerModuleExtension
 import com.intellij.openapi.roots.CompilerProjectExtension
 import com.intellij.openapi.roots.ContentEntry
@@ -74,7 +74,8 @@ class ModuleNode constructor(
 		val classOutput:Path,
 		val classOutputTesting:Path?,
 		val javaSourceVersion:LanguageLevel?,
-		val javaTargetVersion:JavaSdkVersion?) {
+		val javaTargetVersion:JavaSdkVersion?,
+		val javaHome:Path?) {
 
 	class SourceResource {
 		var sourceRoots:List<Path> = emptyList()
@@ -218,7 +219,15 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 	// Import Java compiler data
 	CompilerConfiguration.getInstance(project).projectBytecodeTarget = JpsJavaSdkType.complianceOption(javaTargetVersion.maxLanguageLevel.toJavaVersion())
 	ProjectRootManager.getInstance(project)?.let { projectRootManager ->
-		projectRootManager.projectSdk = getWemiCompatibleSdk(javaTargetVersion)
+		var projectSdk = getWemiCompatibleSdk(javaTargetVersion)
+		if (projectSdk == null) {
+			// Create a new SDK from passed-in javaHomes, if any
+			val firstJavaHome = modules.mapNotNull { it.javaHome }.firstOrNull()
+			if (firstJavaHome != null) {
+				projectSdk = createWemiCompatibleSdk(firstJavaHome)
+			}
+		}
+		projectRootManager.projectSdk = projectSdk
 	}
 	LanguageLevelProjectExtension.getInstance(project).languageLevel = javaSourceVersion
 
@@ -267,6 +276,8 @@ private fun ProjectNode.importProjectNode(project: Project, modifiableModuleMode
 			val moduleJdk = module.javaTargetVersion?.let { getWemiCompatibleSdk(it) }
 			if (moduleJdk != null) {
 				rootModel.sdk = moduleJdk
+			} else if (module.javaHome != null) {
+				rootModel.sdk = createWemiCompatibleSdk(module.javaHome)
 			} else {
 				rootModel.inheritSdk()
 			}

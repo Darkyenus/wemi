@@ -1,5 +1,6 @@
 package wemi.util
 
+import com.esotericsoftware.jsonbeans.JsonWriter
 import wemi.WemiException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -11,7 +12,28 @@ import java.util.*
  * Represents a combination of Java home directory
  * and a path of corresponding java executable for the current platform.
  */
-data class JavaHome(val home:Path, val javaExecutable: Path = javaExecutable(home), val toolsJar:Path? = jdkToolsJar(home))
+data class JavaHome(val home:Path, val javaExecutable: Path = javaExecutable(home), val toolsJar:Path? = jdkToolsJar(home)) : JsonWritable, WithDescriptiveString {
+
+	override fun JsonWriter.write() {
+		writeObject {
+			field("home", home)
+			field("javaExecutable", javaExecutable)
+			field("toolsJar", toolsJar)
+		}
+	}
+
+	override fun toDescriptiveAnsiString(): String {
+		return StringBuilder()
+				.format(Color.Blue).append(home)
+				.format(Color.White).append('/')
+				.format(Color.Blue).append(home.relativize(javaExecutable))
+				.apply {
+					if (toolsJar != null) {
+						format(Color.White).append(" (").append(home.relativize(toolsJar)).append(')')
+					}
+				}.format().toString()
+	}
+}
 
 /**
  * Java home, as set by the java.home property.
