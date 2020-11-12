@@ -144,10 +144,6 @@ val base:Configuration by configuration("") {
 
     extend(foo) {
         queryingExample modify { it.apply { append('2') } }
-
-        extend(bar) {
-            queryingExample modify { it.apply { append('6') } }
-        }
     }
 }
 
@@ -156,10 +152,6 @@ val foo:Configuration by configuration("") {
 
     extend(bar) {
         queryingExample modify { it.apply { append('4') } }
-
-        extend(base) {
-            queryingExample modify { it.apply { append('5') } }
-        }
     }
 }
 
@@ -168,10 +160,6 @@ val bar:Configuration by configuration("") {
 
     extend(base) {
         queryingExample modify { it.apply { append('7') } }
-
-        extend(foo) {
-            queryingExample modify { it.apply { append('8') } }
-        }
     }
 
     extend(foo) {
