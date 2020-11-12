@@ -162,7 +162,8 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
 
         // Check if we haven't resolved this dependency (or its different version) previously
         val resolvedPreviouslyPartialId = resolvedPartials[partialId]
-        val resolvedPreviouslyScope = resolvedScope[resolvedPreviouslyPartialId ?: depId]
+        val scopeDepHolder = resolvedPreviouslyPartialId ?: depId
+        val resolvedPreviouslyScope = resolvedScope[scopeDepHolder]
         if (resolvedPreviouslyScope != null) {
             if (resolvedPreviouslyPartialId == null) {
                 LOG.debug("{} already resolved, skipping", dep)
@@ -173,7 +174,8 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
             // We did already resolve it, its scope may need adjusting.
             val newScope = resolveScopes(resolvedPreviouslyScope, dep.scope)
             if (newScope != resolvedPreviouslyScope) {
-                resolvedScope[resolvedPreviouslyPartialId ?: depId] = newScope
+                resolvedScope[scopeDepHolder] = newScope
+                LOG.debug("Changing the scope of {} from {} to {} (multiple scopes)", scopeDepHolder, resolvedPreviouslyScope, newScope)
             }
             return null
         }
@@ -243,7 +245,7 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
                     transitiveDependency
                 } else {
                     if (transitiveDependency.scope != resolvedToScope) {
-                        LOG.debug("Changing the scope of {} to {}", transitiveDependency, resolvedToScope)
+                        LOG.debug("Changing the scope of {} to {} (transitive scope)", transitiveDependency, resolvedToScope)
                     }
                     Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, dep.exclusions + transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
                 }

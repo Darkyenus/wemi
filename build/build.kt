@@ -212,6 +212,16 @@ val core:Project by project {
             dependency("org.jline", "jline-reader", JLineVersion)
         ) }
 
+    // This must be done manually the old school way, because we need some of these in normal compilation as well
+    // and mixing the two approaches is not great
+    extend(testing) {
+        libraryDependencies addAll { listOf(
+                Dependency(JUnitAPI, scope=ScopeTest),
+                Dependency(JUnitEngine, scope=ScopeTest),
+                Dependency(JUnitPlatformLauncher, scope=ScopeTest)
+        ) }
+    }
+
     /* Used ONLY in wemi.test.forked.TestLauncher */
     libraryDependencies add { Dependency(JUnitPlatformLauncher, scope=ScopeProvided) }
 
