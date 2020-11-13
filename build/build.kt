@@ -45,14 +45,17 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoField
 import java.util.regex.Pattern
 
-val CompilerProjects = listOf(
-        createKotlinCompilerProject("1.1.61"),
-        createKotlinCompilerProject("1.2.71"),
-        createKotlinCompilerProject("1.3.20"),
-        createKotlinCompilerProject("1.3.41"),
-        createKotlinCompilerProject("1.3.61"),
-        createKotlinCompilerProject("1.3.72")
+val KotlinCompilerVersions = listOf(
+        "1.1.61",
+        "1.2.71",
+        "1.3.20",
+        "1.3.41",
+        "1.3.61",
+        "1.3.72",
+        "1.4.10"
 )
+
+val CompilerProjects = KotlinCompilerVersions.map { createKotlinCompilerProject(it) }
 
 const val WemiGroup = "com.darkyen.wemi"
 
@@ -231,8 +234,7 @@ val core:Project by project {
 }
 
 fun latestKotlinDependency(name:String):Dependency {
-    val latestKotlinVersion = KotlinCompilerVersion.values().last().string
-    return dependency("org.jetbrains.kotlin", "kotlin-$name", latestKotlinVersion)
+    return dependency("org.jetbrains.kotlin", "kotlin-$name", KotlinCompilerVersions.last())
 }
 
 fun setupSharedPublishMetadata(metadata:InfoNode, name:String, description:String, inceptionYear:String): InfoNode {
