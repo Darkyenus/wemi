@@ -293,8 +293,10 @@ val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
 
     projectDependencies add { ProjectDependency(core, scope=ScopeProvided) }
 
+    // See https://bintray.com/kotlin/dokka/dokka for latest version number
     /* Used only in wemi.document.DokkaInterface */
     libraryDependencies add { dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", scope=ScopeProvided) }
+    // libraryDependencies add { dependency("org.jetbrains.dokka", "dokka-cli", "1.4.10.2", scope=ScopeProvided) }
 
     repositories set { setOf(JCenter) }
 }

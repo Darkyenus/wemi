@@ -31,6 +31,12 @@ class WemiProjectOpenProcessor : ProjectOpenProcessor() {
 
 	override fun canOpenProject(file: VirtualFile): Boolean = wemiDirectoryToImport(file) != null
 
+	override fun canImportProjectAfterwards(): Boolean = true
+
+	override fun importProjectAfterwards(project: Project, file: VirtualFile) {
+		importWemiProject(project, initial=true)
+	}
+
 	override fun doOpenProject(virtualFile: VirtualFile, projectToClose: Project?, forceOpenInNewFrame: Boolean): Project? {
 		val directoryToImport = wemiDirectoryToImport(virtualFile)!!
 		val wizardContext = WizardContext(null, null)
@@ -94,7 +100,9 @@ class WemiProjectOpenProcessor : ProjectOpenProcessor() {
 			closePreviousProject(projectToClose)
 		}
 		ProjectUtil.updateLastProjectLocation(pathToOpen)
-		ProjectManagerEx.getInstanceEx().openProject(projectToOpen)// TODO(jp): Assertion fails here
+		ApplicationManager.getApplication().executeOnPooledThread {
+			ProjectManagerEx.getInstanceEx().openProject(projectToOpen)
+		}
 
 		if (importToProject) {
 			projectToOpen.save()
@@ -102,7 +110,6 @@ class WemiProjectOpenProcessor : ProjectOpenProcessor() {
 				importWemiProject(projectToOpen, initial=true)
 			}
 		}
-		projectToOpen.isInitialized
 
 		return projectToOpen
 	}
