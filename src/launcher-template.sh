@@ -125,7 +125,11 @@ download_to_file() {
 	if command_exists curl; then
 		curl -C - --fail --retry 3 --location --output "$2" --url "$1" || fail "Failed to fetch $1 to $2 (curl: $?)"
 	elif command_exists wget; then
-		wget --tries=3 --continue --show-progress --output-document="$2" "$1" || fail "Failed to fetch $1 to $2 (wget: $?)"
+		# Download resume in wget is not supported, because it does not play well with custom output file
+		if [ -e "$2" ]; then
+			rm "$2" || log "Failed to delete old download file $2 (rm: $?)"
+		fi
+		wget --show-progress --output-document="$2" "$1" || fail "Failed to fetch $1 to $2 (wget: $?)"
 	else
 		fail_unsatisfied "curl or wget"
 	fi
@@ -137,7 +141,7 @@ download_to_output() {
 	if command_exists curl; then
 		curl --fail --retry 3 --location --silent --show-error --url "$1" || fail "Failed to fetch $1 (curl: $?)"
 	elif command_exists wget; then
-		wget --tries=3 --quiet --output-document=- "$1" || fail "Failed to fetch $1 (wget: $?)"
+		wget --quiet --output-document=- "$1" || fail "Failed to fetch $1 (wget: $?)"
 	else
 		fail_unsatisfied "curl or wget"
 	fi
