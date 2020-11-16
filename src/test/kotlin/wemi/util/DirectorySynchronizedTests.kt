@@ -20,7 +20,7 @@ import java.util.*
 class DirectorySynchronizedTests {
 
     private val VERBOSE
-        get() = true
+        get() = false
 
     @Test
     fun stressTest() {
