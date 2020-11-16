@@ -18,7 +18,7 @@
 
     <change-notes><![CDATA[
       <ul>
-        <li>Compatibility with Wemi 0.15</li>
+        <li>Compatibility with Wemi 0.15 and no older versions, but the import is faster</li>
         <li>Run with Wemi is no longer offered on non Wemi modules and projects</li>
         <li>Improved handling of unusual directory structures</li>
       </ul>
@@ -26,7 +26,7 @@
     </change-notes>
 
     <!-- http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html -->
-    <idea-version since-build="193.5233.102"/>
+    <idea-version since-build=""/>
 
     <!--  http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
     <depends>com.intellij.modules.platform</depends>

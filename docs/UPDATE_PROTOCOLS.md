@@ -4,12 +4,10 @@
 0. Update dependencies
 1. Update changes in
     - [Changelog](../CHANGES.md)
-    - [IDEA plugin changelog](../ide-plugins/WemiForIntelliJ/resources/META-INF/plugin.xml)
+    - [IDEA plugin changelog](../ide-plugins/intellij/src/main/plugin.xml)
 2. Create and push commit named "Version 0.0" + version tag "0.0"
-3. Create github release, with binary builds of IDEA plugin and wemi itself
-    1. Delete `WemiForIntelliJ.zip`, if it exists
-	2. Run `./build/publish-version.sh`
-4. Create commit that changes versions to <NEXT_VERSION>-SNAPSHOT
+3. Run `./build/publish-version.sh`
+4. Create github release, with binary builds of IDEA plugin and wemi itself
 5. Update wemi used by Wemi, update build script
 
 # New Kotlin Version
