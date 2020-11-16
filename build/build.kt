@@ -284,19 +284,18 @@ fun createKotlinCompilerProject(version:String):Project {
 
 // Separate project, because Dokka is distributed through a fat-jar, which also includes kotlin stdlib.
 // This caused compile problems because it leads to two stdlibs on the classpath for the main project.
-val dokkaInterfaceImplementation by project(path("src/main-dokka")) {
+val dokkaInterfaceImplementation by project(path("src/main-dokka"), Archetypes.JavaProject) {
     sources set { FileSet(projectRoot.get() / "src") }
 
-    compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
-
-    libraryDependencies set { emptySet() } // Disable default kotlin stdlib
+    // Commented after the project became Java project
+    // compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
+    // libraryDependencies set { emptySet() } // Disable default kotlin stdlib
 
     projectDependencies add { ProjectDependency(core, scope=ScopeProvided) }
 
     // See https://bintray.com/kotlin/dokka/dokka for latest version number
-    /* Used only in wemi.document.DokkaInterface */
-    libraryDependencies add { dependency("org.jetbrains.dokka", "dokka-fatjar", "0.9.15", scope=ScopeProvided) }
-    // libraryDependencies add { dependency("org.jetbrains.dokka", "dokka-cli", "1.4.10.2", scope=ScopeProvided) }
+    /* Used only in wemi.document.DokkaInterface. KEEP IN SYNC WITH KeyDefaults.DokkaFatJar */
+    libraryDependencies add { dependency("org.jetbrains.dokka", "dokka-cli", "1.4.10.2", scope=ScopeProvided) }
 
     repositories set { setOf(JCenter) }
 }

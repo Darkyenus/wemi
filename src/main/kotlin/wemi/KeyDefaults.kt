@@ -63,7 +63,6 @@ import wemi.util.exists
 import wemi.util.format
 import wemi.util.isDirectory
 import wemi.util.javadocUrl
-import wemi.util.jdkToolsJar
 import wemi.util.name
 import wemi.util.parseJavaVersion
 import wemi.util.pathExtension
@@ -841,7 +840,7 @@ object KeyDefaults {
         options
     }
 
-    private val DokkaFatJar = listOf(Dependency(DependencyId("org.jetbrains.dokka", "dokka-fatjar", "0.9.15"), exclusions = WemiBundledLibrariesExclude))
+    private val DokkaFatJar = listOf(Dependency(DependencyId("org.jetbrains.dokka", "dokka-cli", "1.4.10.2"), exclusions = WemiBundledLibrariesExclude))
 
     val ArchiveDokkaInterface: Value<DokkaInterface> = {
         val artifacts = resolveDependencyArtifacts(DokkaFatJar, listOf(JCenter), progressListener)?.toMutableList()

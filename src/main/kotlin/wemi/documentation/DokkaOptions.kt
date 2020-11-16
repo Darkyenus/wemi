@@ -63,6 +63,9 @@ class DokkaOptions {
      */
     var moduleName: String = ""
 
+    /** The version of the module being documented. */
+    var moduleVersion: String = "0"
+
     /**
      * Documentation format.
      *
@@ -75,20 +78,17 @@ class DokkaOptions {
      */
     var jdkVersion: Int = 6
 
-    /**
-     * Do not output deprecated members, applies globally, can be overridden by packageOptions.
-     */
+    /** Do not output deprecated members, applies globally, can be overridden by packageOptions. */
     var skipDeprecated = false
 
-    /**
-     * Emit warnings about not documented members, applies globally, also can be overridden by packageOptions.
-     */
+    /** Emit warnings about not documented members, applies globally, also can be overridden by packageOptions. */
     var reportNotDocumented = true
 
-    /**
-     * Do not create index pages for empty packages.
-     */
+    /** Do not create index pages for empty packages. */
     var skipEmptyPackages = true
+
+    /**  Include protected and private members */
+    var includeNonPublic = false
 
     /**
      * See documentation about [platforms](https://github.com/Kotlin/dokka#platforms).
@@ -137,10 +137,17 @@ class DokkaOptions {
      */
     val externalDocumentationLinks: ArrayList<ExternalDocumentation> = ArrayList()
 
-    /**
-     * No default documentation link to kotlin-stdlib.
-     */
+    /** Set to true to disable online resolution of package lists. */
+    var offline: Boolean = false
+
+    /** Throw an exception instead of warning. */
+    var failOnWarning: Boolean = false
+
+    /** No default documentation link to kotlin-stdlib. */
     var noStdlibLink: Boolean = false
+
+    /** No default documentation link to JDK documentation */
+    var noJdkLink: Boolean = false
 
     @Suppress("unused")
     companion object {
