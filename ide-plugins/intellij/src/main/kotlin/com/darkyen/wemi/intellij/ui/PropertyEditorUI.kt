@@ -23,6 +23,7 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.projectRoots.JavaSdk
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.ui.configuration.JdkComboBox
 import com.intellij.openapi.roots.ui.configuration.projectRoot.ProjectSdksModel
@@ -335,11 +336,11 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 
 	private val panel1JavaFromPath = JBIntSpinner(MAX_JAVA_VERSION_FOR_WEMI_HINT, MIN_JAVA_VERSION_FOR_WEMI, Integer.MAX_VALUE, 1)
 	// NOTE: Other editors use JrePathEditor here, but I don't understand its API
-	private val panel2JavaFromSdk = JdkComboBox(ProjectSdksModel().apply {// Deprecated: Change after the min API level becomes 201.1610
+	private val panel2JavaFromSdk = JdkComboBox(null, ProjectSdksModel().apply {
 		for (sdk in possibleJavaSdkList) {
 			addSdk(sdk)
 		}
-	})
+	}, { type -> type is JavaSdk }, null, null, null)
 	private val panel3JavaCustom = run {
 		val textField = ExtendableTextField()
 
