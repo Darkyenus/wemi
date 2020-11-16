@@ -14,7 +14,6 @@ import wemi.boot.WemiCacheFolder
 import wemi.boot.WemiRootFolder
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.KotlinCompilerFlags
-import wemi.compile.KotlinCompilerVersion
 import wemi.createProject
 import wemi.dependency
 import wemi.dependency.JCenter

@@ -63,12 +63,20 @@ val pluginIntellij by project(path("plugins/intellij")) {
     projectDependencies add { ProjectDependency(core, scope=ScopeProvided) }
     libraryDependencies add { dependency("org.apache.commons:commons-compress:1.20") }
 
+    val excludeKotlinStdlib = listOf(
+            DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-stdlib"),
+            DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-stdlib-common"),
+            DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk7"),
+            DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk8"),
+            DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-reflect"),
+    )
+
     repositories add { JCenter }
     //repositories add { Repository("jetbrains-bintray-intellij-plugin-service", "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service") }
-    libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-base:3.139") }
-    libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-intellij:3.139") }
-    libraryDependencies add { dependency("org.jetbrains.intellij:blockmap:1.0.5", exclusions = listOf(DependencyExclusion(group = "org.jetbrains.kotlin"))) }
-    libraryDependencies add { dependency("org.jetbrains.intellij:plugin-repository-rest-client:2.0.15", exclusions = listOf(DependencyExclusion(group = "org.jetbrains.kotlin"))) }
+    libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-base:3.139", exclusions = excludeKotlinStdlib) }
+    libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-intellij:3.139", exclusions = excludeKotlinStdlib) }
+    libraryDependencies add { dependency("org.jetbrains.intellij:blockmap:1.0.5", exclusions = excludeKotlinStdlib) }
+    libraryDependencies add { dependency("org.jetbrains.intellij:plugin-repository-rest-client:2.0.15", exclusions = excludeKotlinStdlib) }
 
     libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
     libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }

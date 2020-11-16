@@ -14,6 +14,7 @@ import wemiplugin.intellij.IntelliJ.intellijPluginDependencies
 import wemiplugin.intellij.IntelliJ.resolvedIntellijPluginDependencies
 import wemiplugin.intellij.IntelliJ.intellijPluginArchive
 import wemi.key
+import wemi.compile.KotlinCompilerVersion
 
 val ideIntellij by project(path("intellij"), Archetypes.JavaKotlinProject, IntelliJPluginLayer) {
 
@@ -23,6 +24,11 @@ val ideIntellij by project(path("intellij"), Archetypes.JavaKotlinProject, Intel
 
 	repositories add { Jitpack }
 	libraryDependencies add { dependency("com.github.EsotericSoftware", "jsonbeans", "0.9") }
+
+	// IntelliJ already contains its own Kotlin stdlib
+	Keys.automaticKotlinStdlib set { false }
+	// Keep in sync with whatever is shipped with the IDE
+	Keys.kotlinVersion set { KotlinCompilerVersion.Version1_3_72 }
 
 	resources modify {
 		// TODO(jp): Use system to get wemi/wemiLauncher
