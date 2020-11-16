@@ -223,6 +223,14 @@ val core:Project by project {
                 Dependency(JUnitPlatformLauncher, scope=ScopeTest)
         ) }
     }
+    // Add these when importing from IDE, because IDE does not see it otherwise
+    extend(Configurations.ideImport) {
+        libraryDependencies addAll { listOf(
+                Dependency(JUnitAPI, scope=ScopeTest),
+                Dependency(JUnitEngine, scope=ScopeTest),
+                Dependency(JUnitPlatformLauncher, scope=ScopeTest)
+        ) }
+    }
 
     /* Used ONLY in wemi.test.forked.TestLauncher */
     libraryDependencies add { Dependency(JUnitPlatformLauncher, scope=ScopeProvided) }
