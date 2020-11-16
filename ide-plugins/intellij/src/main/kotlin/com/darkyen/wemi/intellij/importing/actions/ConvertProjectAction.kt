@@ -121,6 +121,7 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
         val buildScript = StringBuilder()
         buildScript.append("@file:Suppress(\"unused\")\n")
         buildScript.append("import wemi.*\n")
+        buildScript.append("import wemi.dependency.*\n")
         buildScript.append("import wemi.util.*\n")
 
         if (modules.isEmpty()) {
@@ -205,22 +206,18 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
             append(" }\n\n")
         }
         if (testSourceFileSets.isNotEmpty()) {
-            append("\textend(testing) {\n")
-            append("\t\tsources modify { it")
+            append("\ttestSources modify { it")
             for (set in testSourceFileSets) {
                 append(" + ").append(set)
             }
             append(" }\n")
-            append("\t}\n\n")
         }
         if (testResourceFileSets.isNotEmpty()) {
-            append("\textend(testing) {\n")
-            append("\t\tresources modify { it")
+            append("\ttestResources modify { it")
             for (set in testResourceFileSets) {
                 append(" + ").append(set)
             }
             append(" }\n")
-            append("\t}\n\n")
         }
 
         // Module, library and jar dependencies
@@ -266,44 +263,37 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
                 }
             }
 
-            // TODO(jp): This is as of 0.14 wrong!!!
             if (DependencyScope.COMPILE in moduleDependencies
                     || DependencyScope.COMPILE in jarDependencies
                     || DependencyScope.COMPILE in libraryDependencies) {
-                appendProjectDependencies("\t", moduleDependencies[DependencyScope.COMPILE])
-                appendLibraryDependencies("\t", libraryDependencies[DependencyScope.COMPILE])
-                appendJarDependencies("\t", projectRoot, moduleRoot, jarDependencies[DependencyScope.COMPILE])
+                appendProjectDependencies("\t", moduleDependencies[DependencyScope.COMPILE], "ScopeCompile")
+                appendLibraryDependencies("\t", libraryDependencies[DependencyScope.COMPILE], "ScopeCompile")
+                appendJarDependencies("\t", projectRoot, moduleRoot, jarDependencies[DependencyScope.COMPILE], "ScopeCompile")
                 append("\n")
             }
 
             if (DependencyScope.TEST in moduleDependencies
                     || DependencyScope.TEST in jarDependencies
                     || DependencyScope.TEST in libraryDependencies) {
-                append("\textend(testing) {\n")
-                appendProjectDependencies("\t\t", moduleDependencies[DependencyScope.TEST])
-                appendLibraryDependencies("\t\t", libraryDependencies[DependencyScope.TEST])
-                appendJarDependencies("\t\t", projectRoot, moduleRoot, jarDependencies[DependencyScope.TEST])
-                append("\t}\n\n")
+                appendProjectDependencies("\t", moduleDependencies[DependencyScope.TEST], "ScopeTest")
+                appendLibraryDependencies("\t", libraryDependencies[DependencyScope.TEST], "ScopeTest")
+                appendJarDependencies("\t", projectRoot, moduleRoot, jarDependencies[DependencyScope.TEST], "ScopeTest")
             }
 
             if (DependencyScope.PROVIDED in moduleDependencies
                     || DependencyScope.PROVIDED in jarDependencies
                     || DependencyScope.PROVIDED in libraryDependencies) {
-                append("\textend(compiling) {\n")
-                appendProjectDependencies("\t\t", moduleDependencies[DependencyScope.PROVIDED])
-                appendLibraryDependencies("\t\t", libraryDependencies[DependencyScope.PROVIDED])
-                appendJarDependencies("\t\t", projectRoot, moduleRoot, jarDependencies[DependencyScope.PROVIDED])
-                append("\t}\n\n")
+                appendProjectDependencies("\t", moduleDependencies[DependencyScope.PROVIDED], "ScopeProvided")
+                appendLibraryDependencies("\t", libraryDependencies[DependencyScope.PROVIDED], "ScopeProvided")
+                appendJarDependencies("\t", projectRoot, moduleRoot, jarDependencies[DependencyScope.PROVIDED], "ScopeProvided")
             }
 
             if (DependencyScope.RUNTIME in moduleDependencies
                     || DependencyScope.RUNTIME in jarDependencies
                     || DependencyScope.RUNTIME in libraryDependencies) {
-                append("\textend(running) {\n")
-                appendProjectDependencies("\t\t", moduleDependencies[DependencyScope.RUNTIME])
-                appendLibraryDependencies("\t\t", libraryDependencies[DependencyScope.RUNTIME])
-                appendJarDependencies("\t\t", projectRoot, moduleRoot, jarDependencies[DependencyScope.RUNTIME])
-                append("\t}\n\n")
+                appendProjectDependencies("\t", moduleDependencies[DependencyScope.RUNTIME], "ScopeRuntime")
+                appendLibraryDependencies("\t", libraryDependencies[DependencyScope.RUNTIME], "ScopeRuntime")
+                appendJarDependencies("\t", projectRoot, moduleRoot, jarDependencies[DependencyScope.RUNTIME], "ScopeRuntime")
             }
         } finally {
             model.dispose()
@@ -311,30 +301,37 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
         append("}\n")
     }
 
-    private fun StringBuilder.appendProjectDependencies(prefix:String, modules:List<Module>?) {
+    private fun StringBuilder.appendProjectDependencies(prefix:String, modules:List<Module>?, scope:String) {
         for (moduleDependency in modules?:return) {
             append(prefix)
-            append("projectDependencies add { dependency(")
+            append("projectDependencies add { ProjectDependency(")
             append(moduleDependency.name.toIdentifier(MODULE_PREFIX).escapeStringLiteral())
-            append(", false) }\n")
+            append(", scope = ")
+            append(scope)
+            append(") }\n")
         }
     }
 
     class MavenLib(val group:String, val name:String, val version:String)
-    private fun StringBuilder.appendLibraryDependencies(prefix:String, libraries:List<MavenLib>?) {
+    private fun StringBuilder.appendLibraryDependencies(prefix:String, libraries:List<MavenLib>?, scope:String) {
         for (library in libraries?:return) {
             append(prefix)
             append("libraryDependencies add { dependency(\"")
             append(library.group.escapeStringLiteral()).append("\", \"")
             append(library.name.escapeStringLiteral()).append("\", \"")
-            append(library.version.escapeStringLiteral()).append("\") }\n")
+            append(library.version.escapeStringLiteral()).append("\", scope = ")
+            append(scope).append(") }\n")
         }
     }
 
-    private fun StringBuilder.appendJarDependencies(prefix:String, projectRoot:Path, moduleRoot:Path, jars:List<Path>?) {
+    private fun StringBuilder.appendJarDependencies(prefix:String, projectRoot:Path, moduleRoot:Path, jars:List<Path>?, scope:String) {
         for (jar in jars?:return) {
             append(prefix)
-            append("unmanagedDependencies add { ")
+            if (scope == "ScopeCompile") {
+                append("unmanagedDependencies add { LocatedPath(")
+            } else {
+                append("externalClasspath add { ScopedLocatedPath(LocatedPath(")
+            }
             if (jar.startsWith(projectRoot)) {
                 append("path(\"")
                 append(projectRoot.relativize(jar).toString().escapeStringLiteral())
@@ -348,7 +345,11 @@ class ConvertProjectAction : AnAction("Convert to Wemi Project",
                 append(jar.toString().escapeStringLiteral())
                 append("\")")
             }
-            append(" }\n")
+            if (scope == "ScopeCompile") {
+                append(") }\n")
+            } else {
+                append("), scope = ").append(scope).append(") }\n")
+            }
         }
     }
 
