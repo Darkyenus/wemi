@@ -420,6 +420,16 @@ private fun resolveProjectInfo(launcher:WemiLauncher,
 	// Kotlin data
 	ideProjectNode.kotlinCompilerData = defaultWemiProject?.compilerOptions ?: emptyMap()
 
+	// Make sure that kotlincJvmTarget is at least 1.8, otherwise build script will be red
+	run {
+		val kotlincJvmTarget = ideProjectNode.kotlinCompilerData["kotlincJvmTarget"]
+		if (kotlincJvmTarget == null || !kotlincJvmTarget.isString || Version(kotlincJvmTarget.asString()) < Version("1.8")) {
+			val map = ideProjectNode.kotlinCompilerData.toMutableMap()
+			map["kotlincJvmTarget"] = JsonValue("1.8")
+			ideProjectNode.kotlinCompilerData = map
+		}
+	}
+
 	tracker.stageEnd()
 
 	val projectModules = HashMap<String, ModuleNode>()

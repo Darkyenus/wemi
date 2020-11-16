@@ -187,7 +187,7 @@ object KotlinCompilerFlags {
 object KotlinJVMCompilerFlags {
     val jdkHome = CompilerFlag<String>("kotlincJdkHome", "Path to JDK home directory to include into classpath, if differs from default JAVA_HOME", "")
 
-    val jvmTarget = CompilerFlag<String>("kotlincJvmTarget", "Target version of the generated JVM bytecode (1.6, 1.8)", "1.6")
+    val jvmTarget = CompilerFlag<String>("kotlincJvmTarget", "Target version of the generated JVM bytecode (1.6, 1.8)", "1.8")
 }
 
 object KotlinJSCompilerFlags {
