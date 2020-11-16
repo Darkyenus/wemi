@@ -71,8 +71,8 @@ val pluginIntellij by project(path("plugins/intellij")) {
             DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk8"),
             DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-reflect"),
     )
-    libraryDependencies add { kotlinDependency("kotlin-stdlib-jdk8") }
-    libraryDependencies add { kotlinDependency("kotlin-stdlib-jdk7") }
+    libraryDependencies add { kotlinDependency("stdlib-jdk8") }
+    libraryDependencies add { kotlinDependency("stdlib-jdk7") }
 
     repositories add { JCenter }
     //repositories add { Repository("jetbrains-bintray-intellij-plugin-service", "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service") }
