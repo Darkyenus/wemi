@@ -18,9 +18,7 @@
 
     <change-notes><![CDATA[
       <ul>
-        <li>Compatibility with Wemi 0.15 and no older versions, but the import is faster</li>
-        <li>Run with Wemi is no longer offered on non Wemi modules and projects</li>
-        <li>Improved handling of unusual directory structures</li>
+        <li>Compatibility with Wemi 0.16 down to 0.15</li>
       </ul>
     ]]>
     </change-notes>

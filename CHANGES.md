@@ -1,4 +1,6 @@
-# 0.15
+# 0.16
+
+# 0.15 2020-11-16
 - Housekeeping update
 - Generated sources are now in `/build-generated/` to prevent IDE conflicts
 - Changed what can be extended and what can extend (`ConfigurationExtension`s can no longer extend, but everything else can be extended, including projects and archetypes)
