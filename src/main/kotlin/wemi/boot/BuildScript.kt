@@ -159,6 +159,11 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
                 result
             }
             Keys.internalClasspath set Static(listOf(LocatedPath(buildScriptInfo.scriptJar)))
+            extend(Configurations.ideImport) {
+                // When doing ideImport, internalClasspath should not contain anything we compiled,
+                // only generated classpath, which we technically don't have.
+                Keys.internalClasspath set Static(emptyList())
+            }
         }
         Keys.run set Static(0)
 
