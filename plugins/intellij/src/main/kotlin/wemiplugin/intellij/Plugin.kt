@@ -112,6 +112,8 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	IntelliJ.resolvedIntellijPluginDependencies set DefaultResolvedIntellijPluginDependencies
 	// Gradle plugin does something like this, but I don't think we need it
 	//Keys.repositories addAll { IntelliJ.intellijPluginRepositories.get().mapNotNull { (it as? IntelliJPluginRepository.Maven)?.repo } }
+	// IntelliJ already contains its own Kotlin stdlib - it would be nice to detect which version is used and use that
+	Keys.automaticKotlinStdlib set { false }
 
 	// Project compilation, archival and publishing
 	IntelliJ.intellijPluginFolder set DefaultIntelliJPluginFolder
