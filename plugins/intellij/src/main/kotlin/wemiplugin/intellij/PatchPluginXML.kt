@@ -1,10 +1,10 @@
 package wemiplugin.intellij
 
+import Files
+import Keys
 import org.slf4j.LoggerFactory
 import wemi.EvalScope
-import wemi.KeyDefaults
 import wemi.Value
-import wemi.generation.WemiGeneratedFolder
 import wemi.util.LocatedPath
 import wemi.util.div
 import wemiplugin.intellij.utils.Patch
@@ -52,4 +52,6 @@ val DefaultIntelliJPluginXmlPatches : Value<Iterable<Patch>> = {
 
 fun pluginXmlSinceBuildPatch(sinceBuildVersion:String):Patch = Patch("idea-version", attribute = "since-build", content = sinceBuildVersion)
 fun pluginXmlUntilBuildPatch(untilBuildVersion:String):Patch = Patch("idea-version", attribute = "until-build", content = untilBuildVersion)
+fun pluginXmlDescriptionPatch(description:Path):Patch = Patch("description", content = String(Files.readAllBytes(description), Charsets.UTF_8))
+fun pluginXmlChangeNotesPatch(changeNotes:Path):Patch = Patch("change-notes", content = String(Files.readAllBytes(changeNotes), Charsets.UTF_8))
 

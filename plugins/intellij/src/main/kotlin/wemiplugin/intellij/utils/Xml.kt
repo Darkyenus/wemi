@@ -161,7 +161,7 @@ class Patch(vararg val element:String, val attribute:String? = null, val content
 		val sb = StringBuilder()
 		sb.append("idea-plugin")
 		for (s in element) {
-			sb.append('/').append(sb)
+			sb.append('/').append(s)
 		}
 		if (attribute != null) {
 			sb.append(" \"").append(attribute).append('"')
