@@ -46,7 +46,9 @@ object IntelliJ {
 
 	val intellijPluginDependencies by key<List<IntelliJPluginDependency>>("Dependencies on another plugins", emptyList())
 	val intellijPluginRepositories by key<List<IntelliJPluginRepository>>("Repositories in which plugin dependencies can be found", listOf(IntelliJPluginsRepo))
-	val resolvedIntellijPluginDependencies by key<List<ResolvedIntelliJPluginDependency>>("Resolved dependencies on another plugins")
+	val intellijResolvedPluginDependencies by key<List<ResolvedIntelliJPluginDependency>>("Resolved dependencies on another plugins")
+	@Deprecated("Renamed", replaceWith = ReplaceWith("intellijResolvedPluginDependencies"))
+	val resolvedIntellijPluginDependencies = intellijResolvedPluginDependencies
 
 	/** See https://bintray.com/jetbrains/intellij-jbr for available versions. */
 	val intellijJbrVersion: Key<String?> by key("Explicitly set JBR version to use. null means use default for given IDE.", null as String?)
@@ -54,16 +56,27 @@ object IntelliJ {
 
 	val intellijIdeDependency by key<IntelliJIDE>("The IntelliJ Platform IDE dependency specification")
 	val intellijIdeRepository: Key<URL> by key("Repository to search for IntelliJ Platform IDE dependencies", IntelliJIDERepo)
-	val resolvedIntellijIdeDependency by key<ResolvedIntelliJIDE>("IDE dependency to use for compilation and running")
+	val intellijResolvedIdeDependency by key<ResolvedIntelliJIDE>("IDE dependency to use for compilation and running")
+	@Deprecated("Renamed", replaceWith = ReplaceWith("intellijResolvedIdeDependency"))
+	val resolvedIntellijIdeDependency = intellijResolvedIdeDependency
 
-	val instrumentCode by key("Instrument Java classes with nullability assertions and compile forms created by IntelliJ GUI Designer.", true)
+
+	val intellijInstrumentCode by key("Instrument Java classes with nullability assertions and compile forms created by IntelliJ GUI Designer.", true)
 
 	val intellijRobotServerDependency: Key<Pair<Dependency, Repository>> by key("Dependency on robot-server plugin for UI testing")
 
-	val intelliJPluginXmlFiles by key<List<LocatedPath>>("plugin.xml files that should be patched and added to classpath", emptyList())
-	val intelliJPluginXmlPatches by key<List<Patch>>("Values to change in plugin.xml. Later added values override previous patches, unless using the ADD mode.", emptyList())
+	val intellijPluginXmlFiles by key<List<LocatedPath>>("plugin.xml files that should be patched and added to classpath", emptyList())
+	@Deprecated("Renamed", replaceWith = ReplaceWith("intellijPluginXmlFiles"))
+	val intelliJPluginXmlFiles = intellijPluginXmlFiles
 
-	val preparedIntellijIdeSandbox by key<IntelliJIDESandbox>("Prepare and return a sandbox directory that can be used for running an IDE along with the developed plugin")
+	val intellijPluginXmlPatches by key<List<Patch>>("Values to change in plugin.xml. Later added values override previous patches, unless using the ADD mode.", emptyList())
+	@Deprecated("Renamed", replaceWith = ReplaceWith("intellijPluginXmlPatches"))
+	val intelliJPluginXmlPatches = intellijPluginXmlPatches
+
+	val intellijIdeSandbox by key<IntelliJIDESandbox>("Prepare and return a sandbox directory that can be used for running an IDE along with the developed plugin")
+	@Deprecated("Renamed", replaceWith = ReplaceWith("intellijIdeSandbox"))
+	val preparedIntellijIdeSandbox = intellijIdeSandbox
+
 
 	val intellijVerifyPluginStrictness by key("How strict the plugin verification should be", Strictness.ALLOW_WARNINGS)
 	val intellijPluginFolder by key<Path>("Prepare and return a directory containing the packaged plugin")
@@ -80,8 +93,6 @@ val JetBrainsAnnotationsDependency = dependency("org.jetbrains", "annotations", 
 val IntelliJPluginsRepo = IntelliJPluginRepository.Maven(Repository("intellij-plugins-repo", URL("https://cache-redirector.jetbrains.com/plugins.jetbrains.com/maven"), authoritative = true, verifyChecksums = false))
 val IntelliJThirdPartyRepo = Repository("intellij-third-party-dependencies", "https://jetbrains.bintray.com/intellij-third-party-dependencies")
 val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugin", "0.10.0", type = TypeChooseByPackaging)
-// TODO(jp): What does this do?
-const val DEFAULT_INTELLIJ_PLUGIN_SERVICE = "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service"
 
 val uiTesting by configuration("IDE UI Testing (launch the IDE in UI testing mode through ${Keys.run} key)") {}
 
@@ -99,17 +110,17 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	// Project dependencies
 	Keys.externalClasspath modify  { cp ->
 		val mcp = cp.toMutable()
-		for (path in IntelliJ.resolvedIntellijIdeDependency.get().jarFiles) {
+		for (path in IntelliJ.intellijResolvedIdeDependency.get().jarFiles) {
 			mcp.add(LocatedPath(path).scoped(ScopeProvided))
 		}
-		for (dependency in IntelliJ.resolvedIntellijPluginDependencies.get()) {
+		for (dependency in IntelliJ.intellijResolvedPluginDependencies.get()) {
 			for (it in dependency.classpath()) {
 				mcp.add(LocatedPath(it).scoped(ScopeProvided))
 			}
 		}
 		mcp
 	}
-	IntelliJ.resolvedIntellijPluginDependencies set DefaultResolvedIntellijPluginDependencies
+	IntelliJ.intellijResolvedPluginDependencies set DefaultResolvedIntellijPluginDependencies
 	// Gradle plugin does something like this, but I don't think we need it
 	//Keys.repositories addAll { IntelliJ.intellijPluginRepositories.get().mapNotNull { (it as? IntelliJPluginRepository.Maven)?.repo } }
 	// IntelliJ already contains its own Kotlin stdlib - it would be nice to detect which version is used and use that
@@ -130,14 +141,14 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	IntelliJ.intellijPublishPluginToRepository set DefaultIntellijPublishPluginToRepository
 
 	// plugin.xml
-	IntelliJ.intelliJPluginXmlPatches addAll DefaultIntelliJPluginXmlPatches
+	IntelliJ.intellijPluginXmlPatches addAll DefaultIntelliJPluginXmlPatches
 	generateResources("patched-plugin-xml-files") { generatePatchedPluginXmlFiles(it) }
 
 	// IntelliJ SDK resolution
 	/** To find exact release version, try https://confluence.jetbrains.com/display/IDEADEV/IDEA+2020.1+latest+builds and related pages. */
 	IntelliJ.intellijIdeDependency set { IntelliJIDE.External() }
-	IntelliJ.resolvedIntellijIdeDependency set ResolveIdeDependency
-	IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox() }
+	IntelliJ.intellijResolvedIdeDependency set ResolveIdeDependency
+	IntelliJ.intellijIdeSandbox set { prepareIntelliJIDESandbox() }
 	Keys.externalSources modify { es ->
 		val sources = es.toMutable()
 		sources.addAll(ResolveIdeDependencySources.invoke(this))
@@ -156,17 +167,17 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 
 	// Unit testing
 	extend(Configurations.testing) {
-		IntelliJ.preparedIntellijIdeSandbox set { prepareIntelliJIDESandbox(testSuffix = "-test") } // TODO(jp): Test tests
+		IntelliJ.intellijIdeSandbox set { prepareIntelliJIDESandbox(testSuffix = "-test") } // TODO(jp): Test tests
 
 		Keys.runSystemProperties modify {
 			val sp = it.toMutableMap()
 
-			val sandboxDir = IntelliJ.preparedIntellijIdeSandbox.get()
+			val sandboxDir = IntelliJ.intellijIdeSandbox.get()
 
 			// since 193 plugins from classpath are loaded before plugins from plugins directory
 			// to handle this, use plugin.path property as task's the very first source of plugins
 			// we cannot do this for IDEA < 193, as plugins from plugin.path can be loaded twice
-			val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
+			val ideVersion = IntelliJ.intellijResolvedIdeDependency.get().version
 			if (ideVersion.baselineVersion >= 193) {
 				sp["plugin.path"] = Files.list(sandboxDir.plugins).collect(Collectors.toList()).joinToString(File.pathSeparator+",") { p -> p.absolutePath }
 			}
@@ -202,7 +213,7 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	// If you are interested in making this work (or know how it works), feel free to get in touch.
 	IntelliJ.intellijRobotServerDependency set { RobotServerDependency to IntelliJThirdPartyRepo }
 	extend(uiTesting) {
-		IntelliJ.preparedIntellijIdeSandbox set {
+		IntelliJ.intellijIdeSandbox set {
 			val (dep, repo) = IntelliJ.intellijRobotServerDependency.get()
 			val artifacts = resolveDependencyArtifacts(listOf(dep), listOf(repo), progressListener)
 					?: throw WemiException("Failed to obtain robot-server dependency", false)

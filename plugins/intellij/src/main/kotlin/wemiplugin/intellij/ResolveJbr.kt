@@ -49,7 +49,7 @@ val DefaultJbrJavaHome: Value<JavaHome> = v@{
 		}
 		LOG.warn("Cannot resolve JBR {}. Falling back to builtin JBR.", jbrVersion)
 	}
-	val builtinJbrVersion = Utils.getBuiltinJbrVersion(IntelliJ.resolvedIntellijIdeDependency.get().homeDir)
+	val builtinJbrVersion = Utils.getBuiltinJbrVersion(IntelliJ.intellijResolvedIdeDependency.get().homeDir)
 	if (builtinJbrVersion != null) {
 		val builtinJbr = resolveJbr(builtinJbrVersion, jbrRepo, progressListener)
 		if (builtinJbr != null) {

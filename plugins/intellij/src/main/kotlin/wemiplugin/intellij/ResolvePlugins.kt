@@ -219,7 +219,7 @@ sealed class IntelliJPluginRepository {
 private val cacheDirectoryPath: Path = WemiSystemCacheFolder / "intellij-plugin-cache"
 
 val DefaultResolvedIntellijPluginDependencies : Value<List<ResolvedIntelliJPluginDependency>> = {
-	val ideaDependency = IntelliJ.resolvedIntellijIdeDependency.get()
+	val ideaDependency = IntelliJ.intellijResolvedIdeDependency.get()
 	val ideVersion = ideaDependency.version
 	val repositories = IntelliJ.intellijPluginRepositories.get()
 

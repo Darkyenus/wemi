@@ -31,7 +31,7 @@ fun EvalScope.prepareIntelliJIDESandbox(sandboxDir: Path = Keys.cacheDirectory.g
 	val pluginJar = IntelliJ.intellijPluginFolder.get()
 	pluginJar.linkOrCopyRecursively(destinationDir / pluginJar.name)
 
-	for (dependency in IntelliJ.resolvedIntellijPluginDependencies.get()) {
+	for (dependency in IntelliJ.intellijResolvedPluginDependencies.get()) {
 		if (dependency.isBuiltin) {
 			continue
 		}

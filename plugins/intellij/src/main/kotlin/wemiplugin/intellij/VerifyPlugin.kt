@@ -1,11 +1,8 @@
 package wemiplugin.intellij
 
-import com.darkyen.dave.ResponseTranslator
-import com.esotericsoftware.jsonbeans.JsonReader
 import org.apache.commons.io.FileUtils
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
-import wemi.BindingHolder
 import wemi.Configurations
 import wemi.ExtendableBindingHolder
 import wemi.WemiException
@@ -17,19 +14,15 @@ import wemi.dependency.Repository
 import wemi.dependency.resolveDependencyArtifacts
 import wemi.key
 import wemi.run.prepareJavaProcess
-import wemi.run.prepareJavaProcessCommand
 import wemi.run.runForegroundProcess
 import wemi.util.JavaHome
 import wemi.util.absolutePath
 import wemi.util.div
-import wemi.util.execute
 import wemi.util.exists
-import wemi.util.httpGet
 import wemi.util.httpGetFile
 import wemi.util.httpGetJson
 import wemi.util.withAdditionalQueryParameters
 import wemiplugin.intellij.utils.unTar
-import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -86,7 +79,7 @@ fun ExtendableBindingHolder.init() {
 		val ideDownloadDirectory = homeDir / "ides"
 
 		// Since VerifyPlugin will download the IDEs separately, we don't provide version but directly the IDE
-		val compilationIde = IntelliJ.resolvedIntellijIdeDependency.get()
+		val compilationIde = IntelliJ.intellijResolvedIdeDependency.get()
 
 		VerificationOptions(
 				verificationReportsDirectory = WemiBuildFolder / "reports/pluginVerifier",
@@ -252,7 +245,7 @@ fun resolveVerifierPath(options:VerificationOptions, activityListener: ActivityL
 		throw WemiException("Cannot resolve Plugin Verifier in offline mode. Provide pre-downloaded Plugin Verifier jar file through VerificationOptions.verifierPath. ")
 	}
 
-	val repository = Repository("intellij-plugin-service", DEFAULT_INTELLIJ_PLUGIN_SERVICE)
+	val repository = Repository("intellij-plugin-service", "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service")
 
 	// Get the IntelliJ Plugin Verifier version. If latest is requested, ask Bintray API
 	val verifierVersion = options.verifierVersion ?: run {
@@ -273,7 +266,7 @@ fun resolveVerifierPath(options:VerificationOptions, activityListener: ActivityL
 	val artifacts = resolveDependencyArtifacts(listOf(dependency), listOf(repository), activityListener)
 			?: emptyList()
 	if (artifacts.isEmpty()) {
-		throw WemiException("Failed to retrieve IntelliJ Plugin Verifier version $verifierVersion from $DEFAULT_INTELLIJ_PLUGIN_SERVICE")
+		throw WemiException("Failed to retrieve IntelliJ Plugin Verifier version $verifierVersion from $repository")
 	}
 
 	return artifacts

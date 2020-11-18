@@ -18,7 +18,7 @@ private val LOG = LoggerFactory.getLogger("PatchPluginXML")
 // See https://jetbrains.org/intellij/sdk/docs/basics/plugin_structure/plugin_configuration_file.html
 
 fun EvalScope.generatePatchedPluginXmlFiles(root: Path) {
-	val filesToPatch = IntelliJ.intelliJPluginXmlFiles.get()
+	val filesToPatch = IntelliJ.intellijPluginXmlFiles.get()
 	if (filesToPatch.isEmpty()) {
 		return
 	}
@@ -26,7 +26,7 @@ fun EvalScope.generatePatchedPluginXmlFiles(root: Path) {
 	for (unpatched in filesToPatch) {
 		val pluginXml = parseXml(unpatched.file) ?: continue
 
-		pluginXml.patchInPlace("idea-plugin", IntelliJ.intelliJPluginXmlPatches.get())
+		pluginXml.patchInPlace("idea-plugin", IntelliJ.intellijPluginXmlPatches.get())
 
 		val patchedPath = root / "META-INF" / unpatched.path
 		if (saveXml(patchedPath, pluginXml)) {
@@ -39,7 +39,7 @@ val DefaultIntelliJPluginXmlPatches : Value<Iterable<Patch>> = {
 	val namePatch = Keys.projectName.getOrElse(null)?.let { Patch("name", content = it) }
 	val idPatch = Keys.projectGroup.getOrElse(null)?.let { Patch("id", content = it) }
 	val versionPatch = Keys.projectVersion.getOrElse(null)?.let { Patch("version", content = it) }
-	val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
+	val ideVersion = IntelliJ.intellijResolvedIdeDependency.get().version
 
 	val sinceBuildPatch = pluginXmlSinceBuildPatch("${ideVersion.baselineVersion}.${ideVersion.build}")
 	// Not added automatically, because smaller/less maintained plugins are generally better without it

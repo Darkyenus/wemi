@@ -35,8 +35,8 @@ private val PREFIXES = mapOf(
 
 val DefaultModifySystemProperties : ValueModifier<Map<String, String>> = {
 	val systemProperties = it.toMutableMap()
-	val sandboxDir = IntelliJ.preparedIntellijIdeSandbox.get()
-	val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
+	val sandboxDir = IntelliJ.intellijIdeSandbox.get()
+	val ideVersion = IntelliJ.intellijResolvedIdeDependency.get().version
 
 	val configDirectory = sandboxDir.config
 	val pluginsDirectory = sandboxDir.plugins
@@ -86,13 +86,13 @@ val DefaultModifyRunOptions : ValueModifier<List<String>> = {
 	if (!runOptions.any { o -> o.startsWith("-Xms") }) {
 		runOptions.add("-Xms256m")
 	}
-	val bootJar = IntelliJ.resolvedIntellijIdeDependency.get().homeDir / "lib/boot.jar"
+	val bootJar = IntelliJ.intellijResolvedIdeDependency.get().homeDir / "lib/boot.jar"
 	if (bootJar.exists()) runOptions.add("-Xbootclasspath/a:${bootJar.absolutePath}")
 	runOptions
 }
 
 fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
-	val ideDirectory = IntelliJ.resolvedIntellijIdeDependency.get().homeDir
+	val ideDirectory = IntelliJ.intellijResolvedIdeDependency.get().homeDir
 	val javaHome = Keys.javaHome.get()
 	val executable = javaHome.javaExecutable
 	val mainClass = Keys.mainClass.get()

@@ -102,7 +102,7 @@ val DefaultIntelliJSearchableOptions : Value<Path?> = {
 	// By explicitly using withoutSearchableOptions, it kicks out withSearchableOptions configuration,
 	// which defines this, so it calls stub and not an infinite loop
 	using(withoutSearchableOptions) {
-		val ideVersion = IntelliJ.resolvedIntellijIdeDependency.get().version
+		val ideVersion = IntelliJ.intellijResolvedIdeDependency.get().version
 		if (ideVersion.baselineVersion < 191 || (ideVersion.baselineVersion == 191 && ideVersion.build < 2752)) {
 			return@using null
 		}
