@@ -255,7 +255,7 @@ operator fun FileSet?.plus(fileSet:FileSet?):FileSet? {
 /** Return receiver with given [patterns] appended. */
 fun FileSet?.appendPatterns(vararg patterns:Pattern):FileSet? {
     if (this == null || patterns.isEmpty()) return this
-    return FileSet(root, *this.patterns, *patterns, defaultExcludes = defaultExcludes, caseSensitive = defaultExcludes, next = this.next.appendPatterns(*patterns))
+    return FileSet(root, *this.patterns, *patterns, defaultExcludes = defaultExcludes, caseSensitive = caseSensitive, next = this.next.appendPatterns(*patterns))
 }
 
 /** See [filterByExtension]. */
