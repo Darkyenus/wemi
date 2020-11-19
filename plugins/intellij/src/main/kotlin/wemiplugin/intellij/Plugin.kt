@@ -60,7 +60,7 @@ object IntelliJ {
 	@Deprecated("Renamed", replaceWith = ReplaceWith("intellijResolvedIdeDependency"))
 	val resolvedIntellijIdeDependency = intellijResolvedIdeDependency
 
-
+	val intellijInstrumentationClasspath by key<List<java.nio.file.Path>>("Classpath used to spawn the instrumentation process")
 	val intellijInstrumentCode by key("Instrument Java classes with nullability assertions and compile forms created by IntelliJ GUI Designer.", true)
 
 	val intellijRobotServerDependency: Key<Pair<Dependency, Repository>> by key("Dependency on robot-server plugin for UI testing")
@@ -125,6 +125,14 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	//Keys.repositories addAll { IntelliJ.intellijPluginRepositories.get().mapNotNull { (it as? IntelliJPluginRepository.Maven)?.repo } }
 	// IntelliJ already contains its own Kotlin stdlib - it would be nice to detect which version is used and use that
 	Keys.automaticKotlinStdlib set { false }
+	IntelliJ.intellijInstrumentationClasspath set DefaultInstrumentationClasspath
+	Keys.compile modify { output ->
+		if (IntelliJ.intellijInstrumentCode.get()) {
+			instrumentClasses(output, IntelliJ.intellijInstrumentationClasspath.get())
+		} else {
+			output
+		}
+	}
 
 	// Project compilation, archival and publishing
 	IntelliJ.intellijPluginFolder set DefaultIntelliJPluginFolder

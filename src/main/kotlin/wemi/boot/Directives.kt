@@ -179,6 +179,10 @@ internal fun parseFileDirectives(source: BufferedReader, directives:Array<Class<
                     LOG.warn("{}:{} Invalid directive annotation - only named parameters are allowed after first named parameter", source, line)
                     return false
                 }
+                if (parameterIndex >= directiveConstructorValues.size) {
+                    LOG.warn("{}:{} Invalid directive annotation - too many parameters - expected parameters are: {}", source, line, directiveClassFieldNames)
+                    return false
+                }
                 directiveConstructorValues[parameterIndex++] = value
             } else {
                 parameterIndex = -1
