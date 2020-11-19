@@ -31,7 +31,8 @@ private val PREFIXES = mapOf(
 		"AI" to "AndroidStudio",
 		"GO" to "GoLand",
 		"RD" to "Rider",
-		"RS" to "Rider")
+		"RS" to "Rider",
+		"RDCPPP" to "Rider")
 
 val DefaultModifySystemProperties : ValueModifier<Map<String, String>> = {
 	val systemProperties = it.toMutableMap()
@@ -66,12 +67,6 @@ val DefaultModifySystemProperties : ValueModifier<Map<String, String>> = {
 		val prefix = PREFIXES[abbreviation]
 		if (prefix != null && prefix.isNotBlank()) {
 			systemProperties["idea.platform.prefix"] = prefix
-
-			if (abbreviation == "RD") {
-				// Allow debugging Rider's out of process ReSharper host
-				systemProperties.putIfAbsent("rider.debug.mono.debug", "true")
-				systemProperties.putIfAbsent("rider.debug.mono.allowConnect", "true")
-			}
 		}
 	}
 
