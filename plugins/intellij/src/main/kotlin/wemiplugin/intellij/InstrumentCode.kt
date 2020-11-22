@@ -25,7 +25,7 @@ import java.nio.file.Path
 private val LOG = LoggerFactory.getLogger("InstrumentCode")
 
 val intellijInstrumentNotNullAnnotations by key("Fully qualified names of NotNull annotations to instrument", listOf("org.jetbrains.annotations.NotNull"))
-val intellijInstrumentSkipClassesAnnotations by key("When adding NotNull assertions by annotation, skip classes with these annotations", listOf("kotlin/Metadata"))
+val intellijInstrumentSkipClassesAnnotations by key("When adding NotNull assertions by annotation, skip classes with these annotations", listOf("kotlin.Metadata"))
 
 fun EvalScope.instrumentClasses(compileOutput: Path, instrumentationClasspath: List<Path>):Path {
 	val notNullAnnotations = intellijInstrumentNotNullAnnotations.get()
@@ -59,7 +59,6 @@ fun EvalScope.instrumentClasses(compileOutput: Path, instrumentationClasspath: L
 	val compilationClasspath = ArrayList<Path>()
 	compilationClasspath.addAll(outputDir)
 	Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get()).mapTo(compilationClasspath) { it.classpathEntry }
-
 
 	val notNullSkipAnnotations = intellijInstrumentSkipClassesAnnotations.get()
 

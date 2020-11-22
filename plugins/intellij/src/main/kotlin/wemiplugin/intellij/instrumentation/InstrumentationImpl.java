@@ -62,7 +62,7 @@ public final class InstrumentationImpl implements Instrumentation {
 					}
 				}
 			}
-			LOG.info("Added @NotNull assertions to {} file(s)", instrumented);
+			LOG.debug("Added @NotNull assertions to {} file(s)", instrumented);
 		}
 
 		if (!generateForms(finder, formFiles, classRoot)) {
