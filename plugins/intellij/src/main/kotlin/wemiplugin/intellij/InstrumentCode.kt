@@ -37,18 +37,18 @@ fun EvalScope.instrumentClasses(compileOutput: Path, instrumentationClasspath: L
 	val javaHome = Keys.javaHome.get().home
 	val instrumentationClassName = "wemiplugin.intellij.instrumentation.InstrumentationImpl"
 
-	if (!Files.exists(javaHome.resolve("lib/jrt-fs.jar"))) {
-		LOG.warn("Non JBR Java detected, instrumentation may not work correctly");
-	}
-
 	val instrumentationClasspathURL = ArrayList<URL>()
 	instrumentationClasspath.mapTo(instrumentationClasspathURL) { it.toUri().toURL() }
-	// If java.home is JBR, add a dependency on its filesystem stuff, which may help find classes in there, but dunno. Give me back rt.jar.
+	// Does not work internally without running on a JBR, so don't bother
+	/*// If java.home is JBR, add a dependency on its filesystem stuff, which may help find classes in there, but dunno. Give me back rt.jar.
+	if (!Files.exists(javaHome.resolve("lib/jrt-fs.jar"))) {
+		LOG.warn("Non JBR Java detected, instrumentation may not work correctly")
+	}
 	javaHome.resolve("lib/jrt-fs.jar").let {
 		if (it.exists()) {
 			instrumentationClasspathURL.add(it.toUri().toURL())
 		}
-	}
+	}*/
 	val classLoader = EnclaveClassLoader(instrumentationClasspathURL.toTypedArray(), IntelliJ.javaClass.classLoader, instrumentationClassName)
 	val instrumentation = Class.forName(instrumentationClassName, true, classLoader).newInstance() as Instrumentation
 

@@ -25,13 +25,9 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLConnection;
-import java.net.URLStreamHandler;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.spi.FileSystemProvider;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -86,7 +82,8 @@ public final class InstrumentationImpl implements Instrumentation {
 			}
 		}
 
-		final String javaHomePath = javaHome.toAbsolutePath().normalize().toString();
+		// This does not work unless running on JBR, which we don't for now
+		/*final String javaHomePath = javaHome.toAbsolutePath().normalize().toString();
 		try {
 			// Copy of InstrumentationClassFinder.createJDKPlatformUrl(javaHomePath) with handler workaround
 			urls.add(new URL("jrt", null, -1, javaHomePath.replace(File.separatorChar, '/'), new URLStreamHandler() {
@@ -98,7 +95,7 @@ public final class InstrumentationImpl implements Instrumentation {
 			}));
 		} catch (Throwable e) {
 			LOG.warn("Failed to turn java home {} into URL", javaHome, e);
-		}
+		}*/
 
 		return new InstrumentationClassFinder(urls.toArray(new URL[0])) {
 
