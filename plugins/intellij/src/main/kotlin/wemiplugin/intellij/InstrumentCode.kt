@@ -19,6 +19,7 @@ import wemi.util.include
 import wemi.util.matchingFiles
 import wemi.util.name
 import wemiplugin.intellij.instrumentation.Instrumentation
+import java.net.URL
 import java.nio.file.Path
 
 private val LOG = LoggerFactory.getLogger("InstrumentCode")
@@ -33,8 +34,22 @@ fun EvalScope.instrumentClasses(compileOutput: Path, instrumentationClasspath: L
 	outputDir.ensureEmptyDirectory()
 	compileOutput.copyRecursively(outputDir)
 
+	val javaHome = Keys.javaHome.get().home
 	val instrumentationClassName = "wemiplugin.intellij.instrumentation.InstrumentationImpl"
-	val classLoader = EnclaveClassLoader(instrumentationClasspath.map { it.toUri().toURL() }.toTypedArray(), IntelliJ.javaClass.classLoader, instrumentationClassName)
+
+	if (!Files.exists(javaHome.resolve("lib/jrt-fs.jar"))) {
+		LOG.warn("Non JBR Java detected, instrumentation may not work correctly");
+	}
+
+	val instrumentationClasspathURL = ArrayList<URL>()
+	instrumentationClasspath.mapTo(instrumentationClasspathURL) { it.toUri().toURL() }
+	// If java.home is JBR, add a dependency on its filesystem stuff, which may help find classes in there, but dunno. Give me back rt.jar.
+	javaHome.resolve("lib/jrt-fs.jar").let {
+		if (it.exists()) {
+			instrumentationClasspathURL.add(it.toUri().toURL())
+		}
+	}
+	val classLoader = EnclaveClassLoader(instrumentationClasspathURL.toTypedArray(), IntelliJ.javaClass.classLoader, instrumentationClassName)
 	val instrumentation = Class.forName(instrumentationClassName, true, classLoader).newInstance() as Instrumentation
 
 	val classFiles = FileSet(outputDir, include("**.class"), caseSensitive = false).matchingFiles()
@@ -44,7 +59,7 @@ fun EvalScope.instrumentClasses(compileOutput: Path, instrumentationClasspath: L
 	val compilationClasspath = ArrayList<Path>()
 	compilationClasspath.addAll(classFiles)
 	Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get()).mapTo(compilationClasspath) { it.classpathEntry }
-	val javaHome = Keys.javaHome.get().home
+
 
 	val notNullSkipAnnotations = intellijInstrumentSkipClassesAnnotations.get()
 

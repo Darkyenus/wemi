@@ -83,10 +83,6 @@ public final class InstrumentationImpl implements Instrumentation {
 			}
 		}
 
-		if (!Files.exists(javaHome.resolve("lib/jrt-fs.jar"))) {
-			LOG.warn("Non JBR Java detected, instrumentation may not work correctly");
-		}
-
 		try {
 			urls.add(InstrumentationClassFinder.createJDKPlatformUrl(javaHome.toAbsolutePath().normalize().toString()));
 		} catch (MalformedURLException e) {
@@ -99,6 +95,7 @@ public final class InstrumentationImpl implements Instrumentation {
 
 			@Override
 			protected InputStream lookupClassAfterClasspath(String internalClassName) {
+				internalClassName += ".class";
 				LOG.debug("Manually looking up class data for {}", internalClassName);
 				return cl.getResourceAsStream(internalClassName);
 			}
