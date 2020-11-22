@@ -57,7 +57,7 @@ fun EvalScope.instrumentClasses(compileOutput: Path, instrumentationClasspath: L
 
 	// The classpath searched when instrumenting, the classpath of the plugin when running
 	val compilationClasspath = ArrayList<Path>()
-	compilationClasspath.addAll(classFiles)
+	compilationClasspath.addAll(outputDir)
 	Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get()).mapTo(compilationClasspath) { it.classpathEntry }
 
 
