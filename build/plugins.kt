@@ -69,7 +69,7 @@ val pluginIntellij by project(path("plugins/intellij")) {
             DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-stdlib-common"),
             DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk7"),
             DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk8"),
-            DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-reflect"),
+            DependencyExclusion(group = "org.jetbrains.kotlin", name = "kotlin-reflect")
     )
     libraryDependencies add { kotlinDependency("stdlib-jdk8") }
     libraryDependencies add { kotlinDependency("stdlib-jdk7") }
@@ -83,6 +83,11 @@ val pluginIntellij by project(path("plugins/intellij")) {
 
     libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
     libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
+
+    // Instrumentation dependencies
+    repositories add { Repository("idea-www.jetbrains.com_intellij-repository-releases", "https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/releases") }
+    repositories add { Repository("intellij-third-party-dependencies", "https://jetbrains.bintray.com/intellij-third-party-dependencies") }
+    libraryDependencies add { dependency("com.jetbrains.intellij.java", "java-compiler-ant-tasks", "201.8743.12", scope=ScopeProvided) }
 
     publishMetadata modify { metadata ->
         setupSharedPublishMetadata(

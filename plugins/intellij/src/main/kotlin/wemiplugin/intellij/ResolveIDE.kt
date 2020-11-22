@@ -102,7 +102,12 @@ val ResolveIdeDependencySources: Value<List<Path>> = {
 
 fun intellijIDERepository(baseRepoUrl:URL, version:String?):Repository {
 	val releaseType = Utils.releaseType(version ?: "")
-	return Repository("idea-${baseRepoUrl.host}-${baseRepoUrl.path.toSafeFileName()}-$releaseType", baseRepoUrl / releaseType)
+	val name = if (baseRepoUrl.host == "cache-redirector.jetbrains.com") {
+		"idea-${baseRepoUrl.path.removePrefix("/").toSafeFileName()}-$releaseType"
+	} else {
+		"idea-${baseRepoUrl.host}-${baseRepoUrl.path.removePrefix("/").toSafeFileName()}-$releaseType"
+	}
+	return Repository(name, baseRepoUrl / releaseType)
 }
 
 /** Resolve IDE from remote repository. */

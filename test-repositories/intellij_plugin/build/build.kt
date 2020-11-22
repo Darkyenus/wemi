@@ -1,4 +1,5 @@
-@file:BuildDependencyPlugin("wemi-plugin-intellij")
+//@file:BuildDependencyPlugin("wemi-plugin-intellij")
+@file:BuildDependency("com.darkyen.wemi", "wemi-plugin-intellij", "0.16-SNAPSHOT")
 @file:BuildDependencyRepository("jcenter", "https://jcenter.bintray.com/")
 
 import wemi.*
@@ -11,6 +12,6 @@ val testPlugin by project(Archetypes.JavaProject, IntelliJPluginLayer) {
     projectVersion set { "1.0-SNAPSHOT" }
 
     IntelliJ.intellijIdeDependency set { IntelliJIDE.External(version = "201.8743.12") }
-    IntelliJ.intelliJPluginXmlFiles add { LocatedPath(path("src/plugin.xml")) }
+    IntelliJ.intellijPluginXmlFiles add { LocatedPath(path("src/plugin.xml")) }
     IntelliJ.intellijPluginDependencies add { IntelliJPluginDependency.External("com.darkyen.darkyenustimetracker", "1.5.1") }
 }
