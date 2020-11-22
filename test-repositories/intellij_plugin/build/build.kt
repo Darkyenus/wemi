@@ -14,5 +14,4 @@ val testPlugin by project(Archetypes.JavaProject, IntelliJPluginLayer) {
     IntelliJ.intellijIdeDependency set { IntelliJIDE.External(version = "201.8743.12") }
     IntelliJ.intellijPluginXmlFiles add { LocatedPath(path("src/plugin.xml")) }
     IntelliJ.intellijPluginDependencies add { IntelliJPluginDependency.External("com.darkyen.darkyenustimetracker", "1.5.1") }
-    IntelliJ.intellijInstrumentCode set { true }
 }

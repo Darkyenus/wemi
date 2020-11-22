@@ -93,7 +93,16 @@ public final class InstrumentationImpl implements Instrumentation {
 			LOG.warn("Failed to turn java home {} into URL", javaHome, e);
 		}
 
-		return new InstrumentationClassFinder(urls.toArray(new URL[0]));
+		return new InstrumentationClassFinder(urls.toArray(new URL[0])) {
+
+			private final ClassLoader cl = getClass().getClassLoader();
+
+			@Override
+			protected InputStream lookupClassAfterClasspath(String internalClassName) {
+				LOG.debug("Manually looking up class data for {}", internalClassName);
+				return cl.getResourceAsStream(internalClassName);
+			}
+		};
 	}
 
 	private static Boolean instrumentNotNull(@NotNull InstrumentationClassFinder finder, @NotNull Path classFile, @NotNull List<String> notNullClassSkipPatterns, @NotNull String[] notNullAnnotations) {
@@ -189,6 +198,7 @@ public final class InstrumentationImpl implements Instrumentation {
 				InstrumenterClassWriter classWriter = new InstrumenterClassWriter(InstrumenterClassWriter.getAsmClassWriterFlags(version), finder);
 				AsmCodeGenerator codeGenerator = new AsmCodeGenerator(rootContainer, finder, new AntNestedFormLoader(finder.getLoader(), classRoot, formFiles), false, classWriter);
 				codeGenerator.patchFile(classFile.toFile());
+				LOG.debug("Form compilation done {} -> {}", formFile, classFile);
 
 				for (FormErrorInfo warning : codeGenerator.getWarnings()) {
 					LOG.warn("{}: {} ({})", formFile, warning.getErrorMessage(), warning.getComponentId());
