@@ -31,6 +31,7 @@ import java.net.URLConnection;
 import java.net.URLStreamHandler;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.spi.FileSystemProvider;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -87,19 +88,16 @@ public final class InstrumentationImpl implements Instrumentation {
 
 		final String javaHomePath = javaHome.toAbsolutePath().normalize().toString();
 		try {
-			urls.add(InstrumentationClassFinder.createJDKPlatformUrl(javaHomePath));
-		} catch (MalformedURLException ignored) {
-			try {
-				urls.add(new URL("jrt", null, -1, javaHomePath.replace(File.separatorChar, '/'), new URLStreamHandler() {
-					@Override
-					protected URLConnection openConnection(URL u) {
-						// Handler is here only so that Java does not throw MalformedURLException
-						throw new AssertionError("This handler is not meant to be used");
-					}
-				}));
-			} catch (Throwable e) {
-				LOG.warn("Failed to turn java home {} into URL", javaHome, e);
-			}
+			// Copy of InstrumentationClassFinder.createJDKPlatformUrl(javaHomePath) with handler workaround
+			urls.add(new URL("jrt", null, -1, javaHomePath.replace(File.separatorChar, '/'), new URLStreamHandler() {
+				@Override
+				protected URLConnection openConnection(URL u) {
+					// Handler is here only so that Java does not throw MalformedURLException
+					throw new AssertionError("This handler is not meant to be used");
+				}
+			}));
+		} catch (Throwable e) {
+			LOG.warn("Failed to turn java home {} into URL", javaHome, e);
 		}
 
 		return new InstrumentationClassFinder(urls.toArray(new URL[0])) {
