@@ -199,11 +199,24 @@ object Archetypes {
     val JUnitLayer by archetype {
         Keys.testParameters set KeyDefaults.TestParameters
         Keys.test set KeyDefaults.Test
-        Keys.libraryDependencies addAll { listOf(
-                Dependency(JUnitAPI, scope=ScopeTest),
-                Dependency(JUnitEngine, scope=ScopeTest),
-                Dependency(JUnitPlatformLauncher, scope=ScopeTest)
-        ) }
+
+        // JUnit dependencies are applied only into the testing scope,
+        // because adding it globally (even with test scope) breaks the
+        // (surprisingly common) case when these libraries are needed
+        // in normal, non-testing code as well.
+        // The libraries must also be added into the ideImport, because
+        // IDE does not (by default) look into configurations.
+        val testingDependencies = Static(listOf(
+                Dependency(JUnitAPI, scope = ScopeTest),
+                Dependency(JUnitEngine, scope = ScopeTest),
+                Dependency(JUnitPlatformLauncher, scope = ScopeTest)
+        ))
+        extend(Configurations.testing) {
+            Keys.libraryDependencies addAll testingDependencies
+        }
+        extend(Configurations.ideImport) {
+            Keys.libraryDependencies addAll testingDependencies
+        }
     }
 
     @Deprecated("Use JUnitLayer instead", ReplaceWith("Archetypes.JUnitLayer", "wemi.Archetypes"))
