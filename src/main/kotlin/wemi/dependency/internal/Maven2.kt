@@ -263,7 +263,7 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
 
     pool.shutdown()
 
-    if (LOG.isInfoEnabled) {
+    if (LOG.isDebugEnabled) {
         val stack = ArrayList<DependencyId>()
         for (root in dependencies) {
             reportCyclicDependencies(resolved, stack, root.dependencyId)
@@ -320,7 +320,7 @@ private fun reportCyclicDependencies(resolved:Map<DependencyId, RawResolvedDepen
         sb.setLength(maxOf(sb.length - arrow.length, 0))
         sb.append(' ').format(Color.Black).append('↩').format()
 
-        LOG.info("Circular dependency: {}", sb)
+        LOG.debug("Circular dependency: {}", sb)
         return
     }
 
