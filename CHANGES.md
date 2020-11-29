@@ -1,7 +1,7 @@
 # 0.16
 - In plugin for intellij plugins: Added ability to instrument classes with not-null assertions and to compile .form files
 - JUnit test dependencies are added in `testing:` again
-- Add ability to machine-readable-print more types, namely `Pair`, `DokkaOptions`, `TestReport`, `TestParameters`
+- Add ability to machine-readable-print more types, namely `Pair`, `DokkaOptions`, `TestReport`, `TestParameters` and `InfoNode`
 
 # 0.15 2020-11-16
 - Housekeeping update

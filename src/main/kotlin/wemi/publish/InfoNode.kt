@@ -1,6 +1,11 @@
 package wemi.publish
 
+import com.esotericsoftware.jsonbeans.JsonWriter
+import wemi.util.JsonWritable
 import wemi.util.appendTimes
+import wemi.util.field
+import wemi.util.fieldCollection
+import wemi.util.writeObject
 
 @Suppress("unused")
 /**
@@ -16,7 +21,7 @@ import wemi.util.appendTimes
  * }
  * ```
  */
-class InfoNode(val name:String) {
+class InfoNode(val name:String) : JsonWritable {
     var text:String? = null
     private var lazyAttributes:ArrayList<Pair<String, String>>? = null
     private var lazyChildren:ArrayList<InfoNode>? = null
@@ -220,5 +225,22 @@ class InfoNode(val name:String) {
 
     override fun toString(): String {
         return toXML().toString()
+    }
+
+    override fun JsonWriter.write() {
+        writeObject {
+            field("name", name)
+            val attributes = lazyAttributes
+            if (attributes != null && attributes.isNotEmpty()) {
+                fieldCollection("attributes", attributes)
+            }
+            if (text != null) {
+                field("text", text)
+            }
+            val children = lazyChildren
+            if (children != null && children.isNotEmpty()) {
+                fieldCollection("children", children)
+            }
+        }
     }
 }
