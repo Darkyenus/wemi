@@ -1,5 +1,10 @@
 package wemi.documentation
 
+import com.esotericsoftware.jsonbeans.JsonWriter
+import wemi.util.JsonWritable
+import wemi.util.field
+import wemi.util.fieldCollection
+import wemi.util.writeObject
 import java.nio.file.Path
 
 /**
@@ -7,7 +12,7 @@ import java.nio.file.Path
  *
  * @see wemi.Keys.archiveDokkaOptions
  */
-class DokkaOptions {
+class DokkaOptions : JsonWritable {
 
     /**
      * Roots from which sources to be documented will be taken.
@@ -18,9 +23,17 @@ class DokkaOptions {
      * @param dir directory of the source root
      * @param platforms to which this source root belongs (see [impliedPlatforms]), empty for default
      */
-    class SourceRoot(val dir: Path, val platforms:List<String> = emptyList()) {
+    class SourceRoot(val dir: Path, val platforms:List<String> = emptyList()) : JsonWritable {
+
         override fun toString(): String {
             return "$dir $platforms"
+        }
+
+        override fun JsonWriter.write() {
+            writeObject {
+                field("dir", dir)
+                fieldCollection("platforms", platforms)
+            }
         }
     }
 
@@ -42,12 +55,21 @@ class DokkaOptions {
      * @param url showing where the source code can be accessed on the web (http://github.com/me/myrepo)
      * @param urlSuffix which is used to append the line number to the URL. Use `#L` for GitHub
      */
-    class SourceLinkMapItem(val dir: Path, val url: String, val urlSuffix:String? = null) {
+    class SourceLinkMapItem(val dir: Path, val url: String, val urlSuffix:String? = null) : JsonWritable {
+
         override fun toString(): String {
             return if (urlSuffix != null) {
                 "$dir to $url (with suffix '$urlSuffix')"
             } else {
                 "$dir to $url"
+            }
+        }
+
+        override fun JsonWriter.write() {
+            writeObject {
+                field("dir", dir)
+                field("url", url)
+                field("urlSuffix", urlSuffix)
             }
         }
     }
@@ -106,9 +128,19 @@ class DokkaOptions {
             val prefix:String,
             val skipDeprecated:Boolean = false,
             val reportNotDocumented:Boolean = true,
-            val includeNonPublic:Boolean = false) {
+            val includeNonPublic:Boolean = false) : JsonWritable {
+
         override fun toString(): String {
             return "$prefix (skipDeprecated=$skipDeprecated, reportNotDocumented=$reportNotDocumented, includeNonPublic=$includeNonPublic)"
+        }
+
+        override fun JsonWriter.write() {
+            writeObject {
+                field("prefix", prefix)
+                field("skipDeprecated", skipDeprecated)
+                field("reportNotDocumented", reportNotDocumented)
+                field("includeNonPublic", includeNonPublic)
+            }
         }
     }
 
@@ -122,12 +154,20 @@ class DokkaOptions {
      * @param url Root URL of the generated documentation to link with. The trailing slash is required! (https://example.com/docs/)
      * @param packageListUrl If package-list file located in non-standard location (file:///home/user/localdocs/package-list)
      */
-    class ExternalDocumentation(val url:String, val packageListUrl:String? = null) {
+    class ExternalDocumentation(val url:String, val packageListUrl:String? = null) : JsonWritable {
+
         override fun toString(): String {
             return if (packageListUrl != null) {
                 url
             } else {
                 "$url (packageList at $packageListUrl)"
+            }
+        }
+
+        override fun JsonWriter.write() {
+            writeObject {
+                field("url", url)
+                field("packageListUrl", packageListUrl)
             }
         }
     }
@@ -177,5 +217,24 @@ class DokkaOptions {
 
     override fun toString(): String {
         return "sourceRoots=$sourceRoots\nsampleRoots=$sampleRoots\nincludes=$includes\nsourceLinks=$sourceLinks\nmoduleName='$moduleName'\noutputFormat='$outputFormat'\njdkVersion=$jdkVersion\nskipDeprecated=$skipDeprecated\nreportNotDocumented=$reportNotDocumented\nskipEmptyPackages=$skipEmptyPackages\nimpliedPlatforms=$impliedPlatforms\nperPackageOptions=$perPackageOptions\nexternalDocumentationLinks=$externalDocumentationLinks\nnoStdlibLink=$noStdlibLink"
+    }
+
+    override fun JsonWriter.write() {
+        writeObject {
+            fieldCollection("sourceRoots", sourceRoots)
+            fieldCollection("sampleRoots", sampleRoots)
+            fieldCollection("includes", includes)
+            fieldCollection("sourceLinks", sourceLinks)
+            field("moduleName", moduleName)
+            field("outputFormat", outputFormat)
+            field("jdkVersion", jdkVersion)
+            field("skipDeprecated", skipDeprecated)
+            field("reportNotDocumented", reportNotDocumented)
+            field("skipEmptyPackages", skipEmptyPackages)
+            fieldCollection("impliedPlatforms", impliedPlatforms)
+            fieldCollection("perPackageOptions", perPackageOptions)
+            fieldCollection("externalDocumentationLinks", externalDocumentationLinks)
+            field("noStdlibLink", noStdlibLink)
+        }
     }
 }
