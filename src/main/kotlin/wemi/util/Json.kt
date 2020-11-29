@@ -198,6 +198,7 @@ inline fun <M : MutableMap<K, V>, reified K, reified V> JsonValue?.fieldToMap(na
  * Converts given [JsonValue] to object of given [type].
  *
  * Not suited for [Collection]s or [Map]s, see [toCollection].
+ * [Pair]s are currently not supported.
  */
 @Suppress("UNCHECKED_CAST")
 fun <T> JsonValue?.to(type:Class<T>):T {
@@ -455,6 +456,15 @@ fun <T> JsonWriter.writeValue(value:T, type:Class<T>?) {
     if (type == null && value is Map<*, *>) {
         @Suppress("UNCHECKED_CAST")
         writeMap(null, null, value as Map<Any?, Any?>)
+        return
+    }
+
+    // Special collections
+    if (value is Pair<*, *>) {
+        writeObject {
+            name("first").writeValue(value.first, null)
+            name("second").writeValue(value.second, null)
+        }
         return
     }
 
