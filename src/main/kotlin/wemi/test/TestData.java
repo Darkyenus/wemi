@@ -1,6 +1,7 @@
 package wemi.test;
 
 import org.jetbrains.annotations.NotNull;
+import wemi.util.Json;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -13,6 +14,7 @@ import java.util.List;
  *
  * Mutable.
  */
+@Json(serializer = TestDataSerializer.class)
 public final class TestData {
 
 	/** Status of this {@link TestIdentifier}'s run */
@@ -40,6 +42,7 @@ public final class TestData {
 	@NotNull
 	public final ArrayList<ReportEntry> reports = new ArrayList<>();
 
+	@Json(serializer = ReportEntrySerializer.class)
 	public static final class ReportEntry {
 		public final long timestamp;
 		@NotNull

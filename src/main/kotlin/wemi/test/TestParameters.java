@@ -1,6 +1,7 @@
 package wemi.test;
 
 import wemi.test.forked.ForkSerialization;
+import wemi.util.Json;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -12,7 +13,9 @@ import java.util.Map;
 import java.util.logging.Level;
 
 /** Parameters for the test run, using JUnit Platform.
- * Has no dependencies - pure Java. */
+ * Has no dependencies - pure Java.
+ * (With the exception of serializer, which is not used in the forked process.) */
+@Json(serializer = TestParametersSerializer.class)
 public final class TestParameters {
 
 	/** The configuration parameters to be used. */

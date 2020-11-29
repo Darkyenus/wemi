@@ -1,6 +1,7 @@
 package wemi.test;
 
 import wemi.WithExitCode;
+import wemi.util.Json;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -12,8 +13,12 @@ import java.util.Map;
  * Returned by the test.
  *
  * In execution order contains {@link TestIdentifier}s that were run and {@link TestData} informing about their execution.
+ *
+ * Has no dependencies - pure Java.
+ * (With the exception of serializer, which is not used in the forked process.)
  */
 @SuppressWarnings("serial")
+@Json(serializer = TestReportSerializer.class)
 public final class TestReport extends LinkedHashMap<TestIdentifier, TestData> implements WithExitCode {
 
 	/** Returns {@link wemi.boot.Launch#EXIT_CODE_SUCCESS} when no tests failed, {@link wemi.boot.Launch#EXIT_CODE_TASK_FAILURE} otherwise. */

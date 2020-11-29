@@ -3,6 +3,7 @@ package wemi.test;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import wemi.test.forked.ForkSerialization;
+import wemi.util.Json;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -11,6 +12,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /** Unique, immutable, test identifier. */
+@Json(serializer = TestIdentifierSerializer.class)
 public final class TestIdentifier {
 
 	/** ID of the test, not human readable, but unique among other [TestIdentifier]s of the run */
