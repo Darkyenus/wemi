@@ -29,7 +29,7 @@ fun shellCommandExecutable(command:String): Path? {
 		val process = if (SystemInfo.isWindows) {
 			ProcessBuilder("C:\\Windows\\System32\\where.exe", command)
 		} else {
-			ProcessBuilder("command", "-v", "java")
+			ProcessBuilder("command", "-v", command)
 		}.run {
 			environment().putAll(EnvironmentUtil.getEnvironmentMap())
 			redirectError(ProcessBuilder.Redirect.PIPE)
