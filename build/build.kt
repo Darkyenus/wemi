@@ -200,7 +200,7 @@ val core: Project by project {
 
 	repositories add { Jitpack }
 
-	val JLineVersion = "3.3.0"
+	val JLineVersion = "3.18.0"
 	libraryDependencies set {
 		setOf(
 				latestKotlinDependency("stdlib"),

@@ -1,5 +1,6 @@
 package wemi.boot
 
+import org.jline.reader.CompletingParsedLine
 import org.jline.reader.ParsedLine
 import org.jline.reader.Parser
 import wemi.util.*
@@ -29,7 +30,7 @@ object TaskParser : Parser {
         return ParsedTaskLine(line, cursor)
     }
 
-    class ParsedTaskLine(val line: String, val cursor: Int) : ParsedLine {
+    class ParsedTaskLine(val line: String, val cursor: Int) : CompletingParsedLine {
         private val parsed = PartitionedLine(arrayOf(line), true, false)
 
         val words:List<String>
@@ -116,6 +117,12 @@ object TaskParser : Parser {
         override fun wordIndex(): Int = positionWord
 
         override fun line(): String = line
+
+        override fun escape(candidate: CharSequence, complete: Boolean): CharSequence = candidate
+
+        override fun rawWordCursor(): Int = wordCursor()
+
+        override fun rawWordLength(): Int = word().length
     }
 
     const val PROJECT_SEPARATOR = "/"
