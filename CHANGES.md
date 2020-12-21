@@ -1,3 +1,5 @@
+# 0.17
+
 # 0.16 2020-12-21
 - In plugin for intellij plugins: Added ability to instrument classes with not-null assertions and to compile .form files
 - JUnit test dependencies are added in `testing:` again
