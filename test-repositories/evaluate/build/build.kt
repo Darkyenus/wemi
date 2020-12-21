@@ -679,7 +679,20 @@ val dependency_resolution by project(Archetypes.JavaProject) {
 fun EvalScope.cliProgressTest():Int {
     val progressListener = progressListener ?: return -1
 
-    progressListener.beginActivity("cliTest")
+    progressListener.beginActivity("cliSerialTest")
+    run {
+        val activity = progressListener.beginParallelActivity("serial")
+        val begin = System.nanoTime()
+        for (i in 0..100) {
+            println("Thing: "+i)
+            activity?.activityDownloadProgress(i.toLong(), 100, System.nanoTime() - begin)
+            Thread.sleep(10L)
+        }
+        activity?.endActivity()
+    }
+    progressListener.endActivity()
+
+    progressListener.beginActivity("cliParallelTest")
 
     var lastThread : Thread? = null
     val threads = kotlin.Array(4) {
@@ -688,6 +701,7 @@ fun EvalScope.cliProgressTest():Int {
         lastThread = Thread({
             val begin = System.nanoTime()
             for (i in 0..100) {
+                println("Thing: "+i)
                 activity?.activityDownloadProgress(i.toLong(), 100, System.nanoTime() - begin)
                 Thread.sleep((10 * (it + 1)).toLong())
             }
@@ -711,6 +725,7 @@ fun EvalScope.cliProgressTest():Int {
 
 val cliTestProject by project(Archetypes.Base) {
     run set {
+        expiresNow()
         cliProgressTest()
     }
 }

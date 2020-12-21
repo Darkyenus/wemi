@@ -7,7 +7,6 @@ import wemi.boot.CLI
 import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiRunningInInteractiveMode
 import wemi.util.*
-import wemi.util.CliStatusDisplay.Companion.withStatus
 import java.nio.file.NoSuchFileException
 import java.util.*
 import java.util.regex.Pattern
@@ -82,7 +81,7 @@ fun <V> EvalScope.read(key: String, description: String, validator: Validator<V>
                 val previousHistory = history
                 try {
                     history = SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key))
-                    CLI.MessageDisplay.withStatus(false) {
+                    CLI.withStatus(false) {
                         readLine("${format(description, format = Format.Bold)} (${format(key, Color.White)}): ")
                     }
                 } finally {
@@ -185,7 +184,7 @@ fun <V> EvalScope.readSecret(key:String, description:String, validator:Validator
                 val previousHistory = history
                 try {
                     history = SimpleHistory(null)
-                    CLI.MessageDisplay.withStatus(false) {
+                    CLI.withStatus(false) {
                         readLine("${format(description, format = Format.Bold)} (${format(key, Color.White)}): ")
                     }
                 } finally {

@@ -2,7 +2,6 @@ package wemi.run
 
 import org.slf4j.LoggerFactory
 import wemi.boot.CLI
-import wemi.util.CliStatusDisplay.Companion.withStatus
 import wemi.util.absolutePath
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -53,7 +52,7 @@ private val LOG_STDERR = LoggerFactory.getLogger("stderr")
  */
 fun runForegroundProcess(builder:ProcessBuilder, separateOutputByNewlines:Boolean = true, controlOutput:Boolean = true, logStdOutLine:(String)->Boolean = { true }, logStdErrLine:(String)->Boolean = { true }):Int {
     // Separate process output from Wemi output
-    return CLI.MessageDisplay.withStatus(false) {
+    return CLI.withStatus(false) {
         if (separateOutputByNewlines) println()
         if (controlOutput) {
             builder.redirectError(ProcessBuilder.Redirect.PIPE)

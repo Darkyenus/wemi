@@ -1,5 +1,6 @@
 package wemi.boot
 
+import org.jline.utils.AttributedString
 import org.jline.utils.AttributedStringBuilder
 import org.jline.utils.AttributedStyle
 import wemi.ActivityListener
@@ -7,20 +8,20 @@ import wemi.Binding
 import wemi.EvaluationListener
 import wemi.Key
 import wemi.Scope
-import wemi.util.CliStatusDisplay
 import wemi.util.appendShortByteSize
 import wemi.util.appendShortTimeDuration
 import java.util.concurrent.TimeUnit
 
-private val STATUS_PREFIX = if (WemiUnicodeOutputSupported) "• " else "# "
-private val STATUS_INFIX = if (WemiUnicodeOutputSupported) " ‣ " else " > "
-private val STATUS_INFIX_PARALLEL = if (WemiUnicodeOutputSupported) " ‣‣ " else " >> "
-private val STATUS_ELLIPSIS = if (WemiUnicodeOutputSupported) "…" else "..."
 private val STATUS_META_STYLE = AttributedStyle.BOLD.foreground(AttributedStyle.GREEN)
 private val STATUS_CONTENT_STYLE = AttributedStyle.DEFAULT.underline()
 private val STATUS_CONTENT_ACTIVITY_STYLE = AttributedStyle.DEFAULT.underline().foreground(AttributedStyle.WHITE)
 private val STATUS_SIZE_STYLE = AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE)
 private val STATUS_TIME_STYLE = AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN)
+
+private val STATUS_PREFIX = AttributedString(if (WemiUnicodeOutputSupported) "• " else "# ", STATUS_META_STYLE)
+private val STATUS_INFIX = AttributedString(if (WemiUnicodeOutputSupported) " ‣ " else " > ", STATUS_META_STYLE)
+private val STATUS_INFIX_PARALLEL = AttributedString(if (WemiUnicodeOutputSupported) " ‣‣ " else " >> ", STATUS_META_STYLE)
+private val STATUS_ELLIPSIS = if (WemiUnicodeOutputSupported) "…" else "..."
 
 private class StackLevel {
 	var key = false
@@ -84,25 +85,17 @@ private class StackLevel {
 	}
 }
 
-internal class KeyEvaluationStatusListenerRenderer(private val display: CliStatusDisplay) {
-	private val messageBuilder = AttributedStringBuilder()
-	private val importantPrefix:Int
+internal class KeyEvaluationStatusListenerRenderer {
 
-	init {
-		messageBuilder.style(STATUS_META_STYLE)
-		messageBuilder.append(STATUS_PREFIX)
-		importantPrefix = messageBuilder.length
-	}
-
+	private val statusLine: CLI.StatusLine = CLI.addStatus(STATUS_PREFIX)
 	val listener = KeyEvaluationStatusListener(this, null)
 
 	fun redraw() {
 		synchronized(this) {
-			val mb = messageBuilder
-			mb.setLength(importantPrefix)
-			listener.drawListener(mb)
-
-			display.setMessage(mb.toAttributedString(), importantPrefix)
+			statusLine.modifyContent {
+				it.setLength(0)
+				listener.drawListener(it)
+			}
 		}
 	}
 }
@@ -120,7 +113,6 @@ internal class KeyEvaluationStatusListener(
 		val stackLevelCount = minOf(stackLevel, stackLevels.size)
 		for (i in 0 until stackLevelCount) {
 			if (i > 0) {
-				mb.style(STATUS_META_STYLE)
 				mb.append(STATUS_INFIX)
 			}
 			val level = stackLevels[i]
@@ -137,6 +129,7 @@ internal class KeyEvaluationStatusListener(
 			} else {
 				mb.append(text)
 			}
+			mb.style(AttributedStyle.DEFAULT)
 
 			if (i + 1 == stackLevelCount) {
 				if (level.extra.isNotEmpty()) {
@@ -147,7 +140,6 @@ internal class KeyEvaluationStatusListener(
 					assert(parallelActivities.all { it.stackLevel > 0 }) // TODO(jp): This failed at some point!!!
 					parallelActivities.firstOrNull()
 				}?.let { firstParallel ->
-					mb.style(STATUS_META_STYLE)
 					mb.append(STATUS_INFIX_PARALLEL)
 					firstParallel.drawListener(mb)
 				}

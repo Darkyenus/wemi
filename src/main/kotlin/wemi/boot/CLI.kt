@@ -8,8 +8,15 @@ import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
 import org.jline.reader.impl.DefaultParser
 import org.jline.reader.impl.LineReaderImpl
+import org.jline.terminal.Attributes
 import org.jline.terminal.Terminal
 import org.jline.terminal.TerminalBuilder
+import org.jline.utils.AttributedCharSequence
+import org.jline.utils.AttributedString
+import org.jline.utils.AttributedStringBuilder
+import org.jline.utils.InfoCmp
+import org.jline.utils.Status
+import org.jline.utils.WCWidth
 import org.slf4j.LoggerFactory
 import wemi.AllConfigurations
 import wemi.AllKeys
@@ -25,8 +32,6 @@ import wemi.Project
 import wemi.WemiException
 import wemi.WemiKotlinVersion
 import wemi.generation.WemiGeneratedFolder
-import wemi.util.CliStatusDisplay
-import wemi.util.CliStatusDisplay.Companion.withStatus
 import wemi.util.Color
 import wemi.util.Format
 import wemi.util.MatchUtils
@@ -35,12 +40,14 @@ import wemi.util.TreeBuildingKeyEvaluationListener
 import wemi.util.WithDescriptiveString
 import wemi.util.appendKeyResultLn
 import wemi.util.appendTimeDuration
+import wemi.util.appendTimes
 import wemi.util.deleteRecursively
 import wemi.util.findCaseInsensitive
 import wemi.util.format
 import wemi.util.isDirectory
 import wemi.util.name
 import java.io.IOException
+import java.io.OutputStream
 import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -54,11 +61,17 @@ object CLI {
 
     private val LOG = LoggerFactory.getLogger(javaClass)
 
-    /**
-     * Terminal used by [CLI]
-     */
+    /** Terminal used by [CLI] */
     private val terminal: Terminal by lazy {
-        val terminal = TerminalBuilder.terminal()
+        /*
+        Useful links:
+        https://www.mkssoftware.com/docs/man5/terminfo.5.asp (terminal capabilities briefly explained)
+         */
+        val terminal = TerminalBuilder.builder()
+                .jansi(true)
+                .jna(false)
+                .encoding(Charsets.UTF_8)
+                .build()
 
         // Show the main thread stack-trace on Ctrl-T
         // NOTE: SIGINFO is supported only on some Unixes, such as OSX
@@ -86,6 +99,19 @@ object CLI {
         terminal
     }
 
+    /** Synchronize on this when printing out something. */
+    private val printLock = Object()
+
+    /** Status display */
+    private val status: Status? by lazy {
+        val status = Status.getStatus(terminal)
+        status.suspend()
+        status
+    }
+
+    /** Whether the [status] is currently not suspended */
+    private var statusSuspended = true
+
     /** Call [during] and while it is executing, forward process signals to [process].
      * This is not always possible, so take this only as a hint.
      * (Currently handles only SIGINT on best effort basis, where it actually attempts to stop the process) */
@@ -110,13 +136,6 @@ object CLI {
         } finally {
             terminal.handle(Terminal.Signal.INT, previousInterrupt)
         }
-    }
-
-    internal val MessageDisplay: CliStatusDisplay? by lazy {
-        if (WemiColorOutputSupported) {
-            // If terminal doesn't support color, it probably doesn't support ANSI codes
-            CliStatusDisplay(terminal)
-        } else null
     }
 
     /** Line reader used when awaiting tasks. */
@@ -181,7 +200,22 @@ object CLI {
             defaultProject = shouldBeDefault
         }
 
-        MessageDisplay?.let { System.setOut(PrintStream(it, true)) }
+        // TODO(jp): Is this necessary?
+        System.setOut(PrintStream(object : OutputStream() {
+            val parent = System.out
+
+            override fun write(b: Int) {
+                synchronized(printLock) {
+                    parent.write(b)
+                }
+            }
+
+            override fun write(b: ByteArray, off: Int, len: Int) {
+                synchronized(printLock) {
+                    parent.write(b, off, len)
+                }
+            }
+        }))
     }
 
     /**
@@ -259,7 +293,9 @@ object CLI {
         }
     }
 
-    private val KeyEvaluationStatusListener = MessageDisplay?.let { KeyEvaluationStatusListenerRenderer(it).listener }
+    private val KeyEvaluationStatusListener:EvaluationListener ? by lazy {
+        status?.let { KeyEvaluationStatusListenerRenderer().listener }
+    }
 
     /**
      * Evaluates the key or command and prints human readable, formatted output.
@@ -274,7 +310,7 @@ object CLI {
         }
 
         val beginTime = System.currentTimeMillis()
-        val keyEvaluationResult = MessageDisplay.withStatus(true) {
+        val keyEvaluationResult = withStatus(true) {
             task.evaluateKey(defaultProject, KeyEvaluationStatusListener + listener)
         }
         val (key, data, status) = keyEvaluationResult
@@ -731,4 +767,180 @@ object CLI {
     internal val ICON_SKIPPED = icon("↷", "SKIP", Color.Magenta)
     internal val ICON_SEE_ABOVE = icon("↑", "SEE ABOVE", Color.Magenta)//⤴ seems to be clipped in some contexts
     internal val ICON_ABORTED = icon("■", "ABORT", Color.Yellow)
+
+    //region Status
+
+    private var originalAttributes: Attributes? = null
+    //private var prevResizeHandler: Terminal.SignalHandler? = null // TODO(jp): Handled internally for JLine Status
+
+    /** Enable or disable status display and return what was the previous state */
+    @PublishedApi
+    internal fun setStatusEnabled(newState:Boolean):Boolean {
+        synchronized(printLock) {
+            val currentlyEnabled = !this.statusSuspended
+            if (currentlyEnabled == newState) {
+                return newState
+            }
+            val status = status
+            if (newState) {
+                this.statusSuspended = false
+                if (statusLinesDirty) {
+                    statusLinesDirty = false
+                    doRedrawStatus()
+                }
+
+                /*prevResizeHandler = terminal.handle(Terminal.Signal.WINCH) {
+                    synchronized(printLock) {
+                        status?.resize()
+                        doRedrawStatus()
+                    }
+                }*/
+                originalAttributes = terminal.enterRawMode()// TODO(jp): Needed?
+                terminal.puts(InfoCmp.Capability.cursor_invisible)
+                status?.restore()
+            } else {
+                this.statusSuspended = true
+                status?.suspend()
+
+                /*if (prevResizeHandler != null) {
+                    terminal.handle(Terminal.Signal.WINCH, prevResizeHandler)
+                }*/
+                terminal.puts(InfoCmp.Capability.cursor_normal)
+                terminal.attributes = originalAttributes
+            }
+            return currentlyEnabled
+        }
+    }
+
+    private fun doRedrawStatus() {
+        val status = status ?: return
+        val statusLines = statusLines
+        if (statusLines.isEmpty()) {
+            status.update(emptyList())
+            return
+        }
+
+        val strings = ArrayList<AttributedString>(statusLines.size)
+        val width = terminal.width - 3 // Just in case, some unicode characters are reported with incorrect size
+
+        val ellipsis = '…'
+        val ellipsisWidth = WCWidth.wcwidth(ellipsis.toInt())
+
+        val builder = AttributedStringBuilder()
+        for (line in statusLines) {
+            val contentLength = line.content.columnLength()
+            if (contentLength <= 0) {
+                // There is no content in here
+                continue
+            }
+
+            val prefixLength = line.prefix.columnLength()
+            val suffixLength = line.suffix.columnLength()
+            val messageLength = prefixLength + suffixLength + contentLength
+
+            if (messageLength <= width) {
+                // Everything fits
+                builder.append(line.prefix)
+                builder.append(line.content)
+                if (suffixLength > 0) {
+                    val remaining = width - messageLength - 1
+                    builder.appendTimes(' ', remaining)
+                    builder.append(line.suffix)
+                }
+            } else if (prefixLength + 5 + ellipsisWidth < width) {
+                // Prefix and some content fits
+                var remaining = width - ellipsisWidth
+                if (remaining > 0) {
+                    builder.append(line.prefix, 0, line.prefix.lengthForColumnWidth(0, remaining))
+                    remaining -= line.prefix.columnLength()
+                }
+                if (remaining > 0) {
+                    builder.append(line.content, 0, line.content.lengthForColumnWidth(0, remaining))
+                    remaining -= line.content.columnLength()
+                }
+                if (remaining > 0) {
+                    builder.append(line.suffix, 0, line.suffix.lengthForColumnWidth(0, remaining))
+                }
+                builder.append(ellipsis)
+            } else {
+                // Do not bother, there is not enough space
+                continue
+            }
+
+            strings.add(builder.toAttributedString())
+            builder.setLength(0)
+        }
+        status.update(strings)
+    }
+
+    fun refreshStatus() {
+        synchronized(printLock) {
+            if (this.statusSuspended) {
+                this.statusLinesDirty = true
+            } else {
+                doRedrawStatus()
+            }
+        }
+    }
+
+    private val statusLines = ArrayList<StatusLine>()
+    private var statusLinesDirty = false
+
+    /** Add a new status line. Call [StatusLine.modifyContent] right after this returns. */
+    fun addStatus(prefix:AttributedCharSequence = AttributedString.EMPTY, suffix:AttributedCharSequence = AttributedString.EMPTY):StatusLine {
+        val status = StatusLine(prefix, suffix)
+        synchronized(printLock) {
+            statusLines.add(status)
+        }
+        return status
+    }
+
+    /** Do the [action] with status [enabled]. */
+    inline fun <T> withStatus(enabled:Boolean, action:()->T):T {
+        val enabledBefore = setStatusEnabled(enabled)
+        try {
+            return action()
+        } finally {
+            setStatusEnabled(enabledBefore)
+        }
+    }
+
+    class StatusLine internal constructor(
+            /** Prefix that is always visible, aligned to the left and does not change. */
+            internal val prefix:AttributedCharSequence,
+            /** Suffix, aligned to the right and does not change. */
+            internal val suffix:AttributedCharSequence) {
+
+        @PublishedApi
+        internal val content = AttributedStringBuilder()
+
+        inline fun modifyContent(modify:(content:AttributedStringBuilder) -> Unit) {
+            modify(content)
+            refreshStatus()
+        }
+
+        /** Call to remove from display. The [StatusLine] does not do anything functional after that. */
+        fun remove() {
+            synchronized(printLock) {
+                statusLines.remove(this)
+            }
+            refreshStatus()
+        }
+    }
+
+    private fun AttributedCharSequence.lengthForColumnWidth(begin:Int, columnWidth:Int):Int {
+        var index = begin
+        var width = 0
+        while (index < this.length) {
+            val cp = codePointAt(index)
+            val w = if (isHidden(index)) 0 else WCWidth.wcwidth(cp)
+            if (width + w > columnWidth) {
+                break
+            }
+            index += Character.charCount(cp)
+            width += w
+        }
+        return index - begin
+    }
+    //endregion
 }
