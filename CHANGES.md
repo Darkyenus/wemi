@@ -1,7 +1,8 @@
-# 0.16
+# 0.16 2020-12-21
 - In plugin for intellij plugins: Added ability to instrument classes with not-null assertions and to compile .form files
 - JUnit test dependencies are added in `testing:` again
 - Add ability to machine-readable-print more types, namely `Pair`, `DokkaOptions`, `TestReport`, `TestParameters` and `InfoNode`
+- Update JLine to 3.18.0, this should help with color codes on Windows
 
 # 0.15 2020-11-16
 - Housekeeping update
