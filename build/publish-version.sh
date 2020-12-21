@@ -18,6 +18,7 @@ if [ "$1" = "--skipTest" ]; then
 fi
 
 # Build the archive files in Wemi
+./wemi clean || fail "wemi (clean)"
 wemi_dist_dir=$(./wemi --machine-readable-output=shell "$task") || fail "wemi (archive)"
 
 # Build IDE plugins

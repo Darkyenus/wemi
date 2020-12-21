@@ -5,6 +5,7 @@
 - JUnit test dependencies are added in `testing:` again
 - Add ability to machine-readable-print more types, namely `Pair`, `DokkaOptions`, `TestReport`, `TestParameters` and `InfoNode`
 - Update JLine to 3.18.0, this should help with color codes on Windows
+- Force hotfix: SimpleHistory did not implement some new methods from JLine
 
 # 0.15 2020-11-16
 - Housekeeping update

@@ -5,7 +5,9 @@ import org.jline.reader.LineReader
 import org.slf4j.LoggerFactory
 import wemi.boot.WemiCacheFolder
 import java.nio.file.Files
+import java.nio.file.OpenOption
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.time.Instant
 
 /**
@@ -28,31 +30,61 @@ internal class SimpleHistory(private val path: Path?) : History {
     }
 
     override fun load() {
-        if (path == null || !Files.exists(path)) {
+        read(path, false)
+    }
+
+    override fun read(file: Path?, incremental: Boolean) {
+        if (file == null || !Files.exists(file)) {
             return
         }
         val lines = try {
-            Files.readAllLines(path, Charsets.UTF_8)
+            Files.readAllLines(file, Charsets.UTF_8)
         } catch (e: Exception) {
             LOG.warn("Failed to load from path {}", path, e)
             return
         }
-        clear()
-        items.addAll(lines)
-        changed = false
-        index = size()
+        if (incremental) {
+            for (line in lines) {
+                add(line)
+            }
+        } else {
+            clear()
+            items.addAll(lines)
+            changed = false
+            index = size()
+        }
     }
 
+
     override fun save() {
-        if (!changed || path == null) {
-            return
+        if (save(path, force = false, incremental = false, append = false)) {
+            changed = false
+        }
+    }
+
+    override fun write(file: Path?, incremental: Boolean) {
+        save(file, true, incremental, false)
+    }
+
+    override fun append(file: Path?, incremental: Boolean) {
+        save(file, true, incremental, true)
+    }
+
+    private fun save(file:Path?, force:Boolean, incremental:Boolean, append:Boolean):Boolean {
+        if ((!changed && !force) || (!changed && incremental) || file == null) {
+            return false
         }
 
         try {
-            if (items.isEmpty()) {
-                Files.deleteIfExists(path)
+            if (items.isEmpty() && !force) {
+                Files.deleteIfExists(file)
             } else {
-                Files.newBufferedWriter(path, Charsets.UTF_8).use { writer ->
+                val openOptions:Array<OpenOption> =
+                        if (append)
+                            arrayOf(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)
+                        else
+                            arrayOf(StandardOpenOption.CREATE, StandardOpenOption.WRITE)
+                Files.newBufferedWriter(file, Charsets.UTF_8, *openOptions).use { writer ->
                     for (line in items) {
                         writer.write(line)
                         writer.append('\n')
@@ -60,11 +92,11 @@ internal class SimpleHistory(private val path: Path?) : History {
                 }
             }
         } catch (e: Exception) {
-            LOG.warn("Failed to write to path {}", path, e)
-            return
+            LOG.warn("Failed to write to path {}", file, e)
+            return false
         }
 
-        changed = false
+        return true
     }
 
     private fun clear() {
@@ -233,6 +265,10 @@ internal class SimpleHistory(private val path: Path?) : History {
         return true
     }
 
+    override fun resetIndex() {
+        index = if (index > items.size) items.size else index
+    }
+
     override fun toString(): String {
         val sb = StringBuilder()
         for (e in this) {
@@ -310,7 +346,7 @@ internal class SimpleHistory(private val path: Path?) : History {
          *
          * @param inputKey or null if free input
          */
-        internal fun inputHistoryName(inputKey:String?):String {
+        internal fun inputHistoryName(inputKey: String?):String {
             return if (inputKey == null) {
                 "input"
             } else {
