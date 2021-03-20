@@ -2,7 +2,7 @@ package com.darkyen.wemi.intellij.ui
 
 import com.darkyen.wemi.intellij.util.MAX_JAVA_VERSION_FOR_WEMI_HINT
 import com.darkyen.wemi.intellij.util.MIN_JAVA_VERSION_FOR_WEMI
-import com.darkyen.wemi.intellij.util.SDK_TYPE_FOR_WEMI
+import com.darkyen.wemi.intellij.util.getJavaExecutable
 import com.darkyen.wemi.intellij.util.getWemiCompatibleSdkList
 import com.darkyen.wemi.intellij.util.shellCommandExecutable
 import com.esotericsoftware.tablelayout.BaseTableLayout
@@ -52,7 +52,6 @@ import java.awt.Graphics
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.io.IOException
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.regex.Pattern
@@ -406,7 +405,7 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 			2 -> panel2JavaFromSdk.selectedJdk?.let { sdk ->
 				javaFromSdk(sdk)?.toString()
 			}
-			3 -> findExistingFileFromAlternatives(Paths.get(panel3JavaCustom.text), "java", "java.exe", "bin/java", "bin/java.exe")?.toString()
+			3 -> getJavaExecutable(panel3JavaCustom.text)?.toString()
 			else -> null
 		} ?: ""
 		set(value) {
@@ -459,18 +458,8 @@ class WemiJavaExecutableEditor(property:KMutableProperty0<String>) : AbstractPro
 		return resultPath
 	}
 
-	private fun findExistingFileFromAlternatives(base:Path, vararg alternatives:String): Path? {
-		for (s in alternatives) {
-			val f = base.resolve(s)
-			if (Files.exists(f)) {
-				return f.toAbsolutePath()
-			}
-		}
-		return null
-	}
-
 	private fun javaFromSdk(sdk: Sdk):Path? {
-		return findExistingFileFromAlternatives(Paths.get(SDK_TYPE_FOR_WEMI.getBinPath(sdk)), "java", "java.exe")
+		return getJavaExecutable(sdk)
 	}
 }
 
