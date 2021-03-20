@@ -33,14 +33,33 @@ fun prepareJavaProcessCommand(javaExecutable: Path, classpath: Collection<Path>,
  * @param mainClass to launch
  * @param javaOptions additional raw options for JVM
  * @param args for the launched program
+ * @param environment variables for the created process, or null to use default
  */
-fun prepareJavaProcess(javaExecutable: Path, workingDirectory: Path, classpath: Collection<Path>,
-                       mainClass: String, javaOptions: Collection<String>, args: Collection<String>): ProcessBuilder {
+fun prepareJavaProcess(javaExecutable: Path, workingDirectory: Path,
+                       classpath: Collection<Path>, mainClass: String, javaOptions: Collection<String>,
+                       args: Collection<String>,
+                       environment:Map<String, String>? = null): ProcessBuilder {
     val command = prepareJavaProcessCommand(javaExecutable, classpath, mainClass, javaOptions, args)
     LOG.debug("Prepared command {} in {}", command, workingDirectory)
-    return ProcessBuilder(command)
+    val builder = ProcessBuilder(command)
             .directory(workingDirectory.toFile())
             .inheritIO()
+    if (environment != null) {
+        val env = builder.environment()
+        try {
+            env.clear()
+        } catch (e:Exception) {
+            LOG.warn("Failed to clear the default process environment", e)
+        }
+        for ((key, value) in environment) {
+            try {
+                env[key] = value
+            } catch (e:Exception) {
+                LOG.warn("Failed to set environment variable '{}'='{}'", key, value, e)
+            }
+        }
+    }
+    return builder
 }
 
 private val LOG_STDOUT = LoggerFactory.getLogger("stdout")

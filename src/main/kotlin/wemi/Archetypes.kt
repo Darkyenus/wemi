@@ -67,6 +67,7 @@ object Archetypes {
         Keys.compilerOptions set { CompilerFlags() }
 
         Keys.runDirectory set { Keys.projectRoot.get() }
+        Keys.runEnvironment set { System.getenv() }
 
         Keys.archive set KeyDefaults.Archive
         Keys.archiveSources set KeyDefaults.ArchiveSources

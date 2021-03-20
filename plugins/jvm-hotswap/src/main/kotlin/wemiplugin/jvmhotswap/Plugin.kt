@@ -69,9 +69,10 @@ object JvmHotswap {
                 options.add("-javaagent:${agentJar.absolutePath}=$port")
 
                 val arguments = Keys.runArguments.get()
+                val environment = Keys.runEnvironment.get()
 
                 val processBuilder = wemi.run.prepareJavaProcess(javaExecutable, directory, classpathEntries,
-                        mainClass, options, arguments)
+                        mainClass, options, arguments, environment)
 
                 // Start server
                 try {

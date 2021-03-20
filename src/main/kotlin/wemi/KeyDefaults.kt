@@ -516,8 +516,10 @@ object KeyDefaults {
             return 0
         }
 
+        val environment = Keys.runEnvironment.get()
+
         return runForegroundProcess(prepareJavaProcess(
-                javaExecutable, directory, classpathEntries, mainClass, options, arguments), controlOutput = false)
+                javaExecutable, directory, classpathEntries, mainClass, options, arguments, environment), controlOutput = false)
     }
 
     val Run: Value<Int> = {
@@ -548,6 +550,7 @@ object KeyDefaults {
             val javaExecutable = Keys.javaHome.get().javaExecutable
             val directory = Keys.runDirectory.get()
             val options = Keys.runOptions.get()
+            val environment = Keys.runEnvironment.get()
 
             // Testing classpath indeed contains all of these
             // (It is needed for example when there are two dependencies, one with provided scope, another with test scope.
@@ -563,7 +566,7 @@ object KeyDefaults {
 
             val processBuilder = prepareJavaProcess(
                     javaExecutable, directory, classpathEntries,
-                    TEST_LAUNCHER_MAIN_CLASS.name, options, emptyList())
+                    TEST_LAUNCHER_MAIN_CLASS.name, options, emptyList(), environment)
 
             val testParameters = Keys.testParameters.get(*input) // Input passthrough
 

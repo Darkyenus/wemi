@@ -91,6 +91,7 @@ fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
 	val javaHome = Keys.javaHome.get()
 	val executable = javaHome.javaExecutable
 	val mainClass = Keys.mainClass.get()
+	val environment = Keys.runEnvironment.get()
 
 	val classpath = ArrayList<Path>()
 	// Apparently the IDE needs to have the tools.jar on classpath
@@ -110,7 +111,7 @@ fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
 
 	val processBuilder = wemi.run.prepareJavaProcess(
 			executable, ideDirectory / "bin", classpath,
-			mainClass, Keys.runOptions.get(), extraArguments)
+			mainClass, Keys.runOptions.get(), extraArguments, environment)
 
 	return runForegroundProcess(processBuilder)
 }

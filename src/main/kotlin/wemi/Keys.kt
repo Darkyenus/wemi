@@ -84,6 +84,7 @@ object Keys {
     val runOptions by key<List<String>>("Options given to 'java' when running the project", defaultValue = emptyList())
     val runSystemProperties by key<Map<String, String>>("System properties given to 'java' when running the project", defaultValue = emptyMap())
     val runArguments by key<List<String>>("Options given to the application when running the project", defaultValue = emptyList())
+    val runEnvironment by key<Map<String, String>>("Environment variables used when running the project", defaultValue = emptyMap())
     val run by key<Int>("Compile and run the project, return exit code", inputKeys = arrayOf("dry" to "Only print the command to run the program, instead of running it (bool)"))
     val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code", inputKeys = arrayOf("main" to "Main class to run"))
 
