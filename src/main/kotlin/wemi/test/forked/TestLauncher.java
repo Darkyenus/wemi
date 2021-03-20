@@ -36,7 +36,7 @@ import java.util.logging.Logger;
  *
  * Reads WHOLE stdin as [TestParameters] json.
  * Program stdout is redirected to stderr, which is also where errors are printed.
- * Whole [TestReport] json is printed into stdout.
+ * Whole [TestReport] is printed into stdout.
  */
 public final class TestLauncher {
 

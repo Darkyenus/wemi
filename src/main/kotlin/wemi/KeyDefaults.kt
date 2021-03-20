@@ -46,6 +46,7 @@ import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
+import wemi.test.withPrefixContainer
 import wemi.util.CycleChecker
 import wemi.util.EnclaveClassLoader
 import wemi.util.LineReadingWriter
@@ -576,11 +577,12 @@ object KeyDefaults {
 
     val TestOfAggregateProject: Value<TestReport> = {
         val resultReport = TestReport()
+        var orderId = 0
         inProjectDependencies { dep ->
             if (dep.scope == ScopeAggregate) {
                 val report = Keys.test.getOrElse(null)
                 if (report != null) {
-                    resultReport.putAll(report)
+                    resultReport.putAll(report.withPrefixContainer("%3d-%s".format(orderId++, dep.project.name), dep.project.name))
                 }
             }
         }

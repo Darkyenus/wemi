@@ -372,3 +372,27 @@ private fun StringBuilder.appendReport(amount:Int, noun:String, action:String, z
     appendTimes(' ', initialLength + reportWidth - 1 - length)
         .append(']').append('\n')
 }
+
+/** Returns a new [TestReport], in which [this] whole report is under a new container with [prefixId] prefixed into IDs.
+ * The container name is [containerDisplayName]. This is useful when combining reports to prevent conflicts. */
+fun TestReport.withPrefixContainer(prefixId:String, containerDisplayName:String):TestReport {
+    if (this.isEmpty()) {
+        return this
+    }
+
+    val prefixedReport = TestReport()
+    for ((id, data) in this) {
+        val prefixedId = TestIdentifier(
+            prefixId+"/"+id.id,
+            if (id.parentId.isEmpty()) prefixId else prefixId+"/"+id.parentId,
+            id.displayName, id.isTest, id.isContainer, id.tags, id.testSource)
+        prefixedReport[prefixedId] = data
+    }
+
+    val containerId = TestIdentifier(prefixId, null, containerDisplayName, false, true, emptySet(), null)
+    val containerData = TestData()
+    containerData.status = if (prefixedReport.values.any { it.status == FAILED }) FAILED else SUCCESSFUL
+    prefixedReport[containerId] = containerData
+
+    return prefixedReport
+}

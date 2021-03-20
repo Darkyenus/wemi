@@ -17,7 +17,6 @@ import java.util.Map;
  * Has no dependencies - pure Java.
  * (With the exception of serializer, which is not used in the forked process.)
  */
-@SuppressWarnings("serial")
 @Json(serializer = TestReportSerializer.class)
 public final class TestReport extends LinkedHashMap<TestIdentifier, TestData> implements WithExitCode {
 
