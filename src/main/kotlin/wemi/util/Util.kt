@@ -508,9 +508,9 @@ fun <T> printTree(roots: Collection<TreeNode<T>>, result: StringBuilder = String
 
         if (rootIndex == 0) {
             if (rootsSize == 1) {
-                result.append(if (wemi.boot.WemiUnicodeOutputSupported) "═ " else "= ")
+                result.append(if (wemi.boot.WemiUnicodeOutputSupported) "╘ " else "= ")
             } else {
-                result.append(if (wemi.boot.WemiUnicodeOutputSupported) "╤ " else "|=")
+                result.append(if (wemi.boot.WemiUnicodeOutputSupported) "╞ " else "|=")
             }
         } else if (rootIndex + 1 == rootsSize) {
             result.append(if (wemi.boot.WemiUnicodeOutputSupported) "╘ " else "\\=")
