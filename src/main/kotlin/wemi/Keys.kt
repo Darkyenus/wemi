@@ -13,6 +13,8 @@ import wemi.documentation.DokkaOptions
 import wemi.publish.ArtifactEntry
 import wemi.publish.InfoNode
 import wemi.run.EnvVarMachineReadableFormatter
+import wemi.run.EscapedStringListShellFormatter
+import wemi.run.ExitCode
 import wemi.run.ProcessBuilderMachineReadableFormatter
 import wemi.run.ProcessBuilderPrettyPrinter
 import wemi.test.TestParameters
@@ -84,12 +86,12 @@ object Keys {
 
     val mainClass by key<String>("Main class of the project")
     val runDirectory by key<Path>("Initial working directory of the project launched by 'run'")
-    val runOptions by key<List<String>>("Options given to 'java' when running the project", defaultValue = emptyList())
+    val runOptions by key<List<String>>("Options given to 'java' when running the project", defaultValue = emptyList(), machineReadableFormatter = EscapedStringListShellFormatter)
     val runSystemProperties by key<Map<String, String>>("System properties given to 'java' when running the project", defaultValue = emptyMap())
-    val runArguments by key<List<String>>("Options given to the application when running the project", defaultValue = emptyList())
+    val runArguments by key<List<String>>("Options given to the application when running the project", defaultValue = emptyList(), machineReadableFormatter = EscapedStringListShellFormatter)
     val runEnvironment by key<Map<String, String>>("Environment variables used when running the project", defaultValue = emptyMap(), machineReadableFormatter = EnvVarMachineReadableFormatter)
     val runProcess by key<ProcessBuilder>("Prepared process for running", prettyPrinter = ProcessBuilderPrettyPrinter, machineReadableFormatter = ProcessBuilderMachineReadableFormatter)
-    val run by key<Int>("Compile and run the project, return exit code")
+    val run by key<ExitCode>("Compile and run the project, return exit code")
 
     val testParameters by key<TestParameters>("Parameters for the test key. By default, discovers all tests in the test sources", inputKeys = arrayOf("class" to "Include classes, whose fully classified name match this regex"))
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it, _ -> it.prettyPrint() })

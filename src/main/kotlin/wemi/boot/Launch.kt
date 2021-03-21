@@ -212,7 +212,7 @@ fun main(args: Array<String>) {
                     exitProcess(EXIT_CODE_ARGUMENT_ERROR)
                 }
             },
-            Option(Option.NO_SHORT_NAME, "machine-readable-output", "create machine readable output, disables implicit interactivity", null, "true|json|shell|false") { arg, _ ->
+            Option('m', "machine-readable-output", "create machine readable output, disables implicit interactivity", null, "true|json|shell|false") { arg, _ ->
                 when (arg?.toLowerCase() ?: "true") {
                     "true", "json" -> machineReadableOutput = MachineReadableOutputFormat.JSON
                     "shell" -> machineReadableOutput = MachineReadableOutputFormat.SHELL
@@ -401,8 +401,10 @@ fun main(args: Array<String>) {
         parsedArgs.machineReadableCheckErrors()
 
         val out = machineOutput!!
+        val format = machineReadableOutput!!
+        var withExitCode:WithExitCode? = null
         for (task in parsedArgs.tasks) {
-            machineReadableEvaluateAndPrint(out, task, machineReadableOutput!!)
+            withExitCode = machineReadableEvaluateAndPrint(out, task, format)
         }
 
         if (interactive) {
@@ -414,9 +416,11 @@ fun main(args: Array<String>) {
                 parsed.machineReadableCheckErrors()
 
                 for (task in parsed.tasks) {
-                    machineReadableEvaluateAndPrint(out, task, machineReadableOutput!!)
+                    machineReadableEvaluateAndPrint(out, task, format)
                 }
             }
+        } else if (withExitCode != null) {
+            exitCode = withExitCode.processExitCode()
         }
     } else {
         CLI.init(WemiRootFolder)

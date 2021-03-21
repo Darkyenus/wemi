@@ -39,6 +39,7 @@ import wemi.dependency.resolveDependencyArtifacts
 import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
+import wemi.run.ExitCode
 import wemi.run.prepareJavaProcess
 import wemi.run.prepareJavaProcessCommand
 import wemi.run.runForegroundProcess
@@ -513,9 +514,9 @@ object KeyDefaults {
         prepareJavaProcess(javaExecutable, directory, classpathEntries, main, options, arguments, environment)
     }
 
-    val Run: Value<Int> = {
+    val Run: Value<ExitCode> = {
         expiresNow()
-        runForegroundProcess(Keys.runProcess.get(), controlOutput = false)
+        ExitCode(runForegroundProcess(Keys.runProcess.get(), controlOutput = false))
     }
 
     val TestParameters: Value<TestParameters> = {

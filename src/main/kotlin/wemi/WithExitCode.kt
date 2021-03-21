@@ -9,7 +9,7 @@ package wemi
  * Conditions for the [processExitCode] to be used:
  * 1. Task must be run non-interactively, supplied as process argument
  * 2. Task (that is, its key evaluation) must be the last task in the passed task list
- * 3. Wemi must be running in standard, i.e. not machine readable mode
+ * 3. Wemi must be running in standard, i.e. not machine readable mode, or in shell-format machine readable mode
  */
 interface WithExitCode {
     /**

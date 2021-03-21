@@ -1,6 +1,10 @@
 # 0.17
 - Add `runEnvironment` key to control environment variables
 - Remove `runMain` and `run` dry parameter, add `runProcess` instead
+- Improve machine readable output ergonomics
+    - Option now also has a short name
+    - SHELL format now supports propagating exit code
+    - `run` task returns `ExitCode` object implementing `WithExitCode`
 
 # 0.16 2020-12-21
 - In plugin for intellij plugins: Added ability to instrument classes with not-null assertions and to compile .form files

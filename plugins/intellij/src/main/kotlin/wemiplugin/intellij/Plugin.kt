@@ -23,6 +23,7 @@ import wemi.dependency.resolveDependencyArtifacts
 import wemi.generation.generateResources
 import wemi.key
 import wemi.readSecret
+import wemi.run.ExitCode
 import wemi.test.JUnit4Engine
 import wemi.util.LocatedPath
 import wemi.util.absolutePath
@@ -170,7 +171,7 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	Keys.mainClass set { "com.intellij.idea.Main" }
 	Keys.run set {
 		expiresNow()
-		runIde()
+		ExitCode(runIde())
 	}
 
 	// Unit testing

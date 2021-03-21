@@ -8,6 +8,7 @@ import wemi.AllConfigurations
 import wemi.AllKeys
 import wemi.AllProjects
 import wemi.WemiException
+import wemi.WithExitCode
 import wemi.util.JsonWritable
 import wemi.util.field
 import wemi.util.writeArray
@@ -25,9 +26,11 @@ import kotlin.system.exitProcess
 private val LOG = LoggerFactory.getLogger("MachineReadableOutput")
 
 enum class MachineReadableOutputFormat {
-    /** Standard Json output. Can easily output most of the object types. */
+    /** Standard Json output. Can easily output most of the object types.
+     * Json value from each invocation is ended with a single NUL character. */
     JSON,
-    /** Custom formatting for easier shell integration. May not correctly handle all value types. */
+    /** Custom formatting for easier shell integration. May not correctly handle all value types.
+     * Printed values should end with newlines. */
     SHELL
 }
 
@@ -49,25 +52,25 @@ fun newMachineReadableJsonPrinter(out:Writer): JsonWriter {
  *
  * May exit process if the task evaluation fails.
  */
-fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task, format:MachineReadableOutputFormat) {
+internal fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task, format:MachineReadableOutputFormat): WithExitCode? {
     LOG.info("> {}", task)
     if (task.isMachineReadableCommand) {
         when (task.key) {
             "version" -> {
                 machineReadablePrint(out, WemiVersion, format)
-                return
+                return null
             }
             "projects" -> {
                 machineReadablePrint(out, AllProjects.values, format)
-                return
+                return null
             }
             "configurations" -> {
                 machineReadablePrint(out, AllConfigurations.values, format)
-                return
+                return null
             }
             "keys" -> {
                 machineReadablePrint(out, AllKeys.values, format)
-                return
+                return null
             }
             "keysWithDescription" -> {
                 machineReadablePrint(out, object : JsonWritable {
@@ -82,17 +85,17 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task, format:Machine
                         }
                     }
                 }, format)
-                return
+                return null
             }
             "defaultProject" -> {
                 machineReadablePrint(out, findDefaultProject(Paths.get("."))?.name, format)
-                return
+                return null
             }
         }
 
         if (task.isMachineReadableOptional) {
             machineReadablePrint(out, null, format)
-            return
+            return null
         }
 
         LOG.error("Can't evaluate {} - unknown command", task)
@@ -105,6 +108,7 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task, format:Machine
             TaskEvaluationStatus.Success -> {
                 @Suppress("UNCHECKED_CAST")
                 machineReadablePrint(out, data, format, key?.machineReadableFormatter as? MachineReadableFormatter<Any?>)
+                return data as? WithExitCode
             }
             TaskEvaluationStatus.NoProject -> {
                 val projectString = data as String?
@@ -152,11 +156,34 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task, format:Machine
         LOG.error("Can't evaluate {} - fatal exception", task, e)
         exitProcess(EXIT_CODE_MACHINE_OUTPUT_THROWN_EXCEPTION_ERROR)
     }
+    return null
+}
+
+internal fun Writer.writeShellEscaped(value:String, oneLine:Boolean) {
+    val safeWithoutQuotes = value.all { it !in "|&;<>()\$`\\\"' \t\n*?[#˜=%" }
+    if (safeWithoutQuotes) {
+        write(value)
+    } else {
+        append('\'')
+        for (c in value) {
+            if ((c < ' ' && c != '\t' && c != '\u000B'/*VT*/) || c == '\u007F') {
+                if (c != '\n' || oneLine) {
+                    throw WemiException("Value contains dangerous character: \\u%04x".format(c.toInt()))
+                }
+            }
+            if (c == '\'') {
+                write("'\"'\"'")
+            } else {
+                append(c)
+            }
+        }
+        append('\'')
+    }
 }
 
 private fun Writer.shellPrint(thing:Any?, printStack:ArrayList<Any>) {
     if (thing == null) {
-        write("\n")
+        append('\n')
     } else if (thing.javaClass.isArray) {
         if (printStack.contains(thing)) {
             write("<self-reference>\n")
@@ -164,22 +191,18 @@ private fun Writer.shellPrint(thing:Any?, printStack:ArrayList<Any>) {
             printStack.add(thing)
             for (i in 0 until Array.getLength(thing)) {
                 shellPrint(Array.get(thing, i), printStack)
-                write("\n")
+                append('\n')
             }
             printStack.removeAt(printStack.lastIndex)
         }
     } else if (thing is CharSequence || thing is Number) {
-        write(thing.toString())
-        write("\n")
+        append(thing.toString()).append('\n')
     } else if (thing is Path) {
-        write(thing.toAbsolutePath().toString())
-        write("\n")
+        append(thing.toAbsolutePath().toString()).append('\n')
     } else if (thing is File) {
-        write(thing.absolutePath)
-        write("\n")
+        append(thing.absolutePath).append('\n')
     } else if (thing is Enum<*>) {
-        write(thing.name)
-        write("\n")
+        append(thing.name).append('\n')
     } else if (thing is Map<*, *>) {
         if (printStack.contains(thing)) {
             write("<self-reference>\n")
@@ -206,7 +229,7 @@ private fun Writer.shellPrint(thing:Any?, printStack:ArrayList<Any>) {
         jsonWriter.setOutputType(OutputType.minimal)
         jsonWriter.setQuoteLongValues(false)
         jsonWriter.writeValue(thing, null)
-        write("\n")
+        append('\n')
     }
 }
 

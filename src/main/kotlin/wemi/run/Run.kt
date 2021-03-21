@@ -2,11 +2,12 @@ package wemi.run
 
 import org.slf4j.LoggerFactory
 import wemi.PrettyPrinter
-import wemi.WemiException
+import wemi.WithExitCode
 import wemi.boot.CLI
 import wemi.boot.MachineReadableFormatter
 import wemi.boot.MachineReadableOutputFormat
 import wemi.boot.newMachineReadableJsonPrinter
+import wemi.boot.writeShellEscaped
 import wemi.util.CliStatusDisplay.Companion.withStatus
 import wemi.util.Color
 import wemi.util.absolutePath
@@ -119,6 +120,28 @@ fun runForegroundProcess(builder:ProcessBuilder, separateOutputByNewlines:Boolea
     }
 }
 
+/** Wrapper for exit code integer that implements [WithExitCode]. */
+class ExitCode(val value:Int): WithExitCode {
+    override fun processExitCode(): Int = value
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ExitCode) return false
+
+        if (value != other.value) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return value
+    }
+
+    override fun toString(): String {
+        return value.toString()
+    }
+}
+
 internal val ProcessBuilderPrettyPrinter:PrettyPrinter<ProcessBuilder> = { pb: ProcessBuilder, _: Int ->
     val sb = StringBuilder()
     sb.format(Color.Blue).append((pb.directory() ?: File(".")).normalize().path).append('\n')
@@ -158,24 +181,19 @@ private fun isSafeEnvironmentVariable(name:String):Boolean {
     return true
 }
 
-private fun Writer.appendShellEscaped(value:String) {
-    val safeWithoutQuotes = value.all { it !in "|&;<>()\$`\\\"' \t\n*?[#˜=%" }
-    if (safeWithoutQuotes) {
-        write(value)
-    } else {
-        append('\'')
-        for (c in value) {
-            if ((c < ' ' && c != '\t' && c != '\u000B'/*VT*/) || c == '\u007F') {
-                throw WemiException("Value contains dangerous character: \\u%04x".format(c.toInt()))
-            }
-            if (c == '\'') {
-                write("'\"'\"'")
-            } else {
-                append(c)
-            }
-        }
-        append('\'')
+internal val EscapedStringListShellFormatter:MachineReadableFormatter<List<String>> = formatter@{ format: MachineReadableOutputFormat, list:List<String>, out:Writer ->
+    if (format != MachineReadableOutputFormat.SHELL) {
+        return@formatter false
     }
+
+    if (list.isNotEmpty()) {
+        out.writeShellEscaped(list[0], true)
+        for (i in 1 until list.size) {
+            out.append(' ').writeShellEscaped(list[i], true)
+        }
+    }
+
+    true
 }
 
 internal val EnvVarMachineReadableFormatter:MachineReadableFormatter<Map<String, String>> = { format: MachineReadableOutputFormat, processEnv: Map<String, String>, out: Writer ->
@@ -197,7 +215,7 @@ internal val EnvVarMachineReadableFormatter:MachineReadableFormatter<Map<String,
                 if (isSafeEnvironmentVariable(key)) {
                     out.write(key)
                     out.append('=')
-                    out.appendShellEscaped(value)
+                    out.writeShellEscaped(value, true)
                     out.append(' ')
                 } else {
                     LOG.warn("Omitting environment variable '{}={}' from output, because its name is suspicious", key, value)
@@ -222,16 +240,7 @@ internal val ProcessBuilderMachineReadableFormatter:MachineReadableFormatter<Pro
         MachineReadableOutputFormat.SHELL -> {
             // Directory and environment is ignored because it is not straightforward to actually use in a shell
             // You can call runEnvironment and runDirectory if you want this information anyway
-            var first = true
-            for (s in pb.command() ?: emptyList()) {
-                if (first) {
-                    first = false
-                } else {
-                    out.append(' ')
-                }
-                out.appendShellEscaped(s)
-            }
-            true
+            EscapedStringListShellFormatter(MachineReadableOutputFormat.SHELL, pb.command() ?: emptyList(), out)
         }
     }
 }
