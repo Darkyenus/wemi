@@ -1,15 +1,13 @@
-@file:Suppress("NOTHING_TO_INLINE", "unused")
+@file:Suppress("NOTHING_TO_INLINE", "unused", "CHANGING_ARGUMENTS_EXECUTION_ORDER_FOR_NAMED_VARARGS")
 
 import wemi.Archetypes.DefaultArchetypes
 import wemi.boot.Task
 import wemi.boot.WemiRootFolder
 import wemi.boot.autoRunTasks
 import wemi.dependency.Classifier
-import wemi.dependency.DEFAULT_OPTIONAL
-import wemi.dependency.DEFAULT_SCOPE
-import wemi.dependency.DEFAULT_SNAPSHOT_VERSION
-import wemi.dependency.DEFAULT_TYPE
 import wemi.dependency.NoClassifier
+import wemi.dependency.ScopeCompile
+import wemi.dependency.TypeJar
 import java.net.URL
 import wemi.kotlinDependency as _kotlinDependency
 import wemi.test.JUnitAPI as _JUnitAPI
@@ -45,8 +43,11 @@ val WemiVersion
     get() = wemi.boot.WemiVersion
 
 // Core Functions
-inline fun project(vararg archetypes: Archetype = DefaultArchetypes, noinline initializer: Project.() -> Unit) = wemi.project(path("."), archetypes = *archetypes, initializer = initializer)
-inline fun project(projectRoot: Path? = path("."), vararg archetypes: Archetype = DefaultArchetypes, noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, *archetypes, initializer = initializer)
+inline fun project(vararg archetypes: Archetype = DefaultArchetypes, noinline initializer: Project.() -> Unit) =
+	wemi.project(path("."), archetypes = *archetypes, initializer = initializer)
+
+inline fun project(projectRoot: Path? = path("."), vararg archetypes: Archetype = DefaultArchetypes,
+                   noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, *archetypes, initializer = initializer)
 
 // Helper functions
 inline fun EvalScope.kotlinDependency(name: String) = _kotlinDependency(name)
@@ -65,18 +66,18 @@ val ScopeTest
     inline get() = wemi.dependency.ScopeTest
 
 fun dependency(group: String, name: String, version: String,
-               classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:wemi.dependency.DepScope = DEFAULT_SCOPE,
-               optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION,
-               exclusions:List<DependencyExclusion> = emptyList(),
-               dependencyManagement:List<Dependency> = emptyList()): Dependency =
-        wemi.dependency(group, name, version, classifier, type, scope, optional, snapshotVersion, exclusions, dependencyManagement)
+               classifier: Classifier = NoClassifier, type: String = TypeJar, scope: wemi.dependency.DepScope = ScopeCompile,
+               optional: Boolean = false, snapshotVersion: String = "",
+               exclusions: List<DependencyExclusion> = emptyList(),
+               dependencyManagement: List<Dependency> = emptyList()): Dependency =
+    wemi.dependency(group, name, version, classifier, type, scope, optional, snapshotVersion, exclusions, dependencyManagement)
 
 fun dependency(groupNameVersionClassifierType: String,
-               scope:wemi.dependency.DepScope = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL,
-               exclusions:List<DependencyExclusion> = emptyList(),
-               snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION,
-               dependencyManagement:List<Dependency> = emptyList()): Dependency =
-        wemi.dependency(groupNameVersionClassifierType, scope, optional, exclusions, snapshotVersion, dependencyManagement)
+               scope: wemi.dependency.DepScope = ScopeCompile, optional: Boolean = false,
+               exclusions: List<DependencyExclusion> = emptyList(),
+               snapshotVersion: String = "",
+               dependencyManagement: List<Dependency> = emptyList()): Dependency =
+    wemi.dependency(groupNameVersionClassifierType, scope, optional, exclusions, snapshotVersion, dependencyManagement)
 
 // Path helpers
 /**

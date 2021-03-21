@@ -2,7 +2,7 @@ package wemi.util
 
 import com.darkyen.tproll.util.PrettyPrinter
 import com.esotericsoftware.jsonbeans.JsonWriter
-import wemi.dependency.DEFAULT_SCOPE
+import wemi.dependency.ScopeCompile
 
 /**
  * A [LocatedPath] that is a part of classpath and carries a (Maven) scope information when that is.
@@ -12,7 +12,7 @@ import wemi.dependency.DEFAULT_SCOPE
  * @see wemi.dependency.ScopeProvided
  * @see wemi.dependency.ScopeTest
  */
-class ScopedLocatedPath(val value:LocatedPath, val scope:String = DEFAULT_SCOPE) : WithDescriptiveString, JsonWritable {
+class ScopedLocatedPath(val value: LocatedPath, val scope: String = ScopeCompile) : WithDescriptiveString, JsonWritable {
 	operator fun component1():LocatedPath = value
 	operator fun component2():String = scope
 
@@ -30,14 +30,14 @@ class ScopedLocatedPath(val value:LocatedPath, val scope:String = DEFAULT_SCOPE)
 		sb.format(Color.Blue)
 		PrettyPrinter.append(sb, value)
 		sb.format()
-		if (scope != DEFAULT_SCOPE) {
+		if (scope != ScopeCompile) {
 			sb.format(Color.White).append(" $").format(Color.Black).append(scope).format()
 		}
 		return sb.toString()
 	}
 
 	override fun toString(): String {
-		if (scope == DEFAULT_SCOPE) {
+		if (scope == ScopeCompile) {
 			return value.toString()
 		} else {
 			return "$value $$scope"
@@ -62,6 +62,6 @@ class ScopedLocatedPath(val value:LocatedPath, val scope:String = DEFAULT_SCOPE)
 }
 
 /** Give [this] a Maven [scope]. */
-fun LocatedPath.scoped(scope:String = DEFAULT_SCOPE): ScopedLocatedPath {
+fun LocatedPath.scoped(scope: String = ScopeCompile): ScopedLocatedPath {
 	return ScopedLocatedPath(this, scope)
 }

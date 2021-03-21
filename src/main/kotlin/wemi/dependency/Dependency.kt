@@ -56,11 +56,8 @@ const val ScopeAggregate: DepScope = "aggregate"
 
 /** A special [DependencyId.type] value that lets Wemi choose the appropriate type by the packaging indicated in POM. */
 const val TypeChooseByPackaging:String = ""
-
-internal const val DEFAULT_TYPE:String = "jar"
-internal const val DEFAULT_SCOPE:DepScope = ScopeCompile
-internal const val DEFAULT_OPTIONAL:Boolean = false
-internal const val DEFAULT_SNAPSHOT_VERSION:String = ""
+/** Default dependency type: a jar file. */
+const val TypeJar:String = "jar"
 
 /**
  * Unique identifier for project/module to be resolved.
@@ -68,32 +65,33 @@ internal const val DEFAULT_SNAPSHOT_VERSION:String = ""
  */
 @Json(DependencyId.Serializer::class)
 class DependencyId constructor(
-        /** group of the dependency (aka organisation, aka groupId) */
-        val group: String,
-        /** name of the dependency (aka artifactId) */
-        val name: String,
-        /** version of the project (aka revision) */
-        version: String,
-        /**
-         * Various variants of the same dependency.
-         * Examples: jdk15, sources, javadoc, linux
-         * @see SourcesClassifier
-         * @see JavadocClassifier
-         */
-        classifier: Classifier = NoClassifier,
-        /**
-         * Corresponds to the packaging of the dependency (and overrides it).
-         * Determines what sort of artifact is retrieved.
-         * See https://maven.apache.org/ref/3.6.0/maven-core/artifact-handlers.html
-         *
-         * Examples: jar (default), pom (returns pom.xml, used internally)
-         */
-        type: String = DEFAULT_TYPE,
-        /** When [isSnapshot] and repository uses unique snapshots, `SNAPSHOT` in the [version]
-         * is replaced by this string for the last resolution pass. Resolver (Wemi) will automatically
-         * replace it with the newest snapshot version (in format: `timestamp-buildNumber`),
-         * but if you need a specific snapshot version, it can be set here. */
-        snapshotVersion: String = DEFAULT_SNAPSHOT_VERSION) {
+    /** group of the dependency (aka organisation, aka groupId) */
+    val group: String,
+    /** name of the dependency (aka artifactId) */
+    val name: String,
+    /** version of the project (aka revision) */
+    version: String,
+    /**
+     * Various variants of the same dependency.
+     * Examples: jdk15, sources, javadoc, linux
+     * @see SourcesClassifier
+     * @see JavadocClassifier
+     */
+    classifier: Classifier = NoClassifier,
+    /**
+     * Corresponds to the packaging of the dependency (and overrides it).
+     * Determines what sort of artifact is retrieved.
+     * See https://maven.apache.org/ref/3.6.0/maven-core/artifact-handlers.html
+     *
+     * Examples: jar (default), pom (returns pom.xml, used internally)
+     */
+    type: String = TypeJar,
+    /** When [isSnapshot] and repository uses unique snapshots, `SNAPSHOT` in the [version]
+     * is replaced by this string for the last resolution pass. Resolver (Wemi) will automatically
+     * replace it with the newest snapshot version (in format: `timestamp-buildNumber`),
+     * but if you need a specific snapshot version, it can be set here. */
+    snapshotVersion: String = ""
+) {
 
     val version = run {
         val trimVersion = version.trim()
@@ -122,14 +120,14 @@ class DependencyId constructor(
         val result = StringBuilder()
         result.append(group).append(':').append(name).append(':').append(version)
 
-        if (isSnapshot && snapshotVersion != DEFAULT_SNAPSHOT_VERSION) {
+        if (isSnapshot && snapshotVersion.isNotEmpty()) {
             result.setLength(maxOf(result.length - "SNAPSHOT".length, 0))
             result.append('(').append(snapshotVersion).append(')')
         }
         if (classifier != NoClassifier) {
             result.append(":").append(classifier)
         }
-        if (type != DEFAULT_TYPE) {
+        if (type != TypeJar) {
             result.append("@").append(type)
         }
         return result.toString()
@@ -172,10 +170,10 @@ class DependencyId constructor(
                 if (value.classifier != NoClassifier) {
                     field("classifier", value.classifier)
                 }
-                if (value.type != DEFAULT_TYPE) {
+                if (value.type != TypeJar) {
                     field("type", value.type)
                 }
-                if (value.snapshotVersion != DEFAULT_SNAPSHOT_VERSION) {
+                if (value.snapshotVersion.isNotEmpty()) {
                     field("snapshotVersion", value.snapshotVersion)
                 }
             }
@@ -188,8 +186,8 @@ class DependencyId constructor(
                     value.field("version"),
 
                     value.field("classifier", NoClassifier),
-                    value.field("type", DEFAULT_TYPE),
-                    value.field("snapshotVersion", DEFAULT_SNAPSHOT_VERSION)
+                    value.field("type", TypeJar),
+                    value.field("snapshotVersion", "")
             )
         }
     }
@@ -249,18 +247,19 @@ class DependencyExclusion(val group: String? = null, val name: String? = null, v
  *
  * @param exclusions to filter transitive dependencies with */
 @Json(Dependency.Serializer::class)
-class Dependency(val dependencyId: DependencyId,
-                 scope: DepScope = DEFAULT_SCOPE,
-                 /** Optional transitive dependencies are skipped by default by Wemi.
-                  * See https://maven.apache.org/guides/introduction/introduction-to-optional-and-excludes-dependencies.html */
-                 val optional: Boolean = DEFAULT_OPTIONAL,
-                 /** Filtering applied to transitive dependencies to exclude some. */
-                 val exclusions: List<DependencyExclusion> = emptyList(),
-                 /** When transitive dependencies match any of these through "{groupId, artifactId, type, classifier}",
-                  * they will be replaced with info in here.
-                  *
-                  * See https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management */
-                 val dependencyManagement: List<Dependency> = emptyList()
+class Dependency(
+    val dependencyId: DependencyId,
+    scope: DepScope = ScopeCompile,
+    /** Optional transitive dependencies are skipped by default by Wemi.
+     * See https://maven.apache.org/guides/introduction/introduction-to-optional-and-excludes-dependencies.html */
+    val optional: Boolean = false,
+    /** Filtering applied to transitive dependencies to exclude some. */
+    val exclusions: List<DependencyExclusion> = emptyList(),
+    /** When transitive dependencies match any of these through "{groupId, artifactId, type, classifier}",
+     * they will be replaced with info in here.
+     *
+     * See https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Management */
+    val dependencyManagement: List<Dependency> = emptyList()
 ) {
 
     fun copy(dependencyId: DependencyId = this.dependencyId,
@@ -283,7 +282,7 @@ class Dependency(val dependencyId: DependencyId,
         val result = StringBuilder()
         result.append(dependencyId)
 
-        if (scope != DEFAULT_SCOPE) {
+        if (scope != ScopeCompile) {
             result.append(" scope:").append(scope)
         }
         if (optional) {
@@ -303,10 +302,10 @@ class Dependency(val dependencyId: DependencyId,
         override fun JsonWriter.write(value: Dependency) {
             writeObject {
                 field("id", value.dependencyId)
-                if (value.scope != DEFAULT_SCOPE) {
+                if (value.scope != ScopeCompile) {
                     field("scope", value.scope)
                 }
-                if (value.optional != DEFAULT_OPTIONAL) {
+                if (value.optional) {
                     field("optional", value.optional)
                 }
                 if (value.exclusions.isNotEmpty()) {
@@ -320,8 +319,8 @@ class Dependency(val dependencyId: DependencyId,
 
         override fun read(value: JsonValue): Dependency {
             val id = value.field<DependencyId>("id")
-            val scope = value.field("scope", DEFAULT_SCOPE)
-            val optional = value.field("optional", DEFAULT_OPTIONAL)
+            val scope = value.field("scope", ScopeCompile)
+            val optional = value.field("optional", false)
             val exclusions:List<DependencyExclusion> = value.fieldToCollection("exclusions", ArrayList())
             val dependencyManagement:List<Dependency> = value.fieldToCollection("dependencyManagement", ArrayList())
             return Dependency(id, scope, optional, exclusions, dependencyManagement)
@@ -420,7 +419,7 @@ class ResolvedDependency private constructor(
     override fun JsonWriter.write() {
         writeObject {
             field("id", id)
-            if (scope != DEFAULT_SCOPE) {
+            if (scope != ScopeCompile) {
                 field("scope", scope)
             }
             fieldCollection("dependencies", dependencies)

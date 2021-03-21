@@ -3,7 +3,11 @@ package wemi.dependency
 import com.esotericsoftware.jsonbeans.JsonWriter
 import wemi.Configuration
 import wemi.Project
-import wemi.util.*
+import wemi.util.JsonWritable
+import wemi.util.field
+import wemi.util.writeArray
+import wemi.util.writeObject
+import wemi.util.writeValue
 
 /**
  * Defines a dependency on a [project] defined in the same build script.
@@ -15,11 +19,11 @@ import wemi.util.*
  * Aggregated project's internal classpath will end up in this projects archive, as if it was on its internal classpath.
  * Non-aggregate projects behave like normal libraries, archived separately.
  */
-class ProjectDependency(val project: Project, vararg val configurations: Configuration, val scope:DepScope = DEFAULT_SCOPE)
+class ProjectDependency(val project: Project, vararg val configurations: Configuration, val scope:DepScope = ScopeCompile)
     : JsonWritable {
 
     @Deprecated("Use ScopeAggregate instead")
-    constructor(project: Project, aggregate:Boolean, vararg configurations: Configuration, scope:DepScope = DEFAULT_SCOPE) : this(project, *configurations, scope = if (aggregate) ScopeAggregate else scope)
+    constructor(project: Project, aggregate:Boolean, vararg configurations: Configuration, scope:DepScope = ScopeCompile) : this(project, *configurations, scope = if (aggregate) ScopeAggregate else scope)
 
     override fun JsonWriter.write() {
         writeObject {

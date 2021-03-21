@@ -14,16 +14,14 @@ import wemi.dependency.ArtifactPath
 import wemi.dependency.CHECKSUMS
 import wemi.dependency.Classifier
 import wemi.dependency.CompatibleSortedRepositories
-import wemi.dependency.DEFAULT_OPTIONAL
-import wemi.dependency.DEFAULT_SCOPE
-import wemi.dependency.DEFAULT_SNAPSHOT_VERSION
-import wemi.dependency.DEFAULT_TYPE
+import wemi.dependency.TypeJar
 import wemi.dependency.Dependency
 import wemi.dependency.DependencyExclusion
 import wemi.dependency.DependencyId
 import wemi.dependency.NoClassifier
 import wemi.dependency.Repository
 import wemi.dependency.ResolvedDependency
+import wemi.dependency.ScopeCompile
 import wemi.dependency.SortedRepositories
 import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.internal.PomBuildingXMLHandler.Companion.SupportedModelVersion
@@ -350,7 +348,7 @@ private val PACKAGING_TO_EXTENSION_MAPPING:Map<String, String> = mapOf(
         "maven-plugin" to "jar",
         "ejb" to "jar",
         "ear" to "jar"
-        // probably more, I don't have experience with this enterprise shtuff
+        // probably more, I don't have experience with this enterprise stuff
 )
 
 /** Same as [ResolvedDependency], but without some fields which are filled in later, such as [ResolvedDependency.scope]. */
@@ -417,7 +415,7 @@ private fun resolveInM2Repository(
 
         val extension = if (resolvedDependencyId.type == TypeChooseByPackaging) {
             if (pom.packaging.isBlank()) {
-                DEFAULT_TYPE
+                TypeJar
             } else {
                 PACKAGING_TO_EXTENSION_MAPPING.getOrDefault(pom.packaging, pom.packaging)
             }
@@ -671,7 +669,7 @@ private fun publishLocked(repository: Repository, metadata: InfoNode, artifacts:
 
     val snapshot = version.endsWith("-SNAPSHOT")
 
-    val pomPath = path / pomPath(groupId, artifactId, version, DEFAULT_SNAPSHOT_VERSION)
+    val pomPath = path / pomPath(groupId, artifactId, version, "")
     LOG.debug("Publishing metadata to {}", pomPath)
     checkValidForPublish(pomPath, snapshot)
     Files.createDirectories(pomPath.parent)
@@ -697,7 +695,7 @@ private fun publishLocked(repository: Repository, metadata: InfoNode, artifacts:
 
 
     for ((artifact, classifier) in artifacts) {
-        val publishedArtifact = path / artifactPath(groupId, artifactId, version, classifier, artifact.name.pathExtension(), DEFAULT_SNAPSHOT_VERSION)
+        val publishedArtifact = path / artifactPath(groupId, artifactId, version, classifier, artifact.name.pathExtension(), "")
         LOG.debug("Publishing {} to {}", artifact, publishedArtifact)
         checkValidForPublish(publishedArtifact, snapshot)
 
@@ -803,7 +801,7 @@ private fun resolveDependencyManagement(
                 //  that "provided" scope should get some special treatment, but I couldn't find any other source for that claim.
                 if (dependency.scope.isNullOrBlank()) {
                     if (standIn.scope.isBlank()) {
-                        DEFAULT_SCOPE
+                        ScopeCompile
                     } else {
                         standIn.scope
                     }
@@ -1069,10 +1067,10 @@ private class RawPom(
                             version ?: "",
                             classifier,
                             type,
-                            DEFAULT_SNAPSHOT_VERSION
+                            ""
                     ),
                     scope?.trim()?.toLowerCase() ?: "",
-                    optional ?: DEFAULT_OPTIONAL,
+                    optional ?: false,
                     exclusions)
         }
 
@@ -1105,10 +1103,10 @@ private class RawPom(
                             version,
                             classifier,
                             type,
-                            DEFAULT_SNAPSHOT_VERSION
+                            ""
                     ),
-                    scope ?: DEFAULT_SCOPE,
-                    optional ?: DEFAULT_OPTIONAL,
+                    scope ?: ScopeCompile,
+                    optional ?: false,
                     exclusions,
                     dependencyManagement), complete)
         }
@@ -1124,7 +1122,7 @@ private class RawPom(
                 name?.translate(warn),
                 version?.translate(warn),
                 classifier?.translate(warn)?.toLowerCase().let { if (it == null || it.isEmpty()) NoClassifier else it },
-                type?.translate(warn)?.toLowerCase().let { if (it == null || it.isEmpty()) DEFAULT_TYPE else it },
+                type?.translate(warn)?.toLowerCase().let { if (it == null || it.isEmpty()) TypeJar else it },
                 scope?.translate(warn)?.toLowerCase(),
                 optional?.translate(warn)?.toLowerCase()?.equals("true", ignoreCase = true),
                 exclusions.map { exclusion ->

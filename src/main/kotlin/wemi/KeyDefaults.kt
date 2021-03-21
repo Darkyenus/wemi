@@ -19,9 +19,7 @@ import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.KotlinSourceFileExtensions
 import wemi.compile.internal.createJavaObjectFileDiagnosticLogger
-import wemi.dependency.DEFAULT_OPTIONAL
-import wemi.dependency.DEFAULT_SCOPE
-import wemi.dependency.DEFAULT_TYPE
+import wemi.dependency.TypeJar
 import wemi.dependency.Dependency
 import wemi.dependency.DependencyId
 import wemi.dependency.JCenter
@@ -41,7 +39,6 @@ import wemi.documentation.DokkaOptions
 import wemi.publish.InfoNode
 import wemi.run.ExitCode
 import wemi.run.prepareJavaProcess
-import wemi.run.prepareJavaProcessCommand
 import wemi.run.runForegroundProcess
 import wemi.test.TEST_LAUNCHER_MAIN_CLASS
 import wemi.test.TestParameters
@@ -65,7 +62,6 @@ import wemi.util.exists
 import wemi.util.format
 import wemi.util.isDirectory
 import wemi.util.javadocUrl
-import wemi.util.jdkToolsJar
 import wemi.util.name
 import wemi.util.parseJavaVersion
 import wemi.util.pathExtension
@@ -995,16 +991,16 @@ object KeyDefaults {
                         newChild("groupId", dependency.dependencyId.group)
                         newChild("artifactId", dependency.dependencyId.name)
                         newChild("version", dependency.dependencyId.version)
-                        if (dependency.dependencyId.type != DEFAULT_TYPE) {
+                        if (dependency.dependencyId.type != TypeJar) {
                             newChild("type", dependency.dependencyId.type)
                         }
                         if (dependency.dependencyId.classifier != NoClassifier) {
                             newChild("classifier", dependency.dependencyId.classifier)
                         }
-                        if (dependency.scope != DEFAULT_SCOPE) {
+                        if (dependency.scope != ScopeCompile) {
                             newChild("scope", dependency.scope)
                         }
-                        if (dependency.optional != DEFAULT_OPTIONAL) {
+                        if (dependency.optional) {
                             newChild("optional", dependency.optional.toString())
                         }
                         newChild("exclusions") {

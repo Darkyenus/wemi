@@ -3,14 +3,12 @@ package wemi
 import wemi.boot.MachineReadableFormatter
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.Classifier
-import wemi.dependency.DEFAULT_OPTIONAL
-import wemi.dependency.DEFAULT_SCOPE
-import wemi.dependency.DEFAULT_SNAPSHOT_VERSION
-import wemi.dependency.DEFAULT_TYPE
+import wemi.dependency.TypeJar
 import wemi.dependency.Dependency
 import wemi.dependency.DependencyExclusion
 import wemi.dependency.DependencyId
 import wemi.dependency.NoClassifier
+import wemi.dependency.ScopeCompile
 import java.nio.file.Path
 import java.util.regex.Pattern
 import kotlin.reflect.KProperty0
@@ -150,12 +148,20 @@ fun KProperty0<Archetype>.inject(injectedInitializer:Archetype.() -> Unit) {
 }
 
 /** Convenience Dependency creator. */
-fun dependency(group: String, name: String, version: String,
-               classifier:Classifier = NoClassifier, type:String = DEFAULT_TYPE, scope:wemi.dependency.DepScope = DEFAULT_SCOPE,
-               optional:Boolean = DEFAULT_OPTIONAL, snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION,
-               exclusions:List<DependencyExclusion> = emptyList(),
-               dependencyManagement:List<Dependency> = emptyList()): Dependency {
-    return Dependency(DependencyId(group, name, version, classifier, type, snapshotVersion), scope, optional, exclusions, dependencyManagement)
+fun dependency(
+    group: String, name: String, version: String,
+    classifier: Classifier = NoClassifier, type: String = TypeJar, scope: wemi.dependency.DepScope = ScopeCompile,
+    optional: Boolean = false, snapshotVersion: String = "",
+    exclusions: List<DependencyExclusion> = emptyList(),
+    dependencyManagement: List<Dependency> = emptyList()
+): Dependency {
+    return Dependency(
+        DependencyId(group, name, version, classifier, type, snapshotVersion),
+        scope,
+        optional,
+        exclusions,
+        dependencyManagement
+    )
 }
 
 /** Used to parse Gradle-like dependency specifiers. The inner pattern is based on what Maven expects, with added ~
@@ -165,11 +171,13 @@ private val DependencyShorthandRegex = Pattern.compile("^([A-Za-z0-9.~_-]+):([A-
 /** Convenience Dependency creator using Gradle dependency notation.
  * That is: "group:name:version:classifier@type", where classifier and extension (along with their preceding : and @)
  * is optional. */
-fun dependency(groupNameVersionClassifierType: String,
-               scope:wemi.dependency.DepScope = DEFAULT_SCOPE, optional:Boolean = DEFAULT_OPTIONAL,
-               exclusions:List<DependencyExclusion> = emptyList(),
-               snapshotVersion:String = DEFAULT_SNAPSHOT_VERSION,
-               dependencyManagement:List<Dependency> = emptyList()): Dependency {
+fun dependency(
+    groupNameVersionClassifierType: String,
+    scope: wemi.dependency.DepScope = ScopeCompile, optional: Boolean = false,
+    exclusions: List<DependencyExclusion> = emptyList(),
+    snapshotVersion: String = "",
+    dependencyManagement: List<Dependency> = emptyList()
+): Dependency {
     val match = DependencyShorthandRegex.matcher(groupNameVersionClassifierType)
     if (!match.matches())
         throw WemiException("dependency($groupNameVersionClassifierType) needs to conform to 'group:name:version:classifier@type' pattern (last two parts being optional)")
@@ -178,7 +186,7 @@ fun dependency(groupNameVersionClassifierType: String,
     val name = match.group(2)!!
     val version = match.group(3)!!
     val classifier = match.group(4) ?: NoClassifier
-    val type = match.group(5) ?: DEFAULT_TYPE
+    val type = match.group(5) ?: TypeJar
 
     return Dependency(DependencyId(group, name, version, classifier, type, snapshotVersion), scope, optional, exclusions, dependencyManagement)
 }

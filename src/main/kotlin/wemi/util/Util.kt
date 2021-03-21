@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory
 import wemi.Key
 import wemi.boot.CLI
 import wemi.boot.WemiColorOutputSupported
-import wemi.dependency.DEFAULT_TYPE
+import wemi.dependency.TypeJar
 import wemi.dependency.DependencyId
 import wemi.dependency.NoClassifier
 import wemi.dependency.ResolvedDependencies
@@ -657,7 +657,7 @@ fun ResolvedDependencies.prettyPrint(includeSkipped:Boolean = false): CharSequen
         if (dependencyId.classifier != NoClassifier) {
             result.format(Color.White).append(':').format().append(dependencyId.classifier)
         }
-        if (dependencyId.type != DEFAULT_TYPE) {
+        if (dependencyId.type != TypeJar) {
             result.format(Color.White).append(' ').append(dependencyId.type)
         }
         result.format()
