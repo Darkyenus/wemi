@@ -26,7 +26,12 @@ class CompilerFlag<Type>(val name: String, val description: String, val default:
 
 private val LOG = LoggerFactory.getLogger("CompilerFlag")
 
-/** A mutable container that holds bindings of [CompilerFlag] to their values. */
+/** A mutable container that holds bindings of [CompilerFlag] to their values.
+ * The standard API for setting keys with [CompilerFlags] value is:
+ * `compilerOptions[SomeOption ] = { previousValue -> "value" }`
+ * for example:
+ * `compilerOptions[JavaCompilerFlags.customFlags] = { it + "-Xlint" }`.
+ */
 class CompilerFlags : JsonWritable {
     private val map = HashMap<CompilerFlag<*>, Any?>()
 
