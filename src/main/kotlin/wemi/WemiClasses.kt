@@ -5,6 +5,7 @@ package wemi
 import com.esotericsoftware.jsonbeans.JsonWriter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import wemi.boot.MachineReadableFormatter
 import wemi.collections.toMutable
 import wemi.compile.CompilerFlag
 import wemi.compile.CompilerFlags
@@ -69,7 +70,14 @@ class Key<V> internal constructor(
          *
          * Called when the key is evaluated in CLI top-level.
          */
-        internal val prettyPrinter: PrettyPrinter<V>?) : WithDescriptiveString, JsonWritable, Comparable<Key<*>> {
+        internal val prettyPrinter: PrettyPrinter<V>?,
+        /**
+         * Optional function that will print the result of this key's evaluation
+         * in a specified machine-readable format.
+         *
+         * Called when the key is evaluated in top-level in machine-readable output mode.
+         */
+        internal val machineReadableFormatter:MachineReadableFormatter<V>?) : WithDescriptiveString, JsonWritable, Comparable<Key<*>> {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

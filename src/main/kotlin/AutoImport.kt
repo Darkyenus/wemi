@@ -181,8 +181,6 @@ val runArguments
     inline get() = Keys.runArguments
 val run
     inline get() = Keys.run
-val runMain
-    inline get() = Keys.runMain
 
 val testParameters
     inline get() = Keys.testParameters

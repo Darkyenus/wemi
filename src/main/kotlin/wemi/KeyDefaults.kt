@@ -495,8 +495,7 @@ object KeyDefaults {
         options
     }
 
-    /** Implements the launch of JVM for [Run] and [RunMain]. */
-    private fun EvalScope.doRun(mainClass:String):Int {
+    val RunProcess: Value<ProcessBuilder> = {
         val javaExecutable = Keys.javaHome.get().javaExecutable
         val classpathEntries = LinkedHashSet<Path>()
         for (locatedFile in Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesRun.get())) {
@@ -505,33 +504,18 @@ object KeyDefaults {
         for (locatedFile in Keys.internalClasspath.get()) {
             classpathEntries.add(locatedFile.classpathEntry)
         }
+        val main = Keys.mainClass.get()
         val directory = Keys.runDirectory.get()
         val options = Keys.runOptions.get().toMutableList()
         val arguments = Keys.runArguments.get()
-
-        val dry = read("dry", "Only print the command to run the program, instead of running it", BooleanValidator, ask = false) ?: false
-        if (dry) {
-            val command = prepareJavaProcessCommand(javaExecutable, classpathEntries, mainClass, options, arguments)
-            println(command.joinToString(" "))
-            return 0
-        }
-
         val environment = Keys.runEnvironment.get()
 
-        return runForegroundProcess(prepareJavaProcess(
-                javaExecutable, directory, classpathEntries, mainClass, options, arguments, environment), controlOutput = false)
+        prepareJavaProcess(javaExecutable, directory, classpathEntries, main, options, arguments, environment)
     }
 
     val Run: Value<Int> = {
         expiresNow()
-        doRun(Keys.mainClass.get())
-    }
-
-    val RunMain: Value<Int> = {
-        val mainClass = read("main", "Main class to start", ClassNameValidator)
-                ?: throw WemiException("Main class not specified", showStacktrace = false)
-        expiresNow()
-        doRun(mainClass)
+        runForegroundProcess(Keys.runProcess.get(), controlOutput = false)
     }
 
     val TestParameters: Value<TestParameters> = {

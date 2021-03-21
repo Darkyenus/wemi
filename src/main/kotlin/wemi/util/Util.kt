@@ -734,22 +734,32 @@ fun StringBuilder.format(foreground: Color? = null, background: Color? = null, f
  * Color for ANSI formatting
  */
 enum class Color(internal val offset: Int) {
-    Black(0), // Significant
-    Red(1), // Error
-    Green(2), // Label
-    Yellow(3), // Suggestion
-    Blue(4), // Value
-    Magenta(5), // (Cache)
-    Cyan(6), // Time
-    White(7) // Not significant
+    /** Significant */
+    Black(0),
+    /** Error */
+    Red(1),
+    /** Label */
+    Green(2),
+    /** Suggestion */
+    Yellow(3),
+    /** Value */
+    Blue(4),
+    /** Cache */
+    Magenta(5),
+    /** Time */
+    Cyan(6),
+    /** Not significant */
+    White(7)
 }
 
 /**
  * Format for ANSI formatting
  */
 enum class Format(internal val number: Int) {
-    Bold(1), // Label or Prompt
-    Underline(4), // Input
+    /** Label or Prompt */
+    Bold(1),
+    /** Input */
+    Underline(4),
 }
 //endregion
 

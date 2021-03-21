@@ -1,5 +1,6 @@
 package wemi.boot
 
+import com.darkyen.tproll.util.StringBuilderWriter
 import com.esotericsoftware.jsonbeans.JsonWriter
 import com.esotericsoftware.jsonbeans.OutputType
 import org.slf4j.LoggerFactory
@@ -28,6 +29,18 @@ enum class MachineReadableOutputFormat {
     JSON,
     /** Custom formatting for easier shell integration. May not correctly handle all value types. */
     SHELL
+}
+
+/** Given some value, print it out using the specified format into the given output.
+ * Return true if the format is supported and value was printed or false otherwise,
+ * in which case default formatter will take over. */
+typealias MachineReadableFormatter<T> = (format:MachineReadableOutputFormat, value:T, out:Writer) -> Boolean
+
+fun newMachineReadableJsonPrinter(out:Writer): JsonWriter {
+    val jsonWriter = JsonWriter(out)
+    jsonWriter.setOutputType(OutputType.json)
+    jsonWriter.setQuoteLongValues(false)
+    return jsonWriter
 }
 
 /**
@@ -87,10 +100,11 @@ fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task, format:Machine
     }
 
     try {
-        val (_, data, status) = task.evaluateKey(null, null)
+        val (key, data, status) = task.evaluateKey(null, null)
         when (status) {
             TaskEvaluationStatus.Success -> {
-                machineReadablePrint(out, data, format)
+                @Suppress("UNCHECKED_CAST")
+                machineReadablePrint(out, data, format, key?.machineReadableFormatter as? MachineReadableFormatter<Any?>)
             }
             TaskEvaluationStatus.NoProject -> {
                 val projectString = data as String?
@@ -196,13 +210,27 @@ private fun Writer.shellPrint(thing:Any?, printStack:ArrayList<Any>) {
     }
 }
 
-private fun machineReadablePrint(out: PrintStream, thing: Any?, format: MachineReadableOutputFormat) {
+private fun <V>machineReadablePrint(out: PrintStream, thing: V, format: MachineReadableOutputFormat, formatter: MachineReadableFormatter<V>? = null) {
+    if (formatter != null) {
+        val sb = StringBuilder()
+        val sbw = StringBuilderWriter(sb)
+        try {
+            if (formatter(format, thing, sbw)) {
+                out.append(sb)
+                if (format == MachineReadableOutputFormat.JSON) {
+                    out.append(0.toChar())
+                }
+                return
+            }
+        } catch (e:Exception) {
+            LOG.warn("Failed to print value using {}", formatter, e)
+        }
+    }
+
     val writer = OutputStreamWriter(out)
     when (format) {
         MachineReadableOutputFormat.JSON -> {
-            val jsonWriter = JsonWriter(writer)
-            jsonWriter.setOutputType(OutputType.json)
-            jsonWriter.setQuoteLongValues(false)
+            val jsonWriter = newMachineReadableJsonPrinter(writer)
             jsonWriter.writeValue(thing, null)
             writer.append(0.toChar())
         }

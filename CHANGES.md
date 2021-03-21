@@ -1,5 +1,6 @@
 # 0.17
 - Add `runEnvironment` key to control environment variables
+- Remove `runMain` and `run` dry parameter, add `runProcess` instead
 
 # 0.16 2020-12-21
 - In plugin for intellij plugins: Added ability to instrument classes with not-null assertions and to compile .form files

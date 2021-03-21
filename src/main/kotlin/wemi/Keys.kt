@@ -12,6 +12,9 @@ import wemi.documentation.DokkaInterface
 import wemi.documentation.DokkaOptions
 import wemi.publish.ArtifactEntry
 import wemi.publish.InfoNode
+import wemi.run.EnvVarMachineReadableFormatter
+import wemi.run.ProcessBuilderMachineReadableFormatter
+import wemi.run.ProcessBuilderPrettyPrinter
 import wemi.test.TestParameters
 import wemi.test.TestReport
 import wemi.test.prettyPrint
@@ -84,9 +87,9 @@ object Keys {
     val runOptions by key<List<String>>("Options given to 'java' when running the project", defaultValue = emptyList())
     val runSystemProperties by key<Map<String, String>>("System properties given to 'java' when running the project", defaultValue = emptyMap())
     val runArguments by key<List<String>>("Options given to the application when running the project", defaultValue = emptyList())
-    val runEnvironment by key<Map<String, String>>("Environment variables used when running the project", defaultValue = emptyMap())
-    val run by key<Int>("Compile and run the project, return exit code", inputKeys = arrayOf("dry" to "Only print the command to run the program, instead of running it (bool)"))
-    val runMain by key<Int>("Compile and run the project, take the main class from the input (key 'main'), return exit code", inputKeys = arrayOf("main" to "Main class to run"))
+    val runEnvironment by key<Map<String, String>>("Environment variables used when running the project", defaultValue = emptyMap(), machineReadableFormatter = EnvVarMachineReadableFormatter)
+    val runProcess by key<ProcessBuilder>("Prepared process for running", prettyPrinter = ProcessBuilderPrettyPrinter, machineReadableFormatter = ProcessBuilderMachineReadableFormatter)
+    val run by key<Int>("Compile and run the project, return exit code")
 
     val testParameters by key<TestParameters>("Parameters for the test key. By default, discovers all tests in the test sources", inputKeys = arrayOf("class" to "Include classes, whose fully classified name match this regex"))
     val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it, _ -> it.prettyPrint() })

@@ -1,5 +1,6 @@
 package wemi
 
+import wemi.boot.MachineReadableFormatter
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.Classifier
 import wemi.dependency.DEFAULT_OPTIONAL
@@ -74,8 +75,8 @@ private val NO_INPUT_KEYS = emptyArray<Pair<InputKey, InputKeyDescription>>()
  *          Recommended to be used only for keys of [Collection]s with empty immutable default.
  * @param inputKeys
  */
-fun <V> key(description: String, defaultValue: V, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: PrettyPrinter<V>? = null): KeyDelegate<V> {
-    return KeyDelegate(description, true, defaultValue, inputKeys, prettyPrinter)
+fun <V> key(description: String, defaultValue: V, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: PrettyPrinter<V>? = null, machineReadableFormatter: MachineReadableFormatter<V>? = null): KeyDelegate<V> {
+    return KeyDelegate(description, true, defaultValue, inputKeys, prettyPrinter, machineReadableFormatter)
 }
 
 /**
@@ -83,8 +84,8 @@ fun <V> key(description: String, defaultValue: V, inputKeys: Array<Pair<InputKey
  *
  * @see [key] with default value for exact documentation
  */
-fun <V> key(description: String, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: PrettyPrinter<V>? = null): KeyDelegate<V> {
-    return KeyDelegate(description, false, null, inputKeys, prettyPrinter)
+fun <V> key(description: String, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: PrettyPrinter<V>? = null, machineReadableFormatter: MachineReadableFormatter<V>? = null): KeyDelegate<V> {
+    return KeyDelegate(description, false, null, inputKeys, prettyPrinter, machineReadableFormatter)
 }
 
 /**

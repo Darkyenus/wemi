@@ -1,11 +1,22 @@
 package wemi.run
 
 import org.slf4j.LoggerFactory
+import wemi.PrettyPrinter
+import wemi.WemiException
 import wemi.boot.CLI
+import wemi.boot.MachineReadableFormatter
+import wemi.boot.MachineReadableOutputFormat
+import wemi.boot.newMachineReadableJsonPrinter
 import wemi.util.CliStatusDisplay.Companion.withStatus
+import wemi.util.Color
 import wemi.util.absolutePath
+import wemi.util.field
+import wemi.util.format
+import wemi.util.writeMap
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
+import java.io.Writer
 import java.nio.file.Path
 import java.util.concurrent.ForkJoinPool
 
@@ -105,5 +116,122 @@ fun runForegroundProcess(builder:ProcessBuilder, separateOutputByNewlines:Boolea
         val result = CLI.forwardSignalsTo(process) { process.waitFor() }
         if (separateOutputByNewlines) println()
         result
+    }
+}
+
+internal val ProcessBuilderPrettyPrinter:PrettyPrinter<ProcessBuilder> = { pb: ProcessBuilder, _: Int ->
+    val sb = StringBuilder()
+    sb.format(Color.Blue).append((pb.directory() ?: File(".")).normalize().path).append('\n')
+    for ((key, value) in pb.environment() ?: emptyMap()) {
+        sb.append("   ").format(Color.Green).append(key).format(Color.White).append(" = '").format(Color.Blue).append(value).format(Color.White).append("'\n")
+    }
+    val command = pb.command()
+    if (command.size > 0) {
+        sb.format(Color.Black).append(command[0]).format(Color.Blue)
+        for (i in 1 until command.size) {
+            sb.append(' ').append(command[i])
+        }
+    } else {
+        sb.format(Color.Red).append("<No command>")
+    }
+    sb.format().append('\n').toString()
+}
+
+/**
+ * This is a bit hairy, but let's be strict, for the sake of security.
+ * https://stackoverflow.com/q/2821043
+ */
+private fun isSafeEnvironmentVariable(name:String):Boolean {
+    if (name.isEmpty()) {
+        return false
+    }
+    val first = name[0]
+    if (first !in 'a'..'z' && first !in 'A'..'Z' && first != '_') {
+        return false
+    }
+    for (i in 1 until name.length) {
+        val c = name[i]
+        if (c !in 'a'..'z' && c !in 'A'..'Z' && c != '_' && c !in '0'..'9') {
+            return false
+        }
+    }
+    return true
+}
+
+private fun Writer.appendShellEscaped(value:String) {
+    val safeWithoutQuotes = value.all { it !in "|&;<>()\$`\\\"' \t\n*?[#˜=%" }
+    if (safeWithoutQuotes) {
+        write(value)
+    } else {
+        append('\'')
+        for (c in value) {
+            if ((c < ' ' && c != '\t' && c != '\u000B'/*VT*/) || c == '\u007F') {
+                throw WemiException("Value contains dangerous character: \\u%04x".format(c.toInt()))
+            }
+            if (c == '\'') {
+                write("'\"'\"'")
+            } else {
+                append(c)
+            }
+        }
+        append('\'')
+    }
+}
+
+internal val EnvVarMachineReadableFormatter:MachineReadableFormatter<Map<String, String>> = { format: MachineReadableOutputFormat, processEnv: Map<String, String>, out: Writer ->
+    when (format) {
+        MachineReadableOutputFormat.JSON -> {
+            newMachineReadableJsonPrinter(out).writeMap(String::class.java, String::class.java, processEnv)
+            true
+        }
+        MachineReadableOutputFormat.SHELL -> {
+            // Diff shell to determine what should be added (but ignore removals)
+            val currentEnv = System.getenv()
+            for ((key, value) in processEnv) {
+                val currentValue = currentEnv[key]
+                if (value == currentValue) {
+                    continue
+                }
+
+                // Check whether key is valid and skip it if it isn't, because it could be a security risk otherwise
+                if (isSafeEnvironmentVariable(key)) {
+                    out.write(key)
+                    out.append('=')
+                    out.appendShellEscaped(value)
+                    out.append(' ')
+                } else {
+                    LOG.warn("Omitting environment variable '{}={}' from output, because its name is suspicious", key, value)
+                }
+            }
+            true
+        }
+    }
+}
+
+internal val ProcessBuilderMachineReadableFormatter:MachineReadableFormatter<ProcessBuilder> = { format: MachineReadableOutputFormat, pb: ProcessBuilder, out: Writer ->
+    when (format) {
+        MachineReadableOutputFormat.JSON -> {
+            val jsonWriter = newMachineReadableJsonPrinter(out)
+            jsonWriter.`object`()
+            jsonWriter.field("directory", (pb.directory() ?: File(".")).absoluteFile.normalize().path)
+            jsonWriter.field("environment", pb.environment() ?: emptyMap())
+            jsonWriter.field("command", pb.command() ?: emptyList())
+            jsonWriter.pop()
+            true
+        }
+        MachineReadableOutputFormat.SHELL -> {
+            // Directory and environment is ignored because it is not straightforward to actually use in a shell
+            // You can call runEnvironment and runDirectory if you want this information anyway
+            var first = true
+            for (s in pb.command() ?: emptyList()) {
+                if (first) {
+                    first = false
+                } else {
+                    out.append(' ')
+                }
+                out.appendShellEscaped(s)
+            }
+            true
+        }
     }
 }

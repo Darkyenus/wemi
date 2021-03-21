@@ -3,6 +3,7 @@
 package wemi
 
 import org.slf4j.LoggerFactory
+import wemi.boot.MachineReadableFormatter
 import wemi.util.exists
 import java.nio.file.Files
 import java.nio.file.Path
@@ -158,7 +159,8 @@ class KeyDelegate<V> internal constructor(
         private val hasDefaultValue: Boolean,
         private val defaultValue: V?,
         private val inputKeys: Array<Pair<InputKey, InputKeyDescription>>,
-        private val prettyPrinter: PrettyPrinter<V>?) : ReadOnlyProperty<Any?, Key<V>> {
+        private val prettyPrinter: PrettyPrinter<V>?,
+        private val machineReadableFormatter: MachineReadableFormatter<V>?) : ReadOnlyProperty<Any?, Key<V>> {
 
     private lateinit var key: Key<V>
 
@@ -180,7 +182,7 @@ class KeyDelegate<V> internal constructor(
                 }
                 throw WemiException("Key $keyName already exists (desc: '${existing.description}')")
             }
-            val key = Key(property.name, description, hasDefaultValue, defaultValue, inputKeys, prettyPrinter)
+            val key = Key(property.name, description, hasDefaultValue, defaultValue, inputKeys, prettyPrinter, machineReadableFormatter)
             BuildScriptData.AllKeys[key.name] = key
             key
         }

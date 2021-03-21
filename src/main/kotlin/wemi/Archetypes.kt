@@ -95,8 +95,8 @@ object Archetypes {
 
         //Keys.mainClass TODO Detect main class?
         Keys.runOptions set KeyDefaults.RunOptions
+        Keys.runProcess set KeyDefaults.RunProcess
         Keys.run set KeyDefaults.Run
-        Keys.runMain set KeyDefaults.RunMain
 
         Keys.archiveSources modify { it.changeExtensionAndMove("jar") }
 
