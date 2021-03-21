@@ -1,9 +1,11 @@
 package wemi.boot
 
 import org.jline.reader.CompletingParsedLine
-import org.jline.reader.ParsedLine
 import org.jline.reader.Parser
-import wemi.util.*
+import wemi.util.Color
+import wemi.util.Format
+import wemi.util.format
+import wemi.util.isValidIdentifier
 
 /**
  * Parses task lines.
@@ -31,7 +33,7 @@ object TaskParser : Parser {
     }
 
     class ParsedTaskLine(val line: String, val cursor: Int) : CompletingParsedLine {
-        private val parsed = PartitionedLine(arrayOf(line), true, false)
+        private val parsed = PartitionedLine(line, machineReadable = false)
 
         val words:List<String>
         val tokenTypes:List<TokenType?>
@@ -130,12 +132,7 @@ object TaskParser : Parser {
     const val INPUT_SEPARATOR = "="
     const val TASK_SEPARATOR = ";"
 
-    private val SEPARATORS = intArrayOf(
-            PROJECT_SEPARATOR[0].toInt(),
-            CONFIGURATION_SEPARATOR[0].toInt(),
-            INPUT_SEPARATOR[0].toInt(),
-            TASK_SEPARATOR[0].toInt())
-
+    private const val SEPARATORS = PROJECT_SEPARATOR+ CONFIGURATION_SEPARATOR+ INPUT_SEPARATOR+ TASK_SEPARATOR
 
     enum class TokenType {
         Project,
@@ -159,11 +156,10 @@ object TaskParser : Parser {
             }
     }
 
-    class PartitionedLine (sources: Array<String>,
-                          allowQuotes: Boolean,
+    class PartitionedLine constructor(source: String,
                           machineReadable: Boolean) {
 
-        val parts:List<Part> = createParts(sources, allowQuotes)
+        val parts:List<Part> = createParts(source)
         val tasks:List<Task> = parseTasks(machineReadable)
 
         //region Lexing
@@ -176,19 +172,17 @@ object TaskParser : Parser {
          *
          * Escape on end of the line is treated as a regular character, so are unmatched quotes.
          */
-        private fun createParts(sources: Array<String>, allowQuotes: Boolean):MutableList<Part> {
+        private fun createParts(source: String):MutableList<Part> {
             val parts = ArrayList<Part>()
-            var indexBase = 0
 
-            var partStart = indexBase
+            var partStart = 0
             var partWhitespace = true
             val partText = StringBuilder()
             var currentQuoted = false
             var escapeNext = false
 
-            fun endWord(index:Int):Part? {
+            fun endWord(endIndex:Int):Part? {
                 val startIndex = partStart
-                val endIndex = indexBase + index
 
                 // Force close quotes
                 if (currentQuoted) {
@@ -219,80 +213,67 @@ object TaskParser : Parser {
                 return part
             }
 
-            for (source in sources) {
-                source.forCodePointsIndexed { index, cp ->
-                    when {
-                        escapeNext -> {
-                            escapeNext = false
-                            if (partWhitespace) {
-                                // It is not whitespace anymore, end the word
-                                endWord(index - 1)//Ended before backslash
-                            }
-                            partWhitespace = false
-                            partText.appendCodePoint(cp)
+            for ((index, c) in source.withIndex()) {
+                when {
+                    escapeNext -> {
+                        escapeNext = false
+                        if (partWhitespace) {
+                            // It is not whitespace anymore, end the word
+                            endWord(index - 1)//Ended before backslash
                         }
-                        cp == '\\'.toInt() -> // Escape next character
-                            escapeNext = true
-                        currentQuoted -> {
-                            if (cp == '"'.toInt()) {
-                                // End quotes
-                                currentQuoted = false
+                        partWhitespace = false
+                        partText.append(c)
+                    }
+                    c == '\\' -> // Escape next character
+                        escapeNext = true
+                    currentQuoted -> {
+                        if (c == '"') {
+                            // End quotes
+                            currentQuoted = false
+                            endWord(index)
+                        } else {
+                            // Continue quotes
+                            partText.append(c)
+                        }
+                    }
+                    c == '"' -> { // Start quotes
+                        endWord(index)
+                        partWhitespace = false
+                        currentQuoted = true
+                    }
+                    c in SEPARATORS -> {
+                        // Separator!
+                        // End current word
+                        endWord(index)
+                        // Create word with just the separator
+                        partText.append(c)
+                        partWhitespace = false
+                        endWord(index + 1)?.meaning = TokenType.Separator
+                    }
+                    else -> { // Any other normal character
+                        val ws = Character.isWhitespace(c)
+                        when {
+                            ws == partWhitespace ->
+                                // Keeping the type
+                                partText.append(c)
+                            ws -> {
+                                // Whitespace just started
                                 endWord(index)
-                            } else {
-                                // Continue quotes
-                                partText.appendCodePoint(cp)
+                                partText.append(c)
                             }
-                        }
-                        allowQuotes && cp == '"'.toInt() -> { // Start quotes
-                            endWord(index)
-                            partWhitespace = false
-                            currentQuoted = true
-                        }
-                        SEPARATORS.contains(cp) -> {
-                            // Separator!
-                            // End current word
-                            endWord(index)
-                            // Create word with just the separator
-                            partText.appendCodePoint(cp)
-                            partWhitespace = false
-                            endWord(index + 1)?.meaning = TokenType.Separator
-                        }
-                        else -> { // Any other normal character
-                            val ws = Character.isWhitespace(cp)
-                            when {
-                                ws == partWhitespace ->
-                                    // Keeping the type
-                                    partText.appendCodePoint(cp)
-                                ws -> {
-                                    // Whitespace just started
-                                    endWord(index)
-                                    partText.appendCodePoint(cp)
-                                }
-                                else -> {
-                                    // Whitespace just ended
-                                    endWord(index)
-                                    partText.appendCodePoint(cp)
-                                    partWhitespace = false
-                                }
+                            else -> {
+                                // Whitespace just ended
+                                endWord(index)
+                                partText.append(c)
+                                partWhitespace = false
                             }
                         }
                     }
                 }
-
-                // Finish last word
-                endWord(source.length)
-
-                if (!allowQuotes) {
-                    // When quotes are not allowed, we are reading already whitespace-split words
-                    // and we don't want to ignore the space in between, which once was there
-                    val wordSplit = Part("", source.length, source.length)
-                    wordSplit.meaning = TokenType.Whitespace
-                    parts.add(wordSplit)
-                }
-
-                indexBase += source.length
             }
 
+            // Finish last word
+            endWord(source.length)
             return parts
         }
         //endregion

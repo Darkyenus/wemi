@@ -51,6 +51,7 @@ final class Option {
 		final PrintStream err = System.err;
 		err.println("Usage: wemi [OPTION]... [TASK]...");
 		err.println("Wemi build system");
+		err.println("Each task argument is treated as a separate interactive line.");
 
 		final StringBuilder[] lines = new StringBuilder[options.length];
 		for (int i = 0; i < options.length; i++) {

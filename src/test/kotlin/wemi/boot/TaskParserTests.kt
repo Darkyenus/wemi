@@ -11,13 +11,13 @@ class TaskParserTests {
     private val Whitespace = Regex("\\s+")
 
     private fun assertEquals(line:String, vararg tasks:Task) {
-        val parsed = TaskParser.PartitionedLine(arrayOf(line), true, false)
+        val parsed = TaskParser.PartitionedLine(line, false)
         assertArrayEquals(tasks, parsed.tasks.toTypedArray())
 
         if (line.indexOf('"') == -1) {
             // Test it as if it came from command line
             // (simple test does not handle quotes yet)
-            val parsedFromCommandLine = TaskParser.PartitionedLine(line.split(Whitespace).toTypedArray(), false, false)
+            val parsedFromCommandLine = TaskParser.PartitionedLine(line, false)
             assertArrayEquals(tasks, parsedFromCommandLine.tasks.toTypedArray())
         }
     }

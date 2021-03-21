@@ -395,15 +395,18 @@ fun main(args: Array<String>) {
     }
 
     var exitCode = EXIT_CODE_SUCCESS
-    val parsedArgs = TaskParser.PartitionedLine(taskArguments, false, machineReadableOutput != null)
+    val parsedArgs = taskArguments.map { TaskParser.PartitionedLine(it, machineReadableOutput != null) }
+    val tasks = parsedArgs.flatMap { it.tasks }
 
     if (machineReadableOutput != null) {
-        parsedArgs.machineReadableCheckErrors()
+        for (arg in parsedArgs) {
+            arg.machineReadableCheckErrors()
+        }
 
         val out = machineOutput!!
         val format = machineReadableOutput!!
         var withExitCode:WithExitCode? = null
-        for (task in parsedArgs.tasks) {
+        for (task in tasks) {
             withExitCode = machineReadableEvaluateAndPrint(out, task, format)
         }
 
@@ -412,7 +415,7 @@ fun main(args: Array<String>) {
             while (true) {
                 val line = reader.readLine() ?: break
 
-                val parsed = TaskParser.PartitionedLine(arrayOf(line), allowQuotes = true, machineReadable = true)
+                val parsed = TaskParser.PartitionedLine(line, machineReadable = true)
                 parsed.machineReadableCheckErrors()
 
                 for (task in parsed.tasks) {
@@ -426,14 +429,19 @@ fun main(args: Array<String>) {
         CLI.init(WemiRootFolder)
 
         try {
-            val formattedErrors = parsedArgs.formattedErrors(true)
-            if (formattedErrors.hasNext()) {
-                println(format("Errors in task input:", Color.Red))
-                do {
-                    println(formattedErrors.next())
-                } while (formattedErrors.hasNext())
-            } else {
-                for (task in parsedArgs.tasks) {
+            var hasError = false
+            for (arg in parsedArgs) {
+                for (error in arg.formattedErrors(true)) {
+                    if (!hasError) {
+                        hasError = true
+                        println(format("Errors in task input:", Color.Red))
+                    }
+                    println(error)
+                }
+            }
+
+            if (!hasError) {
+                for (task in tasks) {
                     val lastTaskResult = CLI.evaluateAndPrint(task)
                     if (interactive) {
                         continue
@@ -444,14 +452,14 @@ fun main(args: Array<String>) {
                             val data = lastTaskResult.data
                             if (data is WithExitCode) {
                                 exitCode = data.processExitCode()
-                                LOG.debug("WithExitCode - using the exit code of '{}': {}", parsedArgs.tasks.last(), exitCode)
+                                LOG.debug("WithExitCode - using the exit code of '{}': {}", tasks.last(), exitCode)
                             } else {
-                                LOG.debug("WithExitCode - {} does not provide exit code", parsedArgs.tasks.last())
+                                LOG.debug("WithExitCode - {} does not provide exit code", tasks.last())
                             }
                         }
                         else -> {
                             exitCode = EXIT_CODE_TASK_ERROR
-                            LOG.debug("WithExitCode - {} evaluation failed", parsedArgs.tasks.last())
+                            LOG.debug("WithExitCode - {} evaluation failed", tasks.last())
                         }
                     }
                     if (exitCode != EXIT_CODE_SUCCESS) {

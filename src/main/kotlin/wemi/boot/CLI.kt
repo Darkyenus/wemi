@@ -660,7 +660,7 @@ object CLI {
             return null
         }
 
-        val parsed = TaskParser.PartitionedLine(arrayOf(command), allowQuotes = true, machineReadable = false)
+        val parsed = TaskParser.PartitionedLine(command, machineReadable = false)
         val tasks = parsed.tasks
 
         val errors = parsed.formattedErrors(true)
