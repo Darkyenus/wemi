@@ -1,3 +1,5 @@
+import wemi.Archetypes.JUnitLayer
+import wemi.Archetypes.JavaKotlinProject
 import wemi.dependency.JCenter
 import wemi.dependency.ProjectDependency
 import wemi.generation.Constant
@@ -5,14 +7,12 @@ import wemi.generation.generateKotlinConstantsFile
 import wemi.generation.generateSources
 
 /** Plugin for hotswapping JVM code at runtime. */
-val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
+val pluginJvmHotswap by project(path("plugins/jvm-hotswap"), JavaKotlinProject, JUnitLayer) {
     projectGroup set { WemiGroup }
     projectName set { "wemi-plugin-jvm-hotswap" }
     projectVersion set { using(wemi) { projectVersion.get() } }
 
     projectDependencies add { ProjectDependency(core, scope=ScopeProvided) }
-    libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
-    libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
 
     publishMetadata modify { metadata ->
         setupSharedPublishMetadata(
@@ -26,7 +26,7 @@ val pluginJvmHotswap by project(path("plugins/jvm-hotswap")) {
 
 /** Plugin which translates Java bytecode to JavaScript through TeaVM.
  * https://github.com/konsoletyper/teavm */
-val pluginTeaVM by project(path("plugins/teavm")) {
+val pluginTeaVM by project(path("plugins/teavm"), JavaKotlinProject, JUnitLayer) {
     projectGroup set { WemiGroup }
     projectName set { "wemi-plugin-teavm" }
     projectVersion set { using(wemi) { projectVersion.get() } }
@@ -40,8 +40,6 @@ val pluginTeaVM by project(path("plugins/teavm")) {
 
     projectDependencies add { ProjectDependency(core, scope=ScopeProvided) }
     libraryDependencies add { dependency("org.teavm", "teavm-tooling", TEAVM_VERSION) }
-    libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
-    libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
 
     publishMetadata modify { metadata ->
         setupSharedPublishMetadata(
@@ -55,7 +53,7 @@ val pluginTeaVM by project(path("plugins/teavm")) {
 
 /** Plugin for building IntelliJ platform plugins.
  * Based on https://github.com/JetBrains/gradle-intellij-plugin */
-val pluginIntellij by project(path("plugins/intellij")) {
+val pluginIntellij by project(path("plugins/intellij"), JavaKotlinProject, JUnitLayer) {
     projectGroup set { WemiGroup }
     projectName set { "wemi-plugin-intellij" }
     projectVersion set { using(wemi) { projectVersion.get() } }
@@ -80,9 +78,6 @@ val pluginIntellij by project(path("plugins/intellij")) {
     libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-intellij:3.139", exclusions = excludeKotlinStdlib) }
     libraryDependencies add { dependency("org.jetbrains.intellij:blockmap:1.0.5", exclusions = excludeKotlinStdlib) }
     libraryDependencies add { dependency("org.jetbrains.intellij:plugin-repository-rest-client:2.0.15", exclusions = excludeKotlinStdlib) }
-
-    libraryDependencies add { Dependency(JUnitAPI, scope=ScopeTest) }
-    libraryDependencies add { Dependency(JUnitEngine, scope=ScopeTest) }
 
     // Instrumentation dependencies
     repositories add { Repository("idea-www.jetbrains.com_intellij-repository-releases", "https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/releases") }

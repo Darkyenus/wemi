@@ -11,7 +11,6 @@ import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
 import wemi.dependency.*
 import wemi.plugin.PluginEnvironment
-import wemi.run.ExitCode
 import wemi.util.*
 import java.io.IOException
 import java.net.URL
@@ -165,6 +164,9 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
                 // only generated classpath, which we technically don't have.
                 Keys.internalClasspath set Static(emptyList())
             }
+
+            Keys.externalSources set KeyDefaults.externalClasspathWithClassifier(SourcesClassifier)
+            Keys.externalDocs set KeyDefaults.externalClasspathWithClassifier(JavadocClassifier)
         }
 
         locked = true
