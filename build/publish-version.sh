@@ -34,17 +34,17 @@ chmod_mode="0444"
 if [ "${wemi_version%-SNAPSHOT}" != "${wemi_version}" ]; then
 	# Snapshot
 	chmod_mode="0644"
-	sftp -b - -f "sftp://wemi@darkyen.com/wemi-versions/" <<-END_SFTP || log "Snapshot version directory already exists"
+	sftp -P 1022 -b - -f "sftp://wemi@darkyen.com/wemi-versions/" <<-END_SFTP || log "Snapshot version directory already exists"
 	mkdir ./${wemi_version}
 END_SFTP
 else
 	# Normal release
-	sftp -b - -f "sftp://wemi@darkyen.com/wemi-versions/" <<-END_SFTP || fail "Version directory must not exist"
+	sftp -P 1022 -b - -f "sftp://wemi@darkyen.com/wemi-versions/" <<-END_SFTP || fail "Version directory must not exist"
 	mkdir ./${wemi_version}
 END_SFTP
 fi
 
-sftp -b - -f "sftp://wemi@darkyen.com/wemi-versions/" <<-END_SFTP || fail "Failed to upload new Wemi version"
+sftp -P 1022 -b - -f "sftp://wemi@darkyen.com/wemi-versions/" <<-END_SFTP || fail "Failed to upload new Wemi version"
 	put ${wemi_dist_dir}/* ./${wemi_version}/
 	chmod ${chmod_mode} ./${wemi_version}/*
 END_SFTP
