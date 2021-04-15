@@ -24,6 +24,7 @@ import wemi.Project
 import wemi.WemiException
 import wemi.WithExitCode
 import wemi.dependency.DependencyExclusion
+import wemi.evaluateKeyOrCommand
 import wemi.util.Color
 import wemi.util.FileSet
 import wemi.util.SystemInfo
@@ -367,7 +368,7 @@ fun main(args: Array<String>) {
     } else {
         for (task in autoRunTasks) {
             LOG.info("Auto-run: {}", task)
-            val result = task.evaluateKey(null, null)
+            val result = evaluateKeyOrCommand(task, null, null)
             when (result.status) {
                 TaskEvaluationStatus.Success -> {
                     LOG.debug("Success")

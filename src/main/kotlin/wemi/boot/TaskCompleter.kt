@@ -112,7 +112,7 @@ internal object TaskCompleter : Completer {
             true
     )
 
-    private val commandCandidates: List<Candidate> = CLI.commands.keys.map { name ->
+    private val commandCandidates: List<Candidate> = CLI.internalCommands.keys.map { name ->
         Candidate(name,
                 name,
                 null,

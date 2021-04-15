@@ -16,6 +16,7 @@ import wemi.AllKeys
 import wemi.AllProjects
 import wemi.BindingHolder
 import wemi.BooleanValidator
+import wemi.BuildScriptData
 import wemi.EvaluationListener
 import wemi.EvaluationListener.Companion.plus
 import wemi.ExtendableBindingHolder
@@ -24,6 +25,7 @@ import wemi.Key
 import wemi.Project
 import wemi.WemiException
 import wemi.WemiKotlinVersion
+import wemi.evaluateKeyOrCommand
 import wemi.generation.WemiGeneratedFolder
 import wemi.util.CliStatusDisplay
 import wemi.util.CliStatusDisplay.Companion.withStatus
@@ -265,8 +267,8 @@ object CLI {
      * Evaluates the key or command and prints human readable, formatted output.
      */
     fun evaluateAndPrint(task: Task, listener:EvaluationListener? = null): TaskEvaluationResult {
-        if (task.couldBeCommand) {
-            val commandFunction = commands[task.key]
+        if (task.couldBeInternalCommand) {
+            val commandFunction = internalCommands[task.key]
             if (commandFunction != null) {
                 return commandFunction(task)
                         ?: TaskEvaluationResult(null, null, TaskEvaluationStatus.Command)
@@ -275,7 +277,7 @@ object CLI {
 
         val beginTime = System.currentTimeMillis()
         val keyEvaluationResult = MessageDisplay.withStatus(true) {
-            task.evaluateKey(defaultProject, KeyEvaluationStatusListener + listener)
+            evaluateKeyOrCommand(task, defaultProject, KeyEvaluationStatusListener + listener)
         }
         val (key, data, status) = keyEvaluationResult
         val duration = System.currentTimeMillis() - beginTime
@@ -315,11 +317,15 @@ object CLI {
             }
             TaskEvaluationStatus.NoKey -> {
                 val keyString = data as String
-                if (task.couldBeCommand) {
-                    printWarning("Can't evaluate $task - no key or command named '$keyString' found", keyString, AllKeys.keys + commands.keys)
-                } else {
-                    printWarning("Can't evaluate $task - no key named '$keyString' found", keyString, AllKeys.keys)
+                val possibilities = ArrayList<String>(BuildScriptData.AllCommands.keys)
+                if (task.couldBeInternalCommand) {
+                    possibilities.addAll(internalCommands.keys)
                 }
+                if (task.input.isEmpty()) {
+                    possibilities.addAll(AllKeys.keys)
+                }
+
+                printWarning("Can't evaluate $task - no key or command named '$keyString' found", keyString, possibilities)
             }
             TaskEvaluationStatus.NotAssigned -> {
                 val error = data as WemiException.KeyNotAssignedException
@@ -360,8 +366,8 @@ object CLI {
         }
     }
 
-    /** Known CLI commands. */
-    internal val commands: Map<String, (Task) -> TaskEvaluationResult?> = HashMap<String, (Task) -> TaskEvaluationResult?>().apply {
+    /** Built-in CLI commands. */
+    internal val internalCommands: Map<String, (Task) -> TaskEvaluationResult?> = HashMap<String, (Task) -> TaskEvaluationResult?>().apply {
         put("exit") {
             throw ExitWemi(false)
         }

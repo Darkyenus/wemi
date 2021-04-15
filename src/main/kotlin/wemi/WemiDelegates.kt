@@ -1,4 +1,4 @@
-@file:Suppress("unused")
+@file:Suppress("unused", "ClassName")
 
 package wemi
 
@@ -21,6 +21,7 @@ internal object BuildScriptData {
     val AllProjects: MutableMap<String, Project> = Collections.synchronizedMap(mutableMapOf<String, Project>())
     val AllKeys: MutableMap<String, Key<*>> = Collections.synchronizedMap(mutableMapOf<String, Key<*>>())
     val AllConfigurations: MutableMap<String, Configuration> = Collections.synchronizedMap(mutableMapOf<String, Configuration>())
+    val AllCommands: MutableMap<String, Command<*>> = Collections.synchronizedMap(mutableMapOf<String, Command<*>>())
 
     /**
      * List of lazy initializers.
@@ -292,4 +293,66 @@ class ArchetypeDelegate internal constructor(
         this.archetype = archetype
         return archetype
     }
+}
+
+/**
+ * Create a new [Command].
+ * To be used as a variable delegate target, example:
+ * ```
+ * val myCommand by command<Unit>("Description", {
+ *      val param = read("someParam")
+ *      someKey set { param }
+ * }) {
+ *      someOtherKey.get()
+ * }
+ * ```
+ *
+ * Two commands must not share the same name. Command name is derived from the name of the variable this
+ * delegate is created by. (Command in example would be called `myCommand`.)
+ *
+ * This delegate object takes care of creating, initializing and registering the [Command].
+ *
+ * @param description of the command
+ * @param setupBinding called to initialize the binding using given input
+ * @param execute to execute the command - run in a scope whose top binding is the binding previously passed to setupBinding
+ */
+class command<T>(
+    private val description: String,
+    private val setupBinding:CommandBindingHolder.() -> Unit,
+    private val execute:Value<T>)
+    : ReadOnlyProperty<Any?, Command<T>> {
+
+    private lateinit var command: Command<T>
+
+    operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): command<T> {
+        this.command = createCommand(property.name, description, setupBinding, execute)
+        return this
+    }
+
+    override fun getValue(thisRef: Any?, property: KProperty<*>): Command<T> = command
+}
+
+/**
+ * ADVANCED USERS ONLY!!! Use [command] instead for most uses.
+ *
+ * Create command dynamically, like using the [command], but without the need to create a separate variable
+ * for each one.
+ *
+ * @param name of the command, must be unique and valid Java-like identifier
+ * @param description of the command
+ * @param setupBinding called to initialize the binding using given input
+ * @param execute to execute the command - run in a scope whose top binding is the binding previously passed to setupBinding
+ */
+fun <T> createCommand(name:String, description: String, setupBinding:CommandBindingHolder.() -> Unit, execute:Value<T>):Command<T> {
+    val command = Command(name, description, setupBinding, execute)
+    synchronized(BuildScriptData.AllCommands) {
+        val existing = BuildScriptData.AllCommands[command.name]
+        if (existing != null) {
+            throw WemiException("Command ${command.name} already exists (desc: '${existing.description}')")
+        }
+
+        BuildScriptData.AllCommands.put(command.name, command)
+    }
+
+    return command
 }

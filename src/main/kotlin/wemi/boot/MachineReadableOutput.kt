@@ -9,6 +9,7 @@ import wemi.AllKeys
 import wemi.AllProjects
 import wemi.WemiException
 import wemi.WithExitCode
+import wemi.evaluateKeyOrCommand
 import wemi.util.JsonWritable
 import wemi.util.field
 import wemi.util.writeArray
@@ -103,7 +104,7 @@ internal fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task, forma
     }
 
     try {
-        val (key, data, status) = task.evaluateKey(null, null)
+        val (key, data, status) = evaluateKeyOrCommand(task, null, null)
         when (status) {
             TaskEvaluationStatus.Success -> {
                 @Suppress("UNCHECKED_CAST")

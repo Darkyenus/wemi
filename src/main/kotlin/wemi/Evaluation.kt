@@ -1,5 +1,9 @@
 package wemi
 
+import org.slf4j.LoggerFactory
+import wemi.boot.Task
+import wemi.boot.TaskEvaluationResult
+import wemi.boot.TaskEvaluationStatus
 import wemi.dependency.DepScope
 import wemi.dependency.ProjectDependency
 import wemi.util.ALL_EXTENSIONS
@@ -9,6 +13,7 @@ import wemi.util.LocatedPath
 import wemi.util.PATH_COMPARATOR_WITH_TOTAL_ORDERING
 import wemi.util.ScopedLocatedPath
 import wemi.util.filterByExtension
+import wemi.util.findCaseInsensitive
 import wemi.util.lastModifiedMillis
 import wemi.util.matchingFiles
 import wemi.util.matchingLocatedFiles
@@ -20,6 +25,8 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+
+private val LOG = LoggerFactory.getLogger("Evaluation")
 
 /** Each external key invocation will increase this value (=tick).
  * Bindings are evaluated only once per tick, regardless of their expiry. */
@@ -355,6 +362,78 @@ fun EvalScope.expiresWith(file: Path) {
     val time = file.lastModifiedMillis()
 
     expiresWhen { file.lastModifiedMillis() != time }
+}
+
+/** Evaluate an command. Can be called only as a root invocation. */
+internal fun <T> evaluateCommand(project:Project, configurations:Array<Configuration>, command: Command<T>, input:Array<Pair<String, String>>, listener:EvaluationListener?):T {
+    val holder = CommandBindingHolder(input)
+    command.setupBinding.invoke(holder)
+    holder.locked = true
+
+    return project.evaluate(listener, *configurations, action = command.execute)
+}
+
+/**
+ * Evaluate this task.
+ *
+ * May throw an exception, but not [WemiException], those are indicated by [TaskEvaluationStatus.Exception].
+ *
+ * @param defaultProject to be used if no project is supplied
+ */
+internal fun evaluateKeyOrCommand(task: Task, defaultProject:Project?, listener:EvaluationListener?): TaskEvaluationResult {
+    var project: Project? = defaultProject
+
+    // Parse Project
+    if (task.project != null) {
+        project = AllProjects.findCaseInsensitive(task.project)
+        if (project == null) {
+            return TaskEvaluationResult(null, task.project, TaskEvaluationStatus.NoProject)
+        }
+    } else if (project == null) {
+        return TaskEvaluationResult(null, null, TaskEvaluationStatus.NoProject)
+    }
+
+    // Parse Configurations
+    val configurations = Array(task.configurations.size) { i ->
+        val configString = task.configurations[i]
+        AllConfigurations.findCaseInsensitive(configString)
+            ?: return TaskEvaluationResult(null, configString, TaskEvaluationStatus.NoConfiguration)
+    }
+
+    // Parse Command
+    val command: Command<*>? = BuildScriptData.AllCommands.findCaseInsensitive(task.key)
+
+    // Parse Key
+    val key: Key<*>?
+
+    if (command == null && task.input.isEmpty()) {
+        key = AllKeys.findCaseInsensitive(task.key)
+    } else {
+        key = null
+    }
+
+    return try {
+        val result = if (command != null) {
+            evaluateCommand(project, configurations, command, task.input, listener)
+        } else if (key != null) {
+            project.evaluate(listener, *configurations) {
+                key.get(*task.input)
+            }
+        } else {
+            if (task.input.isNotEmpty() && AllKeys.findCaseInsensitive(task.key) != null) {
+                LOG.warn("Command {} not found, but a key with the same name exists. Remove input parameters to invoke the key.")
+            }
+            return TaskEvaluationResult(null, task.key, TaskEvaluationStatus.NoKey)
+        }
+
+        TaskEvaluationResult(key, result, TaskEvaluationStatus.Success)
+    } catch (e: WemiException.KeyNotAssignedException) {
+        TaskEvaluationResult(key, e, TaskEvaluationStatus.NotAssigned)
+    } catch (e: WemiException) {
+        TaskEvaluationResult(key, e, TaskEvaluationStatus.Exception)
+    } catch (e: Exception) {
+        TaskEvaluationResult(key, WemiException("Unhandled exception", e), TaskEvaluationStatus.Exception)
+    }
 }
 
 /** Listener watching the progress of some nested activities. */

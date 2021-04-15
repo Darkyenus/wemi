@@ -152,7 +152,7 @@ class Configuration internal constructor(val name: String,
 }
 
 /**
- * Holds information about configuration extensions made by [BindingHolder.extend].
+ * Holds information about configuration extensions made by [ExtendableBindingHolder.extend].
  * Values bound to this take precedence over the values [extending].
  *
  * @param extending which configuration is being extended by this extension (for debugging)
@@ -282,7 +282,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
      * @param configurations that should be applied to this [Project]'s [Scope] before [action] is run in it.
      *          It is equivalent to calling [Scope.using] directly in the [action], but more convenient.
      */
-    inline fun <Result> evaluate(listener:EvaluationListener?, vararg configurations:Configuration, action:EvalScope.()->Result):Result {
+    internal inline fun <Result> evaluate(listener:EvaluationListener?, vararg configurations:Configuration, action:EvalScope.()->Result):Result {
         try {
             evaluateLock()
             return EvalScope(this.scopeFor(configurations.toList()), ArrayList(), ArrayList(), NO_INPUT, listener).run(action)
@@ -358,6 +358,35 @@ class Archetype internal constructor(val name: String, val parent:Archetype?) : 
     }
 
     override fun toString(): String = "$name//"
+}
+
+/** Holds transient bindings for a single command evaluation. */
+class CommandBindingHolder internal constructor(internal val input:Array<out Pair<String, String>>) : ExtendableBindingHolder() {
+
+    /** Used by the input subsystem. See Input.kt. */
+    internal var nextFreeInput = 0
+
+    override fun toDescriptiveAnsiString(): String {
+        TODO("not implemented")
+    }
+}
+
+/** A command is similar to a [Key] with a fixed binding, but it can be invoked only from the CLI or from another commands,
+ * and it accepts textual input which can be used to modify the execution scope.
+ *
+ * Functionality should be generally implemented through standard [Key]s and [Command]s should
+ * only serve as a more convenient/interactive UI for them.
+ *
+ * Unlike [Key]s, [Command]s cannot be rebound. */
+@WemiDsl
+class Command<T> internal constructor(val name: String,
+                                      val description: String,
+                                      internal val setupBinding:CommandBindingHolder.() -> Unit,
+                                      internal val execute:Value<T>) : WithDescriptiveString {
+
+    override fun toDescriptiveAnsiString(): String = format(name, format = Format.Bold, foreground = Color.Blue).toString()
+
+    override fun toString(): String = name
 }
 
 /**

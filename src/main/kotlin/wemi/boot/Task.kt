@@ -1,12 +1,12 @@
 package wemi.boot
 
-import wemi.*
+import wemi.Key
+import wemi.WemiException
 import wemi.boot.Task.Companion.FLAG_MACHINE_READABLE_COMMAND
 import wemi.boot.Task.Companion.FLAG_MACHINE_READABLE_OPTIONAL
 import wemi.boot.TaskParser.CONFIGURATION_SEPARATOR
 import wemi.boot.TaskParser.INPUT_SEPARATOR
 import wemi.boot.TaskParser.PROJECT_SEPARATOR
-import wemi.util.findCaseInsensitive
 
 /**
  * Single key or command evaluation settings, unresolved.
@@ -41,77 +41,31 @@ class Task(
         internal val flags: Int = 0) {
 
     internal val isMachineReadableCommand: Boolean
-        get() = couldBeCommand
+        get() = couldBeInternalCommand
                 && (flags and FLAG_MACHINE_READABLE_COMMAND) != 0
 
     internal val isMachineReadableOptional: Boolean
         get() = (flags and FLAG_MACHINE_READABLE_OPTIONAL) != 0
 
-    internal val couldBeCommand: Boolean
+    internal val couldBeInternalCommand: Boolean
         get() = project == null
                 && configurations.isEmpty()
 
     /**
      * Returns first [input] that has given [name] or is free if [orFree].
      */
-    fun firstInput(name:String, orFree:Boolean):String? {
+    internal fun firstInput(name:String, orFree:Boolean):String? {
         return input.find { (it.first.isEmpty() && orFree) || it.first == name }?.second
     }
 
     /**
      * Returns all [input]s that have given [name] or are free
      */
-    fun inputs(name:String):List<String> {
+    internal fun inputs(name:String):List<String> {
         return input.mapNotNull { (n, i) ->
             if (n.isEmpty() || n == name) {
                 i
             } else null
-        }
-    }
-
-    /**
-     * Evaluate this task.
-     *
-     * May throw an exception, but not [WemiException], those are indicated by [TaskEvaluationStatus.Exception].
-     *
-     * @param defaultProject to be used if no project is supplied
-     */
-    fun evaluateKey(defaultProject:Project?, listener:EvaluationListener?): TaskEvaluationResult {
-        var project: Project? = defaultProject
-
-        // Parse Project
-        if (this.project != null) {
-            project = AllProjects.findCaseInsensitive(this.project)
-            if (project == null) {
-                return TaskEvaluationResult(null, this.project, TaskEvaluationStatus.NoProject)
-            }
-        } else if (project == null) {
-            return TaskEvaluationResult(null, null, TaskEvaluationStatus.NoProject)
-        }
-
-        // Parse Configurations
-        val configurations = Array(this.configurations.size) { i ->
-            val configString = this.configurations[i]
-            AllConfigurations.findCaseInsensitive(configString)
-                    ?: return TaskEvaluationResult(null, configString, TaskEvaluationStatus.NoConfiguration)
-        }
-
-        // Parse Key
-        val key = AllKeys.findCaseInsensitive(this.key)
-                ?: return TaskEvaluationResult(null, this.key, TaskEvaluationStatus.NoKey)
-
-        return try {
-            val result = project.evaluate(listener, *configurations) {
-                key.get(*this@Task.input)
-            }
-
-            TaskEvaluationResult(key, result, TaskEvaluationStatus.Success)
-        } catch (e: WemiException.KeyNotAssignedException) {
-            TaskEvaluationResult(key, e, TaskEvaluationStatus.NotAssigned)
-        } catch (e: WemiException) {
-            TaskEvaluationResult(key, e, TaskEvaluationStatus.Exception)
-        } catch (e: Exception) {
-            TaskEvaluationResult(key, WemiException("Unhandled exception", e), TaskEvaluationStatus.Exception)
         }
     }
 
