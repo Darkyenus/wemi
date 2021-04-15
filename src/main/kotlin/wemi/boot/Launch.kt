@@ -19,7 +19,9 @@ import org.slf4j.LoggerFactory
 import wemi.AllProjects
 import wemi.BooleanValidator
 import wemi.BuildScriptData
+import wemi.Configuration
 import wemi.Configurations
+import wemi.Key
 import wemi.Project
 import wemi.WemiException
 import wemi.WithExitCode
@@ -163,6 +165,15 @@ internal val WemiBundledLibrariesExclude = listOf(
  * Tasks will be evaluated directly after build script is loaded and before pre-specified or interactive tasks.
  * After that, it is not allowed to add new tasks. */
 internal var autoRunTasks:ArrayList<Task>? = ArrayList()
+
+fun autoRun(task: Task) {
+    val tasks = autoRunTasks ?: throw IllegalStateException("Too late to register Task auto-run")
+    tasks.add(task)
+}
+
+fun Project.autoRun(key: Key<*>, vararg configurations: Configuration) {
+    autoRun(Task(this.name, configurations.map { it.name }, key.name, emptyArray()))
+}
 
 /** Entry point for the WEMI build tool. */
 fun main(args: Array<String>) {

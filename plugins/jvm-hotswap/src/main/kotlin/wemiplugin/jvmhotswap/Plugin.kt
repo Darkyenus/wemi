@@ -3,6 +3,8 @@ package wemiplugin.jvmhotswap
 import org.slf4j.LoggerFactory
 import wemi.*
 import wemi.KeyDefaults.inProjectDependencies
+import wemi.configuration
+import wemi.key
 import wemi.util.*
 import java.io.DataOutputStream
 import java.io.IOException

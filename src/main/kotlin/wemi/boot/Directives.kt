@@ -4,7 +4,6 @@ package wemi.boot
 
 import org.slf4j.LoggerFactory
 import java.io.BufferedReader
-import WemiVersion
 
 /**
  * Since Java does not guarantee any persistency in ordering of annotation's fields/methods,

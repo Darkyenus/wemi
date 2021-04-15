@@ -5,6 +5,7 @@ package wemi
 import org.slf4j.LoggerFactory
 import wemi.boot.MachineReadableFormatter
 import wemi.util.exists
+import wemi.util.path
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
@@ -49,15 +50,30 @@ internal object BuildScriptData {
 }
 
 /**
- * Delegate used when declaring a new [Project].
+ * Create a new [Project].
+ * To be used as a variable delegate target, example:
+ * ```
+ * val myProject by project(path(".")) {
+ *      // Init
+ *      projectGroup set {"com.example.my.group"}
+ * }
+ * ```
+ * These variables must be declared in the file-level scope of the build script.
+ * Creating projects elsewhere will lead to an undefined behavior.
  *
- * Mostly boilerplate, but takes care of creating, initializing and registering the [Project].
+ * Delegate class takes care of creating, initializing and registering the [Project].
+ *
+ * @param projectRoot path from which all other paths in the project are derived from (null = not set)
+ * @param initializer function which creates key value bindings for the [Project]
  */
-class ProjectDelegate internal constructor(
-        private val projectRoot: Path?,
-        private val archetypes: Array<out Archetype>,
-        private var initializer: (Project.() -> Unit)?
+class ProjectDelegate(
+    private val projectRoot: Path? = path("."),
+    private vararg val archetypes: Archetype = Archetypes.DefaultArchetypes,
+    private var initializer: (Project.() -> Unit)?
 ) : ReadOnlyProperty<Any?, Project>, BindingHolderInitializer {
+
+    constructor(vararg archetypes: Archetype = Archetypes.DefaultArchetypes, initializer: (Project.() -> Unit)?)
+    : this(projectRoot = path("."), archetypes = *archetypes, initializer = initializer)
 
     private lateinit var project: Project
 
@@ -82,9 +98,9 @@ class ProjectDelegate internal constructor(
 }
 
 /**
- * ADVANCED USERS ONLY!!! Use [ProjectDelegate] instead for most uses.
+ * ADVANCED USERS ONLY!!! Use [project] instead for most uses.
  *
- * Create project dynamically, like using the [ProjectDelegate], but without the need to create a separate variable
+ * Create project dynamically, like using the [project], but without the need to create a separate variable
  * for each one.
  *
  * @param name of the project, must be unique and valid Java-like identifier
@@ -93,7 +109,7 @@ class ProjectDelegate internal constructor(
  * @param checkRootUnique if true, check if no other project is in the [root] and warn if so
  * @param initializer to populate the project's [BindingHolder] with bindings (null is used only internally)
  */
-fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRootUnique:Boolean = true, initializer: (Project.() -> Unit)?):Project {
+fun createProject(name:String, root:Path?, vararg archetypes: Archetype, checkRootUnique:Boolean = true, initializer: (Project.() -> Unit)?): Project {
     val usedRoot = root?.toAbsolutePath()
     if (usedRoot != null && !usedRoot.exists()) {
         Files.createDirectories(usedRoot)
@@ -150,18 +166,48 @@ fun createProject(name:String, root:Path?, vararg archetypes:Archetype, checkRoo
     return project
 }
 
+private val NO_INPUT_KEYS = emptyArray<Pair<InputKey, InputKeyDescription>>()
+
 /**
  * Delegate used when declaring a new [Key].
  *
  * Mostly boilerplate, but takes care of creating and registering the [Key].
  */
-class KeyDelegate<V> internal constructor(
-        private val description: String,
-        private val hasDefaultValue: Boolean,
-        private val defaultValue: V?,
-        private val inputKeys: Array<Pair<InputKey, InputKeyDescription>>,
-        private val prettyPrinter: PrettyPrinter<V>?,
-        private val machineReadableFormatter: MachineReadableFormatter<V>?) : ReadOnlyProperty<Any?, Key<V>> {
+class KeyDelegate<V> private constructor(
+    private val description: String,
+    private val hasDefaultValue: Boolean,
+    private val defaultValue: V?,
+    private val inputKeys: Array<Pair<InputKey, InputKeyDescription>>,
+    private val prettyPrinter: PrettyPrinter<V>?,
+    private val machineReadableFormatter: MachineReadableFormatter<V>?) : ReadOnlyProperty<Any?, Key<V>> {
+
+    /**
+     * Create a new [Key] with a default value
+     * To be used as a variable delegate target, example:
+     * ```
+     * val mySetting by key<String>("Key to store my setting")
+     * ```
+     * These variables must be declared in the file-level scope or in an `object`.
+     *
+     * Two keys must not share the same name. Key name is derived from the name of the variable this
+     * key delegate is created by. (Key in example would be called `mySetting`.)
+     *
+     * @param description of the key, to be shown in help UI
+     * @param defaultValue of the key, used when no binding exists. NOTE: Default value is NOT LAZY like standard binding!
+     *          This same instance will be returned on each return, in every scope, so it MUST be immutable!
+     *          Recommended to be used only for keys of [Collection]s with empty immutable default.
+     * @param inputKeys
+     */
+    constructor(description: String, defaultValue: V, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: PrettyPrinter<V>? = null, machineReadableFormatter: MachineReadableFormatter<V>? = null)
+            : this(description, true, defaultValue, inputKeys, prettyPrinter, machineReadableFormatter)
+
+    /**
+     * Create a new [Key] without default value.
+     *
+     * @see [key] with default value for exact documentation
+     */
+    constructor(description: String, inputKeys: Array<Pair<InputKey, InputKeyDescription>> = NO_INPUT_KEYS, prettyPrinter: PrettyPrinter<V>? = null, machineReadableFormatter: MachineReadableFormatter<V>? = null)
+            : this(description, false, null, inputKeys, prettyPrinter, machineReadableFormatter)
 
     private lateinit var key: Key<V>
 
@@ -194,14 +240,30 @@ class KeyDelegate<V> internal constructor(
 }
 
 /**
- * Delegate used when declaring a new [Configuration].
+ * Create a new [Configuration].
+ * To be used as a variable delegate target, example:
+ * ```
+ * val myConfiguration by configuration("Configuration for my stuff") {
+ *      // Set what the configuration will change
+ *      libraryDependencies add { dependency("com.example:library:1.0") }
+ * }
+ * ```
+ * These variables must be declared in the file-level scope of the build script!
+ * Creating configurations elsewhere will lead to an undefined behavior.
  *
- * Mostly boilerplate, but takes care of creating, initializing and registering the [Configuration].
+ * Two configurations must not share the same name. Configuration name is derived from the name of the variable this
+ * configuration delegate is created by. (Configuration in example would be called `myConfiguration`.)
+ *
+ * Delegate takes care of creating, initializing and registering the [Configuration].
+ *
+ * @param description of the configuration, to be shown in help UI
+ * @param axis of the new configuration, none (null) by default
+ * @param initializer function which creates key value bindings for the [Configuration]
  */
-class ConfigurationDelegate internal constructor(
-        private val description: String,
-        private val axis: Axis?,
-        private var initializer: (Configuration.() -> Unit)?)
+class ConfigurationDelegate(
+    private val description: String,
+    private val axis: Axis? = null,
+    private var initializer: (Configuration.() -> Unit)?)
     : ReadOnlyProperty<Any?, Configuration>, BindingHolderInitializer {
 
     private lateinit var configuration: Configuration
@@ -227,9 +289,9 @@ class ConfigurationDelegate internal constructor(
 }
 
 /**
- * ADVANCED USERS ONLY!!! Use [ConfigurationDelegate] instead for most uses.
+ * ADVANCED USERS ONLY!!! Use [configuration] instead for most uses.
  *
- * Create configuration dynamically, like using the [ConfigurationDelegate], but without the need to create a separate variable
+ * Create configuration dynamically, like using the [configuration], but without the need to create a separate variable
  * for each one.
  *
  * @param name of the configuration, must be unique and valid Java-like identifier
@@ -237,7 +299,7 @@ class ConfigurationDelegate internal constructor(
  * @param axis of the configuration
  * @param initializer to populate the configuration's [BindingHolder] with bindings (null is used only internally)
  */
-fun createConfiguration(name:String, description: String, axis: Axis?, initializer: (Configuration.() -> Unit)?):Configuration {
+fun createConfiguration(name:String, description: String, axis: Axis?, initializer: (Configuration.() -> Unit)?): Configuration {
     val configuration = Configuration(name, description, axis ?: Axis(name))
     synchronized(BuildScriptData.AllConfigurations) {
         val existing = BuildScriptData.AllConfigurations[configuration.name]
@@ -254,19 +316,32 @@ fun createConfiguration(name:String, description: String, axis: Axis?, initializ
 }
 
 /**
- * Delegate used when creating new [Project] [Archetype].
+ * Create a new [Archetype].
+ * To be used as a variable delegate target, example:
+ * ```
+ * val myArchetype by archetype {
+ *      // Set what the archetype will set
+ *      compile set { /* Custom compile process, for example. */ }
+ * }
+ * ```
+ *
+ * Two archetypes should not share the same name. Archetype name is derived from the name of the variable this
+ * archetype delegate is created by. (Archetype in example would be called `myArchetype`.)
+ *
+ * @param parent property which holds the parent archetype from which this one inherits its keys, similar to configuration (This is a property instead of [Archetype] directly, because of the need for lazy evaluation).
+ * @param initializer function which creates key value bindings for the [Archetype]. Executed lazily.
  */
-class ArchetypeDelegate internal constructor(
-        private val parent: KProperty0<Archetype>?,
-        private var initializer: (Archetype.() -> Unit)?
+class ArchetypeDelegate(
+    private val parent: KProperty0<Archetype>? = null,
+    private var initializer: (Archetype.() -> Unit)?
 ) : ReadOnlyProperty<Any?, Archetype> {
 
-    private var archetype:Archetype? = null
+    private var archetype: Archetype? = null
 
     /**
      * @see wemi.inject for usage location
      */
-    internal fun inject(additionalInitializer:Archetype.() -> Unit) {
+    internal fun inject(additionalInitializer: Archetype.() -> Unit) {
         if (this.archetype != null) {
             throw IllegalStateException("$archetype is already initialized")
         }
@@ -316,15 +391,16 @@ class ArchetypeDelegate internal constructor(
  * @param setupBinding called to initialize the binding using given input
  * @param execute to execute the command - run in a scope whose top binding is the binding previously passed to setupBinding
  */
-class command<T>(
+class CommandDelegate<T>(
     private val description: String,
-    private val setupBinding:CommandBindingHolder.() -> Unit,
-    private val execute:Value<T>)
+    private val setupBinding: CommandBindingHolder.() -> Unit,
+    private val execute: Value<T>
+)
     : ReadOnlyProperty<Any?, Command<T>> {
 
     private lateinit var command: Command<T>
 
-    operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): command<T> {
+    operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): CommandDelegate<T> {
         this.command = createCommand(property.name, description, setupBinding, execute)
         return this
     }
@@ -343,7 +419,7 @@ class command<T>(
  * @param setupBinding called to initialize the binding using given input
  * @param execute to execute the command - run in a scope whose top binding is the binding previously passed to setupBinding
  */
-fun <T> createCommand(name:String, description: String, setupBinding:CommandBindingHolder.() -> Unit, execute:Value<T>):Command<T> {
+fun <T> createCommand(name:String, description: String, setupBinding: CommandBindingHolder.() -> Unit, execute: Value<T>): Command<T> {
     val command = Command(name, description, setupBinding, execute)
     synchronized(BuildScriptData.AllCommands) {
         val existing = BuildScriptData.AllCommands[command.name]

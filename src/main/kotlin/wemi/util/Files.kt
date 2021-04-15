@@ -4,6 +4,7 @@ package wemi.util
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import wemi.boot.WemiRootFolder
 import java.io.IOException
 import java.io.OutputStreamWriter
 import java.net.URISyntaxException
@@ -18,6 +19,20 @@ import java.nio.file.attribute.*
 import java.util.*
 
 private val LOG = LoggerFactory.getLogger("Files")
+
+/**
+ * Construct a path, from given string, like with [java.nio.file.Paths.get].
+ * If the resulting path is relative, make it absolute by resolving it on [WemiRootFolder].
+ * Resulting path is normalized (though [java.nio.file.Path.normalize]).
+ */
+fun path(path:String):Path {
+    val result = Paths.get(path)
+    return if (result.isAbsolute) {
+        result.normalize()
+    } else {
+        WemiRootFolder.resolve(result).normalize()
+    }
+}
 
 /** Create a new [URL] with [extraPath] appended to the [URL.path].
  * Useful for adding an extension to the file [URL] points to. */

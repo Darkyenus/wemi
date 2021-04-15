@@ -26,6 +26,12 @@ import java.util.concurrent.atomic.AtomicInteger
 typealias InputKey = String
 typealias InputKeyDescription = String
 
+typealias project = ProjectDelegate
+typealias key<T> = KeyDelegate<T>
+typealias configuration = ConfigurationDelegate
+typealias archetype = ArchetypeDelegate
+typealias command<T> = CommandDelegate<T>
+
 /** Generate newline-ended pretty (with ANSI formatting) representation of the object.
  * Of the object is a collection which makes sense truncated, show only `maxElements` amount of elements. */
 typealias PrettyPrinter<V> = ((V, maxElements:Int) -> CharSequence)
@@ -378,7 +384,6 @@ class CommandBindingHolder internal constructor(internal val input:Array<out Pai
  * only serve as a more convenient/interactive UI for them.
  *
  * Unlike [Key]s, [Command]s cannot be rebound. */
-@WemiDsl
 class Command<T> internal constructor(val name: String,
                                       val description: String,
                                       internal val setupBinding:CommandBindingHolder.() -> Unit,

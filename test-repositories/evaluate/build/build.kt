@@ -3,8 +3,17 @@
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.*
 import wemi.util.*
+import wemi.boot.*
 import wemi.dependency.*
+import wemi.run.*
 import wemi.*
+import wemi.Keys.sources
+import wemi.Keys.projectRoot
+import wemi.Keys.compilerOptions
+import wemi.Keys.externalClasspath
+import wemi.Keys.repositories
+import wemi.Keys.libraryDependencies
+import wemi.Keys.run
 
 val someKey by key<String>("")
 val someConfig by configuration("") {
@@ -711,6 +720,6 @@ fun EvalScope.cliProgressTest():Int {
 
 val cliTestProject by project(Archetypes.Base) {
     run set {
-        cliProgressTest()
+        ExitCode(cliProgressTest())
     }
 }

@@ -1,21 +1,11 @@
-@file:Suppress("NOTHING_TO_INLINE", "unused", "CHANGING_ARGUMENTS_EXECUTION_ORDER_FOR_NAMED_VARARGS")
-
-import wemi.Archetypes.DefaultArchetypes
-import wemi.boot.Task
-import wemi.boot.WemiRootFolder
-import wemi.boot.autoRunTasks
-import wemi.dependency.Classifier
-import wemi.dependency.NoClassifier
-import wemi.dependency.ScopeCompile
-import wemi.dependency.TypeJar
-import java.net.URL
-import wemi.kotlinDependency as _kotlinDependency
-import wemi.test.JUnitAPI as _JUnitAPI
-import wemi.test.JUnitEngine as _JUnitEngine
-import wemi.util.div as _div
+import wemi.ArchetypeDelegate
+import wemi.CommandDelegate
+import wemi.ConfigurationDelegate
+import wemi.KeyDelegate
+import wemi.ProjectDelegate
 
 /*
- * Types and values that should be visible in build scripts without any explicit imports
+ * Types that should be visible in build scripts without any explicit imports
  */
 
 // Types
@@ -35,193 +25,15 @@ typealias Archetypes = wemi.Archetypes
 typealias Configurations = wemi.Configurations
 typealias Keys = wemi.Keys
 
+typealias project = ProjectDelegate
+typealias key<T> = KeyDelegate<T>
+typealias configuration = ConfigurationDelegate
+typealias archetype = ArchetypeDelegate
+typealias command<T> = CommandDelegate<T>
+
 typealias Path = java.nio.file.Path
 typealias Paths = java.nio.file.Paths
 typealias Files = java.nio.file.Files
-
-val WemiVersion
-    get() = wemi.boot.WemiVersion
-
-// Core Functions
-inline fun project(vararg archetypes: Archetype = DefaultArchetypes, noinline initializer: Project.() -> Unit) =
-	wemi.project(path("."), archetypes = *archetypes, initializer = initializer)
-
-inline fun project(projectRoot: Path? = path("."), vararg archetypes: Archetype = DefaultArchetypes,
-                   noinline initializer: Project.() -> Unit) = wemi.project(projectRoot, *archetypes, initializer = initializer)
-
-// Helper functions
-inline fun EvalScope.kotlinDependency(name: String) = _kotlinDependency(name)
-inline val JUnitAPI
-    inline get() = _JUnitAPI
-val JUnitEngine
-    inline get() = _JUnitEngine
-
-val ScopeCompile
-    inline get() = wemi.dependency.ScopeCompile
-val ScopeProvided
-    inline get() = wemi.dependency.ScopeProvided
-val ScopeRuntime
-    inline get() = wemi.dependency.ScopeRuntime
-val ScopeTest
-    inline get() = wemi.dependency.ScopeTest
-
-fun dependency(group: String, name: String, version: String,
-               classifier: Classifier = NoClassifier, type: String = TypeJar, scope: wemi.dependency.DepScope = ScopeCompile,
-               optional: Boolean = false, snapshotVersion: String = "",
-               exclusions: List<DependencyExclusion> = emptyList(),
-               dependencyManagement: List<Dependency> = emptyList()): Dependency =
-    wemi.dependency(group, name, version, classifier, type, scope, optional, snapshotVersion, exclusions, dependencyManagement)
-
-fun dependency(groupNameVersionClassifierType: String,
-               scope: wemi.dependency.DepScope = ScopeCompile, optional: Boolean = false,
-               exclusions: List<DependencyExclusion> = emptyList(),
-               snapshotVersion: String = "",
-               dependencyManagement: List<Dependency> = emptyList()): Dependency =
-    wemi.dependency(groupNameVersionClassifierType, scope, optional, exclusions, snapshotVersion, dependencyManagement)
-
-// Path helpers
-/**
- * Construct a path, from given string, like with [java.nio.file.Paths.get].
- * If the resulting path is relative, make it absolute by resolving it on [WemiRootFolder].
- * Resulting path is normalized (though [java.nio.file.Path.normalize]).
- */
-fun path(path:String):Path {
-    val result = Paths.get(path)
-    return if (result.isAbsolute) {
-        result.normalize()
-    } else {
-        WemiRootFolder.resolve(result).normalize()
-    }
-}
-inline operator fun URL.div(path: CharSequence): URL = this._div(path)
-inline operator fun Path.div(path: CharSequence): Path = this._div(path)
-inline operator fun CharSequence.div(path: CharSequence): StringBuilder = this._div(path)
-
-// Miscellaneous
-fun autoRun(task: Task) {
-    val tasks = autoRunTasks ?: throw IllegalStateException("Too late to register Task auto-run")
-    tasks.add(task)
-}
-
-fun Project.autoRun(key:Key<*>, vararg configurations:Configuration) {
-    autoRun(Task(this.name, configurations.map { it.name }, key.name, emptyArray()))
-}
-
-// Configurations
-val testing
-    inline get() = Configurations.testing
-
-// Keys
-val projectGroup
-    inline get() = Keys.projectGroup
-val projectName
-    inline get() = Keys.projectName
-val projectVersion
-    inline get() = Keys.projectVersion
-
-val projectRoot
-    inline get() = Keys.projectRoot
-val buildDirectory
-    inline get() = Keys.buildDirectory
-val cacheDirectory
-    inline get() = Keys.cacheDirectory
-
-val sources
-    inline get() = Keys.sources
-val resources
-    inline get() = Keys.resources
-val testSources
-    inline get() = Keys.testSources
-val testResources
-    inline get() = Keys.testResources
-
-val repositories
-    inline get() = Keys.repositories
-val libraryDependencies
-    inline get() = Keys.libraryDependencies
-val libraryDependencyMapper
-    inline get() = Keys.libraryDependencyMapper
-val resolvedLibraryDependencies
-    inline get() = Keys.resolvedLibraryDependencies
-val unmanagedDependencies
-    inline get() = Keys.unmanagedDependencies
-val projectDependencies
-    inline get() = Keys.projectDependencies
-
-val externalClasspath
-    inline get() = Keys.externalClasspath
-val internalClasspath
-    inline get() = Keys.internalClasspath
-
-val javaHome
-    inline get() = Keys.javaHome
-val kotlinVersion
-    inline get() = Keys.kotlinVersion
-val compilerOptions
-    inline get() = Keys.compilerOptions
-val outputClassesDirectory
-    inline get() = Keys.outputClassesDirectory
-val outputSourcesDirectory
-    inline get() = Keys.outputSourcesDirectory
-val outputHeadersDirectory
-    inline get() = Keys.outputHeadersDirectory
-val kotlinCompiler
-    inline get() = Keys.kotlinCompiler
-val javaCompiler
-    inline get() = Keys.javaCompiler
-val compile
-    inline get() = Keys.compile
-
-val mainClass
-    inline get() = Keys.mainClass
-val runDirectory
-    inline get() = Keys.runDirectory
-val runOptions
-    inline get() = Keys.runOptions
-val runArguments
-    inline get() = Keys.runArguments
-val run
-    inline get() = Keys.run
-
-val testParameters
-    inline get() = Keys.testParameters
-val test
-    inline get() = Keys.test
-
-val archiveJavadocOptions
-    inline get() = Keys.archiveJavadocOptions
-val archiveDokkaOptions
-    inline get() = Keys.archiveDokkaOptions
-val archiveDokkaInterface
-    inline get() = Keys.archiveDokkaInterface
-val archive
-    inline get() = Keys.archive
-val archiveSources
-    inline get() = Keys.archiveSources
-val archiveDocs
-    inline get() = Keys.archiveDocs
-
-val publishMetadata
-    inline get() = Keys.publishMetadata
-val publishRepository
-    inline get() = Keys.publishRepository
-val publishArtifacts
-    inline get() = Keys.publishArtifacts
-val publish
-    inline get() = Keys.publish
-
-val assemblyMergeStrategy
-    inline get() = Keys.assemblyMergeStrategy
-val assemblyRenameFunction
-    inline get() = Keys.assemblyRenameFunction
-val assemblyMapFilter
-    inline get() = Keys.assemblyMapFilter
-val assemblyPrependData
-    inline get() = Keys.assemblyPrependData
-val assemblyOutputFile
-    inline get() = Keys.assemblyOutputFile
-val assembly
-    inline get() = Keys.assembly
 
 // Build script directive annotations
 typealias BuildDependency = wemi.boot.BuildDependency
