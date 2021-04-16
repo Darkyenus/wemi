@@ -125,7 +125,7 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	// Gradle plugin does something like this, but I don't think we need it
 	//Keys.repositories addAll { IntelliJ.intellijPluginRepositories.get().mapNotNull { (it as? IntelliJPluginRepository.Maven)?.repo } }
 	// IntelliJ already contains its own Kotlin stdlib - it would be nice to detect which version is used and use that
-	Keys.automaticKotlinStdlib set { false }
+	Keys.automaticKotlinStdlib put false
 	IntelliJ.intellijInstrumentationClasspath set DefaultInstrumentationClasspath
 	Keys.compile modify { output ->
 		if (IntelliJ.intellijInstrumentCode.get()) {
@@ -138,7 +138,7 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	// Project compilation, archival and publishing
 	IntelliJ.intellijPluginFolder set DefaultIntelliJPluginFolder
 	IntelliJ.intellijPluginArchive set DefaultIntelliJPluginArchive
-	IntelliJ.intellijPluginSearchableOptions set { null }
+	IntelliJ.intellijPluginSearchableOptions put null
 	extend(withSearchableOptions) {
 		IntelliJ.intellijPluginSearchableOptions set DefaultIntelliJSearchableOptions
 	}
@@ -171,7 +171,7 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	Keys.runSystemProperties modify DefaultModifySystemProperties
 	Keys.runOptions modify DefaultModifyRunOptions
 	Keys.javaHome set DefaultJbrJavaHome
-	Keys.mainClass set { "com.intellij.idea.Main" }
+	Keys.mainClass put "com.intellij.idea.Main"
 	Keys.run set {
 		expiresNow()
 		ExitCode(runIde())
@@ -223,7 +223,7 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	// mentions no UI testing (and actually discourages it, as of time of this writing),
 	// this part of the plugin remains untested and a direct port from the gradle plugin.
 	// If you are interested in making this work (or know how it works), feel free to get in touch.
-	IntelliJ.intellijRobotServerDependency set { RobotServerDependency to IntelliJThirdPartyRepo }
+	IntelliJ.intellijRobotServerDependency put (RobotServerDependency to IntelliJThirdPartyRepo)
 	extend(uiTesting) {
 		IntelliJ.intellijIdeSandbox set {
 			val (dep, repo) = IntelliJ.intellijRobotServerDependency.get()

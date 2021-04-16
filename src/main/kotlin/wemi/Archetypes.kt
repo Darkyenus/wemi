@@ -53,8 +53,8 @@ object Archetypes {
      * Implements basic key implementations that don't usually change.
      */
     val Base by archetype {
-        Keys.buildDirectory set Static(WemiBuildFolder)
-        Keys.cacheDirectory set Static(WemiCacheFolder)
+        Keys.buildDirectory put WemiBuildFolder
+        Keys.cacheDirectory put WemiCacheFolder
 
         Keys.resolvedLibraryDependencies set KeyDefaults.ResolvedLibraryDependencies
         Keys.internalClasspath set KeyDefaults.internalClasspath(compile = true)
@@ -84,10 +84,10 @@ object Archetypes {
      * Implements basic key implementations for JVM that don't usually change.
      */
     val JVMBase by archetype(::Base) {
-        Keys.repositories set Static(DefaultRepositories)
+        Keys.repositories put DefaultRepositories
 
-        Keys.javaHome set Static(CurrentProcessJavaHome)
-        Keys.javaCompiler set LazyStatic {
+        Keys.javaHome put CurrentProcessJavaHome
+        Keys.javaCompiler putLazy {
             ToolProvider.getSystemJavaCompiler()
                 ?: throw WemiException("Could not find Java Compiler in the classpath, ensure that you are running Wemi from JDK-bundled JRE. " +
                         "Default java.home property is set to \"${System.getProperty("java.home")}\".")
@@ -101,16 +101,13 @@ object Archetypes {
         Keys.archiveSources modify { it.changeExtensionAndMove("jar") }
 
         Keys.publishMetadata set KeyDefaults.PublishModelM2
-        Keys.publishRepository set Static(LocalM2Repository)
+        Keys.publishRepository put LocalM2Repository
         Keys.publishArtifacts addAll { artifacts(NoClassifier, includeSources = true, includeDocumentation = true) }
         Keys.publish set KeyDefaults.PublishM2
 
-        Keys.assemblyMergeStrategy set {
-            JarMergeStrategyChooser
-        }
-        Keys.assemblyRenameFunction set {
-            DefaultRenameFunction
-        }
+        Keys.assemblyMergeStrategy put JarMergeStrategyChooser
+        Keys.assemblyRenameFunction put DefaultRenameFunction
+
         Keys.assemblyOutputFile set { Keys.buildDirectory.get() / (Keys.projectName.get() + "-" + Keys.projectVersion.get() + "-assembly.jar") }
         Keys.assembly set KeyDefaults.Assembly
     }
@@ -176,7 +173,7 @@ object Archetypes {
 
     /** Primary archetype for projects that produce JavaScript source files as output */
     val KotlinJSProject by archetype(::Base) {
-        Keys.repositories set Static(DefaultRepositories)
+        Keys.repositories put DefaultRepositories
 
         Keys.sources set { FileSet(Keys.projectRoot.get() / "src/main/kotlin") }
         Keys.testSources set { FileSet(Keys.projectRoot.get() / "src/test/kotlin") }
@@ -207,11 +204,11 @@ object Archetypes {
         // in normal, non-testing code as well.
         // The libraries must also be added into the ideImport, because
         // IDE does not (by default) look into configurations.
-        val testingDependencies = Static(listOf(
+        val testingDependencies:Value<Iterable<Dependency>> = { listOf(
                 Dependency(JUnitAPI, scope = ScopeTest),
                 Dependency(JUnitEngine, scope = ScopeTest),
                 Dependency(JUnitPlatformLauncher, scope = ScopeTest)
-        ))
+        ) }
         extend(Configurations.testing) {
             Keys.libraryDependencies addAll testingDependencies
         }

@@ -132,23 +132,23 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSourceSet:FileSet, bui
 
 internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?): Project {
     return Project(WemiBuildScriptProjectName, WemiBuildFolder, emptyArray()).apply {
-        Keys.projectName set Static(WemiBuildScriptProjectName)
-        Keys.projectRoot set Static(WemiBuildFolder)
-        Keys.cacheDirectory set Static (WemiCacheFolder)
-        Keys.compilerOptions set Static (BuildScriptInfo.compilerOptions)
+        Keys.projectName put WemiBuildScriptProjectName
+        Keys.projectRoot put WemiBuildFolder
+        Keys.cacheDirectory put  WemiCacheFolder
+        Keys.compilerOptions put  BuildScriptInfo.compilerOptions
 
         if (buildScriptInfo != null) {
-            Keys.repositories set Static(buildScriptInfo.repositories)
-            Keys.libraryDependencies set Static(buildScriptInfo.dependencies)
-            Keys.unmanagedDependencies set LazyStatic {
+            Keys.repositories put buildScriptInfo.repositories
+            Keys.libraryDependencies put buildScriptInfo.dependencies
+            Keys.unmanagedDependencies putLazy {
                 val dependencies = WMutableList<LocatedPath>()
                 for (unmanagedDependency in buildScriptInfo.unmanagedDependencies) {
                     dependencies.add(LocatedPath(unmanagedDependency))
                 }
                 dependencies
             }
-            Keys.sources set Static(buildScriptInfo.sourceSet)
-            Keys.externalClasspath set LazyStatic {
+            Keys.sources put buildScriptInfo.sourceSet
+            Keys.externalClasspath putLazy {
                 val result = ArrayList<ScopedLocatedPath>(buildScriptInfo.unmanagedDependencies.size + buildScriptInfo.managedDependencies.size)
                 for (dependency in buildScriptInfo.unmanagedDependencies) {
                     result.add(LocatedPath(dependency).scoped(ScopeCompile))
@@ -158,11 +158,11 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
                 }
                 result
             }
-            Keys.internalClasspath set Static(listOf(LocatedPath(buildScriptInfo.scriptJar)))
+            Keys.internalClasspath put listOf(LocatedPath(buildScriptInfo.scriptJar))
             extend(Configurations.ideImport) {
                 // When doing ideImport, internalClasspath should not contain anything we compiled,
                 // only generated classpath, which we technically don't have.
-                Keys.internalClasspath set Static(emptyList())
+                Keys.internalClasspath put emptyList()
             }
 
             Keys.externalSources set KeyDefaults.externalClasspathWithClassifier(SourcesClassifier)

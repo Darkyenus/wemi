@@ -144,7 +144,7 @@ object Configurations {
 
         // Jitpack needs to publish to somewhere within project's repository and to copy it to local maven as well
         val PublishRepositoryRoot = WemiCacheFolder / "-jitpack-out"
-        Keys.publishRepository set { Repository("local-jitpack", PublishRepositoryRoot) }
+        Keys.publishRepository put Repository("local-jitpack", PublishRepositoryRoot)
 
         // Everything which is published inside PublishRepositoryRoot (and we expect to be the case always)
         // should also get copied over to ~/.m2/repository, so that Jitpack can detect it

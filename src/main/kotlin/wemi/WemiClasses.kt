@@ -578,6 +578,57 @@ sealed class BindingHolder : WithDescriptiveString {
     }
 
     /**
+     * Like [set], but the value is static and not dynamically computed.
+     *
+     * Only for values that should be evaluated only once per whole binding,
+     * regardless of Scope. Use only for values with no dependencies on any modifiable input.
+     *
+     * Example:
+     * ```kotlin
+     * projectName put "MyProject"
+     * ```
+     */
+    infix fun <V> Key<V>.put(staticValue: V) {
+        this.set {
+            progressListener?.keyEvaluationFeature("put")
+            staticValue
+        }
+    }
+
+    /**
+     * Something between [set] and [put].
+     * For values that should be evaluated only once, like in [put], but lazily.
+     * Similar to [put] in nature of supported values.
+     *
+     * Example:
+     * ```kotlin
+     * heavyResource putLazy { createHeavyResource() }
+     * ```
+     */
+    infix fun <V> Key<V>.putLazy(lazyValue: () -> V) {
+        this set object : (EvalScope) -> V {
+            private var generator:(()->V)? = lazyValue
+            private var cachedValue:V? = null
+
+            override fun invoke(scope: EvalScope): V {
+                val generator = this.generator
+                val value:V
+                @Suppress("UNCHECKED_CAST")
+                if (generator != null) {
+                    value = generator.invoke()
+                    this.cachedValue = value
+                    this.generator = null
+                    scope.progressListener?.keyEvaluationFeature("first lazy static")
+                } else {
+                    scope.progressListener?.keyEvaluationFeature("lazy static")
+                    value = this.cachedValue as V
+                }
+                return value
+            }
+        }
+    }
+
+    /**
      * Add given [valueModifier] to the list of receiver key modifiers for this scope.
      *
      * When the key is queried and obtained in this or any less significant [BindingHolder] in the [Scope],
@@ -661,52 +712,4 @@ sealed class BindingHolder : WithDescriptiveString {
      * One line string, using only White foreground for non-important stuff and Bold for important stuff.
      */
     abstract override fun toDescriptiveAnsiString(): String
-}
-
-/**
- * Special [Value] for values that should be evaluated only once per whole binding,
- * regardless of Scope. Use only for values with no dependencies on any modifiable input.
- *
- * Example:
- * ```kotlin
- * projectName set Static("MyProject")
- * ```
- *
- * @see LazyStatic for values that are in this nature, but their computation is not trivial
- */
-class Static<V>(private val value:V) : (EvalScope) -> V {
-    override fun invoke(ignored: EvalScope): V {
-        ignored.progressListener?.keyEvaluationFeature("static")
-        return value
-    }
-}
-
-/**
- * Special [Value] for values that should be evaluated only once, but lazily.
- * Similar to [Static] in nature of supported values.
- *
- * Example:
- * ```kotlin
- * heavyResource set LazyStatic { createHeavyResource() }
- * ```
- */
-class LazyStatic<V>(generator:()->V) : (EvalScope) -> V {
-    private var generator:(()->V)? = generator
-    private var cachedValue:V? = null
-
-    override fun invoke(scope: EvalScope): V {
-        val generator = this.generator
-        val value:V
-        @Suppress("UNCHECKED_CAST")
-        if (generator != null) {
-            value = generator.invoke()
-            this.cachedValue = value
-            this.generator = null
-            scope.progressListener?.keyEvaluationFeature("first lazy static")
-        } else {
-            scope.progressListener?.keyEvaluationFeature("lazy static")
-            value = this.cachedValue as V
-        }
-        return value
-    }
 }

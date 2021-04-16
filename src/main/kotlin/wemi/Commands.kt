@@ -9,7 +9,7 @@ object Commands {
 	val run: Command<ExitCode> by command("Proxy for the run key, with ability to specify main class", {
 		val mainClass = read("main", "Main class to start", ClassNameValidator, ask = false)
 		if (mainClass != null) {
-			Keys.mainClass set { mainClass }
+			Keys.mainClass put mainClass
 		}
 	}) { Keys.run.get() }
 
