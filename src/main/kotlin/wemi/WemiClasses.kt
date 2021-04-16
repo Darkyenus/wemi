@@ -385,6 +385,10 @@ class CommandBindingHolder internal constructor(
         return project.evaluate(listener, *configurations, command = this, action = value)
     }
 
+    fun <V> evaluate(vararg configurations: Configuration, value:Value<V>):V {
+        return project.evaluate(listener, *this.configurations + configurations, command = this, action = value)
+    }
+
     override fun toDescriptiveAnsiString(): String {
         val sb = StringBuilder()
         sb.append("CommandBindingHolder").format(Color.White).append("(")

@@ -3,7 +3,6 @@ package wemiplugin.jvmhotswap
 import org.slf4j.LoggerFactory
 import wemi.util.LocatedPath
 import wemi.util.isDirectory
-import wemi.util.isRegularFile
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
