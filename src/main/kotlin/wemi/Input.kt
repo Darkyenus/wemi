@@ -30,7 +30,7 @@ internal val NO_INPUT = emptyArray<Pair<String,String>>()
  * @param ask if value is not already specified, ask the user
  * @return found value or null if validator fails on all possible values
  */
-fun <V> EvalScope.read(key: String, description: String, validator: Validator<V>, ask:Boolean = true): V? {
+fun <V> CommandBindingHolder.read(key: String, description: String, validator: Validator<V>, ask:Boolean = true): V? {
     val input = this.input
 
     // Search in prepared by key
@@ -116,7 +116,7 @@ private val SECRET_KEY_VALUE_REGEX = Pattern.compile("^([a-zA-Z0-9-_.]+)[\\s]*:[
  *      If you do have such file, remember to not push it to version control system!
  *      Keys taken from file are not case sensitive.
  */
-fun <V> EvalScope.readSecret(key:String, description:String, validator:Validator<V>):V? {
+fun <V> CommandBindingHolder.readSecret(key:String, description:String, validator:Validator<V>):V? {
     val input = this.input
 
     // Search in prepared by key

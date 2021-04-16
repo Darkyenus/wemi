@@ -518,11 +518,6 @@ object KeyDefaults {
     val TestParameters: Value<TestParameters> = {
         val testParameters = wemi.test.TestParameters()
         testParameters.classpathRoots.add(Keys.outputClassesDirectory.get().absolutePath)
-
-        read("class", "Include classes, whose fully classified name match this regex", StringValidator, ask=false)?.let {  classPattern ->
-            testParameters.filterClassNamePatterns.included.add(classPattern)
-        }
-
         testParameters
     }
 
