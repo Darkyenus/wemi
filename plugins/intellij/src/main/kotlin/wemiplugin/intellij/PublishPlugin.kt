@@ -1,6 +1,5 @@
 package wemiplugin.intellij
 
-import Configurations
 import org.jetbrains.intellij.pluginRepository.PluginRepositoryFactory
 import org.slf4j.LoggerFactory
 import wemi.Value

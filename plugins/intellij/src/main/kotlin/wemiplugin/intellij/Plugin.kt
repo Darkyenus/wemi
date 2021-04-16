@@ -12,6 +12,7 @@ import wemi.StringValidator
 import wemi.WemiException
 import wemi.archetype
 import wemi.collections.toMutable
+import wemi.command
 import wemi.configuration
 import wemi.dependency
 import wemi.dependency.Dependency
@@ -23,6 +24,7 @@ import wemi.dependency.resolveDependencyArtifacts
 import wemi.generation.generateResources
 import wemi.key
 import wemi.readSecret
+import wemi.readSecretFromFile
 import wemi.run.ExitCode
 import wemi.test.JUnit4Engine
 import wemi.util.LocatedPath
@@ -101,6 +103,19 @@ val searchableOptionsAxis = Axis("searchableOptions")
 val withoutSearchableOptions by configuration("Do not build IntelliJ plugin searchable options", searchableOptionsAxis) {}
 val withSearchableOptions by configuration("Do not build IntelliJ plugin searchable options", searchableOptionsAxis) {}
 
+val intellijPublishPluginToRepository by command("Proxy for intellijPublishPluginToRepository that allows setting the intellijPublishPluginToken") {
+	val pluginName = evaluate { IntelliJ.intellijPluginName.get() }
+	val token = readSecret("intellij-plugin-publish-token-$pluginName",
+		"Publish token for plugin $pluginName. You can get one at https://plugins.jetbrains.com",
+		StringValidator)
+
+	if (token != null) {
+		IntelliJ.intellijPublishPluginToken put token
+	}
+
+	evaluate { IntelliJ.intellijPublishPluginToRepository.get() }
+}
+
 /** A layer over [wemi.Archetypes.JVMBase] which turns the project into an IntelliJ platform plugin. */
 val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 
@@ -144,8 +159,8 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	}
 	IntelliJ.intellijPublishPluginToken set {
 		val pluginName = IntelliJ.intellijPluginName.get()
-		readSecret("intellij-plugin-publish-token-$pluginName", "Publish token for plugin $pluginName. You can get one at https://plugins.jetbrains.com", StringValidator)
-				?: throw WemiException("IntelliJ publish token for plugin $pluginName must be specified")
+		readSecretFromFile("intellij-plugin-publish-token-$pluginName", StringValidator)
+			?: throw WemiException("IntelliJ publish token for plugin $pluginName must be specified")
 	}
 	IntelliJ.intellijPublishPluginToRepository set DefaultIntellijPublishPluginToRepository
 

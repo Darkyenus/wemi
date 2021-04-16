@@ -1,8 +1,5 @@
 package wemiplugin.teavm
 
-import ScopeProvided
-import dependency
-import libraryDependencies
 import org.slf4j.LoggerFactory
 import org.teavm.backend.wasm.render.WasmBinaryVersion
 import org.teavm.tooling.TeaVMProblemRenderer
@@ -18,10 +15,13 @@ import org.teavm.vm.TeaVMProgressFeedback
 import org.teavm.vm.TeaVMProgressListener
 import wemi.KeyDefaults
 import wemi.KeyDefaults.inProjectDependencies
+import wemi.Keys.libraryDependencies
 import wemi.Value
 import wemi.WemiException
 import wemi.archetype
 import wemi.compile.CompilerFlag
+import wemi.dependency
+import wemi.dependency.ScopeProvided
 import wemi.key
 import wemi.util.LocatedPath
 import wemi.util.ensureEmptyDirectory

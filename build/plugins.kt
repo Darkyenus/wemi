@@ -93,3 +93,5 @@ val pluginIntellij by project(path("plugins/intellij"), JavaKotlinProject, JUnit
         )
     }
 }
+
+val pluginProjects = listOf(pluginJvmHotswap, pluginTeaVM, pluginIntellij)

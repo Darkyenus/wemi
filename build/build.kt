@@ -107,6 +107,13 @@ val wemi: Project by project(Archetypes.AggregateJVMProject) {
 				println(testResult.prettyPrint())
 				throw WemiException("Can't build distribution archive when the tests are failing", showStacktrace = false)
 			}
+
+			// Also build all plugins
+			for (pluginProject in pluginProjects) {
+				using(pluginProject) {
+					compile.get()
+				}
+			}
 		}
 
 		val archiveContentDir = distributionArchiveContent.get()

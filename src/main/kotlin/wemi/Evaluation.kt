@@ -140,17 +140,17 @@ class EvalScope @PublishedApi internal constructor(
 
     /** Run the [action] in a scope, which is created by layering [configurations] over this [Scope]. */
     inline fun <Result> using(vararg configurations: Configuration, action: EvalScope.() -> Result): Result {
-        return deriveEvalScope(scope.project.scopeFor(scope.configurations + configurations)).use { it.action() }
+        return deriveEvalScope(scope.project.scopeFor(scope.configurations + configurations, scope.command)).use { it.action() }
     }
 
     /** Run the [action] in a scope, which is created by replacing the project and layering the configurations on top. */
     inline fun <Result> using(project:Project, vararg configurations:Configuration, action: EvalScope.() -> Result): Result {
-        return deriveEvalScope(project.scopeFor(scope.configurations + configurations)).use { it.action() }
+        return deriveEvalScope(project.scopeFor(scope.configurations + configurations, scope.command)).use { it.action() }
     }
 
     /** Run the [action] in a scope, which is created by replacing the project with [scope]. */
     inline fun <Result> using(projectDep: ProjectDependency, action: EvalScope.() -> Result): Result {
-        return deriveEvalScope(projectDep.project.scopeFor(projectDep.configurations.toList() + scope.configurations)).use { it.action() }
+        return deriveEvalScope(projectDep.project.scopeFor(projectDep.configurations.toList() + scope.configurations, scope.command)).use { it.action() }
     }
 
     private fun <V : Output, Output> getKeyValue(key: Key<V>, otherwise: Output, useOtherwise: Boolean): Output {
@@ -353,11 +353,12 @@ fun EvalScope.expiresWith(file: Path) {
 
 /** Evaluate an command. Can be called only as a root invocation. */
 internal fun <T> evaluateCommand(project:Project, configurations:Array<Configuration>, command: Command<T>, input:Array<Pair<String, String>>, listener:EvaluationListener?):T {
-    val holder = CommandBindingHolder(input)
-    command.setupBinding.invoke(holder)
-    holder.locked = true
-
-    return project.evaluate(listener, *configurations, action = command.execute)
+    val holder = CommandBindingHolder(project, configurations, input, listener)
+    try {
+        return command.execute.invoke(holder)
+    } finally {
+        holder.locked = true
+    }
 }
 
 /**

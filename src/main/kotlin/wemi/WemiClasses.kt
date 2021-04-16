@@ -224,18 +224,21 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         }
 
         val size = result.size
-        Array<ExtendableBindingHolder>(size) { result[size - 1 - it] }
+        Array(size) { result[size - 1 - it] }
     }
 
-    private fun createScope(configurations:List<Configuration>):Scope {
+    private fun createScope(configurations:List<Configuration>, command:CommandBindingHolder?):Scope {
         @Suppress("UNCHECKED_CAST")
         val rawHolders:Array<ExtendableBindingHolder> = run {
             val baseHolders = baseHolders
             val baseHoldersSize = baseHolders.size
-            val rawHolders = arrayOfNulls<ExtendableBindingHolder>(baseHoldersSize + configurations.size)
+            val rawHolders = arrayOfNulls<ExtendableBindingHolder>(baseHoldersSize + configurations.size + (if (command == null) 0 else 1))
             System.arraycopy(baseHolders, 0, rawHolders, 0, baseHoldersSize)
             for (i in configurations.indices) {
                 rawHolders[baseHoldersSize + i] = configurations[i]
+            }
+            if (command != null) {
+                rawHolders[rawHolders.lastIndex] = command
             }
             rawHolders as Array<ExtendableBindingHolder>
         }
@@ -255,14 +258,14 @@ class Project internal constructor(val name: String, internal val projectRoot: P
             }
         }
 
-        return Scope(this, configurations, holders)
+        return Scope(this, configurations, command, holders)
     }
 
     internal val scopeCache = HashMap<List<Configuration>, Scope>()
 
     /** Create base [Scope] in which evaluation tree for this [Project] can start. */
     @PublishedApi
-    internal fun scopeFor(parts:List<Configuration>):Scope {
+    internal fun scopeFor(parts:List<Configuration>, command:CommandBindingHolder?):Scope {
         // Filter it
         val filteredParts = ArrayList<Configuration>(parts.size)
         val usedAxes = BitSet()
@@ -276,7 +279,11 @@ class Project internal constructor(val name: String, internal val projectRoot: P
         }
         filteredParts.reverse()
 
-        return scopeCache.getOrPut(filteredParts) { createScope(filteredParts) }
+        if (command != null) {
+            return createScope(filteredParts, command)
+        }
+
+        return scopeCache.getOrPut(filteredParts) { createScope(filteredParts, null) }
     }
 
     /**
@@ -288,10 +295,10 @@ class Project internal constructor(val name: String, internal val projectRoot: P
      * @param configurations that should be applied to this [Project]'s [Scope] before [action] is run in it.
      *          It is equivalent to calling [Scope.using] directly in the [action], but more convenient.
      */
-    internal inline fun <Result> evaluate(listener:EvaluationListener?, vararg configurations:Configuration, action:EvalScope.()->Result):Result {
+    internal inline fun <Result> evaluate(listener:EvaluationListener?, vararg configurations:Configuration, command:CommandBindingHolder? = null, action:EvalScope.()->Result):Result {
         try {
             evaluateLock()
-            return EvalScope(this.scopeFor(configurations.toList()), ArrayList(), ArrayList(), listener).run(action)
+            return EvalScope(this.scopeFor(configurations.toList(), command), ArrayList(), ArrayList(), listener).run(action)
         } finally {
             evaluateUnlock()
         }
@@ -367,7 +374,16 @@ class Archetype internal constructor(val name: String, val parent:Archetype?) : 
 }
 
 /** Holds transient bindings for a single command evaluation. */
-class CommandBindingHolder internal constructor(internal val input:Array<out Pair<String, String>>) : ExtendableBindingHolder() {
+class CommandBindingHolder internal constructor(
+    private val project: Project,
+    private val configurations: Array<Configuration>,
+    internal val input: Array<Pair<String, String>>,
+    private val listener: EvaluationListener?
+) : ExtendableBindingHolder() {
+
+    fun <V> evaluate(value:Value<V>):V {
+        return project.evaluate(listener, *configurations, command = this, action = value)
+    }
 
     override fun toDescriptiveAnsiString(): String {
         val sb = StringBuilder()
@@ -395,8 +411,7 @@ class CommandBindingHolder internal constructor(internal val input:Array<out Pai
  * Unlike [Key]s, [Command]s cannot be rebound. */
 class Command<T> internal constructor(val name: String,
                                       val description: String,
-                                      internal val setupBinding:CommandBindingHolder.() -> Unit,
-                                      internal val execute:Value<T>) : WithDescriptiveString {
+                                      internal val execute:CommandBindingHolder.() -> T) : WithDescriptiveString {
 
     override fun toDescriptiveAnsiString(): String = format(name, format = Format.Bold, foreground = Color.Blue).toString()
 
@@ -411,9 +426,10 @@ class Command<T> internal constructor(val name: String,
  * @param bindingHolders list of holders contributing to the scope's holder stack. Most significant holders last.
  */
 class Scope internal constructor(
-        val project:Project,
-        val configurations:List<Configuration>,
-        internal val bindingHolders:List<BindingHolder>) {
+    val project:Project,
+    val configurations:List<Configuration>,
+    @PublishedApi internal val command:CommandBindingHolder?,
+    internal val bindingHolders:List<BindingHolder>) {
 
     private val configurationScopeCache: MutableMap<Configuration, Scope> = HashMap()
 

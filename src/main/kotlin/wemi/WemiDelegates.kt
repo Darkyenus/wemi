@@ -388,20 +388,17 @@ class ArchetypeDelegate(
  * This delegate object takes care of creating, initializing and registering the [Command].
  *
  * @param description of the command
- * @param setupBinding called to initialize the binding using given input
- * @param execute to execute the command - run in a scope whose top binding is the binding previously passed to setupBinding
+ * @param execute to execute the command see [CommandBindingHolder]
  */
 class CommandDelegate<T>(
     private val description: String,
-    private val setupBinding: CommandBindingHolder.() -> Unit,
-    private val execute: Value<T>
-)
-    : ReadOnlyProperty<Any?, Command<T>> {
+    private val execute: CommandBindingHolder.() -> T
+) : ReadOnlyProperty<Any?, Command<T>> {
 
     private lateinit var command: Command<T>
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): CommandDelegate<T> {
-        this.command = createCommand(property.name, description, setupBinding, execute)
+        this.command = createCommand(property.name, description, execute)
         return this
     }
 
@@ -416,11 +413,10 @@ class CommandDelegate<T>(
  *
  * @param name of the command, must be unique and valid Java-like identifier
  * @param description of the command
- * @param setupBinding called to initialize the binding using given input
- * @param execute to execute the command - run in a scope whose top binding is the binding previously passed to setupBinding
+ * @param execute to execute the command - see [CommandBindingHolder]
  */
-fun <T> createCommand(name:String, description: String, setupBinding: CommandBindingHolder.() -> Unit, execute: Value<T>): Command<T> {
-    val command = Command(name, description, setupBinding, execute)
+fun <T> createCommand(name:String, description: String, execute: CommandBindingHolder.() -> T): Command<T> {
+    val command = Command(name, description, execute)
     synchronized(BuildScriptData.AllCommands) {
         val existing = BuildScriptData.AllCommands[command.name]
         if (existing != null) {

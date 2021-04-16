@@ -145,28 +145,7 @@ fun <V> CommandBindingHolder.readSecret(key:String, description:String, validato
     }
 
     // Read file
-    val secretsFile = WemiBuildFolder / "wemi-secrets.txt"
-    val secretFromFile = try {
-        Files.lines(secretsFile).map { line ->
-            val matcher = SECRET_KEY_VALUE_REGEX.matcher(line)
-            if (matcher.matches() && matcher.group(1).equals(key, ignoreCase = true)) {
-                matcher.group(2)
-            } else null
-        }.filter { it != null }.findFirst().orElse(null)
-    } catch (e:NoSuchFileException) {
-        LOG.info("Not reading secret {} from {} - file does not exist")
-        null
-    } catch (e:Exception) {
-        LOG.warn("Failed to read {} to obtain {}", secretsFile, key, e)
-        null
-    }
-    if (secretFromFile != null) {
-        validator(secretFromFile).use({ success ->
-            return success
-        }, {
-            LOG.warn("Can't use value of secret key {} from {}, because the value does not pass validation: {}", key, secretsFile, it.replace(secretFromFile, "<secret>"))
-        })
-    }
+    readSecretFromFile(key, validator)?.let { return it }
 
     // Still no hit, read interactively
     if (!WemiRunningInInteractiveMode) {
@@ -200,6 +179,34 @@ fun <V> CommandBindingHolder.readSecret(key:String, description:String, validato
     } catch (e: EndOfFileException) {
         return null
     }
+}
+
+fun <V> readSecretFromFile(key:String, validator:Validator<V>):V? {
+    // Read file
+    val secretsFile = WemiBuildFolder / "wemi-secrets.txt"
+    val secretFromFile = try {
+        Files.lines(secretsFile).map { line ->
+            val matcher = SECRET_KEY_VALUE_REGEX.matcher(line)
+            if (matcher.matches() && matcher.group(1).equals(key, ignoreCase = true)) {
+                matcher.group(2)
+            } else null
+        }.filter { it != null }.findFirst().orElse(null)
+    } catch (e:NoSuchFileException) {
+        LOG.info("Not reading secret {} from {} - file does not exist")
+        null
+    } catch (e:Exception) {
+        LOG.warn("Failed to read {} to obtain {}", secretsFile, key, e)
+        null
+    }
+    if (secretFromFile != null) {
+        validator(secretFromFile).use({ success ->
+            return success
+        }, {
+            LOG.warn("Can't use value of secret key {} from {}, because the value does not pass validation: {}", key, secretsFile, it.replace(secretFromFile, "<secret>"))
+        })
+    }
+
+    return null
 }
 
 
