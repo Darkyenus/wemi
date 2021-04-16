@@ -544,7 +544,7 @@ object KeyDefaults {
                     javaExecutable, directory, classpathEntries,
                     TEST_LAUNCHER_MAIN_CLASS.name, options, emptyList(), environment)
 
-            val testParameters = Keys.testParameters.get(*input) // Input passthrough
+            val testParameters = Keys.testParameters.get()
 
             val report = handleProcessForTesting(processBuilder, testParameters)
                     ?: throw WemiException("Test execution failed, see logs for more information", showStacktrace = false)

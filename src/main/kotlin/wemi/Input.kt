@@ -14,9 +14,6 @@ import java.util.regex.Pattern
 
 private val LOG = LoggerFactory.getLogger("Input")
 
-@PublishedApi
-internal val NO_INPUT = emptyArray<Pair<String,String>>()
-
 /**
  * Read a [V] from the input.
  * The value is first searched for using the [key] from explicit input pairs.
@@ -30,7 +27,7 @@ internal val NO_INPUT = emptyArray<Pair<String,String>>()
  * @param ask if value is not already specified, ask the user
  * @return found value or null if validator fails on all possible values
  */
-fun <V> CommandBindingHolder.read(key: String, description: String, validator: Validator<V>, ask:Boolean = true): V? {
+fun <V> CommandBindingHolder.read(key: String, description: String, validator: Validator<V>, ask:Boolean = true, acceptFree:Boolean = false): V? {
     val input = this.input
 
     // Search in prepared by key
@@ -48,22 +45,21 @@ fun <V> CommandBindingHolder.read(key: String, description: String, validator: V
     }
 
     // Search in prepared for free
-    // Move nextFreeInput to a valid index of free input
-    while (nextFreeInput < input.size && input[nextFreeInput].first.isNotEmpty()) {
-        nextFreeInput++
-    }
-    // Try to use it
-    if (nextFreeInput < input.size) {
-        val freeInput = input[nextFreeInput].second
-        validator(freeInput).use({
-            // We will use this free input
-            SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key)).add(freeInput)
-            SimpleHistory.getHistory(SimpleHistory.inputHistoryName(null)).add(freeInput)
-            nextFreeInput++
-            return it
-        }, {
-            LOG.info("Can't use free '{}' for input key '{}': {}", freeInput, key, it)
-        })
+    if (acceptFree) {
+        for ((preparedKey, preparedValue) in input) {
+            if (preparedKey.isNotEmpty()) {
+                continue
+            }
+
+            validator(preparedValue).use({
+                // We will use this free input
+                SimpleHistory.getHistory(SimpleHistory.inputHistoryName(key)).add(preparedValue)
+                SimpleHistory.getHistory(SimpleHistory.inputHistoryName(null)).add(preparedValue)
+                return it
+            }, {
+                LOG.info("Can't use free '{}' for input key '{}': {}", preparedValue, key, it)
+            })
+        }
     }
 
     if (!ask) {
@@ -116,7 +112,7 @@ private val SECRET_KEY_VALUE_REGEX = Pattern.compile("^([a-zA-Z0-9-_.]+)[\\s]*:[
  *      If you do have such file, remember to not push it to version control system!
  *      Keys taken from file are not case sensitive.
  */
-fun <V> CommandBindingHolder.readSecret(key:String, description:String, validator:Validator<V>):V? {
+fun <V> CommandBindingHolder.readSecret(key:String, description:String, validator:Validator<V>, acceptFree:Boolean = false):V? {
     val input = this.input
 
     // Search in prepared by key
@@ -133,20 +129,19 @@ fun <V> CommandBindingHolder.readSecret(key:String, description:String, validato
     }
 
     // Search in prepared for free
-    // Move nextFreeInput to a valid index of free input
-    while (nextFreeInput < input.size && input[nextFreeInput].first.isNotEmpty()) {
-        nextFreeInput++
-    }
-    // Try to use it
-    if (nextFreeInput < input.size) {
-        val freeInput = input[nextFreeInput].second
-        validator(freeInput).use({
-            // We will use this free input
-            nextFreeInput++
-            return it
-        }, {
-            LOG.info("Can't use specified free input value for input key '{}': {}", key, it.replace(freeInput, "<secret>"))
-        })
+    if (acceptFree) {
+        for ((preparedKey, preparedValue) in input) {
+            if (preparedKey.isNotEmpty()) {
+                continue
+            }
+
+            validator(preparedValue).use({
+                // We will use this free input
+                return it
+            }, {
+                LOG.info("Can't use specified free input value for input key '{}'", key)
+            })
+        }
     }
 
     // Read file

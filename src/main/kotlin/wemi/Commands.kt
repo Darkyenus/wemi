@@ -4,7 +4,7 @@ import wemi.run.ExitCode
 import wemi.test.TestReport
 
 /** [Command]s that are included with Wemi. */
-object DefaultCommands {
+object Commands {
 
 	val run: Command<ExitCode> by command("Proxy for the run key, with ability to specify main class", {
 		val mainClass = read("main", "Main class to start", ClassNameValidator, ask = false)

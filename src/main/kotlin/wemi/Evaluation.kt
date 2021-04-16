@@ -51,32 +51,24 @@ class Binding<T> constructor(val key:Key<T>,
     internal val dependsOn = ArrayList<Binding<*>>()
 
     internal var lastEvaluated:Int = LAST_EVALUATED_NEVER
-    /* Evaluating key repeatedly with different input will trash the cache.
-    It is not expected to happen, so we do not optimize for it.
-    (Besides, changing values of any other dependency key will do the same) */
-    internal var lastEvaluatedWithInput:Array<out Pair<String, String>> = NO_INPUT
     internal var lastEvaluatedTo:T? = null
     internal var lastEvaluationExpirationTriggers = ArrayList<() -> Boolean>()
 
     internal enum class Freshness(val fresh:Boolean, val listenerMessage:String) {
         Fresh(true, "from cache"),
         FreshThisTick(true, "from cache (already evaluated)"),
-        DifferentInput(false, "re-evaluated (different input)"),
         FirstEvaluation(false, "first evaluation"),
         ExplicitlyExpired(false, "re-evaluated (explicit expiry)"),
         ExplicitlyForcedToExpire(false, "re-evaluated (same-tick forced expiry)"),
         ChildNotFresh(false, "re-evaluated (child expired)")
     }
 
-    internal fun isFresh(forInput:Array<out Pair<String, String>>):Freshness {
+    internal fun isFresh():Freshness {
         if (lastEvaluated == LAST_EVALUATED_NEVER) {
             return Freshness.FirstEvaluation
         }
         if (lastEvaluated == LAST_EVALUATED_FORCE_EXPIRED) {
             return Freshness.ExplicitlyForcedToExpire
-        }
-        if (!lastEvaluatedWithInput.contentEquals(forInput)) {
-            return Freshness.DifferentInput
         }
         if (lastEvaluated == globalTickTime) {
             return Freshness.FreshThisTick
@@ -86,7 +78,7 @@ class Binding<T> constructor(val key:Key<T>,
             return Freshness.ExplicitlyExpired
         }
         for (binding in dependsOn) {
-            if (!binding.isFresh(binding.lastEvaluatedWithInput).fresh) {
+            if (!binding.isFresh().fresh) {
                 return Freshness.ChildNotFresh
             }
         }
@@ -124,11 +116,7 @@ class EvalScope @PublishedApi internal constructor(
         @PublishedApi internal val scope:Scope,
         @PublishedApi internal val usedBindings: ArrayList<Binding<*>>,
         @PublishedApi internal val expirationTriggers: ArrayList<() -> Boolean>,
-        val input:Array<out Pair<String, String>>,
         val progressListener:EvaluationListener?) : Closeable {
-
-    /** Used by the input subsystem. See Input.kt. */
-    internal var nextFreeInput = 0
 
     private var closed = false
 
@@ -147,7 +135,7 @@ class EvalScope @PublishedApi internal constructor(
     @PublishedApi
     internal fun deriveEvalScope(scope:Scope):EvalScope {
         ensureNotClosed()
-        return EvalScope(scope, usedBindings, expirationTriggers, input, progressListener)
+        return EvalScope(scope, usedBindings, expirationTriggers, progressListener)
     }
 
     /** Run the [action] in a scope, which is created by layering [configurations] over this [Scope]. */
@@ -165,7 +153,7 @@ class EvalScope @PublishedApi internal constructor(
         return deriveEvalScope(projectDep.project.scopeFor(projectDep.configurations.toList() + scope.configurations)).use { it.action() }
     }
 
-    private fun <V : Output, Output> getKeyValue(key: Key<V>, otherwise: Output, useOtherwise: Boolean, input:Array<out Pair<String, String>>): Output {
+    private fun <V : Output, Output> getKeyValue(key: Key<V>, otherwise: Output, useOtherwise: Boolean): Output {
         ensureNotClosed()
         val listener = progressListener
         listener?.keyEvaluationStarted(scope, key)
@@ -182,7 +170,7 @@ class EvalScope @PublishedApi internal constructor(
         // Record we used this key to fill current binding information
         usedBindings.add(binding)
 
-        val bindingFresh = binding.isFresh(input)
+        val bindingFresh = binding.isFresh()
         listener?.keyEvaluationFeature(bindingFresh.listenerMessage)
         val result:V = if (bindingFresh.fresh) {
             @Suppress("UNCHECKED_CAST")
@@ -193,7 +181,7 @@ class EvalScope @PublishedApi internal constructor(
             binding.lastEvaluationExpirationTriggers.clear()
 
             val result:V =
-            EvalScope(scope, newDependsOn, binding.lastEvaluationExpirationTriggers, input, listener).use { evalScope ->
+            EvalScope(scope, newDependsOn, binding.lastEvaluationExpirationTriggers, listener).use { evalScope ->
                 val boundValue = binding.value
                 var result =
                 if (boundValue == null) {
@@ -230,7 +218,6 @@ class EvalScope @PublishedApi internal constructor(
             }
 
             binding.lastEvaluated = globalTickTime
-            binding.lastEvaluatedWithInput = input
             binding.lastEvaluatedTo = result
 
             binding.dependsOn.clear()
@@ -247,15 +234,15 @@ class EvalScope @PublishedApi internal constructor(
 
     /** Return the value bound to this wemi.key in this scope.
      * Throws exception if no value set. */
-    fun <V> Key<V>.get(vararg input:Pair<String, String> = NO_INPUT): V {
+    fun <V> Key<V>.get(): V {
         @Suppress("UNCHECKED_CAST")
-        return getKeyValue(this, null, false, input) as V
+        return getKeyValue(this, null, false) as V
     }
 
     /** Return the value bound to this wemi.key in this scope.
      * Returns [unset] if no value set. */
-    fun <V : Else, Else> Key<V>.getOrElse(unset: Else, vararg input:Pair<String, String> = NO_INPUT): Else {
-        return getKeyValue(this, unset, true, input)
+    fun <V : Else, Else> Key<V>.getOrElse(unset: Else): Else {
+        return getKeyValue(this, unset, true)
     }
 
     /** Value that will be eventually returned as a result of this evaluation will additionally expire when [isExpired]
@@ -352,7 +339,7 @@ class EvalScope @PublishedApi internal constructor(
     }
 
     override fun toString(): String {
-        return "EvalScope($scope, input=${input.contentToString()})"
+        return "EvalScope($scope)"
     }
 }
 
@@ -417,7 +404,7 @@ internal fun evaluateKeyOrCommand(task: Task, defaultProject:Project?, listener:
             evaluateCommand(project, configurations, command, task.input, listener)
         } else if (key != null) {
             project.evaluate(listener, *configurations) {
-                key.get(*task.input)
+                key.get()
             }
         } else {
             if (task.input.isNotEmpty() && AllKeys.findCaseInsensitive(task.key) != null) {

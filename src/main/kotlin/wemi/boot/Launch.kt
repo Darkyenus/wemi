@@ -21,6 +21,7 @@ import wemi.BooleanValidator
 import wemi.BuildScriptData
 import wemi.Configuration
 import wemi.Configurations
+import wemi.Commands
 import wemi.Key
 import wemi.Project
 import wemi.WemiException
@@ -365,8 +366,9 @@ fun main(args: Array<String>) {
     // Process initializers
     BuildScriptData.flushInitializers()
 
-    // - Ensure Configurations are loaded -
+    // - Ensure Configurations and Commands are loaded -
     Configurations
+    Commands
     // ------------------------------------
 
     // Auto-run

@@ -291,7 +291,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
     internal inline fun <Result> evaluate(listener:EvaluationListener?, vararg configurations:Configuration, action:EvalScope.()->Result):Result {
         try {
             evaluateLock()
-            return EvalScope(this.scopeFor(configurations.toList()), ArrayList(), ArrayList(), NO_INPUT, listener).run(action)
+            return EvalScope(this.scopeFor(configurations.toList()), ArrayList(), ArrayList(), listener).run(action)
         } finally {
             evaluateUnlock()
         }
@@ -369,11 +369,20 @@ class Archetype internal constructor(val name: String, val parent:Archetype?) : 
 /** Holds transient bindings for a single command evaluation. */
 class CommandBindingHolder internal constructor(internal val input:Array<out Pair<String, String>>) : ExtendableBindingHolder() {
 
-    /** Used by the input subsystem. See Input.kt. */
-    internal var nextFreeInput = 0
-
     override fun toDescriptiveAnsiString(): String {
-        TODO("not implemented")
+        val sb = StringBuilder()
+        sb.append("CommandBindingHolder").format(Color.White).append("(")
+        input.joinTo(sb, ", ")
+        sb.format(Color.White).append(")").format()
+        return sb.toString()
+    }
+
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.append("CommandBindingHolder(")
+        input.joinTo(sb, ", ")
+        sb.append(")")
+        return sb.toString()
     }
 }
 
