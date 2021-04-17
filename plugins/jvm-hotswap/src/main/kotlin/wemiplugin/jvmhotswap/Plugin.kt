@@ -8,7 +8,6 @@ import wemi.boot.CLI
 import wemi.collections.toMutable
 import wemi.command
 import wemi.configuration
-import wemi.key
 import wemi.keys.internalClasspath
 import wemi.keys.outputClassesDirectory
 import wemi.keys.runOptions
@@ -36,22 +35,8 @@ import java.util.concurrent.TimeUnit
 object JvmHotswap {
 
     private val LOG = LoggerFactory.getLogger("Hotswap")
-    private const val DEFAULT_HOTSWAP_AGENT_PORT = 5015
 
-    val hotswapAgentPort by key("Network port used to communicate with hotswap agent", DEFAULT_HOTSWAP_AGENT_PORT)
-
-    val runningHotswap by configuration("Used for initial compilation and process creation of the hotswapped process") {
-        runOptions modify {
-            val options = it.toMutable()
-            val port = hotswapAgentPort.get()
-            val agentJar = Magic.classpathFileOf(JvmHotswap.javaClass)!!
-            LOG.debug("Agent jar: {}", agentJar)
-            options.add("-javaagent:${agentJar.absolutePath}=$port")
-            options
-        }
-    }
-
-    val recompilingHotswap by configuration("Used for later compilations of the hotswapped process") {
+    val recompilingHotswap by configuration("Used when recompiling the hotswapped process") {
         outputClassesDirectory modify { dir ->
             dir.parent / "${dir.name}-hotswap"
         }
@@ -66,32 +51,41 @@ object JvmHotswap {
     Strings are sent through Java's DataOutputStream.
      */
     val runHotswap: Command<ExitCode> by command("Compile and run the project, watch changes to source files and recompile+hotswap them automatically") {
-        var processBuilder: ProcessBuilder? = null
-        var sources: FileSet? = null
-        var port = DEFAULT_HOTSWAP_AGENT_PORT
-        val initialInternalClasspath = ArrayList<LocatedPath>()
-        evaluate(runningHotswap) {
-            processBuilder = runProcess.get()
-            sources = wemi.keys.sources.get().let {
-                var result = it
-                inProjectDependencies {
-                    result += wemi.keys.sources.get()
-                }
-                result
-            }
-            port = hotswapAgentPort.get()
-            initialInternalClasspath.addAll(internalClasspath.get())
-            inProjectDependencies {
-                initialInternalClasspath.addAll(internalClasspath.get())
-            }
-        }
-
         // Start server
         try {
-            ServerSocket(port, 1, InetAddress.getLoopbackAddress())
+            ServerSocket(0, 1, InetAddress.getLoopbackAddress())
         } catch (e: IOException) {
-            throw WemiException("Failed to bind agent-listener to port $port", e)
+            throw WemiException("Failed to bind agent-listener server socket", e)
         }.use { server ->
+            val port = server.localPort
+
+            var processBuilder: ProcessBuilder? = null
+            var sources: FileSet? = null
+            val initialInternalClasspath = ArrayList<LocatedPath>()
+
+            runOptions modify {
+                val options = it.toMutable()
+                val agentJar = Magic.classpathFileOf(JvmHotswap.javaClass)!!
+                LOG.debug("Agent jar: {}", agentJar)
+                options.add("-javaagent:${agentJar.absolutePath}=$port")
+                options
+            }
+
+            evaluate {
+                processBuilder = runProcess.get()
+                sources = wemi.keys.sources.get().let {
+                    var result = it
+                    inProjectDependencies {
+                        result += wemi.keys.sources.get()
+                    }
+                    result
+                }
+                initialInternalClasspath.addAll(internalClasspath.get())
+                inProjectDependencies {
+                    initialInternalClasspath.addAll(internalClasspath.get())
+                }
+            }
+
             // Create initial snapshot of sources
             val sourceIncluded: (LocatedPath) -> Boolean = { !it.file.isHidden() }
             var sourceSnapshot = snapshotFiles(sources.matchingLocatedFiles(), sourceIncluded)
@@ -134,7 +128,6 @@ object JvmHotswap {
                     }
 
                     var changeCount = 0
-                    var changedClass = ""
 
                     // We can't do anything about added classes (those should get picked up automatically),
                     // nor removed classes. So just detect what has changed and recompile it.
@@ -145,8 +138,8 @@ object JvmHotswap {
                             // This file changed!
                             outputStream.writeUTF(newFile.absolutePath)
                             changeCount++
-                            changedClass = key
                         }
+                        LOG.debug("{} changed", key)
                     }
 
                     if (changeCount > 0) {
@@ -154,12 +147,7 @@ object JvmHotswap {
                     }
 
                     classpathSnapshot = newClasspathSnapshot
-
-                    if (changeCount == 1) {
-                        LOG.info("Swapped {}", changedClass)
-                    } else if (changeCount > 1) {
-                        LOG.info("Swapped {} and {} more", changedClass, changeCount - 1)
-                    }
+                    LOG.debug("Recompilation done - {} change(s)", changeCount)
                 }
             }
 
