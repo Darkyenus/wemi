@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory
 import wemi.AllProjects
 import wemi.AllProjectsMutable
 import wemi.BooleanValidator
-import wemi.BuildScriptData
 import wemi.Configuration
 import wemi.Key
 import wemi.Project
@@ -27,6 +26,7 @@ import wemi.WemiException
 import wemi.WithExitCode
 import wemi.dependency.DependencyExclusion
 import wemi.evaluateKeyOrCommand
+import wemi.flushInitializers
 import wemi.util.Color
 import wemi.util.FileSet
 import wemi.util.SystemInfo
@@ -362,13 +362,13 @@ fun main(args: Array<String>) {
         exitProcess(EXIT_CODE_BUILD_SCRIPT_COMPILATION_ERROR)
     }
 
-    // Process initializers
-    BuildScriptData.flushInitializers()
-
     // - Ensure Configurations and Commands are loaded -
     wemi.configurations.testing
     wemi.commands.run
     // ------------------------------------
+
+    // Process initializers
+    flushInitializers()
 
     // Auto-run
     val autoRunTasks = autoRunTasks!!

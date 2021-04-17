@@ -20,32 +20,31 @@ private val LOG = LoggerFactory.getLogger("Wemi")
 
 private typealias BindingHolderInitializer = () -> Unit
 
-/** Internal structure holding all loaded build script data. */
-internal object BuildScriptData {
+/**
+ * List of lazy initializers.
+ * Projects and configurations are initialized lazily, to allow cyclic dependencies.
+ *
+ * When null, startup initialization has already been done and further initializations should happen eagerly.
+ */
+private var PendingInitializers:ArrayList<BindingHolderInitializer>? = ArrayList()
 
-    /**
-     * List of lazy initializers.
-     * Projects and configurations are initialized lazily, to allow cyclic dependencies.
-     *
-     * When null, startup initialization has already been done and further initializations should happen eagerly.
-     */
-    var PendingInitializers:ArrayList<BindingHolderInitializer>? = ArrayList()
-        private set
-
-    fun flushInitializers() {
-        while (true) {
-            val initializerList = PendingInitializers ?: return
-            if (initializerList.isEmpty()) {
-                break
-            }
-            PendingInitializers = ArrayList()
-            LOG.debug("Flushing initializers")
-            for (function in initializerList) {
-                function()
-            }
+internal fun flushInitializers() {
+    while (true) {
+        val initializerList = PendingInitializers ?: return
+        if (initializerList.isEmpty()) {
+            break
         }
-        PendingInitializers = null
+        PendingInitializers = ArrayList()
+        LOG.debug("Flushing initializers")
+        for (function in initializerList) {
+            function()
+        }
     }
+    PendingInitializers = null
+}
+
+private fun enqueueInitializer(initializer:BindingHolderInitializer) {
+    PendingInitializers?.add(initializer) ?: initializer()
 }
 
 /**
@@ -89,7 +88,7 @@ class ProjectDelegate(
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): ProjectDelegate {
         this.project = createProject(property.name, projectRoot, *archetypes, checkRootUnique = true, initializer = null)
-        BuildScriptData.PendingInitializers?.add(this) ?: this()
+        enqueueInitializer(this)
         return this
     }
 
@@ -282,7 +281,7 @@ class ConfigurationDelegate(
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): ConfigurationDelegate {
         this.configuration = createConfiguration(property.name, description, axis, null)
-        BuildScriptData.PendingInitializers?.add(this) ?: this()
+        enqueueInitializer(this)
         return this
     }
 
