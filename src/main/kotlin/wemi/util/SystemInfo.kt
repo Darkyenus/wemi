@@ -122,7 +122,7 @@ object SystemInfo {
 		} else if ("x86" in osArch || "x32" in osArch || "i386" in osArch || "i486" in osArch || "i586" in osArch || "i686" in osArch) {
 			isX86 = true
 			is32bit = true
-		} else if ("aarch64" in osArch || "armv8" in osArch) {
+		} else if ("aarch64" in osArch || "armv8" in osArch || "arm64" in osArch) {
 			isARM = true
 			is64bit = true
 		} else if ("arm" in osArch) {

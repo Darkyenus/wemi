@@ -94,8 +94,11 @@ object IntelliJ {
 
 val JetBrainsAnnotationsDependency = dependency("org.jetbrains", "annotations", "20.1.0", scope = ScopeProvided)
 val IntelliJPluginsRepo = IntelliJPluginRepository.Maven(Repository("intellij-plugins-repo", URL("https://cache-redirector.jetbrains.com/plugins.jetbrains.com/maven"), authoritative = true, verifyChecksums = false))
-val IntelliJThirdPartyRepo = Repository("intellij-third-party-dependencies", "https://jetbrains.bintray.com/intellij-third-party-dependencies")
-val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugin", "0.10.0", type = TypeChooseByPackaging)
+val IntelliJAsmRepo = Repository("intellij-third-party-dependencies", "https://cache-redirector.jetbrains.com/intellij-dependencies")
+
+val RobotServerRepo = Repository("intellij-dependencies", "https://cache-redirector.jetbrains.com/intellij-dependencies")
+//val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugin", "0.10.0", type = TypeChooseByPackaging)
+val RobotServerDependency = dependency("com.intellij.remoterobot", "robot-server-plugin", "0.11.1", type = TypeChooseByPackaging)
 
 val uiTesting by configuration("IDE UI Testing (launch the IDE in UI testing mode through $run key)") {}
 
@@ -170,9 +173,6 @@ val IntelliJPluginLayer by archetype(::JUnitLayer) {
 
 	// IntelliJ SDK resolution
 	/** To find exact release version, try https://confluence.jetbrains.com/display/IDEADEV/IDEA+2020.1+latest+builds and related pages. */
-	/** To find exact release version, try https://confluence.jetbrains.com/display/IDEADEV/IDEA+2020.1+latest+builds and related pages. */
-	/** To find exact release version, try https://confluence.jetbrains.com/display/IDEADEV/IDEA+2020.1+latest+builds and related pages. */
-	/** To find exact release version, try https://confluence.jetbrains.com/display/IDEADEV/IDEA+2020.1+latest+builds and related pages. */
 	IntelliJ.intellijIdeDependency set { IntelliJIDE.External() }
 	IntelliJ.intellijResolvedIdeDependency set ResolveIdeDependency
 	IntelliJ.intellijIdeSandbox set { prepareIntelliJIDESandbox() }
@@ -238,7 +238,7 @@ val IntelliJPluginLayer by archetype(::JUnitLayer) {
 	// mentions no UI testing (and actually discourages it, as of time of this writing),
 	// this part of the plugin remains untested and a direct port from the gradle plugin.
 	// If you are interested in making this work (or know how it works), feel free to get in touch.
-	IntelliJ.intellijRobotServerDependency put (RobotServerDependency to IntelliJThirdPartyRepo)
+	IntelliJ.intellijRobotServerDependency put (RobotServerDependency to RobotServerRepo)
 	extend(uiTesting) {
 		IntelliJ.intellijIdeSandbox set {
 			val (dep, repo) = IntelliJ.intellijRobotServerDependency.get()

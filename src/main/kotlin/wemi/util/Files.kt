@@ -104,6 +104,28 @@ operator fun URL.div(path: CharSequence): URL {
     return URL(protocol, host, port, newFile.toString())
 }
 
+/** Return a new [URL] with its path replaced. */
+fun URL.withPath(path:String):URL {
+    val query = this.query ?: ""
+    val fragment:String? = this.ref
+
+    val newFile = StringBuilder(path.length + query.length + (fragment?.length ?: 0) + 16)
+
+    if (!path.startsWith('/')) {
+        newFile.append('/')
+    }
+    newFile.append(path)
+
+    if (query.isNotEmpty()) {
+        newFile.append('?').append(query)
+    }
+
+    if (fragment != null) {
+        newFile.append('#').append(fragment)
+    }
+    return URL(protocol, host, port, newFile.toString())
+}
+
 /** Return [this] [URL] with [parameters] added as query parameters */
 fun URL.withAdditionalQueryParameters(vararg parameters:Pair<String, String>):URL {
     val params = StringBuilder()

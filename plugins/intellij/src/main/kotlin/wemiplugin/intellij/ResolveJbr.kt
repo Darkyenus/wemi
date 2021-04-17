@@ -65,6 +65,11 @@ val DefaultJbrJavaHome: Value<JavaHome> = v@{
 private val JbrCacheFolder = WemiSystemCacheFolder / "intellij-jbr-cache"
 
 fun resolveJbr(version:String, overrideRepoUrl:URL?, progressListener: ActivityListener?):Jbr? {
+	if (version.isBlank()) {
+		LOG.warn("Can't resolve JBR with blank version")
+		return null
+	}
+
 	val jbrArtifact = jbrArtifactFrom(if (version.startsWith('u')) "8$version" else version) ?: return null
 	val javaDir = JbrCacheFolder / jbrArtifact.name.toSafeFileName('_')
 	if (javaDir.exists()) {
@@ -135,8 +140,7 @@ private fun findJavaExecutable(javaHome:Path):Path? {
 	} else null
 }
 
-private val DEFAULT_JBR_REPO = URL("https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-jbr/")
-private val DEFAULT_OLD_JBR_REPO = URL("https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-jdk/")
+private val DEFAULT_JBR_REPO = URL("https://cache-redirector.jetbrains.com/intellij-jbr")
 
 private fun jbrArtifactFrom(version:String):JbrArtifact? {
 	var prefix = when {
@@ -153,11 +157,7 @@ private fun jbrArtifactFrom(version:String):JbrArtifact? {
 	val buildNumber = Version(buildNumberString)
 	val isJava8 = majorVersion.startsWith('8')
 
-	val repoUrl = if (!isJava8 || buildNumber >= Version("1483.31")) {
-		DEFAULT_JBR_REPO
-	} else {
-		DEFAULT_OLD_JBR_REPO
-	}
+	val repoUrl = DEFAULT_JBR_REPO
 
 	val os = when {
 		SystemInfo.IS_WINDOWS -> "windows"
@@ -169,22 +169,23 @@ private fun jbrArtifactFrom(version:String):JbrArtifact? {
 		}
 	}
 
-	val oldFormat = prefix == "jbrex" || isJava8 && buildNumber < Version("1483.24")
-	val arch = when {
-		SystemInfo.IS_X86 && SystemInfo.IS_64_BIT -> "x64"
-		SystemInfo.IS_X86 && SystemInfo.IS_32_BIT -> if (oldFormat) "x86" else "i586"
-		else -> {
-			LOG.warn("JBR is not available for current processor architecture")
-			return null
-		}
-	}
-
+	val oldFormat = prefix == "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-servicejbrex" || isJava8 && buildNumber < Version("1483.24")
 	if (oldFormat) {
-		return JbrArtifact("jbrex${majorVersion}b${buildNumberString}_${os}_${arch}", repoUrl)
+		return JbrArtifact("jbrex${majorVersion}b${buildNumberString}_${os}_${jbrArch(false)}", repoUrl)
 	}
 
 	if (prefix.isEmpty()) {
-		prefix = if (isJava8) "jbrx-" else "jbr-"
+		prefix = if (isJava8) "jbrx-" else if (buildNumber < Version("1319.6")) "jbr-" else "jbr_jcef-"
 	}
-	return JbrArtifact("$prefix$majorVersion-$os-$arch-b$buildNumberString", repoUrl)
+	return JbrArtifact("$prefix$majorVersion-$os-${jbrArch(isJava8)}-b$buildNumberString", repoUrl)
+}
+
+private fun jbrArch(newFormat:Boolean):String? {
+	return when {
+		SystemInfo.IS_ARM && SystemInfo.IS_64_BIT -> "aarch64"
+		SystemInfo.IS_X86 && SystemInfo.IS_64_BIT -> "x64"
+		SystemInfo.IS_WINDOWS && System.getenv("ProgramFiles(x86)") != null -> "x64" // NOTE(jp): I'm not sure if we need this, seems like a workaround for bad arch detection
+		SystemInfo.IS_X86 && SystemInfo.IS_32_BIT -> if (newFormat) "i586" else "x86"
+		else -> null
+	}
 }

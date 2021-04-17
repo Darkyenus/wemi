@@ -1,6 +1,8 @@
 package wemiplugin.intellij.utils
 
 import Files
+import com.darkyen.dave.Response
+import com.darkyen.dave.ResponseTranslator
 import org.slf4j.LoggerFactory
 import org.w3c.dom.Document
 import org.w3c.dom.Element
@@ -8,6 +10,7 @@ import org.w3c.dom.Node
 import org.xml.sax.InputSource
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.InputStream
 import java.io.Reader
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
@@ -78,6 +81,16 @@ fun parseXml(path: Path):Document? {
 		LOG.warn("Failed to read and parse {}", path, e)
 		return null
 	}
+}
+
+internal val XML_REQUEST_TRANSLATOR = object : ResponseTranslator<Document?> {
+	override fun decode(response: Response<*>?, inp: InputStream?): Document? {
+		return (inp?.bufferedReader() ?: return null).use {
+			parseXml(it)
+		}
+	}
+
+	override fun decodeEmptyBody(response: Response<*>?): Document? = null
 }
 
 fun saveXml(path:Path, document:Document):Boolean {

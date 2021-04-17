@@ -17,25 +17,30 @@ import wemi.keys.javaHome
 import wemi.run.prepareJavaProcess
 import wemi.run.runForegroundProcess
 import wemi.util.JavaHome
+import wemi.util.Version
 import wemi.util.absolutePath
 import wemi.util.div
+import wemi.util.execute
 import wemi.util.exists
+import wemi.util.httpGet
 import wemi.util.httpGetFile
-import wemi.util.httpGetJson
 import wemi.util.withAdditionalQueryParameters
+import wemiplugin.intellij.utils.XML_REQUEST_TRANSLATOR
+import wemiplugin.intellij.utils.getFirstElement
 import wemiplugin.intellij.utils.unTar
 import java.net.HttpURLConnection
 import java.net.URL
-
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
 
-private val BINTRAY_API_VERIFIER_VERSION_LATEST = URL("https://api.bintray.com/packages/jetbrains/intellij-plugin-service/intellij-plugin-verifier/versions/_latest")
+private val VERIFIER_METADATA_URL = URL("https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/intellij-plugin-verifier/intellij-plugin-verifier/org/jetbrains/intellij/plugins/verifier-cli/maven-metadata.xml")
 private const val KNOWN_LATEST_INTELLIJ_VERIFIER_VERSION = "1.253"
 private val IDE_DOWNLOAD_URL = URL("https://data.services.jetbrains.com/products/download")
 const val CACHE_REDIRECTOR = "https://cache-redirector.jetbrains.com"
+private val DEFAULT_INTELLIJ_PLUGIN_VERIFIER_REPO = Repository("intellij-plugin-verifier", "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/intellij-plugin-verifier/intellij-plugin-verifier")
+private val OLD_INTELLIJ_PLUGIN_VERIFIER_REPO = Repository("intellij-plugin-service", "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service")
 
 enum class FailureLevel(val testValue:String) {
 	COMPATIBILITY_WARNINGS("Compatibility warnings"),
@@ -240,14 +245,14 @@ fun resolveVerifierPath(options:VerificationOptions, activityListener: ActivityL
 		throw WemiException("Cannot resolve Plugin Verifier in offline mode. Provide pre-downloaded Plugin Verifier jar file through VerificationOptions.verifierPath. ")
 	}
 
-	val repository = Repository("intellij-plugin-service", "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service")
-
-	// Get the IntelliJ Plugin Verifier version. If latest is requested, ask Bintray API
+	// Get the IntelliJ Plugin Verifier version. If latest is requested, ask repository
 	val verifierVersion = options.verifierVersion ?: run {
 		// Check what is latest and get it
-		val url = BINTRAY_API_VERIFIER_VERSION_LATEST
+		val url = VERIFIER_METADATA_URL
 		LOG.debug("Resolving latest IntelliJ Plugin Verifier version through {}", url)
-		val version = httpGetJson(url, activityListener)?.getString("name", null)
+		val document = httpGet(url).execute(activityListener, XML_REQUEST_TRANSLATOR)
+
+		val version = document.body?.documentElement?.getFirstElement("versioning")?.getFirstElement("latest")?.textContent
 		if (version == null) {
 			LOG.warn("Failed to determine latest version of IntelliJ Plugin Verifier, falling back to {}", KNOWN_LATEST_INTELLIJ_VERIFIER_VERSION)
 			KNOWN_LATEST_INTELLIJ_VERIFIER_VERSION
@@ -256,6 +261,8 @@ fun resolveVerifierPath(options:VerificationOptions, activityListener: ActivityL
 			version
 		}
 	}
+
+	val repository = if (Version(verifierVersion) >= Version("1.255")) DEFAULT_INTELLIJ_PLUGIN_VERIFIER_REPO else OLD_INTELLIJ_PLUGIN_VERIFIER_REPO
 
 	val dependency = dependency("org.jetbrains.intellij.plugins", "verifier-cli", verifierVersion, classifier = "all", type = "jar")
 	val artifacts = resolveDependencyArtifacts(listOf(dependency), listOf(repository), activityListener)

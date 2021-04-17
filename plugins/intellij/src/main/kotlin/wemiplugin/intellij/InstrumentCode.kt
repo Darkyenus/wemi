@@ -124,7 +124,7 @@ val DefaultInstrumentationClasspath:Value<List<Path>> = v@{
 	val dependency = dependency("com.jetbrains.intellij.java", "java-compiler-ant-tasks", compilerVersion)
 	val repositories = listOf(
 			intellijIDERepository(IntelliJ.intellijIdeRepository.get(), intellijDependency.version.asString()),
-			IntelliJThirdPartyRepo,
+			IntelliJAsmRepo,
 			MavenCentral
 	)
 

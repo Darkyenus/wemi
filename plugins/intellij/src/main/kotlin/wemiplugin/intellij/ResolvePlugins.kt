@@ -21,7 +21,9 @@ import wemi.util.httpGetFile
 import wemi.util.isDirectory
 import wemi.util.name
 import wemi.util.pathHasExtension
+import wemi.util.pathParent
 import wemi.util.toSafeFileName
+import wemi.util.withPath
 import wemiplugin.intellij.utils.Utils
 import wemiplugin.intellij.utils.Utils.sourcePluginXmlFiles
 import wemiplugin.intellij.utils.forEachElement
@@ -115,18 +117,25 @@ sealed class IntelliJPluginRepository {
 
 		init {
 			val rawUrl = URL(url)
-			var xmlPath = rawUrl.path
-			var repoPath = xmlPath
-			if (xmlPath.endsWith(".xml", ignoreCase = true)) {
-				repoPath = xmlPath.dropLastWhile { it != '/' }
+			val rawUrlPath = rawUrl.path
+
+			var repoUrl:URL
+			val pluginsXmlUrl:URL
+
+			if (rawUrl.path.pathHasExtension("xml")) {
+				repoUrl = rawUrl.withPath(rawUrlPath.pathParent())
+				pluginsXmlUrl = rawUrl
 			} else {
-				xmlPath = "$repoPath/updatePlugins.xml"
+				repoUrl = rawUrl
+				pluginsXmlUrl = rawUrl / "updatePlugins.xml"
 			}
-			if (!repoPath.endsWith('/')) {
-				repoPath += '/'
+
+			if (!repoUrl.path.endsWith('/')) {
+				repoUrl = repoUrl.withPath(repoUrl.path + "/")
 			}
-			repoUrl = URL(rawUrl.protocol, rawUrl.host, rawUrl.port, repoPath)
-			pluginsXmlUrl = URL(rawUrl.protocol, rawUrl.host, rawUrl.port, xmlPath)
+
+			this.repoUrl = repoUrl
+			this.pluginsXmlUrl = pluginsXmlUrl
 		}
 
 		private class Plugin(val id:String, val version:String, val url: URL)

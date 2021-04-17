@@ -90,7 +90,8 @@ val DefaultModifyRunOptions : ValueModifier<List<String>> = {
 }
 
 fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
-	val ideDirectory = IntelliJ.intellijResolvedIdeDependency.get().homeDir
+	val ideDependency = IntelliJ.intellijResolvedIdeDependency.get()
+	val ideDirectory = ideDependency.homeDir
 	val javaHome = javaHome.get()
 	val executable = javaHome.javaExecutable
 	val mainClass = mainClass.get()
@@ -102,15 +103,23 @@ fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
 	if (toolsJar != null) {
 		classpath.add(toolsJar)
 	}
-	classpath.add(ideDirectory / "lib/idea_rt.jar")
-	classpath.add(ideDirectory / "lib/idea.jar")
-	classpath.add(ideDirectory / "lib/bootstrap.jar")
-	classpath.add(ideDirectory / "lib/extensions.jar")
-	classpath.add(ideDirectory / "lib/util.jar")
-	classpath.add(ideDirectory / "lib/openapi.jar")
-	classpath.add(ideDirectory / "lib/trove4j.jar")
-	classpath.add(ideDirectory / "lib/jdom.jar")
-	classpath.add(ideDirectory / "lib/log4j.jar")
+
+	val version = ideDependency.version.baselineVersion
+	if (version > 203 || (version == 203 && ideDependency.version.build > 0)) {
+		classpath.add(ideDirectory / "lib/bootstrap.jar")
+		classpath.add(ideDirectory / "lib/util.jar")
+		classpath.add(ideDirectory / "lib/jdom.jar")
+		classpath.add(ideDirectory / "lib/log4j.jar")
+		classpath.add(ideDirectory / "lib/jna.jar")
+	} else {
+		classpath.add(ideDirectory / "lib/bootstrap.jar")
+		classpath.add(ideDirectory / "lib/extensions.jar")
+		classpath.add(ideDirectory / "lib/util.jar")
+		classpath.add(ideDirectory / "lib/jdom.jar")
+		classpath.add(ideDirectory / "lib/log4j.jar")
+		classpath.add(ideDirectory / "lib/jna.jar")
+		classpath.add(ideDirectory / "lib/trove4j.jar")
+	}
 
 	val processBuilder = wemi.run.prepareJavaProcess(
 			executable, ideDirectory / "bin", classpath,

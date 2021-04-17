@@ -3,9 +3,11 @@
 
 import wemi.*
 import wemi.keys.*
+import wemi.archetypes.*
+import wemi.util.*
 import wemiplugin.intellij.*
 
-val testPlugin by project(Archetypes.JavaProject, IntelliJPluginLayer) {
+val testPlugin by project(JavaProject, IntelliJPluginLayer) {
 
     projectGroup set { "com.darkyen" }
     projectName set { "test-plugin" }

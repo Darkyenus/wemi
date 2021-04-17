@@ -1,6 +1,5 @@
 import wemi.Archetypes.JUnitLayer
 import wemi.Archetypes.JavaKotlinProject
-import wemi.dependency.JCenter
 import wemi.dependency.ProjectDependency
 import wemi.generation.Constant
 import wemi.generation.generateKotlinConstantsFile
@@ -72,16 +71,15 @@ val pluginIntellij by project(path("plugins/intellij"), JavaKotlinProject, JUnit
     libraryDependencies add { kotlinDependency("stdlib-jdk8") }
     libraryDependencies add { kotlinDependency("stdlib-jdk7") }
 
-    repositories add { JCenter }
-    //repositories add { Repository("jetbrains-bintray-intellij-plugin-service", "https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-plugin-service") }
-    libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-base:3.139", exclusions = excludeKotlinStdlib) }
-    libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-intellij:3.139", exclusions = excludeKotlinStdlib) }
+    repositories add { Repository("intellij-plugin-structure", "https://cache-redirector.jetbrains.com/packages.jetbrains.team/maven/p/intellij-plugin-verifier/intellij-plugin-structure") }
+    repositories add { Repository("intellij-dependencies", "https://cache-redirector.jetbrains.com/intellij-dependencies") }
+    libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-base:3.169", exclusions = excludeKotlinStdlib) }
+    libraryDependencies add { dependency("org.jetbrains.intellij.plugins:structure-intellij:3.169", exclusions = excludeKotlinStdlib) }
     libraryDependencies add { dependency("org.jetbrains.intellij:blockmap:1.0.5", exclusions = excludeKotlinStdlib) }
     libraryDependencies add { dependency("org.jetbrains.intellij:plugin-repository-rest-client:2.0.15", exclusions = excludeKotlinStdlib) }
 
     // Instrumentation dependencies
     repositories add { Repository("idea-www.jetbrains.com_intellij-repository-releases", "https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/releases") }
-    repositories add { Repository("intellij-third-party-dependencies", "https://jetbrains.bintray.com/intellij-third-party-dependencies") }
     libraryDependencies add { dependency("com.jetbrains.intellij.java", "java-compiler-ant-tasks", "201.8743.12", scope=ScopeProvided) }
 
     publishMetadata modify { metadata ->
