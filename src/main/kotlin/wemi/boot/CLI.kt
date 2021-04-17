@@ -11,12 +11,12 @@ import org.jline.reader.impl.LineReaderImpl
 import org.jline.terminal.Terminal
 import org.jline.terminal.TerminalBuilder
 import org.slf4j.LoggerFactory
+import wemi.AllCommands
 import wemi.AllConfigurations
 import wemi.AllKeys
 import wemi.AllProjects
 import wemi.BindingHolder
 import wemi.BooleanValidator
-import wemi.BuildScriptData
 import wemi.EvaluationListener
 import wemi.EvaluationListener.Companion.plus
 import wemi.ExtendableBindingHolder
@@ -315,7 +315,7 @@ object CLI {
             }
             TaskEvaluationStatus.NoKey -> {
                 val keyString = data as String
-                val possibilities = ArrayList<String>(BuildScriptData.AllCommands.keys)
+                val possibilities = ArrayList<String>(AllCommands.keys)
                 if (task.couldBeInternalCommand) {
                     possibilities.addAll(internalCommands.keys)
                 }

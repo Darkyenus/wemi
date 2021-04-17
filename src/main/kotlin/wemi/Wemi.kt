@@ -9,6 +9,7 @@ import wemi.dependency.NoClassifier
 import wemi.dependency.ScopeCompile
 import wemi.dependency.TypeJar
 import wemi.keys.kotlinVersion
+import java.util.*
 import java.util.regex.Pattern
 import kotlin.reflect.KProperty0
 import kotlin.reflect.jvm.isAccessible
@@ -16,17 +17,26 @@ import kotlin.reflect.jvm.isAccessible
 /** Version of Kotlin used for build scripts */
 val WemiKotlinVersion = KotlinCompilerVersion.values().last()
 
+internal val AllProjectsMutable: MutableMap<String, Project> = Collections.synchronizedMap(mutableMapOf<String, Project>())
+internal val AllKeysMutable: MutableMap<String, Key<*>> = Collections.synchronizedMap(mutableMapOf<String, Key<*>>())
+internal val AllConfigurationsMutable: MutableMap<String, Configuration> = Collections.synchronizedMap(mutableMapOf<String, Configuration>())
+internal val AllCommandsMutable: MutableMap<String, Command<*>> = Collections.synchronizedMap(mutableMapOf<String, Command<*>>())
+
 /** Immutable view into the list of loaded [Project]s. */
 val AllProjects: Map<String, Project>
-    get() = BuildScriptData.AllProjects
+    get() = AllProjectsMutable
 
 /** Immutable view into the list of loaded [Key]s. */
 val AllKeys: Map<String, Key<*>>
-    get() = BuildScriptData.AllKeys
+    get() = AllKeysMutable
 
 /** Immutable view into the list of loaded [Configuration]s. */
 val AllConfigurations: Map<String, Configuration>
-    get() = BuildScriptData.AllConfigurations
+    get() = AllConfigurationsMutable
+
+/** Immutable view into the list of loaded [Configuration]s. */
+val AllCommands: Map<String, Command<*>>
+    get() = AllCommandsMutable
 
 /** Standard function type that is bound as value to the key in [BindingHolder] */
 typealias Value<V> = EvalScope.() -> V

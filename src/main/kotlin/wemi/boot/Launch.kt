@@ -17,6 +17,7 @@ import org.jline.reader.UserInterruptException
 import org.joda.time.Duration
 import org.slf4j.LoggerFactory
 import wemi.AllProjects
+import wemi.AllProjectsMutable
 import wemi.BooleanValidator
 import wemi.BuildScriptData
 import wemi.Configuration
@@ -354,7 +355,7 @@ fun main(args: Array<String>) {
 
     // Load build script configuration
     WemiBuildScriptProject = buildScriptProject
-    BuildScriptData.AllProjects[buildScriptProject.name] = buildScriptProject
+    AllProjectsMutable[buildScriptProject.name] = buildScriptProject
 
     val errors = buildScriptInfo?.let { loadBuildScript(it) } ?: 0
     if (errors > 0 && !allowBrokenBuildScripts) {

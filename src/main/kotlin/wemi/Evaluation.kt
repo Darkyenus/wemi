@@ -399,7 +399,7 @@ internal fun evaluateKeyOrCommand(task: Task, defaultProject:Project?, listener:
     }
 
     // Parse Command
-    val command: Command<*>? = BuildScriptData.AllCommands.findCaseInsensitive(task.key)
+    val command: Command<*>? = AllCommands.findCaseInsensitive(task.key)
 
     // Parse Key
     val key: Key<*>?

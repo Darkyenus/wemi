@@ -4,8 +4,10 @@ import org.jline.reader.Candidate
 import org.jline.reader.Completer
 import org.jline.reader.LineReader
 import org.jline.reader.ParsedLine
+import wemi.AllCommands
+import wemi.AllConfigurations
 import wemi.AllKeys
-import wemi.BuildScriptData
+import wemi.AllProjects
 import wemi.boot.TaskParser.TokenType.*
 import wemi.util.SimpleHistory
 import wemi.util.findCaseInsensitive
@@ -18,7 +20,7 @@ internal object TaskCompleter : Completer {
     private val projectCandidates by lazy {
         val candidates = ArrayList<Candidate>()
 
-        for (name in BuildScriptData.AllProjects.keys) {
+        for (name in AllProjects.keys) {
             val item = name + TaskParser.PROJECT_SEPARATOR
             candidates.add(Candidate(
                     item,
@@ -36,7 +38,7 @@ internal object TaskCompleter : Completer {
     private val projectCandidatesNoSuffix by lazy {
         val candidates = ArrayList<Candidate>()
 
-        for (name in BuildScriptData.AllProjects.keys) {
+        for (name in AllProjects.keys) {
             candidates.add(Candidate(
                     name,
                     name + TaskParser.PROJECT_SEPARATOR,
@@ -53,7 +55,7 @@ internal object TaskCompleter : Completer {
     private val configurationCandidates: List<Candidate> by lazy {
         val candidates = ArrayList<Candidate>()
 
-        for (config in BuildScriptData.AllConfigurations.values) {
+        for (config in AllConfigurations.values) {
             val item = config.name + TaskParser.CONFIGURATION_SEPARATOR
             candidates.add(Candidate(
                     item,
@@ -71,7 +73,7 @@ internal object TaskCompleter : Completer {
     private val configurationCandidatesNoSuffix: List<Candidate> by lazy {
         val candidates = ArrayList<Candidate>()
 
-        for (config in BuildScriptData.AllConfigurations.values) {
+        for (config in AllConfigurations.values) {
             candidates.add(Candidate(
                     config.name,
                     config.name + TaskParser.CONFIGURATION_SEPARATOR,
@@ -88,7 +90,7 @@ internal object TaskCompleter : Completer {
     private val keyCandidates: List<Candidate> by lazy {
         val candidates = ArrayList<Candidate>()
 
-        for (key in BuildScriptData.AllKeys.values) {
+        for (key in AllKeys.values) {
             candidates.add(Candidate(
                     key.name,
                     key.name,
@@ -105,7 +107,7 @@ internal object TaskCompleter : Completer {
     private val commandCandidates: List<Candidate> by lazy {
         val candidates = ArrayList<Candidate>()
 
-        for (command in BuildScriptData.AllCommands.values) {
+        for (command in AllCommands.values) {
             candidates.add(Candidate(
                 command.name,
                 command.name,

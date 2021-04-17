@@ -22,10 +22,6 @@ private typealias BindingHolderInitializer = () -> Unit
 
 /** Internal structure holding all loaded build script data. */
 internal object BuildScriptData {
-    val AllProjects: MutableMap<String, Project> = Collections.synchronizedMap(mutableMapOf<String, Project>())
-    val AllKeys: MutableMap<String, Key<*>> = Collections.synchronizedMap(mutableMapOf<String, Key<*>>())
-    val AllConfigurations: MutableMap<String, Configuration> = Collections.synchronizedMap(mutableMapOf<String, Configuration>())
-    val AllCommands: MutableMap<String, Command<*>> = Collections.synchronizedMap(mutableMapOf<String, Command<*>>())
 
     /**
      * List of lazy initializers.
@@ -140,21 +136,23 @@ fun createProject(name:String, root:Path?, vararg archetypes: Archetype, checkRo
     }
 
     val project = Project(name, usedRoot, archetypes)
-    // Not added to AllProjects, because build script project may be reloaded multiple times and only final version will be added
-    synchronized(BuildScriptData.AllProjects) {
-        for ((_, otherProject) in BuildScriptData.AllProjects) {
-            if (otherProject.name == name) {
-                if (otherProject.projectRoot == null) {
-                    throw WemiException("Project named '$name' already exists (without root)")
-                } else {
-                    throw WemiException("Project named '$name' already exists (at ${otherProject.projectRoot})")
-                }
-            }
-            if (checkRootUnique && otherProject.projectRoot != null && usedRoot != null && Files.isSameFile(otherProject.projectRoot, usedRoot)) {
+    if (checkRootUnique && usedRoot != null) {
+        AllProjectsMutable.values.forEach { otherProject ->
+            if (otherProject.projectRoot != null && Files.isSameFile(otherProject.projectRoot, usedRoot)) {
                 LOG.debug("Project $name is at the same location as project ${otherProject.name}")
             }
         }
-        BuildScriptData.AllProjects.put(project.name, project)
+    }
+    AllProjectsMutable.compute(project.name) { _, oldProject ->
+        if (oldProject != null) {
+            if (oldProject.projectRoot == null) {
+                throw WemiException("Project named '$name' already exists (without root)")
+            } else {
+                throw WemiException("Project named '$name' already exists (at ${oldProject.projectRoot})")
+            }
+        }
+
+        project
     }
     project.apply {
         projectName put name
@@ -215,16 +213,16 @@ class KeyDelegate<V> private constructor(
     private lateinit var key: Key<V>
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): KeyDelegate<V> {
-        this.key = synchronized(BuildScriptData.AllKeys) {
+        this.key = synchronized(AllKeysMutable) {
             var keyName = property.name
-            var existing = BuildScriptData.AllKeys[keyName]
+            var existing = AllKeysMutable[keyName]
             while (existing != null) /* no looping, just break support */ {
                 if (thisRef != null) {
                     val simpleName = thisRef.javaClass.simpleName
                     val fullName = thisRef.javaClass.name
                     val oldName = keyName
                     keyName = (if (simpleName.isNullOrEmpty()) fullName else simpleName).replace('.', '_')+"_"+property.name
-                    existing = BuildScriptData.AllKeys[keyName]
+                    existing = AllKeysMutable[keyName]
                     if (existing == null) {
                         LOG.warn("Key {} already exists, renaming duplicate to {}", oldName, keyName)
                         break
@@ -233,7 +231,7 @@ class KeyDelegate<V> private constructor(
                 throw WemiException("Key $keyName already exists (desc: '${existing.description}')")
             }
             val key = Key(property.name, description, hasDefaultValue, defaultValue, inputKeys, prettyPrinter, machineReadableFormatter)
-            BuildScriptData.AllKeys[key.name] = key
+            AllKeysMutable[key.name] = key
             key
         }
         return this
@@ -304,13 +302,11 @@ class ConfigurationDelegate(
  */
 fun createConfiguration(name:String, description: String, axis: Axis?, initializer: (Configuration.() -> Unit)?): Configuration {
     val configuration = Configuration(name, description, axis ?: Axis(name))
-    synchronized(BuildScriptData.AllConfigurations) {
-        val existing = BuildScriptData.AllConfigurations[configuration.name]
-        if (existing != null) {
-            throw WemiException("Configuration ${configuration.name} already exists (desc: '${existing.description}')")
+    AllConfigurationsMutable.compute(configuration.name) { _, previousValue ->
+        if (previousValue != null) {
+            throw WemiException("Configuration ${configuration.name} already exists (desc: '${previousValue.description}')")
         }
-
-        BuildScriptData.AllConfigurations.put(configuration.name, configuration)
+        configuration
     }
     initializer?.invoke(configuration)
     configuration.locked = true
@@ -422,14 +418,12 @@ class CommandDelegate<T>(
  */
 fun <T> createCommand(name:String, description: String, prettyPrinter: PrettyPrinter<T>? = null, machineReadableFormatter:MachineReadableFormatter<T>? = null, execute: CommandBindingHolder.() -> T): Command<T> {
     val command = Command(name, description, execute, prettyPrinter, machineReadableFormatter)
-    synchronized(BuildScriptData.AllCommands) {
-        val existing = BuildScriptData.AllCommands[command.name]
-        if (existing != null) {
-            throw WemiException("Command ${command.name} already exists (desc: '${existing.description}')")
+    AllCommandsMutable.compute(command.name) { _, oldValue ->
+        if (oldValue != null) {
+            throw WemiException("Command ${command.name} already exists (desc: '${oldValue.description}')")
         }
 
-        BuildScriptData.AllCommands.put(command.name, command)
+        command
     }
-
     return command
 }
