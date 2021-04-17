@@ -29,6 +29,7 @@ fun repositoryCachePath(repositoryName:String): Path {
 val MavenCentral = Repository("central", URL("https://repo.maven.apache.org/maven2/"), snapshots = false, authoritative = true)
 
 /** [Bintray JCenter repository](https://bintray.com/bintray/jcenter). Cached by [LocalM2Repository]. */
+@Deprecated("JCenter service has been shut down")
 val JCenter = Repository("jcenter", URL("https://jcenter.bintray.com/"), snapshots = false)
 
 /** [Jitpack repository](https://jitpack.io). Cached by [LocalM2Repository]. */

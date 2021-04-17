@@ -97,6 +97,14 @@ val wemi: Project by project(Archetypes.AggregateJVMProject) {
 			Files.copy(path.file, distFolder / path.file.name)
 		}
 
+		// Build plugins
+		val pluginDir = distFolder / "plugins"
+		Files.createDirectories(pluginDir)
+		for (pluginProject in pluginProjects) {
+			val pluginFile = using(pluginProject) { archive.get() }!!
+			Files.copy(pluginFile, pluginDir / (using(pluginProject) { projectName.get() }+".jar"))
+		}
+
 		distFolder
 	}
 
@@ -106,13 +114,6 @@ val wemi: Project by project(Archetypes.AggregateJVMProject) {
 			if (testResult.values.any { it.status == TestStatus.FAILED }) {
 				println(testResult.prettyPrint())
 				throw WemiException("Can't build distribution archive when the tests are failing", showStacktrace = false)
-			}
-
-			// Also build all plugins
-			for (pluginProject in pluginProjects) {
-				using(pluginProject) {
-					compile.get()
-				}
 			}
 		}
 

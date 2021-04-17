@@ -1,7 +1,8 @@
 import wemi.*
 import wemi.keys.*
+import wemi.archetypes.*
 
-val hello by project(Archetypes.KotlinJSProject) {
+val hello by project(KotlinJSProject) {
 
     projectGroup set { "com.darkyen" }
     projectName set { "web" }

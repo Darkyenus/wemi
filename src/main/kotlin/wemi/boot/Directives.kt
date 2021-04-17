@@ -83,7 +83,9 @@ annotation class BuildClasspathDependency(val file:String)
 @Retention(AnnotationRetention.SOURCE)
 @Repeatable
 @DirectiveFields(["name", "group"])
-annotation class BuildDependencyPlugin(val name:String, val group:String = "com.darkyen.wemi")
+annotation class BuildDependencyPlugin(val name:String, val group:String = OFFICIAL_WEMI_PLUGIN_GROUP)
+
+internal const val OFFICIAL_WEMI_PLUGIN_GROUP = "com.darkyen.wemi"
 
 /**
  * Directives supported in build-scripts.

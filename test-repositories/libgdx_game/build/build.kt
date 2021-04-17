@@ -5,6 +5,7 @@ import wemi.util.executable
 import wemi.compile.JavaCompilerFlags
 import wemi.dependency.*
 import wemi.*
+import wemi.util.*
 import wemi.boot.CLI.makeDefault
 
 val gdxVersion = "1.9.7"
