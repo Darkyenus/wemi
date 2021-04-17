@@ -3,6 +3,8 @@ package wemi.util
 import org.jline.terminal.Attributes
 import org.jline.terminal.Terminal
 import org.jline.utils.*
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Implements a status bar with an arbitrary message for CLI output.
@@ -73,7 +75,7 @@ internal class CliStatusDisplay(private val terminal: Terminal) : LineReadingOut
             val ellipsis = '…'
             val ellipsisWidth = WCWidth.wcwidth(ellipsis.toInt())
 
-            val importantPrefix = message.substring(0, Math.max(Math.min(message.length, messageImportantPrefix), 0))
+            val importantPrefix = message.substring(0, max(min(message.length, messageImportantPrefix), 0))
             val importantPrefixWidth = importantPrefix.columnLength()
 
             if (importantPrefixWidth >= width) {

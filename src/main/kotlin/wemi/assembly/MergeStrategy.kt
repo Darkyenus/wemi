@@ -8,7 +8,7 @@ enum class MergeStrategy {
     First,
     /** Only the last copy is kept */
     Last,
-    /** Only own copy (the from [wemi.Keys.internalClasspath] or aggregate) is used, others are discarded, error if multiple own */
+    /** Only own copy (the from [wemi.keys.internalClasspath] or aggregate) is used, others are discarded, error if multiple own */
     SingleOwn,
     /** Only one copy is expected, error if multiple */
     SingleOrError,
@@ -23,7 +23,7 @@ enum class MergeStrategy {
     Discard,
     /** Only one value is expected, take the copy only if all other copies hold equal data */
     Deduplicate,
-    /** Move the file to different path, specified by [wemi.Keys.assemblyRenameFunction] */
+    /** Move the file to different path, specified by [wemi.keys.assemblyRenameFunction] */
     Rename,
     /** Like [Rename], but multiple files with equal content are allowed */
     RenameDeduplicate

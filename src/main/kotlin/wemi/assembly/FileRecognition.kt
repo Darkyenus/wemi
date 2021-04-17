@@ -3,7 +3,7 @@ package wemi.assembly
 import wemi.util.pathHasExtension
 
 /**
- * Contains utilities for recognizing file type classes, from the [wemi.Keys.assembly] point of view.
+ * Contains utilities for recognizing file type classes, from the [wemi.keys.assembly] point of view.
  *
  * Based on https://github.com/sbt/sbt-assembly
  */

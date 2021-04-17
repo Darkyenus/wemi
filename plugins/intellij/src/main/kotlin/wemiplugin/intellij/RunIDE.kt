@@ -1,10 +1,13 @@
 package wemiplugin.intellij
 
-import Keys
 import org.slf4j.LoggerFactory
 import wemi.EvalScope
 import wemi.ValueModifier
 import wemi.collections.toMutable
+import wemi.keys.javaHome
+import wemi.keys.mainClass
+import wemi.keys.runEnvironment
+import wemi.keys.runOptions
 import wemi.run.runForegroundProcess
 import wemi.util.SystemInfo
 import wemi.util.absolutePath
@@ -88,10 +91,10 @@ val DefaultModifyRunOptions : ValueModifier<List<String>> = {
 
 fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
 	val ideDirectory = IntelliJ.intellijResolvedIdeDependency.get().homeDir
-	val javaHome = Keys.javaHome.get()
+	val javaHome = javaHome.get()
 	val executable = javaHome.javaExecutable
-	val mainClass = Keys.mainClass.get()
-	val environment = Keys.runEnvironment.get()
+	val mainClass = mainClass.get()
+	val environment = runEnvironment.get()
 
 	val classpath = ArrayList<Path>()
 	// Apparently the IDE needs to have the tools.jar on classpath
@@ -111,7 +114,7 @@ fun EvalScope.runIde(extraArguments: List<String> = emptyList()): Int {
 
 	val processBuilder = wemi.run.prepareJavaProcess(
 			executable, ideDirectory / "bin", classpath,
-			mainClass, Keys.runOptions.get(), extraArguments, environment)
+			mainClass, runOptions.get(), extraArguments, environment)
 
 	return runForegroundProcess(processBuilder)
 }

@@ -1,11 +1,11 @@
 package wemiplugin.intellij
 
 import Files
-import Keys
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
 import wemi.Value
 import wemi.boot.WemiSystemCacheFolder
+import wemi.keys.javaHome
 import wemi.util.JavaHome
 import wemi.util.SystemInfo
 import wemi.util.Version
@@ -28,6 +28,7 @@ private val LOG = LoggerFactory.getLogger("ResolveJbr")
  * JBR - JetBrains Runtime is a custom Java distribution by JetBrains to use with their IDEs.
  * [More info here.](https://confluence.jetbrains.com/display/JBR/JetBrains+Runtime)
  */
+@Suppress("MemberVisibilityCanBePrivate")
 class Jbr(val version:String, val javaHome:Path, val javaExecutable: Path) {
 	fun toJavaHome():JavaHome {
 		val bin = javaExecutable.parent
@@ -58,7 +59,7 @@ val DefaultJbrJavaHome: Value<JavaHome> = v@{
 		LOG.warn("Cannot resolve builtin JBR {}. Falling back to local Java.", builtinJbrVersion)
 	}
 
-	Keys.javaHome.get()
+	javaHome.get()
 }
 
 private val JbrCacheFolder = WemiSystemCacheFolder / "intellij-jbr-cache"

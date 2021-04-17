@@ -1,6 +1,6 @@
 @file:BuildDependencyPlugin("wemi-plugin-jvm-hotswap")
 
-import wemi.Keys.runOptions
+import wemi.keys.*
 import wemi.util.executable
 import wemi.compile.JavaCompilerFlags
 import wemi.dependency.*

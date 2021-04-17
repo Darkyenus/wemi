@@ -174,7 +174,7 @@ inline fun <reified T> JsonValue?.field(name:String):T {
     return this?.get(name).to(T::class.java)
 }
 
-/** Same as the other [field], but if the field does't exist, returns [default]. */
+/** Same as the other [field], but if the field doesn't exist, returns [default]. */
 inline fun <reified T> JsonValue?.field(name:String, default:T):T {
     val value = this?.get(name) ?: return default
     return value.to(T::class.java)
@@ -215,9 +215,9 @@ fun <T> JsonValue?.to(type:Class<T>):T {
             return this.asByte() as T
         java.lang.Short::class.java, java.lang.Short.TYPE ->
             return this.asShort() as T
-        java.lang.Character::class.java, java.lang.Character.TYPE ->
+        java.lang.Character::class.java, Character.TYPE ->
             return this.asChar() as T
-        java.lang.Integer::class.java, java.lang.Integer.TYPE ->
+        java.lang.Integer::class.java, Integer.TYPE ->
             return this.asInt() as T
         java.lang.Long::class.java, java.lang.Long.TYPE ->
             return this.asLong() as T
@@ -402,8 +402,8 @@ fun <T> JsonWriter.writeValue(value:T, type:Class<T>?) {
         java.lang.Boolean::class.java, java.lang.Boolean.TYPE,
         java.lang.Byte::class.java, java.lang.Byte.TYPE,
         java.lang.Short::class.java, java.lang.Short.TYPE,
-        java.lang.Character::class.java, java.lang.Character.TYPE,
-        java.lang.Integer::class.java, java.lang.Integer.TYPE,
+        java.lang.Character::class.java, Character.TYPE,
+        java.lang.Integer::class.java, Integer.TYPE,
         java.lang.Long::class.java, java.lang.Long.TYPE,
         java.lang.Float::class.java, java.lang.Float.TYPE,
         java.lang.Double::class.java, java.lang.Double.TYPE,

@@ -1,5 +1,6 @@
 package wemi.boot
 
+import wemi.Command
 import wemi.Key
 import wemi.WemiException
 import wemi.boot.Task.Companion.FLAG_MACHINE_READABLE_COMMAND
@@ -155,8 +156,11 @@ enum class TaskEvaluationStatus {
 /**
  * Result of task evaluation.
  *
- * @param key that was evaluated, if known
+ * @param key that was evaluated, if known (will be null of [command] is not null)
+ * @param command that was evaluated, if known (will be null of [key] is not null)
  * @param data [status]-dependent data, see documentation of [TaskEvaluationStatus]
  * @param status of the evaluation
  */
-data class TaskEvaluationResult(val key: Key<*>?, val data: Any?, val status: TaskEvaluationStatus)
+data class TaskEvaluationResult constructor(val key: Key<*>?, val command: Command<*>?, val data: Any?, val status: TaskEvaluationStatus) {
+    constructor(data: Any?, status: TaskEvaluationStatus): this(null, null, data, status)
+}

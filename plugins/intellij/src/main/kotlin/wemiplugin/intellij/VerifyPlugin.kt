@@ -3,16 +3,17 @@ package wemiplugin.intellij
 import org.apache.commons.io.FileUtils
 import org.slf4j.LoggerFactory
 import wemi.ActivityListener
-import wemi.Configurations
 import wemi.ExtendableBindingHolder
 import wemi.WemiException
 import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiRootFolder
 import wemi.boot.WemiSystemCacheFolder
+import wemi.configurations.offline
 import wemi.dependency
 import wemi.dependency.Repository
 import wemi.dependency.resolveDependencyArtifacts
 import wemi.key
+import wemi.keys.javaHome
 import wemi.run.prepareJavaProcess
 import wemi.run.runForegroundProcess
 import wemi.util.JavaHome
@@ -50,8 +51,8 @@ enum class FailureLevel(val testValue:String) {
 	NOT_DYNAMIC("Plugin cannot be loaded/unloaded without IDE restart");
 
 	companion object {
-		val ALL = EnumSet.allOf(FailureLevel::class.java)
-		val NONE = EnumSet.noneOf(FailureLevel::class.java)
+		val ALL: EnumSet<FailureLevel> = EnumSet.allOf(FailureLevel::class.java)
+		val NONE: EnumSet<FailureLevel> = EnumSet.noneOf(FailureLevel::class.java)
 	}
 }
 
@@ -87,13 +88,13 @@ fun ExtendableBindingHolder.init() {
 				localPaths = listOf(compilationIde.homeDir)
 		)
 	}
-	extend(Configurations.offline) {
+	extend(offline) {
 		intellijVerifyPluginOptions modify { it.copy(offline = true) }
 	}
 	intellijVerifyPlugin set {
 		val options = intellijVerifyPluginOptions.get()
 		val archive = IntelliJ.intellijPluginArchive.get()
-		val javaHome = Keys.javaHome.get()
+		val javaHome = javaHome.get()
 		runPluginVerifier(archive, options, javaHome, progressListener)
 	}
 }
@@ -122,14 +123,8 @@ data class VerificationOptions(
 		 * the TeamCity compatible output will be returned to stdout. */
 		val teamCityOutputFormat:Boolean = false,
 		/**
-		 * Returns which subsystems of IDE should be checked.
-		 *
-		 * @return subsystems to check
 		 * Specifies which subsystems of IDE should be checked.
 		 * Available options: `all` (default), `android-only`, `without-android`.
-		 * Accepts {@link String} or {@link Closure}.
-		 *
-		 * @param subsystemsToCheck subsystems of IDE should to check
 		 */
 		val subsystemsToCheck:String = "",
 		/** Do not attempt to connect to the Internet and work only from local resources. */

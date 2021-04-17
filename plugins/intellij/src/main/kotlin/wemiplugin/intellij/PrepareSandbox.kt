@@ -1,11 +1,11 @@
 package wemiplugin.intellij
 
 import Files
-import Keys
 import org.slf4j.LoggerFactory
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import wemi.EvalScope
+import wemi.keys.cacheDirectory
 import wemi.util.deleteRecursively
 import wemi.util.div
 import wemi.util.ensureEmptyDirectory
@@ -21,13 +21,14 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 private val LOG = LoggerFactory.getLogger("PrepareSandbox")
 
+@Suppress("MemberVisibilityCanBePrivate")
 class IntelliJIDESandbox(val base:Path, val config:Path, val plugins:Path, val system:Path) {
 	override fun toString(): String {
 		return "IntelliJIDESandbox(base=$base, config=${base.relativize(config)}, plugins=${base.relativize(plugins)}, system=${base.relativize(system)})"
 	}
 }
 
-fun EvalScope.prepareIntelliJIDESandbox(sandboxDir: Path = Keys.cacheDirectory.get() / "idea-sandbox", testSuffix:String = "", vararg extraPluginDirectories: Path): IntelliJIDESandbox {
+fun EvalScope.prepareIntelliJIDESandbox(sandboxDir: Path = cacheDirectory.get() / "idea-sandbox", testSuffix:String = "", vararg extraPluginDirectories: Path): IntelliJIDESandbox {
 	val destinationDir = sandboxDir / "plugins$testSuffix"
 
 	// A file which contains names of files added by us to clear.

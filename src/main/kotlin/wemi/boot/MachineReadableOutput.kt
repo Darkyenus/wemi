@@ -104,11 +104,11 @@ internal fun machineReadableEvaluateAndPrint(out: PrintStream, task: Task, forma
     }
 
     try {
-        val (key, data, status) = evaluateKeyOrCommand(task, null, null)
+        val (key, command, data, status) = evaluateKeyOrCommand(task, null, null)
         when (status) {
             TaskEvaluationStatus.Success -> {
                 @Suppress("UNCHECKED_CAST")
-                machineReadablePrint(out, data, format, key?.machineReadableFormatter as? MachineReadableFormatter<Any?>)
+                machineReadablePrint(out, data, format, (key?.machineReadableFormatter ?: command?.machineReadableFormatter) as? MachineReadableFormatter<Any?>?)
                 return data as? WithExitCode
             }
             TaskEvaluationStatus.NoProject -> {

@@ -2,18 +2,18 @@ package wemi.assembly
 
 import java.nio.file.Path
 
-/** Used by [wemi.Keys.assemblyMergeStrategy] and [wemi.Keys.assemblyRenameFunction] as a representation of data source.
+/** Used by [wemi.keys.assemblyMergeStrategy] and [wemi.keys.assemblyRenameFunction] as a representation of data source.
  * Most fields are internally cached. */
 class AssemblySource private constructor(
         /** Debug name of the source */
         private val name:String,
         /** File from which the data somehow originated, if any.
-         * This is just a hint, for example for [wemi.Keys.assemblyRenameFunction].
+         * This is just a hint, for example for [wemi.keys.assemblyRenameFunction].
          * File may even be a directory, archive, etc.*/
         val sourceFile: Path?,
         /** Time of last modification. -1 if unknown */
         val lastModifiedMs: Long,
-        /** Is this from the [wemi.Keys.internalClasspath] or aggregate? */
+        /** Is this from the [wemi.keys.internalClasspath] or aggregate? */
         val own: Boolean) {
 
     constructor(name:String, sourceFile:Path?, lastModifiedMs:Long, own:Boolean, data:ByteArray)

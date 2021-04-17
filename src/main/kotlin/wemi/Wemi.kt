@@ -8,6 +8,7 @@ import wemi.dependency.DependencyId
 import wemi.dependency.NoClassifier
 import wemi.dependency.ScopeCompile
 import wemi.dependency.TypeJar
+import wemi.keys.kotlinVersion
 import java.util.regex.Pattern
 import kotlin.reflect.KProperty0
 import kotlin.reflect.jvm.isAccessible
@@ -107,7 +108,7 @@ fun dependency(
  * - And more, see [Maven Central](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.jetbrains.kotlin%22)
  */
 fun EvalScope.kotlinDependency(name: String): Dependency {
-    return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-$name", Keys.kotlinVersion.get().string))
+    return Dependency(DependencyId("org.jetbrains.kotlin", "kotlin-$name", kotlinVersion.get().string))
 }
 
 @DslMarker

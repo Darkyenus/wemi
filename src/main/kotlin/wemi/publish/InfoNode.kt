@@ -9,7 +9,7 @@ import wemi.util.writeObject
 
 @Suppress("unused")
 /**
- * Info node for [wemi.Keys.publish].
+ * Info node for [wemi.keys.publish].
  *
  * Instances create tree structure for arbitrary publishing metadata.
  *

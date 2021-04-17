@@ -22,7 +22,7 @@ import javax.tools.JavaFileObject
 private val LOG = LoggerFactory.getLogger("CompilerMessageLogging")
 
 /**
- * Mirror of [org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation]
+ * Mirror of `org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation`
  *
  * @param path standard filesystem path to the source file or anything else if that is not possible to obtain
  */
@@ -33,8 +33,8 @@ private val LINE_SEPARATOR = System.lineSeparator()
 /**
  * Log given message
  *
- * @param severity [org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity].name()
- *                  or [javax.tools.Diagnostic.Kind].name()
+ * @param severity `org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity.name()`
+ *                  or `javax.tools.Diagnostic.Kind.name()`
  */
 fun Logger.render(marker: Marker?,
                   severity: String,
@@ -154,7 +154,7 @@ fun Logger.render(marker: Marker?,
     }
 }
 
-private val JavaLintExtractorPattern = Pattern.compile(": \\[([a-zA-Z-._0-9]+)\\]")
+private val JavaLintExtractorPattern = Pattern.compile(": \\[([a-zA-Z-._0-9]+)]")
 
 fun createJavaObjectFileDiagnosticLogger(log:Logger):DiagnosticListener<JavaFileObject> {
     return DiagnosticListener { diagnostic ->

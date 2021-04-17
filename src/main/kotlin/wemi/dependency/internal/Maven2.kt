@@ -800,11 +800,7 @@ private fun resolveDependencyManagement(
                 //  http://maven.40175.n5.nabble.com/DependencyManagement-to-force-scope-td112273.html suggests,
                 //  that "provided" scope should get some special treatment, but I couldn't find any other source for that claim.
                 if (dependency.scope.isNullOrBlank()) {
-                    if (standIn.scope.isBlank()) {
-                        ScopeCompile
-                    } else {
-                        standIn.scope
-                    }
+                    standIn.scope.ifBlank { ScopeCompile }
                 } else dependency.scope,
                 dependency.optional,
                 dependency.exclusions + standIn.exclusions

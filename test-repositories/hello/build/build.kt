@@ -1,4 +1,5 @@
 import wemi.*
+import wemi.keys.*
 
 val hello by project {
 

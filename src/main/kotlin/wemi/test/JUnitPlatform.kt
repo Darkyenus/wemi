@@ -236,7 +236,7 @@ fun TestReport.prettyPrint(): CharSequence {
 
         // Name (+ test/container)
         sb.format(if (isContainer) Color.White else null, format = if (isTest) Format.Bold else null)
-        sb.append(if (displayName.isBlank()) id else displayName)
+        sb.append(displayName.ifBlank { id })
         sb.format()
 
         // Status

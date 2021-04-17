@@ -9,9 +9,11 @@ import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerFlags
 import wemi.compile.KotlinJVMCompilerFlags
+import wemi.configurations.ideImport
 import wemi.dependency.*
 import wemi.plugin.PluginEnvironment
 import wemi.util.*
+import wemi.keys.*
 import java.io.IOException
 import java.net.URL
 import java.net.URLClassLoader
@@ -132,23 +134,23 @@ internal fun getBuildScript(cacheFolder: Path, buildScriptSourceSet:FileSet, bui
 
 internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?): Project {
     return Project(WemiBuildScriptProjectName, WemiBuildFolder, emptyArray()).apply {
-        Keys.projectName put WemiBuildScriptProjectName
-        Keys.projectRoot put WemiBuildFolder
-        Keys.cacheDirectory put  WemiCacheFolder
-        Keys.compilerOptions put  BuildScriptInfo.compilerOptions
+        projectName put WemiBuildScriptProjectName
+        wemi.keys.projectRoot put WemiBuildFolder
+        cacheDirectory put  WemiCacheFolder
+        compilerOptions put  BuildScriptInfo.compilerOptions
 
         if (buildScriptInfo != null) {
-            Keys.repositories put buildScriptInfo.repositories
-            Keys.libraryDependencies put buildScriptInfo.dependencies
-            Keys.unmanagedDependencies putLazy {
+            repositories put buildScriptInfo.repositories
+            libraryDependencies put buildScriptInfo.dependencies
+            unmanagedDependencies putLazy {
                 val dependencies = WMutableList<LocatedPath>()
                 for (unmanagedDependency in buildScriptInfo.unmanagedDependencies) {
                     dependencies.add(LocatedPath(unmanagedDependency))
                 }
                 dependencies
             }
-            Keys.sources put buildScriptInfo.sourceSet
-            Keys.externalClasspath putLazy {
+            sources put buildScriptInfo.sourceSet
+            externalClasspath putLazy {
                 val result = ArrayList<ScopedLocatedPath>(buildScriptInfo.unmanagedDependencies.size + buildScriptInfo.managedDependencies.size)
                 for (dependency in buildScriptInfo.unmanagedDependencies) {
                     result.add(LocatedPath(dependency).scoped(ScopeCompile))
@@ -158,15 +160,15 @@ internal fun createProjectFromBuildScriptInfo(buildScriptInfo:BuildScriptInfo?):
                 }
                 result
             }
-            Keys.internalClasspath put listOf(LocatedPath(buildScriptInfo.scriptJar))
-            extend(Configurations.ideImport) {
+            internalClasspath put listOf(LocatedPath(buildScriptInfo.scriptJar))
+            extend(ideImport) {
                 // When doing ideImport, internalClasspath should not contain anything we compiled,
                 // only generated classpath, which we technically don't have.
-                Keys.internalClasspath put emptyList()
+                internalClasspath put emptyList()
             }
 
-            Keys.externalSources set KeyDefaults.externalClasspathWithClassifier(SourcesClassifier)
-            Keys.externalDocs set KeyDefaults.externalClasspathWithClassifier(JavadocClassifier)
+            externalSources set KeyDefaults.externalClasspathWithClassifier(SourcesClassifier)
+            externalDocs set KeyDefaults.externalClasspathWithClassifier(JavadocClassifier)
         }
 
         locked = true

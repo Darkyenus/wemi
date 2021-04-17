@@ -3,7 +3,10 @@
 package wemi
 
 import org.slf4j.LoggerFactory
+import wemi.archetypes.Base
+import wemi.archetypes.DefaultArchetypes
 import wemi.boot.MachineReadableFormatter
+import wemi.keys.projectName
 import wemi.util.exists
 import wemi.util.path
 import java.nio.file.Files
@@ -68,11 +71,11 @@ internal object BuildScriptData {
  */
 class ProjectDelegate(
     private val projectRoot: Path? = path("."),
-    private vararg val archetypes: Archetype = Archetypes.DefaultArchetypes,
+    private vararg val archetypes: Archetype = DefaultArchetypes,
     private var initializer: (Project.() -> Unit)?
 ) : ReadOnlyProperty<Any?, Project>, BindingHolderInitializer {
 
-    constructor(vararg archetypes: Archetype = Archetypes.DefaultArchetypes, initializer: (Project.() -> Unit)?)
+    constructor(vararg archetypes: Archetype = DefaultArchetypes, initializer: (Project.() -> Unit)?)
     : this(projectRoot = path("."), archetypes = *archetypes, initializer = initializer)
 
     private lateinit var project: Project
@@ -122,7 +125,7 @@ fun createProject(name:String, root:Path?, vararg archetypes: Archetype, checkRo
         for (a in archetypes) {
             var archetype = a
             while (true) {
-                if (archetype === Archetypes.Base) {
+                if (archetype === Base) {
                     baseArchetypeCount++
                 }
                 archetype = archetype.parent ?: break
@@ -154,9 +157,9 @@ fun createProject(name:String, root:Path?, vararg archetypes: Archetype, checkRo
         BuildScriptData.AllProjects.put(project.name, project)
     }
     project.apply {
-        Keys.projectName put name
+        projectName put name
         if (usedRoot != null) {
-            Keys.projectRoot put usedRoot
+            wemi.keys.projectRoot put usedRoot
         }
 
         initializer?.invoke(this)
@@ -392,13 +395,15 @@ class ArchetypeDelegate(
  */
 class CommandDelegate<T>(
     private val description: String,
+    private val prettyPrinter: PrettyPrinter<T>? = null,
+    private val machineReadableFormatter:MachineReadableFormatter<T>? = null,
     private val execute: CommandBindingHolder.() -> T
 ) : ReadOnlyProperty<Any?, Command<T>> {
 
     private lateinit var command: Command<T>
 
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): CommandDelegate<T> {
-        this.command = createCommand(property.name, description, execute)
+        this.command = createCommand(property.name, description, prettyPrinter, machineReadableFormatter, execute)
         return this
     }
 
@@ -415,8 +420,8 @@ class CommandDelegate<T>(
  * @param description of the command
  * @param execute to execute the command - see [CommandBindingHolder]
  */
-fun <T> createCommand(name:String, description: String, execute: CommandBindingHolder.() -> T): Command<T> {
-    val command = Command(name, description, execute)
+fun <T> createCommand(name:String, description: String, prettyPrinter: PrettyPrinter<T>? = null, machineReadableFormatter:MachineReadableFormatter<T>? = null, execute: CommandBindingHolder.() -> T): Command<T> {
+    val command = Command(name, description, execute, prettyPrinter, machineReadableFormatter)
     synchronized(BuildScriptData.AllCommands) {
         val existing = BuildScriptData.AllCommands[command.name]
         if (existing != null) {

@@ -375,17 +375,17 @@ internal fun evaluateKeyOrCommand(task: Task, defaultProject:Project?, listener:
     if (task.project != null) {
         project = AllProjects.findCaseInsensitive(task.project)
         if (project == null) {
-            return TaskEvaluationResult(null, task.project, TaskEvaluationStatus.NoProject)
+            return TaskEvaluationResult(task.project, TaskEvaluationStatus.NoProject)
         }
     } else if (project == null) {
-        return TaskEvaluationResult(null, null, TaskEvaluationStatus.NoProject)
+        return TaskEvaluationResult(null, TaskEvaluationStatus.NoProject)
     }
 
     // Parse Configurations
     val configurations = Array(task.configurations.size) { i ->
         val configString = task.configurations[i]
         AllConfigurations.findCaseInsensitive(configString)
-            ?: return TaskEvaluationResult(null, configString, TaskEvaluationStatus.NoConfiguration)
+            ?: return TaskEvaluationResult(configString, TaskEvaluationStatus.NoConfiguration)
     }
 
     // Parse Command
@@ -411,16 +411,16 @@ internal fun evaluateKeyOrCommand(task: Task, defaultProject:Project?, listener:
             if (task.input.isNotEmpty() && AllKeys.findCaseInsensitive(task.key) != null) {
                 LOG.warn("Command {} not found, but a key with the same name exists. Remove input parameters to invoke the key.")
             }
-            return TaskEvaluationResult(null, task.key, TaskEvaluationStatus.NoKey)
+            return TaskEvaluationResult(task.key, TaskEvaluationStatus.NoKey)
         }
 
-        TaskEvaluationResult(key, result, TaskEvaluationStatus.Success)
+        TaskEvaluationResult(key, command, result, TaskEvaluationStatus.Success)
     } catch (e: WemiException.KeyNotAssignedException) {
-        TaskEvaluationResult(key, e, TaskEvaluationStatus.NotAssigned)
+        TaskEvaluationResult(key, command, e, TaskEvaluationStatus.NotAssigned)
     } catch (e: WemiException) {
-        TaskEvaluationResult(key, e, TaskEvaluationStatus.Exception)
+        TaskEvaluationResult(key, command, e, TaskEvaluationStatus.Exception)
     } catch (e: Exception) {
-        TaskEvaluationResult(key, WemiException("Unhandled exception", e), TaskEvaluationStatus.Exception)
+        TaskEvaluationResult(key, command, WemiException("Unhandled exception", e), TaskEvaluationStatus.Exception)
     }
 }
 

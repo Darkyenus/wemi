@@ -12,7 +12,7 @@ import wemi.util.writeValue
 /**
  * Defines a dependency on a [project] defined in the same build script.
  *
- * Dependency pulls [project]s [wemi.Keys.internalClasspath] and [wemi.Keys.externalClasspath] into
+ * Dependency pulls [project]s [wemi.keys.internalClasspath] and [wemi.keys.externalClasspath] into
  * this project's external classpath.
  *
  * To create an aggregate project dependency, set [scope] to [ScopeAggregate].

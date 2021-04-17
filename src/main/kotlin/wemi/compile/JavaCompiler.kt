@@ -1,3 +1,5 @@
+@file:Suppress("RemoveExplicitTypeArguments")
+
 package wemi.compile
 
 /** Extensions that a valid Java source file can have */

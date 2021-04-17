@@ -12,6 +12,7 @@ import wemi.dependency
 import wemi.dependency.Repository
 import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.resolveDependencyArtifacts
+import wemi.keys.libraryDependencies
 import wemi.util.SystemInfo
 import wemi.util.div
 import wemi.util.executable
@@ -70,7 +71,7 @@ class ResolvedIntelliJIDE(
 }
 
 val ResolveIdeDependency: Value<ResolvedIntelliJIDE> = {
-	val withKotlin = !Keys.libraryDependencies.get().any { it.dependencyId.group == "org.jetbrains.kotlin" && isKotlinRuntime(it.dependencyId.name) }
+	val withKotlin = !libraryDependencies.get().any { it.dependencyId.group == "org.jetbrains.kotlin" && isKotlinRuntime(it.dependencyId.name) }
 
 	val result = when (val dependency = IntelliJ.intellijIdeDependency.get()) {
 		is IntelliJIDE.Local -> resolveLocalIDE(dependency.path, withKotlin)

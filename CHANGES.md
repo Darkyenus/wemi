@@ -5,6 +5,9 @@
     - Option now also has a short name
     - SHELL format now supports propagating exit code
     - `run` task returns `ExitCode` object implementing `WithExitCode`
+- The big flattening: Removed `Keys`, `Configurations` and `Archetypes` objects. Their content is now in top level variables in respective packages (`wemi.keys.run` for example). This should help with wildcard importing.
+- Added a concept of user defined commands, which work similarly to keys, but have a fixed binding and can be only invoked in the top level
+- Input parameters are now applicable only to commands, not to key bindings
 
 # 0.16 2020-12-21
 - In plugin for intellij plugins: Added ability to instrument classes with not-null assertions and to compile .form files

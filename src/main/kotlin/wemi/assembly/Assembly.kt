@@ -16,7 +16,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 
 /**
- * A script to be used in [wemi.Keys.assemblyPrependData] which launches self jar with `exec java -jar` command.
+ * A script to be used in [wemi.keys.assemblyPrependData] which launches self jar with `exec java -jar` command.
  */
 val PREPEND_SCRIPT_EXEC_JAR: ByteArray = "#!/usr/bin/env sh\nexec java -jar \"$0\" \"$@\"\n"
         .toByteArray(Charsets.UTF_8)
@@ -162,8 +162,7 @@ class AssemblyOperation : Closeable {
             }
 
             // Resolve duplicate
-            val strategy = mergeStrategy(path)
-            when (strategy) {
+            when (val strategy = mergeStrategy(path)) {
                 MergeStrategy.First -> {
                     val first = dataList.first()
                     LOG.debug("Including first item {}", first)

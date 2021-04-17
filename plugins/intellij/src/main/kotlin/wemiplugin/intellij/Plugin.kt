@@ -1,19 +1,18 @@
 package wemiplugin.intellij
 
 import Files
-import Keys
 import Path
 import org.slf4j.LoggerFactory
-import wemi.Archetypes
 import wemi.Axis
-import wemi.Configurations
 import wemi.Key
 import wemi.StringValidator
 import wemi.WemiException
 import wemi.archetype
+import wemi.archetypes.JUnitLayer
 import wemi.collections.toMutable
 import wemi.command
 import wemi.configuration
+import wemi.configurations.testing
 import wemi.dependency
 import wemi.dependency.Dependency
 import wemi.dependency.Repository
@@ -23,6 +22,7 @@ import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.resolveDependencyArtifacts
 import wemi.generation.generateResources
 import wemi.key
+import wemi.keys.*
 import wemi.readSecret
 import wemi.readSecretFromFile
 import wemi.run.ExitCode
@@ -97,7 +97,7 @@ val IntelliJPluginsRepo = IntelliJPluginRepository.Maven(Repository("intellij-pl
 val IntelliJThirdPartyRepo = Repository("intellij-third-party-dependencies", "https://jetbrains.bintray.com/intellij-third-party-dependencies")
 val RobotServerDependency = dependency("org.jetbrains.test", "robot-server-plugin", "0.10.0", type = TypeChooseByPackaging)
 
-val uiTesting by configuration("IDE UI Testing (launch the IDE in UI testing mode through ${Keys.run} key)") {}
+val uiTesting by configuration("IDE UI Testing (launch the IDE in UI testing mode through $run key)") {}
 
 val searchableOptionsAxis = Axis("searchableOptions")
 val withoutSearchableOptions by configuration("Do not build IntelliJ plugin searchable options", searchableOptionsAxis) {}
@@ -116,15 +116,15 @@ val intellijPublishPluginToRepository by command("Proxy for intellijPublishPlugi
 	evaluate { IntelliJ.intellijPublishPluginToRepository.get() }
 }
 
-/** A layer over [wemi.Archetypes.JVMBase] which turns the project into an IntelliJ platform plugin. */
-val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
+/** A layer over [wemi.archetypes.JVMBase] which turns the project into an IntelliJ platform plugin. */
+val IntelliJPluginLayer by archetype(::JUnitLayer) {
 
 	// Project input info
-	IntelliJ.intellijPluginName set { Keys.projectName.get() }
-	Keys.libraryDependencies add { JetBrainsAnnotationsDependency }
+	IntelliJ.intellijPluginName set { projectName.get() }
+	libraryDependencies add { JetBrainsAnnotationsDependency }
 
 	// Project dependencies
-	Keys.externalClasspath modify  { cp ->
+	externalClasspath modify  { cp ->
 		val mcp = cp.toMutable()
 		for (path in IntelliJ.intellijResolvedIdeDependency.get().jarFiles) {
 			mcp.add(LocatedPath(path).scoped(ScopeProvided))
@@ -138,11 +138,11 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	}
 	IntelliJ.intellijResolvedPluginDependencies set DefaultResolvedIntellijPluginDependencies
 	// Gradle plugin does something like this, but I don't think we need it
-	//Keys.repositories addAll { IntelliJ.intellijPluginRepositories.get().mapNotNull { (it as? IntelliJPluginRepository.Maven)?.repo } }
+	//repositories addAll { IntelliJ.intellijPluginRepositories.get().mapNotNull { (it as? IntelliJPluginRepository.Maven)?.repo } }
 	// IntelliJ already contains its own Kotlin stdlib - it would be nice to detect which version is used and use that
-	Keys.automaticKotlinStdlib put false
+	automaticKotlinStdlib put false
 	IntelliJ.intellijInstrumentationClasspath set DefaultInstrumentationClasspath
-	Keys.compile modify { output ->
+	compile modify { output ->
 		if (IntelliJ.intellijInstrumentCode.get()) {
 			instrumentClasses(output, IntelliJ.intellijInstrumentationClasspath.get())
 		} else {
@@ -176,27 +176,27 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 	IntelliJ.intellijIdeDependency set { IntelliJIDE.External() }
 	IntelliJ.intellijResolvedIdeDependency set ResolveIdeDependency
 	IntelliJ.intellijIdeSandbox set { prepareIntelliJIDESandbox() }
-	Keys.externalSources modify { es ->
+	externalSources modify { es ->
 		val sources = es.toMutable()
 		sources.addAll(ResolveIdeDependencySources.invoke(this))
 		sources
 	}
 
 	// IntelliJ SDK launch
-	Keys.runSystemProperties modify DefaultModifySystemProperties
-	Keys.runOptions modify DefaultModifyRunOptions
-	Keys.javaHome set DefaultJbrJavaHome
-	Keys.mainClass put "com.intellij.idea.Main"
-	Keys.run set {
+	runSystemProperties modify DefaultModifySystemProperties
+	runOptions modify DefaultModifyRunOptions
+	javaHome set DefaultJbrJavaHome
+	mainClass put "com.intellij.idea.Main"
+	run set {
 		expiresNow()
 		ExitCode(runIde())
 	}
 
 	// Unit testing
-	extend(Configurations.testing) {
+	extend(testing) {
 		IntelliJ.intellijIdeSandbox set { prepareIntelliJIDESandbox(testSuffix = "-test") } // TODO(jp): Test tests
 
-		Keys.runSystemProperties modify {
+		runSystemProperties modify {
 			val sp = it.toMutableMap()
 
 			val sandboxDir = IntelliJ.intellijIdeSandbox.get()
@@ -230,7 +230,7 @@ val IntelliJPluginLayer by archetype(Archetypes::JUnitLayer) {
 		//                )
 	}
 	// IntelliJ test fixtures use JUnit4 API
-	Keys.libraryDependencies add { Dependency(JUnit4Engine, scope= ScopeTest) }
+	libraryDependencies add { Dependency(JUnit4Engine, scope= ScopeTest) }
 
 	// UI Testing
 	// Since I can't find any documentation about the robot thing, and since

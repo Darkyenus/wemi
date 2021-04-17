@@ -346,7 +346,7 @@ class Project internal constructor(val name: String, internal val projectRoot: P
  * Archetype usually specifies which languages can be used and what the compile output is.
  *
  * @param name used mostly for debugging
- * @see Archetypes for more info about this concept
+ * @see wemi.archetypes for more info about this concept
  */
 @WemiDsl
 class Archetype internal constructor(val name: String, val parent:Archetype?) : ExtendableBindingHolder() {
@@ -413,18 +413,44 @@ class CommandBindingHolder internal constructor(
  * only serve as a more convenient/interactive UI for them.
  *
  * Unlike [Key]s, [Command]s cannot be rebound. */
-class Command<T> internal constructor(val name: String,
-                                      val description: String,
-                                      internal val execute:CommandBindingHolder.() -> T) : WithDescriptiveString {
+class Command<T> internal constructor(
+    val name: String,
+    val description: String,
+    internal val execute:CommandBindingHolder.() -> T,
+    /**
+     * Optional function that can convert the result of this command's evaluation to a more readable
+     * or more informative string.
+     */
+    internal val prettyPrinter: PrettyPrinter<T>?,
+    /**
+     * Optional function that will print the result of this command's evaluation
+     * in a specified machine-readable format.
+     *
+     * Called when the command is evaluated in top-level in machine-readable output mode.
+     */
+    internal val machineReadableFormatter:MachineReadableFormatter<T>?) : WithDescriptiveString {
 
     override fun toDescriptiveAnsiString(): String = format(name, format = Format.Bold, foreground = Color.Blue).toString()
 
     override fun toString(): String = name
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Command<*>) return false
+
+        if (name != other.name) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return name.hashCode()
+    }
 }
 
 /**
  * Defines a part of scope in the scope linked-list structure.
- * Scope allows to query the values of bound [Keys].
+ * Scope allows to query the values of bound [Key]s.
  * Each scope is internally formed by an ordered list of [BindingHolder]s.
  *
  * @param bindingHolders list of holders contributing to the scope's holder stack. Most significant holders last.

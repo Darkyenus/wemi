@@ -2,6 +2,7 @@
 @file:BuildDependencyRepository("jcenter", "https://jcenter.bintray.com/")
 
 import wemi.*
+import wemi.keys.*
 import wemiplugin.intellij.*
 
 val testPlugin by project(Archetypes.JavaProject, IntelliJPluginLayer) {

@@ -21,10 +21,6 @@ typealias Dependency = wemi.dependency.Dependency
 typealias DependencyExclusion = wemi.dependency.DependencyExclusion
 typealias LocatedPath = wemi.util.LocatedPath
 
-typealias Archetypes = wemi.Archetypes
-typealias Configurations = wemi.Configurations
-typealias Keys = wemi.Keys
-
 typealias project = ProjectDelegate
 typealias key<T> = KeyDelegate<T>
 typealias configuration = ConfigurationDelegate

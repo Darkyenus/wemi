@@ -4,7 +4,7 @@ package wemi
  * [Key]s may return objects that implement this interface.
  * Under certain circumstances, Wemi can take its process' exit code from that returned object.
  *
- * For example, [Keys.test] uses this to exit with non-zero exit code when tests fail.
+ * For example, [wemi.keys.test] uses this to exit with non-zero exit code when tests fail.
  *
  * Conditions for the [processExitCode] to be used:
  * 1. Task must be run non-interactively, supplied as process argument

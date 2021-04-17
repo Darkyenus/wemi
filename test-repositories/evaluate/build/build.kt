@@ -3,17 +3,17 @@
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.*
 import wemi.util.*
+import wemi.util.div
 import wemi.boot.*
+import wemi.test.*
+import wemi.test.JUnitAPI
+import wemi.test.JUnitEngine
 import wemi.dependency.*
 import wemi.run.*
 import wemi.*
-import wemi.Keys.sources
-import wemi.Keys.projectRoot
-import wemi.Keys.compilerOptions
-import wemi.Keys.externalClasspath
-import wemi.Keys.repositories
-import wemi.Keys.libraryDependencies
-import wemi.Keys.run
+import wemi.keys.*
+import wemi.archetypes.*
+import wemi.configurations.*
 
 val someKey by key<String>("")
 val someConfig by configuration("") {
@@ -35,7 +35,7 @@ val subtracting by configuration("") {}
 val modifyEvaluationTest by key<Unit>("Tests simple modifier evaluation logic")
 
 
-val keyExtensionArchetype by archetype(Archetypes::Base) {
+val keyExtensionArchetype by archetype(::Base) {
     keyWhichIsSetInArchetypeThenExtended set { "" }
 }
 val keyWhichIsExtended by key<String>("")
@@ -622,7 +622,7 @@ val artifactInMultipleRepositories_2 by configuration("") {
     }
 }
 
-val dependency_resolution by project(Archetypes.JavaProject) {
+val dependency_resolution by project(JavaProject) {
     val longRunning = true
 
     // Test dependency resolution by resolving against changing repository 3 different libraries
@@ -634,7 +634,7 @@ val dependency_resolution by project(Archetypes.JavaProject) {
      */
     autoRun(checkResolution, release_1)
     autoRun(checkResolution, release_2)
-    autoRun(checkResolution, Configurations.offline, release_2)
+    autoRun(checkResolution, offline, release_2)
 
     /* 2. Non-unique snapshot
         1. Exists
@@ -718,7 +718,7 @@ fun EvalScope.cliProgressTest():Int {
     return 0
 }
 
-val cliTestProject by project(Archetypes.Base) {
+val cliTestProject by project(Base) {
     run set {
         ExitCode(cliProgressTest())
     }

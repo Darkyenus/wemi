@@ -3,7 +3,7 @@ package wemiplugin.jvmhotswap
 import org.slf4j.LoggerFactory
 import wemi.Command
 import wemi.KeyDefaults.inProjectDependencies
-import wemi.Keys
+import wemi.keys.*
 import wemi.WemiException
 import wemi.collections.toMutable
 import wemi.command
@@ -38,11 +38,11 @@ object JvmHotswap {
     val hotswapAgentPort by key("Network port used to communicate with hotswap agent", DEFAULT_HOTSWAP_AGENT_PORT)
 
     val hotswapping by configuration("Used to execute compile hot-swaps by runHotswap key") {
-        Keys.outputClassesDirectory modify { dir ->
+        outputClassesDirectory modify { dir ->
             dir.parent / "${dir.name}-hotswap"
         }
 
-        Keys.runOptions modify {
+        runOptions modify {
             val options = it.toMutable()
             val port = hotswapAgentPort.get()
             val agentJar = Magic.classpathFileOf(JvmHotswap.javaClass)!!
@@ -66,16 +66,16 @@ object JvmHotswap {
         var port = DEFAULT_HOTSWAP_AGENT_PORT
         var initialInternalClasspath: List<LocatedPath> = emptyList()
         evaluate(hotswapping) {
-            processBuilder = Keys.runProcess.get()
-            sources = Keys.sources.get().let {
+            processBuilder = runProcess.get()
+            sources = wemi.keys.sources.get().let {
                 var result = it
                 inProjectDependencies {
-                    result += Keys.sources.get()
+                    result += wemi.keys.sources.get()
                 }
                 result
             }
             port = hotswapAgentPort.get()
-            initialInternalClasspath = Keys.internalClasspath.get()
+            initialInternalClasspath = internalClasspath.get()
         }
 
         // Start server
@@ -114,7 +114,7 @@ object JvmHotswap {
 
                 // Recompile
                 val newClasspathSnapshot = try {
-                    snapshotFiles(evaluate(hotswapping) { Keys.internalClasspath.get() }, classpathIncluded)
+                    snapshotFiles(evaluate(hotswapping) { internalClasspath.get() }, classpathIncluded)
                 } catch (e: WemiException.CompilationException) {
                     LOG.info("Can't swap: {}", e.message)
                     continue

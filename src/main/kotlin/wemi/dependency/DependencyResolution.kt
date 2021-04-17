@@ -99,7 +99,7 @@ private class LoggingDownloadTracker : ActivityListener {
         downloadStatuses.removeAt(downloadStatuses.lastIndex)
     }
 
-    override fun beginParallelActivity(activity: String): ActivityListener? {
+    override fun beginParallelActivity(activity: String): ActivityListener {
         val fork = LoggingDownloadTracker()
         fork.beginActivity(activity)
         return fork

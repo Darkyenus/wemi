@@ -30,7 +30,7 @@ open class WemiException : RuntimeException {
     class KeyNotAssignedException(val key: Key<*>, val scope: Scope) : WemiException("'${key.name}' not assigned in $scope", showStacktrace = false)
 
     /**
-     * Special version of the [WemiException], thrown typically by implementations of [Keys.compile] to indicate
+     * Special version of the [WemiException], thrown typically by implementations of [wemi.keys.compile] to indicate
      * compilation error, caused by invalid source code.
      */
     class CompilationException : WemiException {

@@ -10,7 +10,7 @@ import java.nio.file.Path
 /**
  * Contains all options needed for Dokka invocation through [DokkaInterface].
  *
- * @see wemi.Keys.archiveDokkaOptions
+ * @see wemi.keys.archiveDokkaOptions
  */
 class DokkaOptions : JsonWritable {
 

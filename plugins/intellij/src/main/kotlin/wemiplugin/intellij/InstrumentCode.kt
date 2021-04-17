@@ -1,6 +1,5 @@
 package wemiplugin.intellij
 
-import Keys
 import org.slf4j.LoggerFactory
 import wemi.EvalScope
 import wemi.Value
@@ -9,6 +8,11 @@ import wemi.dependency
 import wemi.dependency.MavenCentral
 import wemi.dependency.resolveDependencyArtifacts
 import wemi.key
+import wemi.keys.externalClasspath
+import wemi.keys.javaHome
+import wemi.keys.outputClassesDirectory
+import wemi.keys.scopesCompile
+import wemi.keys.sources
 import wemi.util.EnclaveClassLoader
 import wemi.util.FileSet
 import wemi.util.copyRecursively
@@ -30,11 +34,11 @@ val intellijInstrumentSkipClassesAnnotations by key("When adding NotNull asserti
 fun EvalScope.instrumentClasses(compileOutput: Path, instrumentationClasspath: List<Path>):Path {
 	val notNullAnnotations = intellijInstrumentNotNullAnnotations.get()
 
-	val outputDir = Keys.outputClassesDirectory.get().let { it.resolveSibling("${it.name}-instrumented") }
+	val outputDir = outputClassesDirectory.get().let { it.resolveSibling("${it.name}-instrumented") }
 	outputDir.ensureEmptyDirectory()
 	compileOutput.copyRecursively(outputDir)
 
-	val javaHome = Keys.javaHome.get().home
+	val javaHome = javaHome.get().home
 	val instrumentationClassName = "wemiplugin.intellij.instrumentation.InstrumentationImpl"
 
 	val instrumentationClasspathURL = ArrayList<URL>()
@@ -53,12 +57,12 @@ fun EvalScope.instrumentClasses(compileOutput: Path, instrumentationClasspath: L
 	val instrumentation = Class.forName(instrumentationClassName, true, classLoader).newInstance() as Instrumentation
 
 	val classFiles = FileSet(outputDir, include("**.class"), caseSensitive = false).matchingFiles()
-	val formFiles = Keys.sources.get()?.filterByExtension("form").matchingFiles()
+	val formFiles = sources.get()?.filterByExtension("form").matchingFiles()
 
 	// The classpath searched when instrumenting, the classpath of the plugin when running
 	val compilationClasspath = ArrayList<Path>()
 	compilationClasspath.addAll(outputDir)
-	Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get()).mapTo(compilationClasspath) { it.classpathEntry }
+	externalClasspath.getLocatedPathsForScope(scopesCompile.get()).mapTo(compilationClasspath) { it.classpathEntry }
 
 	val notNullSkipAnnotations = intellijInstrumentSkipClassesAnnotations.get()
 

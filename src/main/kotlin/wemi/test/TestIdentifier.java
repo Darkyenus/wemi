@@ -110,7 +110,7 @@ public final class TestIdentifier {
 		final String displayName = in.readUTF();
 		final boolean isTest = in.readBoolean();
 		final boolean isContainer = in.readBoolean();
-		final HashSet<String> tags = new HashSet<String>();
+		final HashSet<String> tags = new HashSet<>();
 		ForkSerialization.readFrom(in, tags);
 		final String testSource = in.readUTF();
 		return new TestIdentifier(id, parentId, displayName, isTest, isContainer, tags, testSource);

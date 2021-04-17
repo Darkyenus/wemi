@@ -1,7 +1,5 @@
 package wemiplugin.intellij.utils
 
-import Files
-import Keys
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationFail
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationSuccess
 import com.jetbrains.plugin.structure.base.plugin.PluginProblem
@@ -10,6 +8,7 @@ import com.jetbrains.plugin.structure.intellij.plugin.IdePluginManager
 import org.slf4j.LoggerFactory
 import wemi.EvalScope
 import wemi.KeyDefaults.inProjectDependencies
+import wemi.keys.resources
 import wemi.util.LocatedPath
 import wemi.util.absolutePath
 import wemi.util.div
@@ -32,7 +31,7 @@ internal object Utils {
 	private val LOG = LoggerFactory.getLogger(Utils.javaClass)
 
 	fun EvalScope.sourcePluginXmlFiles(validate:Boolean = true):List<LocatedPath> {
-		return Keys.resources.getLocatedPaths().filter {
+		return resources.getLocatedPaths().filter {
 			it.path == "META-INF/plugin.xml" && (!validate || run {
 				// Validate this file, that it really contains idea-plugin
 				val xml = parseXml(it.file) ?: return@run false

@@ -1,7 +1,6 @@
 package wemi.generation
 
-import Files
-import Keys
+import wemi.keys.*
 import LocatedPath
 import org.slf4j.LoggerFactory
 import wemi.BindingHolder
@@ -37,13 +36,13 @@ private val LOG = LoggerFactory.getLogger("Generation")
 val WemiGeneratedFolder by lazy { WemiRootFolder / "build-generated" }
 
 /**
- * Create a new source directory ([root]) for generated sources and add it to [wemi.Keys.sources].
- * On each invocation of [wemi.Keys.sources], the directory is emptied and [generate] should generate necessary files.
+ * Create a new source directory ([root]) for generated sources and add it to [sources].
+ * On each invocation of [sources], the directory is emptied and [generate] should generate necessary files.
  * @param name unique name of the generated sources directory
  */
 inline fun BindingHolder.generateSources(name:String, crossinline generate:EvalScope.(root:Path)->Unit) {
-	Keys.sources modify {
-		val sourceDir = WemiGeneratedFolder / "sources-${Keys.projectName.get().toSafeFileName()}-$name"
+	sources modify {
+		val sourceDir = WemiGeneratedFolder / "sources-${projectName.get().toSafeFileName()}-$name"
 		sourceDir.ensureEmptyDirectory()
 		generate(sourceDir)
 		it + FileSet(sourceDir)
@@ -51,13 +50,13 @@ inline fun BindingHolder.generateSources(name:String, crossinline generate:EvalS
 }
 
 /**
- * Create a new resource directory ([root]) for generated resources and add it to [wemi.Keys.resources].
- * On each invocation of [wemi.Keys.resources], the directory is emptied and [generate] should generate necessary files.
+ * Create a new resource directory ([root]) for generated resources and add it to [resources].
+ * On each invocation of [resources], the directory is emptied and [generate] should generate necessary files.
  * @param name unique name of the generated sources directory
  */
 inline fun BindingHolder.generateResources(name:String, crossinline generate:EvalScope.(root:Path)->Unit) {
-	Keys.resources modify {
-		val resourceDir = WemiGeneratedFolder / "resources-${Keys.projectName.get().toSafeFileName()}-$name"
+	resources modify {
+		val resourceDir = WemiGeneratedFolder / "resources-${projectName.get().toSafeFileName()}-$name"
 		resourceDir.ensureEmptyDirectory()
 		generate(resourceDir)
 		it + FileSet(resourceDir)
@@ -65,14 +64,14 @@ inline fun BindingHolder.generateResources(name:String, crossinline generate:Eva
 }
 
 /**
- * Create a new internal classpath directory ([root]) for generated classpath entries and add it to [wemi.Keys.generatedClasspath].
- * On each invocation of [wemi.Keys.generatedClasspath], the directory is emptied and [generate] should generate necessary files.
+ * Create a new internal classpath directory ([root]) for generated classpath entries and add it to [generatedClasspath].
+ * On each invocation of [generatedClasspath], the directory is emptied and [generate] should generate necessary files.
  *
  * Jar files in the [root] directory will be automatically added directly.
  */
 inline fun BindingHolder.generateClasspath(name:String, crossinline generate:EvalScope.(root:Path)->Unit) {
-	Keys.generatedClasspath modify {
-		val cpDir = WemiGeneratedFolder / "classpath-${Keys.projectName.get().toSafeFileName()}-$name"
+	generatedClasspath modify {
+		val cpDir = WemiGeneratedFolder / "classpath-${projectName.get().toSafeFileName()}-$name"
 		cpDir.ensureEmptyDirectory()
 		generate(cpDir)
 		val classpath = it.toMutable()
@@ -193,14 +192,14 @@ fun generateJavaConstantsFile(root: Path, name:String, constants:Map<String, Con
 		}
 		writer.append(" */\n\n")
 
-		if (!packageName.isBlank()) {
+		if (packageName.isNotBlank()) {
 			writer.append("package ").append(packageName).append(";\n\n")
 		}
 
 		writer.append("public final class ").append(className).append(" {\n\n")
 
 		for ((key, value) in constants) {
-			if (!value.comment.isBlank()) {
+			if (value.comment.isNotBlank()) {
 				if (value.comment.indexOf('\n') >= 0) {
 					// Multi-line comment
 					writer.append("\t/**\n")
@@ -303,12 +302,12 @@ fun generateKotlinConstantsFile(root: Path, name:String, constants:Map<String, C
 		}
 		writer.append(" */\n\n")
 
-		if (!packageName.isBlank()) {
+		if (packageName.isNotBlank()) {
 			writer.append("package ").append(packageName).append("\n\n")
 		}
 
 		for ((key, value) in constants) {
-			if (!value.comment.isBlank()) {
+			if (value.comment.isNotBlank()) {
 				if (value.comment.indexOf('\n') >= 0) {
 					// Multi-line comment
 					writer.append("/**\n")

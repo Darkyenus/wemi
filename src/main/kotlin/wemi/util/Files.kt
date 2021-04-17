@@ -48,7 +48,7 @@ internal fun URL.appendToPath(extraPath:CharSequence):URL {
     val newFile = StringBuilder(oldPath.length + query.length + extraPath.length + (fragment?.length ?: 0) + 2)
     newFile.append(oldPath).append(extraPath)
 
-    if (!query.isEmpty()) {
+    if (query.isNotEmpty()) {
         newFile.append('?').append(query)
     }
 
@@ -307,7 +307,7 @@ operator fun CharSequence.div(path: CharSequence): StringBuilder {
 fun URL.toPath(): Path? {
     try {
         if (host != null
-                && !host.isBlank()
+                && host.isNotBlank()
                 && !host.equals("localhost", ignoreCase = true)
                 && !host.equals("127.0.0.1", ignoreCase = true)) {
             return null
@@ -608,7 +608,7 @@ fun Path.copyRecursively(to:Path, vararg options:CopyOption) {
     } else {
         // Directory
         val root = this
-        val copyAttributes = options.contains<CopyOption>(StandardCopyOption.COPY_ATTRIBUTES)
+        val copyAttributes = options.contains(StandardCopyOption.COPY_ATTRIBUTES)
 
         Files.walkFileTree(root, object : FileVisitor<Path>{
 

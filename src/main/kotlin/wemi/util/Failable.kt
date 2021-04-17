@@ -40,7 +40,7 @@ private constructor(val successful: Boolean, val value: Success?, val failure: F
     inline fun <Result> map(operation: (Success) -> Result):Failable<Result, Failure> {
         if (successful) {
             @Suppress("UNCHECKED_CAST")
-            return Failable.success(operation(value as Success))
+            return success(operation(value as Success))
         } else {
             return this.reFail()
         }

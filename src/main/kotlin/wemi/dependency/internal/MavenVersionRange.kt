@@ -1,7 +1,7 @@
 package wemi.dependency.internal
 
 /**
- *
+ * Range of two versions as used in Maven.
  */
 class MavenVersionRange(private val min:MavenVersion?, private val minInclusive:Boolean, private val max:MavenVersion?, private val maxInclusive:Boolean) {
 

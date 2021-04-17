@@ -221,9 +221,8 @@ internal object TaskCompleter : Completer {
         } else if (type == null) {
             // User is ready to start typing other part of task, check what was before to give meaningful suggestion
             val prevIndex = wordIndex - 1
-            val prevToken = tokenTypes.getOrNull(prevIndex)
 
-            when (prevToken) {
+            when (tokenTypes.getOrNull(prevIndex)) {
                 null -> {
                     if (prevIndex < 0) {
                         // Start of the line, core of the command is needed

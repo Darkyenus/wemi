@@ -1,3 +1,5 @@
+@file:Suppress("MemberVisibilityCanBePrivate")
+
 package wemi.util
 
 import org.slf4j.LoggerFactory

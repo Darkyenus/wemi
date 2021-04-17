@@ -10,6 +10,10 @@ import wemi.documentation.DokkaOptions.SourceLinkMapItem
 import wemi.dependency.*
 import wemi.*
 import wemi.generation.*
+import wemi.archetypes.*
+import wemi.keys.*
+import wemi.util.*
+import wemi.test.*
 import com.esotericsoftware.jsonbeans.JsonValue
 
 val basics by project {
@@ -172,7 +176,7 @@ val bar:Configuration by configuration("") {
 /**
  * Running this project should produce the same result as running [basics], after it was published with `basics/publish`.
  */
-val basicsFromRepository by project(Archetypes.AggregateJVMProject) {
+val basicsFromRepository by project(AggregateJVMProject) {
     libraryDependencies add { dependency("com.darkyen:basics:1.0-SNAPSHOT") }
     // Needed because of the special dependency there
     repositories add { Repository("spigot-snapshots", "https://hub.spigotmc.org/nexus/content/repositories/snapshots", releases = false) }

@@ -31,7 +31,7 @@ internal annotation class DirectiveFields(val value:Array<String>)
  * @param name of the artifact coordinate OR empty string (default) when using compact form
  * @param version of the artifact coordinate OR empty string (default) when using compact form
  * @see wemi.dependency function, which has similar arguments
- * @see wemi.Keys.libraryDependencies key, which stores library dependencies for built projects
+ * @see wemi.keys.libraryDependencies key, which stores library dependencies for built projects
  * @see BuildDependencyRepository to add more repositories to search in
  * @see BuildClasspathDependency to add files directly to the build script classpath, without resolution step
  */
@@ -47,7 +47,7 @@ annotation class BuildDependency(val groupOrFull:String, val name:String = "", v
  * @param name of the repository
  * @param url of the repository
  * @see wemi.dependency.Repository constructor, which has similar arguments
- * @see wemi.Keys.repositories key, which stores repositories for built projects
+ * @see wemi.keys.repositories key, which stores repositories for built projects
  * @see BuildDependency for important notes about build-script directive annotations.
  */
 @Target(AnnotationTarget.FILE)
@@ -62,7 +62,7 @@ annotation class BuildDependencyRepository(val name:String, val url:String)
  * @param file path to the classpath file (typically .jar) or directory.
  * Absolute or relative to the [wemi.boot.WemiRootFolder] (=project's root directory)
  * @see BuildDependency for important notes about build-script directive annotations
- * @see wemi.Keys.externalClasspath key, which stores raw classpath dependencies of built projects
+ * @see wemi.keys.externalClasspath key, which stores raw classpath dependencies of built projects
  */
 @Target(AnnotationTarget.FILE)
 @Retention(AnnotationRetention.SOURCE)
@@ -163,7 +163,7 @@ internal fun parseFileDirectives(source: BufferedReader, directives:Array<Class<
                 } else {
                     val wemiVersionName = ::WemiVersion.name
                     if (value == wemiVersionName) {
-                        wemi.boot.WemiVersion
+                        WemiVersion
                     } else {
                         LOG.warn("{}:{} Invalid directive annotation - unrecognized parameter '{}', only strings and '{}' allowed", source, line, value, wemiVersionName)
                         return false

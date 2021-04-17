@@ -1,5 +1,8 @@
+import wemi.archetypes.*
+import wemi.keys.*
+import wemi.*
 
-val hello by project(wemi.Archetypes.JavaProject) {
+val hello by project(JavaProject) {
 
     projectGroup set { "com.darkyen" }
     projectName set { "hello-java" }

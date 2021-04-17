@@ -21,7 +21,6 @@ import wemi.EvaluationListener
 import wemi.EvaluationListener.Companion.plus
 import wemi.ExtendableBindingHolder
 import wemi.IntValidator
-import wemi.Key
 import wemi.Project
 import wemi.WemiException
 import wemi.WemiKotlinVersion
@@ -271,7 +270,7 @@ object CLI {
             val commandFunction = internalCommands[task.key]
             if (commandFunction != null) {
                 return commandFunction(task)
-                        ?: TaskEvaluationResult(null, null, TaskEvaluationStatus.Command)
+                        ?: TaskEvaluationResult(null, TaskEvaluationStatus.Command)
             }
         }
 
@@ -279,7 +278,7 @@ object CLI {
         val keyEvaluationResult = MessageDisplay.withStatus(true) {
             evaluateKeyOrCommand(task, defaultProject, KeyEvaluationStatusListener + listener)
         }
-        val (key, data, status) = keyEvaluationResult
+        val (key, command, data, status) = keyEvaluationResult
         val duration = System.currentTimeMillis() - beginTime
 
         when (status) {
@@ -292,8 +291,7 @@ object CLI {
                 val newlinePoint = out.length
 
                 @Suppress("UNCHECKED_CAST")
-                out.appendKeyResultLn(key as Key<Any?>, data)
-
+                out.appendKeyResultLn((key?.prettyPrinter ?: command?.prettyPrinter) as wemi.PrettyPrinter<Any?>?, data)
 
                 // Add a newline at newlinePoint if key result contains newlines (other than the last one)
                 if (out.indexOf('\n', newlinePoint) != out.length - 1) {

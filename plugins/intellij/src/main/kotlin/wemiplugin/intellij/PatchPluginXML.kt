@@ -1,12 +1,12 @@
 package wemiplugin.intellij
 
 import Files
-import Keys
 import org.slf4j.LoggerFactory
 import wemi.EvalScope
 import wemi.Value
 import wemi.util.LocatedPath
 import wemi.util.div
+import wemi.keys.*
 import wemiplugin.intellij.utils.Patch
 import wemiplugin.intellij.utils.parseXml
 import wemiplugin.intellij.utils.patchInPlace
@@ -36,9 +36,9 @@ fun EvalScope.generatePatchedPluginXmlFiles(root: Path) {
 }
 
 val DefaultIntelliJPluginXmlPatches : Value<Iterable<Patch>> = {
-	val namePatch = Keys.projectName.getOrElse(null)?.let { Patch("name", content = it) }
-	val idPatch = Keys.projectGroup.getOrElse(null)?.let { Patch("id", content = it) }
-	val versionPatch = Keys.projectVersion.getOrElse(null)?.let { Patch("version", content = it) }
+	val namePatch = projectName.getOrElse(null)?.let { Patch("name", content = it) }
+	val idPatch = projectGroup.getOrElse(null)?.let { Patch("id", content = it) }
+	val versionPatch = projectVersion.getOrElse(null)?.let { Patch("version", content = it) }
 	val ideVersion = IntelliJ.intellijResolvedIdeDependency.get().version
 
 	val sinceBuildPatch = pluginXmlSinceBuildPatch("${ideVersion.baselineVersion}.${ideVersion.build}")

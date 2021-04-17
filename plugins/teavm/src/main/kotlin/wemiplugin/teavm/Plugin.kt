@@ -15,7 +15,7 @@ import org.teavm.vm.TeaVMProgressFeedback
 import org.teavm.vm.TeaVMProgressListener
 import wemi.KeyDefaults
 import wemi.KeyDefaults.inProjectDependencies
-import wemi.Keys.libraryDependencies
+import wemi.keys.*
 import wemi.Value
 import wemi.WemiException
 import wemi.archetype
@@ -62,6 +62,7 @@ object TeaVMCompilerFlags {
 	val heapDump = CompilerFlag("teavm.heapDump", "", false)
 }
 
+@Suppress("MemberVisibilityCanBePrivate")
 class TeaVMResult(val output: List<Path>, val mapFile: Path?, val sourcesDir: Path?) {
 	override fun toString(): String {
 		val sb = StringBuilder()
@@ -86,11 +87,11 @@ val TeaVMCompileDefault: Value<TeaVMResult> = {
 	val cacheDir = KeyDefaults.outputClassesDirectory("teavm-cache").invoke(this)
 	val outputDir = KeyDefaults.outputClassesDirectory("teavm-output").invoke(this)
 	outputDir.ensureEmptyDirectory()
-	val flags = Keys.compilerOptions.get()
+	val flags = compilerOptions.get()
 
 	val classpath = LinkedHashSet<Path>()
-	Keys.internalClasspath.get().mapTo(classpath) { it.classpathEntry }
-	Keys.externalClasspath.getLocatedPathsForScope(Keys.scopesCompile.get()).mapTo(classpath) { it.classpathEntry }
+	internalClasspath.get().mapTo(classpath) { it.classpathEntry }
+	externalClasspath.getLocatedPathsForScope(scopesCompile.get()).mapTo(classpath) { it.classpathEntry }
 
 	val tool = TeaVMTool()
 	tool.setProgressListener(object : TeaVMProgressListener {
@@ -139,12 +140,12 @@ val TeaVMCompileDefault: Value<TeaVMResult> = {
 	tool.log = log
 	val targetType = flags.getOrDefault(TeaVMCompilerFlags.targetType)
 	tool.targetType = targetType
-	val mainClass = Keys.mainClass.getOrElse(null)
+	val mainClass = mainClass.getOrElse(null)
 	tool.mainClass = mainClass
 	tool.setEntryPointName(flags.getOrDefault(TeaVMCompilerFlags.entryPointName))
 	tool.targetDirectory = outputDir.toFile()
 	val targetFileName = flags.getOrDefault(TeaVMCompilerFlags.targetFileName).let {
-		var name = if (it.isBlank()) "classes" else it
+		var name = it.ifBlank { "classes" }
 		val extension = when (targetType) {
 			TeaVMTargetType.JAVASCRIPT -> "js"
 			TeaVMTargetType.WEBASSEMBLY -> "wasm"
@@ -186,7 +187,7 @@ val TeaVMCompileDefault: Value<TeaVMResult> = {
 		val internalSources = ArrayList<LocatedPath>()
 
 		override fun open() {
-			for (classpathEntry in Keys.externalSources.get()) {
+			for (classpathEntry in externalSources.get()) {
 				if (classpathEntry.isDirectory()) {
 					directories.add(classpathEntry)
 				} else {
@@ -201,9 +202,9 @@ val TeaVMCompileDefault: Value<TeaVMResult> = {
 				}
 			}
 
-			internalSources.addAll(Keys.sources.get().matchingLocatedFiles())
+			internalSources.addAll(sources.get().matchingLocatedFiles())
 			inProjectDependencies {
-				internalSources.addAll(Keys.sources.get().matchingLocatedFiles())
+				internalSources.addAll(sources.get().matchingLocatedFiles())
 			}
 		}
 

@@ -98,7 +98,7 @@ class TreeBuildingKeyEvaluationListener(private val printValues: Boolean, privat
             val body = keyData.body()
             val originalLength = body.length
             body.append('\n') // Body convention
-            body.appendKeyResultLn(binding.key, result, maxPrintedCollectionElements)
+            body.appendKeyResultLn(binding.key.prettyPrinter, result, maxPrintedCollectionElements)
             body.setLength(body.length - 1) // Strip newline appended by previous statement
 
             if (body.length == originalLength + 1) {

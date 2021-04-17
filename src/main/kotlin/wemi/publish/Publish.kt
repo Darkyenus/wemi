@@ -1,21 +1,23 @@
 package wemi.publish
 
-import wemi.Configurations
 import wemi.EvalScope
-import wemi.Keys
 import wemi.dependency.Classifier
 import wemi.dependency.JavadocClassifier
 import wemi.dependency.SourcesClassifier
 import wemi.dependency.joinClassifiers
+import wemi.keys.archive
+import wemi.keys.archiveDocs
+import wemi.keys.archiveSources
+import wemi.keys.publishArtifacts
 import java.nio.file.Path
 
 /**
- * Artifact to [Classifier] pairing used in [wemi.Keys.publishArtifacts].
+ * Artifact to [Classifier] pairing used in [publishArtifacts].
  */
 typealias ArtifactEntry = Pair<Path, Classifier>
 
 /**
- * Collect artifact entries to be added to [wemi.Keys.publishArtifacts].
+ * Collect artifact entries to be added to [publishArtifacts].
  *
  * ### Example:
  * ```
@@ -31,19 +33,19 @@ typealias ArtifactEntry = Pair<Path, Classifier>
 fun EvalScope.artifacts(classifier: Classifier, includeSources:Boolean = true, includeDocumentation:Boolean = true):List<ArtifactEntry> {
     val result = ArrayList<ArtifactEntry>(3)
 
-    val artifact = Keys.archive.get()
+    val artifact = archive.get()
 
     if (artifact != null) {
         result.add(artifact to classifier)
     }
 
     if (includeSources) {
-        val sourceArtifact = Keys.archiveSources.get()
+        val sourceArtifact = archiveSources.get()
         result.add(sourceArtifact to joinClassifiers(classifier, SourcesClassifier))
     }
 
     if (includeDocumentation) {
-        val docsArtifact = Keys.archiveDocs.get()
+        val docsArtifact = archiveDocs.get()
         result.add(docsArtifact to joinClassifiers(classifier, JavadocClassifier))
     }
 

@@ -2,14 +2,12 @@ package wemi.util
 
 import com.darkyen.tproll.util.PrettyPrinter
 import org.slf4j.LoggerFactory
-import wemi.Key
 import wemi.boot.CLI
 import wemi.boot.WemiColorOutputSupported
-import wemi.dependency.TypeJar
 import wemi.dependency.DependencyId
 import wemi.dependency.NoClassifier
 import wemi.dependency.ResolvedDependencies
-import java.util.*
+import wemi.dependency.TypeJar
 
 //region StringBuilder enhancements
 fun Appendable.append(integer:Int):Appendable {
@@ -319,18 +317,14 @@ internal fun StringBuilder.appendPrettyCollection(collection:Collection<*>, maxC
 
 private val APPEND_KEY_RESULT_LOG = LoggerFactory.getLogger("AppendKeyResult")
 
-/**
- * Append the [value] formatted like the result of the [key] and newline.
- */
-fun <V> StringBuilder.appendKeyResultLn(key: Key<V>, value:V, maxCollectionElements:Int = Int.MAX_VALUE) {
-    val prettyPrinter = key.prettyPrinter
-
+/** Append the [value] formatted like the result and newline. */
+fun <V> StringBuilder.appendKeyResultLn(prettyPrinter: wemi.PrettyPrinter<V>?, value:V, maxCollectionElements:Int = Int.MAX_VALUE) {
     if (prettyPrinter != null) {
         val printed: CharSequence? =
                 try {
                     prettyPrinter(value, maxCollectionElements)
                 } catch (e: Exception) {
-                    APPEND_KEY_RESULT_LOG.warn("Pretty-printer for {} failed", key, e)
+                    APPEND_KEY_RESULT_LOG.warn("Pretty-printer failed", e)
                     null
                 }
 

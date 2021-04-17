@@ -1,7 +1,6 @@
 package wemiplugin.intellij
 
 import Files
-import Keys
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationFail
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationSuccess
 import com.jetbrains.plugin.structure.base.plugin.PluginProblem
@@ -17,6 +16,10 @@ import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
 import wemi.dependency.ScopeCompile
 import wemi.dependency.ScopeRuntime
+import wemi.keys.archive
+import wemi.keys.cacheDirectory
+import wemi.keys.externalClasspath
+import wemi.keys.projectVersion
 import wemi.util.FileSet
 import wemi.util.absolutePath
 import wemi.util.div
@@ -47,14 +50,14 @@ enum class Strictness {
 
 val DefaultIntelliJPluginFolder : Value<Path> = {
 	val pluginName = IntelliJ.intellijPluginName.get().toSafeFileName()
-	val pluginDir = Keys.cacheDirectory.get() / "-intellij-plugin-archive" / pluginName
+	val pluginDir = cacheDirectory.get() / "-intellij-plugin-archive" / pluginName
 	pluginDir.ensureEmptyDirectory()
 	val pluginLibDir = pluginDir / "lib"
 	Files.createDirectories(pluginLibDir)
 
-	val externalClasspath = Keys.externalClasspath.getLocatedPathsForScope(setOf(ScopeCompile, ScopeRuntime)).map { it.classpathEntry }
+	val externalClasspath = externalClasspath.getLocatedPathsForScope(setOf(ScopeCompile, ScopeRuntime)).map { it.classpathEntry }
 
-	val pluginJar = Keys.archive.get()
+	val pluginJar = archive.get()
 	if (pluginJar == null || !pluginJar.isRegularFile() || !pluginJar.name.pathHasExtension("jar")) {
 		throw WemiException("Archive must produce a jar, got: $pluginJar")
 	}
@@ -107,7 +110,7 @@ val DefaultIntelliJSearchableOptions : Value<Path?> = {
 			return@using null
 		}
 
-		val cacheDir = Keys.cacheDirectory.get()
+		val cacheDir = cacheDirectory.get()
 		val outputDir = cacheDir / "-intellij-searchable-options"
 		outputDir.ensureEmptyDirectory()
 		LOG.info("Starting IDE for searchable option collection")
@@ -136,7 +139,7 @@ val DefaultIntelliJSearchableOptions : Value<Path?> = {
 val DefaultIntelliJPluginArchive : Value<Path> = {
 	val folder = using(withSearchableOptions) { IntelliJ.intellijPluginFolder.get() }
 
-	val zip = folder.parent / "${folder.name}-${Keys.projectVersion.get()}.zip"
+	val zip = folder.parent / "${folder.name}-${projectVersion.get()}.zip"
 	AssemblyOperation().use {
 		for (file in FileSet(folder).matchingLocatedFiles()) {
 			it.addSource("${folder.name}/${file.path}", file.file, true)
