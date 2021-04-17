@@ -102,6 +102,23 @@ internal object TaskCompleter : Completer {
         candidates
     }
 
+    private val commandCandidates: List<Candidate> by lazy {
+        val candidates = ArrayList<Candidate>()
+
+        for (command in BuildScriptData.AllCommands.values) {
+            candidates.add(Candidate(
+                command.name,
+                command.name,
+                null,
+                command.description,
+                null,
+                null,
+                true))
+        }
+
+        candidates
+    }
+
     private val taskSeparatorCandidate = Candidate(
             TaskParser.TASK_SEPARATOR,
             TaskParser.TASK_SEPARATOR,
@@ -112,7 +129,7 @@ internal object TaskCompleter : Completer {
             true
     )
 
-    private val commandCandidates: List<Candidate> = CLI.internalCommands.keys.map { name ->
+    private val internalCommandCandidates: List<Candidate> = CLI.internalCommands.keys.map { name ->
         Candidate(name,
                 name,
                 null,
@@ -230,6 +247,7 @@ internal object TaskCompleter : Completer {
                         candidates.addAll(configurationCandidates)
                         candidates.addAll(keyCandidates)
                         candidates.addAll(commandCandidates)
+                        candidates.addAll(internalCommandCandidates)
                     } //else we don't know
                 }
                 Project,
@@ -259,11 +277,13 @@ internal object TaskCompleter : Completer {
                             candidates.addAll(configurationCandidates)
                             candidates.addAll(keyCandidates)
                             candidates.addAll(commandCandidates)
+                            candidates.addAll(internalCommandCandidates)
                         }
                         TaskParser.CONFIGURATION_SEPARATOR -> {
                             // Configuration has been entered, time for new one, or perhaps a key?
                             candidates.addAll(configurationCandidates)
                             candidates.addAll(keyCandidates)
+                            candidates.addAll(commandCandidates)
                         }
                         TaskParser.INPUT_SEPARATOR -> {
                             // Time to add some input
@@ -274,6 +294,7 @@ internal object TaskCompleter : Completer {
                             // Project has been added, but configurations and keys are still missing
                             candidates.addAll(configurationCandidates)
                             candidates.addAll(keyCandidates)
+                            candidates.addAll(commandCandidates)
                         }
                     }
                 }
@@ -307,10 +328,11 @@ internal object TaskCompleter : Completer {
                     }
                     if (!hasProject) {
                         candidates.addAll(projectCandidates)
-                        candidates.addAll(commandCandidates)
+                        candidates.addAll(internalCommandCandidates)
                     }
                     candidates.addAll(configurationCandidates)
                     candidates.addAll(keyCandidates)
+                    candidates.addAll(commandCandidates)
                 }
                 InputKey -> {
                     // Editing input key, suggest them
