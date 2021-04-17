@@ -10,6 +10,9 @@ import java.util.*
 
 private val LOG = LoggerFactory.getLogger("FileTreeWatcher")
 
+typealias FileSnapshot = Map<String, Pair<Path, ByteArray>>
+typealias MutableFileSnapshot = MutableMap<String, Pair<Path, ByteArray>>
+
 /**
  * Compute digest of given file.
  * Returns null if file fails to be read or digested, for any reason.
@@ -37,20 +40,20 @@ private fun MessageDigest.digest(path:Path):ByteArray? {
 /**
  * Used by [snapshotFiles].
  */
-private fun snapshotFile(digest:MessageDigest, result:HashMap<LocatedPath, ByteArray?>, isIncluded: (LocatedPath) -> Boolean, path:LocatedPath) {
-    if (result.containsKey(path) || !isIncluded(path)) {
+private fun snapshotFile(digest:MessageDigest, result:MutableFileSnapshot, isIncluded: (LocatedPath) -> Boolean, path:LocatedPath) {
+    val pathClasspathName = path.path
+    if (result.containsKey(pathClasspathName) || !isIncluded(path)) {
         // Already processed, probably nested roots or symlinks, or filtered out
         return
     }
 
     val file = path.file
     if (file.isDirectory()) {
-        result[path] = null
         Files.list(file).forEachOrdered {
             snapshotFile(digest, result, isIncluded, LocatedPath(path.root, it))
         }
     } else {
-        result[path] = (digest.digest(file) ?: return /* Ignore weird files */)
+        result[pathClasspathName] = file to (digest.digest(file) ?: return /* Ignore weird files */)
     }// else dunno, we don't care
 }
 
@@ -63,9 +66,9 @@ private fun snapshotFile(digest:MessageDigest, result:HashMap<LocatedPath, ByteA
  * @param roots files or directories (that are searched recursively for files) to be included in the report
  * @param isIncluded function to filter out files, that should not be included in the report
  */
-fun snapshotFiles(roots:Collection<LocatedPath>, isIncluded:(LocatedPath) -> Boolean):Map<LocatedPath, ByteArray?> {
+fun snapshotFiles(roots:Collection<LocatedPath>, isIncluded:(LocatedPath) -> Boolean):FileSnapshot {
     val digest = MessageDigest.getInstance("MD5")!! // Fast digest, guaranteed to be present
-    val result = HashMap<LocatedPath, ByteArray?>(roots.size + roots.size / 2)
+    val result = HashMap<String, Pair<Path, ByteArray>>(roots.size + roots.size / 2)
 
     for (root in roots) {
         snapshotFile(digest, result, isIncluded, root)
@@ -74,7 +77,7 @@ fun snapshotFiles(roots:Collection<LocatedPath>, isIncluded:(LocatedPath) -> Boo
     return result
 }
 
-fun snapshotsAreEqual(first:Map<LocatedPath, ByteArray?>, second:Map<LocatedPath, ByteArray?>):Boolean {
+fun snapshotsAreEqual(first:FileSnapshot, second:FileSnapshot):Boolean {
     if (first.size != second.size) {
         return false
     }
@@ -84,7 +87,7 @@ fun snapshotsAreEqual(first:Map<LocatedPath, ByteArray?>, second:Map<LocatedPath
             return false
         }
         // Not using MessageDigest.isEqual because we don't need time-constant comparisons
-        if (!Arrays.equals(value, second[key])) {
+        if (!Arrays.equals(value.second, second[key]?.second)) {
             return false
         }
     }

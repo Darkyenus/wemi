@@ -19,8 +19,10 @@ import wemi.util.writeValue
  * Aggregated project's internal classpath will end up in this projects archive, as if it was on its internal classpath.
  * Non-aggregate projects behave like normal libraries, archived separately.
  */
-class ProjectDependency(val project: Project, vararg val configurations: Configuration, val scope:DepScope = ScopeCompile)
+data class ProjectDependency(val project: Project, val configurations: List<Configuration>, val scope:DepScope = ScopeCompile)
     : JsonWritable {
+
+    constructor(project:Project, vararg configurations: Configuration, scope:DepScope = ScopeCompile) : this(project, listOf(*configurations), scope)
 
     @Deprecated("Use ScopeAggregate instead")
     constructor(project: Project, aggregate:Boolean, vararg configurations: Configuration, scope:DepScope = ScopeCompile) : this(project, *configurations, scope = if (aggregate) ScopeAggregate else scope)
@@ -46,23 +48,5 @@ class ProjectDependency(val project: Project, vararg val configurations: Configu
         sb.append(" scope=").append(scope)
 
         return sb.toString()
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is ProjectDependency) return false
-
-        if (project != other.project) return false
-        if (!configurations.contentEquals(other.configurations)) return false
-        if (scope != other.scope) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = project.hashCode()
-        result = 31 * result + configurations.contentHashCode()
-        result = 31 * result + scope.hashCode()
-        return result
     }
 }

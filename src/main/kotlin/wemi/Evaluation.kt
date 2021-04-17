@@ -143,14 +143,24 @@ class EvalScope @PublishedApi internal constructor(
         return deriveEvalScope(scope.project.scopeFor(scope.configurations + configurations, scope.command)).use { it.action() }
     }
 
+    /** Run the [action] in a scope, which is created by layering [configurations] over this [Scope]. */
+    inline fun <Result> using(configurations: List<Configuration>, action: EvalScope.() -> Result): Result {
+        return deriveEvalScope(scope.project.scopeFor(scope.configurations + configurations, scope.command)).use { it.action() }
+    }
+
     /** Run the [action] in a scope, which is created by replacing the project and layering the configurations on top. */
     inline fun <Result> using(project:Project, vararg configurations:Configuration, action: EvalScope.() -> Result): Result {
         return deriveEvalScope(project.scopeFor(scope.configurations + configurations, scope.command)).use { it.action() }
     }
 
+    /** Run the [action] in a scope, which is created by replacing the project and layering the configurations on top. */
+    inline fun <Result> using(project:Project, configurations:List<Configuration>, action: EvalScope.() -> Result): Result {
+        return deriveEvalScope(project.scopeFor(scope.configurations + configurations, scope.command)).use { it.action() }
+    }
+
     /** Run the [action] in a scope, which is created by replacing the project with [scope]. */
     inline fun <Result> using(projectDep: ProjectDependency, action: EvalScope.() -> Result): Result {
-        return deriveEvalScope(projectDep.project.scopeFor(projectDep.configurations.toList() + scope.configurations, scope.command)).use { it.action() }
+        return deriveEvalScope(projectDep.project.scopeFor(projectDep.configurations + scope.configurations, scope.command)).use { it.action() }
     }
 
     private fun <V : Output, Output> getKeyValue(key: Key<V>, otherwise: Output, useOtherwise: Boolean): Output {

@@ -3,12 +3,16 @@ package wemiplugin.jvmhotswap
 import org.slf4j.LoggerFactory
 import wemi.Command
 import wemi.KeyDefaults.inProjectDependencies
-import wemi.keys.*
 import wemi.WemiException
+import wemi.boot.CLI
 import wemi.collections.toMutable
 import wemi.command
 import wemi.configuration
 import wemi.key
+import wemi.keys.internalClasspath
+import wemi.keys.outputClassesDirectory
+import wemi.keys.runOptions
+import wemi.keys.runProcess
 import wemi.run.ExitCode
 import wemi.util.FileSet
 import wemi.util.LocatedPath
@@ -24,7 +28,6 @@ import java.io.DataOutputStream
 import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
-import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
@@ -37,11 +40,7 @@ object JvmHotswap {
 
     val hotswapAgentPort by key("Network port used to communicate with hotswap agent", DEFAULT_HOTSWAP_AGENT_PORT)
 
-    val hotswapping by configuration("Used to execute compile hot-swaps by runHotswap key") {
-        outputClassesDirectory modify { dir ->
-            dir.parent / "${dir.name}-hotswap"
-        }
-
+    val runningHotswap by configuration("Used for initial compilation and process creation of the hotswapped process") {
         runOptions modify {
             val options = it.toMutable()
             val port = hotswapAgentPort.get()
@@ -49,6 +48,12 @@ object JvmHotswap {
             LOG.debug("Agent jar: {}", agentJar)
             options.add("-javaagent:${agentJar.absolutePath}=$port")
             options
+        }
+    }
+
+    val recompilingHotswap by configuration("Used for later compilations of the hotswapped process") {
+        outputClassesDirectory modify { dir ->
+            dir.parent / "${dir.name}-hotswap"
         }
     }
 
@@ -64,8 +69,8 @@ object JvmHotswap {
         var processBuilder: ProcessBuilder? = null
         var sources: FileSet? = null
         var port = DEFAULT_HOTSWAP_AGENT_PORT
-        var initialInternalClasspath: List<LocatedPath> = emptyList()
-        evaluate(hotswapping) {
+        val initialInternalClasspath = ArrayList<LocatedPath>()
+        evaluate(runningHotswap) {
             processBuilder = runProcess.get()
             sources = wemi.keys.sources.get().let {
                 var result = it
@@ -75,7 +80,10 @@ object JvmHotswap {
                 result
             }
             port = hotswapAgentPort.get()
-            initialInternalClasspath = internalClasspath.get()
+            initialInternalClasspath.addAll(internalClasspath.get())
+            inProjectDependencies {
+                initialInternalClasspath.addAll(internalClasspath.get())
+            }
         }
 
         // Start server
@@ -95,57 +103,63 @@ object JvmHotswap {
             // Separate process output from Wemi output
             println()
             val process = processBuilder!!.start()
-
-            val agentSocket = try {
-                server.accept()
-            } catch (e: IOException) {
-                throw WemiException("Failure when waiting for agent to connect on port $port", e)
-            }
-            val outputStream = DataOutputStream(agentSocket.getOutputStream())
-
-            while (!process.waitFor(2, TimeUnit.SECONDS)) {
-                // Process is still running, check filesystem for changes
-                val newSourceSnapshot = snapshotFiles(sources.matchingLocatedFiles(), sourceIncluded)
-                if (snapshotsAreEqual(newSourceSnapshot, sourceSnapshot)) {
-                    // No changes
-                    continue
+            CLI.forwardSignalsTo(process) {
+                val agentSocket = try {
+                    server.accept()
+                } catch (e: IOException) {
+                    throw WemiException("Failure when waiting for agent to connect on port $port", e)
                 }
-                sourceSnapshot = newSourceSnapshot
+                val outputStream = DataOutputStream(agentSocket.getOutputStream())
 
-                // Recompile
-                val newClasspathSnapshot = try {
-                    snapshotFiles(evaluate(hotswapping) { internalClasspath.get() }, classpathIncluded)
-                } catch (e: WemiException.CompilationException) {
-                    LOG.info("Can't swap: {}", e.message)
-                    continue
-                }
-
-                var changeCount = 0
-
-                // We can't do anything about added classes (those should get picked up automatically),
-                // nor removed classes. So just detect what has changed and recompile it.
-                for ((key, value) in classpathSnapshot) {
-                    if (value == null) {
+                while (!process.waitFor(2, TimeUnit.SECONDS)) {
+                    // Process is still running, check filesystem for changes
+                    val newSourceSnapshot = snapshotFiles(sources.matchingLocatedFiles(), sourceIncluded)
+                    if (snapshotsAreEqual(newSourceSnapshot, sourceSnapshot)) {
+                        // No changes
                         continue
                     }
-                    val newHash = newClasspathSnapshot[key] ?: continue
-                    if (!MessageDigest.isEqual(value, newHash)) {
-                        // This file changed!
-                        outputStream.writeUTF(key.file.absolutePath)
-                        changeCount++
+                    sourceSnapshot = newSourceSnapshot
+
+                    // Recompile
+                    val newClasspathSnapshot = try {
+                        snapshotFiles(evaluate(recompilingHotswap) {
+                            val result = ArrayList(internalClasspath.get())
+                            inProjectDependencies {
+                                result.addAll(internalClasspath.get())
+                            }
+                            result }, classpathIncluded)
+                    } catch (e: WemiException.CompilationException) {
+                        LOG.info("Can't swap: {}", e.message)
+                        continue
                     }
-                }
 
-                if (changeCount > 0) {
-                    outputStream.writeUTF("")
-                }
+                    var changeCount = 0
+                    var changedClass = ""
 
-                classpathSnapshot = newClasspathSnapshot
+                    // We can't do anything about added classes (those should get picked up automatically),
+                    // nor removed classes. So just detect what has changed and recompile it.
+                    for ((key, value) in classpathSnapshot) {
+                        val (_, oldHash) = value
+                        val (newFile, newHash) = newClasspathSnapshot[key] ?: continue
+                        if (!oldHash.contentEquals(newHash)) {
+                            // This file changed!
+                            outputStream.writeUTF(newFile.absolutePath)
+                            changeCount++
+                            changedClass = key
+                        }
+                    }
 
-                if (changeCount == 1) {
-                    LOG.info("Swapped 1 class")
-                } else if (changeCount > 1) {
-                    LOG.info("Swapped {} classes", changeCount)
+                    if (changeCount > 0) {
+                        outputStream.writeUTF("")
+                    }
+
+                    classpathSnapshot = newClasspathSnapshot
+
+                    if (changeCount == 1) {
+                        LOG.info("Swapped {}", changedClass)
+                    } else if (changeCount > 1) {
+                        LOG.info("Swapped {} and {} more", changedClass, changeCount - 1)
+                    }
                 }
             }
 

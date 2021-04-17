@@ -284,7 +284,7 @@ fun EvalScope.resolveIntelliJPlugin(dependency: IntelliJPluginDependency, resolv
 			externalPluginDependency(dependency.zipPath, null)
 		}
 		is IntelliJPluginDependency.Project -> {
-			using(dependency.projectDependency.project, *dependency.projectDependency.configurations) {
+			using(dependency.projectDependency.project, dependency.projectDependency.configurations) {
 				val archive = IntelliJ.intellijPluginArchive.get()
 				val intellijPlugin = Utils.createPlugin(archive, validatePluginXml = false, logProblems = true)
 						?: throw WemiException("Cannot use ${dependency.projectDependency} as a plugin dependency - it is invalid", false)
