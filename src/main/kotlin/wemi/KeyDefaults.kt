@@ -9,21 +9,16 @@ import wemi.assembly.DefaultAssemblyMapFilter
 import wemi.assembly.DefaultRenameFunction
 import wemi.assembly.NoConflictStrategyChooser
 import wemi.assembly.NoPrependData
-import wemi.boot.WemiBundledLibrariesExclude
 import wemi.boot.WemiVersion
 import wemi.collections.WMutableList
 import wemi.compile.JavaCompilerFlags
 import wemi.compile.JavaSourceFileExtensions
 import wemi.compile.KotlinCompiler
-import wemi.compile.KotlinCompilerFlags
-import wemi.compile.KotlinJVMCompilerFlags
 import wemi.compile.KotlinSourceFileExtensions
 import wemi.compile.internal.createJavaObjectFileDiagnosticLogger
-import wemi.configurations.*
-import wemi.dependency.TypeJar
+import wemi.configurations.ideImport
+import wemi.configurations.testing
 import wemi.dependency.Dependency
-import wemi.dependency.DependencyId
-import wemi.dependency.JCenter
 import wemi.dependency.MavenCentral
 import wemi.dependency.NoClassifier
 import wemi.dependency.ProjectDependency
@@ -31,12 +26,59 @@ import wemi.dependency.Repository
 import wemi.dependency.ResolvedDependencies
 import wemi.dependency.ScopeAggregate
 import wemi.dependency.ScopeCompile
+import wemi.dependency.TypeJar
 import wemi.dependency.internal.publish
 import wemi.dependency.joinClassifiers
 import wemi.dependency.resolveDependencies
 import wemi.dependency.resolveDependencyArtifacts
-import wemi.documentation.DokkaInterface
-import wemi.documentation.DokkaOptions
+import wemi.keys.archive
+import wemi.keys.archiveJavadocOptions
+import wemi.keys.assemblyMapFilter
+import wemi.keys.assemblyMergeStrategy
+import wemi.keys.assemblyOutputFile
+import wemi.keys.assemblyPrependData
+import wemi.keys.assemblyRenameFunction
+import wemi.keys.cacheDirectory
+import wemi.keys.compile
+import wemi.keys.compilerOptions
+import wemi.keys.externalClasspath
+import wemi.keys.externalDocs
+import wemi.keys.externalSources
+import wemi.keys.generatedClasspath
+import wemi.keys.internalClasspath
+import wemi.keys.javaCompiler
+import wemi.keys.javaHome
+import wemi.keys.kotlinCompiler
+import wemi.keys.libraryDependencies
+import wemi.keys.libraryDependencyMapper
+import wemi.keys.mainClass
+import wemi.keys.outputClassesDirectory
+import wemi.keys.outputHeadersDirectory
+import wemi.keys.outputJavascriptDirectory
+import wemi.keys.outputSourcesDirectory
+import wemi.keys.projectDependencies
+import wemi.keys.projectGroup
+import wemi.keys.projectName
+import wemi.keys.projectVersion
+import wemi.keys.publishArtifacts
+import wemi.keys.publishMetadata
+import wemi.keys.publishRepository
+import wemi.keys.repositories
+import wemi.keys.resolvedLibraryDependencies
+import wemi.keys.resources
+import wemi.keys.runArguments
+import wemi.keys.runDirectory
+import wemi.keys.runEnvironment
+import wemi.keys.runOptions
+import wemi.keys.runProcess
+import wemi.keys.runSystemProperties
+import wemi.keys.scopesCompile
+import wemi.keys.scopesRun
+import wemi.keys.scopesTest
+import wemi.keys.sources
+import wemi.keys.test
+import wemi.keys.testParameters
+import wemi.keys.unmanagedDependencies
 import wemi.publish.InfoNode
 import wemi.run.ExitCode
 import wemi.run.prepareJavaProcess
@@ -47,7 +89,6 @@ import wemi.test.TestReport
 import wemi.test.handleProcessForTesting
 import wemi.test.withPrefixContainer
 import wemi.util.CycleChecker
-import wemi.util.EnclaveClassLoader
 import wemi.util.LineReadingWriter
 import wemi.util.LocatedPath
 import wemi.util.Magic
@@ -58,7 +99,6 @@ import wemi.util.appendCentered
 import wemi.util.appendTimes
 import wemi.util.constructLocatedFiles
 import wemi.util.div
-import wemi.keys.*
 import wemi.util.ensureEmptyDirectory
 import wemi.util.exists
 import wemi.util.format
@@ -72,7 +112,6 @@ import wemi.util.prettyPrint
 import wemi.util.scoped
 import wemi.util.toSafeFileName
 import java.io.File
-import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -81,8 +120,6 @@ import java.util.*
 import javax.tools.DocumentationTool
 import javax.tools.StandardLocation
 import javax.tools.ToolProvider
-import kotlin.collections.ArrayList
-import kotlin.collections.LinkedHashSet
 
 /**
  * Contains default values bound to keys.
@@ -778,97 +815,6 @@ object KeyDefaults {
 
         val locatedFiles = ArrayList<LocatedPath>()
         constructLocatedFiles(javadocOutput, locatedFiles)
-
-        AssemblyOperation().use { assemblyOperation ->
-            // Load data
-            for (file in locatedFiles) {
-                assemblyOperation.addSource(file, own = true, extractJarEntries = false)
-            }
-
-            val outputFile = defaultArchiveFileName("docs", "jar")
-            assemblyOperation.assembly(
-                    NoConflictStrategyChooser,
-                    DefaultRenameFunction,
-                    DefaultAssemblyMapFilter,
-                    outputFile,
-                    NoPrependData,
-                    compress = true)
-
-            expiresWith(outputFile)
-            outputFile
-        }
-    }
-
-    val ArchiveDokkaOptions: Value<DokkaOptions> = {
-        val compilerOptions = compilerOptions.get()
-
-        val options = DokkaOptions()
-
-        for (sourceRoot in sources.getLocatedPaths().mapNotNullTo(HashSet()) { it.root?.toAbsolutePath() }) {
-            options.sourceRoots.add(DokkaOptions.SourceRoot(sourceRoot))
-        }
-
-        options.moduleName = compilerOptions.getOrNull(KotlinCompilerFlags.moduleName) ?: projectName.get()
-        val javaVersion = parseJavaVersion(
-                compilerOptions.getOrNull(JavaCompilerFlags.sourceVersion)
-                        ?: compilerOptions.getOrNull(JavaCompilerFlags.targetVersion)
-                        ?: compilerOptions.getOrNull(KotlinJVMCompilerFlags.jvmTarget))
-        if (javaVersion != null) {
-            options.jdkVersion = javaVersion
-        }
-        options.externalDocumentationLinks.add(DokkaOptions.ExternalDocumentation(javadocUrl(javaVersion)))
-
-        options.impliedPlatforms.add("JVM")
-
-        options
-    }
-
-    private val DokkaFatJar = listOf(Dependency(DependencyId("org.jetbrains.dokka", "dokka-fatjar", "0.9.15"), exclusions = WemiBundledLibrariesExclude))
-
-    val ArchiveDokkaInterface: Value<DokkaInterface> = {
-        val artifacts = resolveDependencyArtifacts(DokkaFatJar, listOf(JCenter), progressListener)?.toMutableList()
-                ?: throw IllegalStateException("Failed to retrieve kotlin compiler library")
-
-        javaHome.get().toolsJar?.let { artifacts.add(it) }
-
-        ARCHIVE_DOKKA_LOG.trace("Classpath for Dokka: {}", artifacts)
-
-        val implementationClassName = "wemi.documentation.impl.DokkaInterfaceImpl"
-        /** Loads artifacts normally. */
-        val dependencyClassLoader = URLClassLoader(artifacts.map { it.toUri().toURL() }.toTypedArray(), Magic.WemiDefaultClassLoader)
-        /** Makes sure that the implementation class is loaded in a class loader that has artifacts available. */
-        val forceClassLoader = EnclaveClassLoader(emptyArray(), dependencyClassLoader,
-                implementationClassName, // Own entry point
-                "org.jetbrains.dokka.") // Force loading all of Dokka in here
-
-        val clazz = Class.forName(implementationClassName, true, forceClassLoader)
-
-        clazz.newInstance() as DokkaInterface
-    }
-
-    private val ARCHIVE_DOKKA_LOG = LoggerFactory.getLogger("ArchiveDokka")
-    val ArchiveDokka: Value<Path> = archive@{
-        val options = archiveDokkaOptions.get()
-
-        if (options.sourceRoots.isEmpty()) {
-            ARCHIVE_DOKKA_LOG.info("No source files for Dokka, creating dummy documentation instead")
-            return@archive ArchiveDummyDocumentation()
-        }
-
-        val cacheDirectory = cacheDirectory.get()
-        val dokkaOutput = cacheDirectory / "dokka-${projectName.get().toSafeFileName('_')}"
-        dokkaOutput.ensureEmptyDirectory()
-
-        val packageListCacheFolder = cacheDirectory / "dokka-package-list-cache"
-
-        val externalClasspath = externalClasspath.getLocatedPathsForScope(scopesCompile.get()).mapTo(LinkedHashSet()) { it.classpathEntry }
-
-        val dokka = archiveDokkaInterface.get()
-
-        dokka.execute(externalClasspath, dokkaOutput, packageListCacheFolder, options, ARCHIVE_DOKKA_LOG)
-
-        val locatedFiles = ArrayList<LocatedPath>()
-        constructLocatedFiles(dokkaOutput, locatedFiles)
 
         AssemblyOperation().use { assemblyOperation ->
             // Load data

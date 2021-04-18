@@ -169,9 +169,7 @@ val JavaKotlinProject by archetype(::JVMBase) {
     kotlinCompiler set { kotlinVersion.get().compilerInstance(progressListener) }
     compile set KeyDefaults.CompileJavaKotlin
 
-    archiveDokkaOptions set KeyDefaults.ArchiveDokkaOptions
-    archiveDokkaInterface set KeyDefaults.ArchiveDokkaInterface
-    archiveDocs set KeyDefaults.ArchiveDokka
+    archiveDocs set KeyDefaults.ArchiveJavadoc
 }
 
 /** Primary archetype for projects that produce JavaScript source files as output */

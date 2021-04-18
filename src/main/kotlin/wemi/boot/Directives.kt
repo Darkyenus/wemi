@@ -77,7 +77,6 @@ annotation class BuildClasspathDependency(val file:String)
  * The group is for convenience set by default to "com.darkyen.wemi", which is the group of official plugins.
  * This also automatically adds the repository in which the official plugins are published
  * (like [BuildDependencyRepository] does). This repository is currently [wemi.dependency.Jitpack].
- * (It also sneakily adds [wemi.dependency.JCenter] because IntelliJ plugin needs it.)
  */
 @Target(AnnotationTarget.FILE)
 @Retention(AnnotationRetention.SOURCE)

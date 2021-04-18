@@ -851,7 +851,7 @@ fun CharSequence.toValidIdentifier(): String? {
  *
  * @return N or null if invalid
  */
-internal fun parseJavaVersion(version:String?):Int? {
+fun parseJavaVersion(version:String?):Int? {
     return version?.removePrefix("1.")?.toIntOrNull()
 }
 

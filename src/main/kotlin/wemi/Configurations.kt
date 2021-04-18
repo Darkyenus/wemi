@@ -61,18 +61,6 @@ val offline by configuration("Disables features that are not available when offl
         return this.startsWith("file:", ignoreCase = true)
     }
 
-    archiveDokkaOptions modify { options ->
-        // TODO This sadly does not work as org.jetbrains.dokka.DocumentationOptions adds own links.
-        // However, Dokka caches package-lists, so it should work after you package once and cache gets created.
-        options.apply {
-            externalDocumentationLinks.removeIf {
-                if (it.packageListUrl != null) {
-                    false
-                } else !it.url.localUrl()
-            }
-        }
-    }
-
     archiveJavadocOptions modify {
         // Search for -link options and remove them if they are not local
         // There is also -linkoffline option, but that specifies explicit package-list, so it should be fine

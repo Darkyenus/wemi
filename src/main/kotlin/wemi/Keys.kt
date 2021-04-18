@@ -10,8 +10,6 @@ import wemi.compile.CompilerFlags
 import wemi.compile.KotlinCompiler
 import wemi.compile.KotlinCompilerVersion
 import wemi.dependency.*
-import wemi.documentation.DokkaInterface
-import wemi.documentation.DokkaOptions
 import wemi.publish.ArtifactEntry
 import wemi.publish.InfoNode
 import wemi.run.EnvVarMachineReadableFormatter
@@ -45,7 +43,7 @@ val cacheDirectory by key<Path>("Directory in which Wemi stores cache and proces
 
 /**
  * Contains all source files. Individual compilers process them based on their extension.
- * Under [wemi.testing] contains test sources as well (in addition to normal sources).
+ * Under [wemi.configurations.testing] contains test sources as well (in addition to normal sources).
  */
 val sources by key<FileSet?>("Source files of the project (compiled, part of internal classpath)", defaultValue = null, prettyPrinter = FILE_SET_PRETTY_PRINTER)
 val resources by key<FileSet?>("Resource files of the project (not compiled, part of internal classpath)", defaultValue = null, prettyPrinter = FILE_SET_PRETTY_PRINTER)
@@ -98,8 +96,6 @@ val testParameters by key<TestParameters>("Parameters for the test key. By defau
 val test by key<TestReport>("Run the tests (through the JUnit Platform by default)", prettyPrinter = { it, _ -> it.prettyPrint() })
 
 val archiveJavadocOptions by key<List<String>>("Options when archiving Javadoc")
-val archiveDokkaOptions by key<DokkaOptions>("Options when archiving Dokka")
-val archiveDokkaInterface by key<DokkaInterface>("Dokka instance used when creating documentation")
 val archive by key<Path?>("Archive project's output and return path to the created file, if any")
 val archiveSources by key<Path>("Archive project's sources and return path to the created file")
 val archiveDocs by key<Path>("Archive project's documentation and return path to the created file")
@@ -119,4 +115,3 @@ val assemblyMapFilter by key<AssemblyMapFilter>("Function that allows controllin
 val assemblyPrependData by key<ByteArray>("Data to prepend to the jar created by assembly task", defaultValue = ByteArray(0))
 val assemblyOutputFile by key<Path>("File to which assembled jar should be saved")
 val assembly by key<Path>("Assembly the project and its dependencies into a fat jar")
-

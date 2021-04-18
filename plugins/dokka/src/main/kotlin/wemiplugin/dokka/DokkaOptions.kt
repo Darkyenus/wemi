@@ -1,4 +1,4 @@
-package wemi.documentation
+package wemiplugin.dokka
 
 import com.esotericsoftware.jsonbeans.JsonWriter
 import wemi.util.JsonWritable
@@ -10,7 +10,7 @@ import java.nio.file.Path
 /**
  * Contains all options needed for Dokka invocation through [DokkaInterface].
  *
- * @see wemi.keys.archiveDokkaOptions
+ * @see wemiplugin.dokka.archiveDokkaOptions
  */
 class DokkaOptions : JsonWritable {
 

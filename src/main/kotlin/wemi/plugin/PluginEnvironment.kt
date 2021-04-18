@@ -24,7 +24,7 @@ interface PluginEnvironment {
      * Example:
      * ```
      * fun initialize() {
-     *      Archetypes::Base.inject {
+     *      ::Base.inject {
      *          myKey set { "foo" }
      *      }
      * }

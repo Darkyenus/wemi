@@ -1,5 +1,7 @@
 import wemi.Archetypes.JUnitLayer
 import wemi.Archetypes.JavaKotlinProject
+import wemi.compile.KotlinCompilerFlags
+import wemi.dependency.MavenCentral
 import wemi.dependency.ProjectDependency
 import wemi.generation.Constant
 import wemi.generation.generateKotlinConstantsFile
@@ -79,7 +81,7 @@ val pluginIntellij by project(path("plugins/intellij"), JavaKotlinProject, JUnit
     libraryDependencies add { dependency("org.jetbrains.intellij:plugin-repository-rest-client:2.0.15", exclusions = excludeKotlinStdlib) }
 
     // Instrumentation dependencies
-    repositories add { Repository("idea-www.jetbrains.com_intellij-repository-releases", "https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/releases") }
+    repositories add { Repository("intellij-releases", "https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/releases") }
     libraryDependencies add { dependency("com.jetbrains.intellij.java", "java-compiler-ant-tasks", "201.8743.12", scope=ScopeProvided) }
 
     publishMetadata modify { metadata ->
@@ -92,4 +94,33 @@ val pluginIntellij by project(path("plugins/intellij"), JavaKotlinProject, JUnit
     }
 }
 
-val pluginProjects = listOf(pluginJvmHotswap, pluginTeaVM, pluginIntellij)
+val pluginDokka by project(path("plugins/dokka"), JavaKotlinProject) {
+
+    compilerOptions[KotlinCompilerFlags.customFlags] = { it + "-Xskip-runtime-version-check" }
+
+    projectDependencies add { ProjectDependency(core, scope = ScopeProvided) }
+
+    val dokkaVersion = "1.4.30"
+    libraryDependencies set { setOf(
+        dependency("org.jetbrains.dokka", "dokka-core", dokkaVersion)
+    ) }
+
+    generateSources("core-version") {
+        generateKotlinConstantsFile(it, "wemiplugin.dokka.Version", mapOf(
+            "DokkaVersion" to Constant.StringConstant(dokkaVersion, "Version of the bundled Dokka")
+        ))
+    }
+
+    repositories set { setOf(MavenCentral) }
+
+    publishMetadata modify { metadata ->
+        setupSharedPublishMetadata(
+            metadata,
+            "Wemi Plugin: Dokka support",
+            "Generate documentation with dokka",
+            "2018"
+        )
+    }
+}
+
+val pluginProjects = listOf(pluginJvmHotswap, pluginTeaVM, pluginIntellij, pluginDokka)
