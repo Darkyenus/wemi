@@ -248,14 +248,6 @@ class BuildScriptInfo internal constructor(
             BuildDependencyPlugin::class.java -> {
                 val (name, group) = fields
 
-                if (group == OFFICIAL_WEMI_PLUGIN_GROUP) {
-                    val bundledPluginJar = try { Magic.WemiLauncherFile.parent / "plugins/$name.jar" } catch (e:Exception) { null }
-                    if (bundledPluginJar != null) {
-                        _unmanagedDependencies.add(bundledPluginJar)
-                        return
-                    }
-                }
-
                 _repositories.add(Jitpack)
                 val version = if (WemiVersion.endsWith("-SNAPSHOT")) WemiBuildCommit else WemiVersion
                 _dependencies.add(Dependency(DependencyId(group, name, version), exclusions = WemiBundledLibrariesExclude))

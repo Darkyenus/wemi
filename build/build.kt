@@ -97,12 +97,9 @@ val wemi: Project by project(Archetypes.AggregateJVMProject) {
 			Files.copy(path.file, distFolder / path.file.name)
 		}
 
-		// Build plugins
-		val pluginDir = distFolder / "plugins"
-		Files.createDirectories(pluginDir)
+		// Build plugins to test them
 		for (pluginProject in pluginProjects) {
-			val pluginFile = using(pluginProject) { archive.get() }!!
-			Files.copy(pluginFile, pluginDir / (using(pluginProject) { projectName.get() }+".jar"))
+			using(pluginProject) { compile.get() }
 		}
 
 		distFolder
