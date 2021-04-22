@@ -284,7 +284,7 @@ class BuildScriptInfo internal constructor(
             }
         }
 
-        val (resolved, resolvedComplete) = resolveDependencies(dependencies, repositories)
+        val (resolved, resolvedComplete) = resolveDependencies(_dependencies, _repositories, useExternalRepositories = true)
         for ((_, r) in resolved) {
             _managedDependencies.add(r.artifact?.path ?: continue)
         }

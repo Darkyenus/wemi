@@ -13,8 +13,12 @@ import java.util.concurrent.TimeUnit
  *
  * If any dependency fails to resolve, returns null.
  */
-fun resolveDependencyArtifacts(dependencies: Collection<Dependency>, repositories: Collection<Repository>, progressListener:ActivityListener?, mapper: ((Dependency) -> Dependency) = { it }, allowErrors:Boolean = false): List<Path>? {
-    val (resolved, ok ) = resolveDependencies(dependencies, repositories, progressListener = progressListener, mapper = mapper)
+fun resolveDependencyArtifacts(dependencies: Collection<Dependency>, repositories: Collection<Repository>,
+                               progressListener:ActivityListener?,
+                               mapper: ((Dependency) -> Dependency) = { it },
+                               allowErrors:Boolean = false,
+                               useExternalRepositories:Boolean = false): List<Path>? {
+    val (resolved, ok) = resolveDependencies(dependencies, repositories, progressListener = progressListener, mapper = mapper, useExternalRepositories = useExternalRepositories)
 
     if (!ok) {
         for (value in resolved.values) {
@@ -124,12 +128,14 @@ class ResolvedDependencies(dependencies:Map<DependencyId, ResolvedDependency>,
  *
  * This is the entry point to dependency resolution.
  *
+ * @param useExternalRepositories whether to use repositories specified in poms of dependencies
  * @return true if all [dependencies] resolve correctly without error
  */
 fun resolveDependencies(dependencies: Collection<Dependency>,
                         repositories: Collection<Repository>,
                         mapper: ((Dependency) -> Dependency) = { it },
-                        progressListener: ActivityListener? = null): Partial<ResolvedDependencies> {
+                        progressListener: ActivityListener? = null,
+                        useExternalRepositories:Boolean = false): Partial<ResolvedDependencies> {
     // Sort repositories
     val sorted = ArrayList(repositories)
     sorted.sortWith(REPOSITORY_COMPARATOR)
@@ -144,7 +150,7 @@ fun resolveDependencies(dependencies: Collection<Dependency>,
         // On wait
         LOG.info("Waiting for lock on {}", dir)
     }) {
-        wemi.dependency.internal.resolveArtifacts(dependencies, sorted, mapper, progressListener ?: RootLoggingDownloadTracker)
+        wemi.dependency.internal.resolveArtifacts(dependencies, sorted, mapper, progressListener ?: RootLoggingDownloadTracker, useExternalRepositories)
     }
 
     return result.map { ResolvedDependencies(it, dependencies.map { dep -> dep.dependencyId }) }
@@ -159,7 +165,7 @@ internal typealias SortedRepositories = List<Repository>
 internal typealias CompatibleSortedRepositories = SortedRepositories
 
 /** Compares repositories so that authoritative and then local repositories are first. */
-private val REPOSITORY_COMPARATOR = Comparator<Repository> { o1, o2 ->
+internal val REPOSITORY_COMPARATOR = Comparator<Repository> { o1, o2 ->
     // Authoritative goes first
     val authoritative = o2.authoritative.compareTo(o1.authoritative)
     if (authoritative != 0) {

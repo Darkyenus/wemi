@@ -19,9 +19,11 @@ import wemi.dependency.Dependency
 import wemi.dependency.DependencyExclusion
 import wemi.dependency.DependencyId
 import wemi.dependency.NoClassifier
+import wemi.dependency.REPOSITORY_COMPARATOR
 import wemi.dependency.Repository
 import wemi.dependency.ResolvedDependency
 import wemi.dependency.ScopeCompile
+import wemi.dependency.SnapshotCheckDaily
 import wemi.dependency.SortedRepositories
 import wemi.dependency.TypeChooseByPackaging
 import wemi.dependency.internal.PomBuildingXMLHandler.Companion.SupportedModelVersion
@@ -116,11 +118,14 @@ private fun sanityCheckDependencyIdPart(id:DependencyId, part:String, partName:S
  * @param dependencies to resolve
  * @param repositories to use
  * @param mapper to modify which dependency is actually resolved
+ * @param useExternalRepositories whether to use repositories specified in poms of dependencies
  */
 internal fun resolveArtifacts(dependencies: Collection<Dependency>,
                               repositories: SortedRepositories,
                               mapper: (Dependency) -> Dependency,
-                              progressTracker: ActivityListener?):Partial<Map<DependencyId, ResolvedDependency>> {
+                              progressTracker: ActivityListener?,
+                              useExternalRepositories:Boolean
+):Partial<Map<DependencyId, ResolvedDependency>> {
     if (dependencies.isEmpty()) {
         return Partial(emptyMap(), true)
     } else if (repositories.isEmpty()) {
@@ -139,7 +144,7 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
         operator fun component2() = resolvedDependency
     }
 
-    fun submitDependency(dep:Dependency): Future<Resolved>? {
+    fun submitDependency(dep:Dependency, externalRepositories:SortedRepositories): Future<Resolved>? {
         LOG.trace("submitDependency({})", dep)
         val depId = dep.dependencyId
         // Sanity check
@@ -182,84 +187,106 @@ internal fun resolveArtifacts(dependencies: Collection<Dependency>,
         resolvedScope[depId] = dep.scope
 
         return pool.submit({ tracker ->
-            val resolvedDep = resolveInM2Repository(depId, dep.dependencyManagement, repositories, tracker)
+            var combinedRepositories = repositories
+            if (useExternalRepositories && externalRepositories.isNotEmpty()) {
+                LOG.info("Resolution of {} uses extra external repositories defined in POM: {}", depId, externalRepositories)
+                combinedRepositories = combinedRepositories + externalRepositories
+            }
+            val resolvedDep = resolveInM2Repository(depId, dep.dependencyManagement, combinedRepositories, tracker)
             Resolved(dep, resolvedDep)
         }, progressTracker, dep.dependencyId.toString())
     }
 
     var noError = true
-    var level = dependencies.mapNotNull(::submitDependency)
+    try {
+        var level = dependencies.mapNotNull { submitDependency(it, emptyList()) }
 
-    while (level.isNotEmpty()) {
-        val nextLevel = ArrayList<Future<Resolved>>()
-        for (future in level) {
-            val (dep, resolvedDep) = future.get()
+        while (level.isNotEmpty()) {
+            val nextLevel = ArrayList<Future<Resolved>>()
+            for (future in level) {
+                val (dep, resolvedDep) = future.get()
 
-            resolved[dep.dependencyId] = resolvedDep
+                resolved[dep.dependencyId] = resolvedDep
 
-            if (resolvedDep.hasError) {
-                noError = false
-                continue
-            }
-
-            for (transitiveDependency in resolvedDep.dependencies) {
-                if (transitiveDependency.optional) {
-                    LOG.debug("Excluded optional {} (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                if (resolvedDep.hasError) {
+                    noError = false
                     continue
                 }
 
-                val exclusionRule = dep.exclusions.find { it.excludes(transitiveDependency.dependencyId) }
-                if (exclusionRule != null) {
-                    LOG.debug("Excluded {} with rule {} (dependency of {})", transitiveDependency.dependencyId, exclusionRule, dep.dependencyId)
-                    continue
-                }
+                for (transitiveDependency in resolvedDep.dependencies) {
+                    if (transitiveDependency.optional) {
+                        LOG.debug("Excluded optional {} (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
+                        continue
+                    }
 
-                // Resolve scope
-                // (See the table at https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope)
-                val resolvedToScope:String? = when (transitiveDependency.scope) {
-                    "compile" -> when (dep.scope) {
-                        "compile" -> "compile"
-                        "provided" -> "provided"
-                        "runtime" -> "runtime"
-                        "test" -> "test"
+                    val exclusionRule = dep.exclusions.find { it.excludes(transitiveDependency.dependencyId) }
+                    if (exclusionRule != null) {
+                        LOG.debug(
+                            "Excluded {} with rule {} (dependency of {})",
+                            transitiveDependency.dependencyId,
+                            exclusionRule,
+                            dep.dependencyId
+                        )
+                        continue
+                    }
+
+                    // Resolve scope
+                    // (See the table at https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope)
+                    val resolvedToScope: String? = when (transitiveDependency.scope) {
+                        "compile" -> when (dep.scope) {
+                            "compile" -> "compile"
+                            "provided" -> "provided"
+                            "runtime" -> "runtime"
+                            "test" -> "test"
+                            else -> null
+                        }
+                        "runtime" -> when (dep.scope) {
+                            "compile" -> "runtime"
+                            "provided" -> "provided"
+                            "runtime" -> "runtime"
+                            "test" -> "test"
+                            else -> null
+                        }
                         else -> null
                     }
-                    "runtime" -> when (dep.scope) {
-                        "compile" -> "runtime"
-                        "provided" -> "provided"
-                        "runtime" -> "runtime"
-                        "test" -> "test"
-                        else -> null
+
+                    if (resolvedToScope == null) {
+                        LOG.debug(
+                            "Excluded {} due to transitive scope change (dependency of {})",
+                            transitiveDependency.dependencyId,
+                            dep.dependencyId
+                        )
+                        continue
                     }
-                    else -> null
-                }
 
-                if (resolvedToScope == null) {
-                    LOG.debug("Excluded {} due to transitive scope change (dependency of {})", transitiveDependency.dependencyId, dep.dependencyId)
-                    continue
-                }
-
-                val transitivelyAdjusted = if (transitiveDependency.scope == resolvedToScope && dep.exclusions.isEmpty()) {
-                    transitiveDependency
-                } else {
-                    if (transitiveDependency.scope != resolvedToScope) {
-                        LOG.debug("Changing the scope of {} to {} (transitive scope)", transitiveDependency, resolvedToScope)
+                    val transitivelyAdjusted = if (transitiveDependency.scope == resolvedToScope && dep.exclusions.isEmpty()) {
+                        transitiveDependency
+                    } else {
+                        if (transitiveDependency.scope != resolvedToScope) {
+                            LOG.debug("Changing the scope of {} to {} (transitive scope)", transitiveDependency, resolvedToScope)
+                        }
+                        Dependency(
+                            transitiveDependency.dependencyId,
+                            resolvedToScope,
+                            transitiveDependency.optional,
+                            dep.exclusions + transitiveDependency.exclusions,
+                            transitiveDependency.dependencyManagement
+                        )
                     }
-                    Dependency(transitiveDependency.dependencyId, resolvedToScope, transitiveDependency.optional, dep.exclusions + transitiveDependency.exclusions, transitiveDependency.dependencyManagement)
-                }
 
-                val mapped = mapper(transitivelyAdjusted)
-                if (mapped != transitivelyAdjusted) {
-                    LOG.debug("{} mapped to {}", transitivelyAdjusted, mapped)
-                }
+                    val mapped = mapper(transitivelyAdjusted)
+                    if (mapped != transitivelyAdjusted) {
+                        LOG.debug("{} mapped to {}", transitivelyAdjusted, mapped)
+                    }
 
-                submitDependency(mapped)?.let { nextLevel.add(it) }
+                    submitDependency(mapped, resolvedDep.extraDependencyRepositories)?.let { nextLevel.add(it) }
+                }
             }
+            level = nextLevel
         }
-        level = nextLevel
+    } finally {
+        pool.shutdown()
     }
-
-    pool.shutdown()
 
     if (LOG.isDebugEnabled) {
         val stack = ArrayList<DependencyId>()
@@ -353,16 +380,20 @@ private val PACKAGING_TO_EXTENSION_MAPPING:Map<String, String> = mapOf(
 
 /** Same as [ResolvedDependency], but without some fields which are filled in later, such as [ResolvedDependency.scope]. */
 private class RawResolvedDependency private constructor(
-        val id: DependencyId, val dependencies: List<Dependency>,
+        val id: DependencyId,
+        val dependencies: List<Dependency>,
+        /** If the pom of this dependency included repositories that are not already used,
+         * they appear here and should be used for resolution of [dependencies]. */
+        val extraDependencyRepositories: SortedRepositories,
         val resolvedFrom: Repository?, val log: CharSequence?, val artifact:ArtifactPath?) {
 
     /** Error constructor */
     constructor(id:DependencyId, log:CharSequence, resolvedFrom:Repository? = null)
-            : this(id, emptyList(), resolvedFrom, log, null)
+            : this(id, emptyList(), emptyList(), resolvedFrom, log, null)
 
     /** Success constructor */
-    constructor(id:DependencyId, dependencies:List<Dependency>, resolvedFrom:Repository, artifact:ArtifactPath)
-            :this(id, dependencies, resolvedFrom, null, artifact)
+    constructor(id:DependencyId, dependencies:List<Dependency>, extraDependencyRepositories: SortedRepositories, resolvedFrom:Repository, artifact:ArtifactPath)
+            :this(id, dependencies, extraDependencyRepositories, resolvedFrom, null, artifact)
 
     /** `true` if this dependency failed to resolve (partially or completely), for any reason */
     val hasError: Boolean
@@ -401,7 +432,7 @@ private fun resolveInM2Repository(
         val repository = retrievedPom.path.artifactPath.repository
 
         if (resolvedDependencyId.type.equals("pom", ignoreCase = true)) {
-            return RawResolvedDependency(resolvedDependencyId, emptyList(), repository, retrievedPom.path.artifactPath)
+            return RawResolvedDependency(resolvedDependencyId, emptyList(), emptyList(), repository, retrievedPom.path.artifactPath)
         }
 
         val resolvedPom = resolveRawPom(retrievedPom.path.artifactPath, transitiveDependencyManagement, usedRepositories, progressTracker).fold {
@@ -438,7 +469,7 @@ private fun resolveInM2Repository(
             // can always be lazily loaded and the size of all dependencies can be quite big.
             val retrievedArtifact = retrieved.artifactPath
             retrievedArtifact.data = null
-            return RawResolvedDependency(resolvedDependencyId, pom.dependencies, repository, retrievedArtifact)
+            return RawResolvedDependency(resolvedDependencyId, pom.dependencies, pom.extraRepositories, repository, retrievedArtifact)
         }, { failure ->
             if (pom.packaging.isNotBlank() && resolvedDependencyId.type != TypeChooseByPackaging && !extension.equals(pom.packaging, ignoreCase = true)) {
                 LOG.info("Retrieving {}, which maps to file extension {}, failed, while the remote POM uses {} packaging - maybe the type is wrong?", resolvedDependencyId, extension, pom.packaging)
@@ -738,7 +769,9 @@ private class Pom constructor(
         val groupId:String?, val artifactId:String?, val version:String?,
         val packaging:String,
         val dependencies:List<Dependency>,
-        val dependencyManagement:List<Dependency>)
+        val dependencyManagement:List<Dependency>,
+        val extraRepositories:SortedRepositories
+)
 
 /**
  * Resolves against [transitiveDependencyManagement] and [ownDependencyManagement].
@@ -813,10 +846,11 @@ private fun resolveDependencyManagement(
 /** Given a [dependencyManagement] list, replace all elements of scope import with their imported counterparts.
  * @param pomUrl url of the pom in which the [dependencyManagement] was found, for logging
  * @param repositories in which to resolve the imports */
-private fun flattedDependencyManagementImports(dependencyManagement:List<Dependency>, transitiveDependencyManagement:List<Dependency>, pomUrl:URL, repositories:SortedRepositories, progressTracker:ActivityListener?):Failable<List<Dependency>, String> {
+private fun flattedDependencyManagementImports(dependencyManagement:List<Dependency>, transitiveDependencyManagement:List<Dependency>, pomUrl:URL, repositories:SortedRepositories, progressTracker:ActivityListener?):Failable<Pair<List<Dependency>, List<Repository>>, String> {
     // Resolve <dependencyManagement> <scope>import
     // http://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope
     val flatDependencyManagement = ArrayList<Dependency>(dependencyManagement.size * 2)
+    val importedRepositories = ArrayList<Repository>()
 
     for (dependency in dependencyManagement) {
         val dep = dependency.dependencyId
@@ -842,10 +876,15 @@ private fun flattedDependencyManagementImports(dependencyManagement:List<Depende
         }.use({ importedPom ->
             val imported = importedPom.dependencyManagement
             if (imported.isNotEmpty()) {
-                LOG.trace("dependencyManagement of {} imported {} from {}", pomUrl, imported, dep)
+                LOG.trace("dependencyManagement of {} imported {} through {}", pomUrl, imported, dep)
 
                 // Specification says, that it should be replaced
                 flatDependencyManagement.addAll(imported)
+            }
+            if (importedPom.extraRepositories.isNotEmpty()) {
+                LOG.trace("dependencyManagement of {} imported repositories {} through {}", pomUrl, importedPom.extraRepositories, dep)
+
+                importedRepositories.addAll(importedPom.extraRepositories)
             }
         }, { error ->
             LOG.warn("dependencyManagement import in {} of {} failed: {}", pomUrl, dep, error)
@@ -853,7 +892,7 @@ private fun flattedDependencyManagementImports(dependencyManagement:List<Depende
         })
     }
 
-    return Failable.success(flatDependencyManagement)
+    return Failable.success(flatDependencyManagement to importedRepositories)
 }
 
 /**
@@ -873,6 +912,7 @@ private class RawPom(
     var parent: RawPom? = null
     val dependencies = ArrayList<RawPomDependency>()
     val dependencyManagement = ArrayList<RawPomDependency>()
+    val repositories = ArrayList<Repository>()
 
     val profiles = ArrayList<PomProfile>()
 
@@ -981,6 +1021,7 @@ private class RawPom(
             // Apply the profile
             this.dependencies.addAll(profile.dependencies)
             this.dependencyManagement.addAll(profile.dependencyManagement)
+            this.repositories.addAll(profile.repositories)
             this.properties.putAll(profile.properties)
         }
     }
@@ -995,6 +1036,7 @@ private class RawPom(
 
         val translatedDependencies = ArrayList<TranslatedRawPomDependency>()
         val ownDependencyManagement = ArrayList<Dependency>()
+        val combinedRepositories = LinkedHashSet<Repository>()
         var pom = this
         var pomIsParent = false
         while (true) {
@@ -1014,17 +1056,20 @@ private class RawPom(
                 // If it is an error, it will fail somewhere down the line.
                 it.translate(false).resolveAsDependencyManagement()
             }
+            combinedRepositories.addAll(pom.repositories)
             pom = pom.parent ?: break
             pomIsParent = true
         }
 
-        val expandedOwnDependencyManagement = flattedDependencyManagementImports(ownDependencyManagement, transitiveDependencyManagement, url, repositories, progressTracker).let {
+        val (expandedOwnDependencyManagement, dependencyManagementImportedRepositories) = flattedDependencyManagementImports(ownDependencyManagement, transitiveDependencyManagement, url, repositories, progressTracker).let {
             if (it.successful) {
                 it.value!!
             } else {
                 return it.reFail()
             }
         }
+
+        combinedRepositories.addAll(dependencyManagementImportedRepositories)
 
         // Further dependencies should use this thing's dependencyManagement, but only after what parent provided is considered
         val combinedDependencyManagement = transitiveDependencyManagement + expandedOwnDependencyManagement
@@ -1038,7 +1083,12 @@ private class RawPom(
             dep
         }
 
-        return Failable.success(Pom(resolvedGroupId, resolvedArtifactId, resolvedVersion, resolvedPackaging, newDependencies, ownDependencyManagement))
+        combinedRepositories.removeAll(repositories)// We don't need these repositories twice
+
+        val combinedSortedRepositories = ArrayList(combinedRepositories)
+        combinedSortedRepositories.sortWith(REPOSITORY_COMPARATOR)
+
+        return Failable.success(Pom(resolvedGroupId, resolvedArtifactId, resolvedVersion, resolvedPackaging, newDependencies, ownDependencyManagement, combinedSortedRepositories))
     }
 
     class RawPomDependency(val group: String?, val name: String?, val version: String?,
@@ -1263,6 +1313,7 @@ private class PomProfile {
     val properties = HashMap<String, String>()
     val dependencies = ArrayList<RawPom.RawPomDependency>()
     val dependencyManagement = ArrayList<RawPom.RawPomDependency>()
+    val repositories = ArrayList<Repository>()
 }
 
 private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, pom.url) {
@@ -1288,6 +1339,103 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
     private var lastProfile:PomProfile = PomProfile()
     private var lastProfilePropertyName:String? = null
     private var lastProfilePropertyValue:String? = null
+
+    // https://maven.apache.org/ref/3.8.1/maven-model/maven.html#class_repository
+    private var lastRepoUniqueVersion = true
+    private var lastRepoReleasesEnabled = true
+    private var lastRepoReleasesUpdatePolicy = "daily"
+    private var lastRepoReleasesChecksumPolicy = "warn"
+    private var lastRepoSnapshotsEnabled = true
+    private var lastRepoSnapshotsUpdatePolicy = "daily"
+    private var lastRepoSnapshotsChecksumPolicy = "warn"
+    private var lastRepoId:String? = null
+    private var lastRepoName:String? = null
+    private var lastRepoUrl:String? = null
+    private var lastRepoLayout = "default"
+
+    private fun finishRepo() : Repository? {
+        try {
+            if (!lastRepoLayout.equals("default", ignoreCase = true)) {
+                LOG.warn("Pom at {} contains a definition of a repository with non-default layout. This is not supported, so the repository will be ignored", pom.url)
+                return null
+            }
+
+            val repoId = lastRepoId ?: lastRepoName ?: lastRepoUrl
+            if (repoId == null) {
+                LOG.warn("Pom at {} contains a definition of a repository with no ID, it will be ignored", pom.url)
+                return null
+            }
+
+            if (lastRepoUrl == null) {
+                LOG.warn("Pom at {} contains a definition of a repository with no URL, it will be ignored", pom.url)
+                return null
+            }
+
+            val url = try { URL(lastRepoUrl) } catch (e:Exception) {
+                LOG.warn("Pom at {} contains a definition of a repository invalid URL, it will be ignored", pom.url)
+                return null
+            }
+
+            if (url.protocol != "https" && url.protocol != "http") {
+                LOG.warn("Pom at {} contains a definition of a repository with URL with unsupported protocol ({}), it will be ignored", url, pom.url)
+                return null
+            }
+
+            if (!lastRepoReleasesEnabled && !lastRepoSnapshotsEnabled) {
+                LOG.warn("Pom at {} contains a definition of a repository with both releases and snapshots disabled, it will be ignored", pom.url)
+                return null
+            }
+
+            var snapshotUpdateDelaySeconds = SnapshotCheckDaily
+            if (lastRepoSnapshotsUpdatePolicy.equals("always", ignoreCase = true)) {
+                snapshotUpdateDelaySeconds = 0
+            } else if (lastRepoSnapshotsUpdatePolicy.equals("daily", ignoreCase = true)) {
+                snapshotUpdateDelaySeconds = SnapshotCheckDaily
+            } else if (lastRepoSnapshotsUpdatePolicy.equals("never", ignoreCase = true)) {
+                snapshotUpdateDelaySeconds = Long.MAX_VALUE
+            } else if (lastRepoSnapshotsUpdatePolicy.startsWith("interval:", ignoreCase = true)) {
+                val minutes = lastRepoSnapshotsUpdatePolicy.substring("interval:".length).toIntOrNull()
+                if (minutes != null) {
+                    snapshotUpdateDelaySeconds = minutes * 60L
+                }
+            }
+
+            val verifyChecksums: Boolean
+            val tolerateChecksumMismatch: Boolean
+            if (lastRepoReleasesChecksumPolicy.equals("fail", ignoreCase = true) || lastRepoSnapshotsChecksumPolicy.equals("fail", ignoreCase = true)) {
+                verifyChecksums = true
+                tolerateChecksumMismatch = false
+            } else if (lastRepoReleasesChecksumPolicy.equals("warn", ignoreCase = true) || lastRepoSnapshotsChecksumPolicy.equals("warn", ignoreCase = true)) {
+                verifyChecksums = true
+                tolerateChecksumMismatch = true
+            } else if (lastRepoReleasesChecksumPolicy.equals("ignore", ignoreCase = true) || lastRepoSnapshotsChecksumPolicy.equals("ignore", ignoreCase = true)) {
+                verifyChecksums = false
+                tolerateChecksumMismatch = true
+            } else {
+                verifyChecksums = true
+                tolerateChecksumMismatch = false
+            }
+
+            return Repository(repoId, url,
+                releases = lastRepoReleasesEnabled,
+                snapshots = lastRepoSnapshotsEnabled,
+                snapshotUpdateDelaySeconds = snapshotUpdateDelaySeconds,
+                verifyChecksums = verifyChecksums,
+                tolerateChecksumMismatch = tolerateChecksumMismatch)
+        } finally {
+            lastRepoUniqueVersion = true
+            lastRepoReleasesEnabled = true
+            lastRepoReleasesUpdatePolicy = "daily"
+            lastRepoReleasesChecksumPolicy = "warn"
+            lastRepoSnapshotsEnabled = true
+            lastRepoSnapshotsUpdatePolicy = "daily"
+            lastRepoSnapshotsChecksumPolicy = "warn"
+            lastRepoId = null
+            lastRepoName = null
+            lastRepoUrl = null
+            lastRepoLayout = "default"
+        }
+    }
 
     override fun doElement() {
         // Version
@@ -1407,21 +1555,31 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
         }
 
         // Repositories
-        /*else if (atElement(RepoReleases)) {
-
-        } else if (atElement(RepoSnapshots)) {
-
-        } else if (atElement(RepoId)) {
-
-        } else if (atElement(RepoName)) {
-
-        } else if (atElement(RepoUrl)) {
-
-        } else if (atElement(RepoLayout)) {
-
-        }*/ else if (atElement(Repo)) {
-            //TODO Add support
-            LOG.debug("Pom at {} uses custom repositories, which are not supported yet", pom.url)
+        else if (atElement(RepoReleasesEnabled) || atElement(ProfileRepoReleasesEnabled)) {
+            lastRepoReleasesEnabled = bool(lastRepoReleasesEnabled)
+        } else if (atElement(RepoSnapshotsEnabled) || atElement(ProfileRepoSnapshotsEnabled)) {
+            lastRepoSnapshotsEnabled = bool(lastRepoSnapshotsEnabled)
+        } else if (atElement(RepoReleasesUpdatePolicy) || atElement(ProfileRepoReleasesUpdatePolicy)) {
+            lastRepoReleasesUpdatePolicy = characters()
+        } else if (atElement(RepoSnapshotsUpdatePolicy) || atElement(ProfileRepoSnapshotsUpdatePolicy)) {
+            lastRepoSnapshotsUpdatePolicy = characters()
+        } else if (atElement(RepoReleasesChecksumPolicy) || atElement(ProfileRepoReleasesChecksumPolicy)) {
+            lastRepoReleasesChecksumPolicy = characters()
+        } else if (atElement(RepoSnapshotsChecksumPolicy) || atElement(ProfileRepoSnapshotsChecksumPolicy)) {
+            lastRepoSnapshotsChecksumPolicy = characters()
+        } else if (atElement(RepoId) || atElement(ProfileRepoId)) {
+            lastRepoId = characters()
+        } else if (atElement(RepoName) || atElement(ProfileRepoName)) {
+            lastRepoName = characters()
+        } else if (atElement(RepoUrl) || atElement(ProfileRepoUrl)) {
+            lastRepoUrl = characters()
+        } else if (atElement(RepoLayout) || atElement(ProfileRepoLayout)) {
+            lastRepoLayout = characters()
+        } else if (atElement(Repo)) {
+            val repo = finishRepo()
+            if (repo != null) {
+                pom.repositories.add(repo)
+            }
         }
 
         // Profiles
@@ -1455,7 +1613,12 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
             lastProfilePropertyName = characters()
         } else if (atElement(ProfileActivationPropertyValue)) {
             lastProfilePropertyValue = characters()
-        }// TODO(jp): Support for repositories in profiles
+        } else if (atElement(ProfileRepo)) {
+            val repo = finishRepo()
+            if (repo != null) {
+                lastProfile.repositories.add(repo)
+            }
+        }
     }
 
     companion object {
@@ -1505,8 +1668,12 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
         val Property = arrayOf("project", "properties")
 
         val Repo = arrayOf("project", "repositories", "repository")
-        val RepoReleases = arrayOf("project", "repositories", "repository", "releases")
-        val RepoSnapshots = arrayOf("project", "repositories", "repository", "snapshots")
+        val RepoReleasesEnabled = arrayOf("project", "repositories", "repository", "releases", "enabled")
+        val RepoReleasesUpdatePolicy = arrayOf("project", "repositories", "repository", "releases", "updatePolicy")
+        val RepoReleasesChecksumPolicy = arrayOf("project", "repositories", "repository", "releases", "checksumPolicy")
+        val RepoSnapshotsEnabled = arrayOf("project", "repositories", "repository", "snapshots", "enabled")
+        val RepoSnapshotsUpdatePolicy = arrayOf("project", "repositories", "repository", "snapshots", "updatePolicy")
+        val RepoSnapshotsChecksumPolicy = arrayOf("project", "repositories", "repository", "snapshots", "checksumPolicy")
         val RepoId = arrayOf("project", "repositories", "repository", "id")
         val RepoName = arrayOf("project", "repositories", "repository", "name")
         val RepoUrl = arrayOf("project", "repositories", "repository", "url")
@@ -1525,8 +1692,12 @@ private class PomBuildingXMLHandler(private val pom: RawPom) : XMLHandler(LOG, p
         val ProfileActivationPropertyValue = arrayOf("project", "profiles", "profile", "activation", "property", "value")
 
         val ProfileRepo = Repo.inProfile()
-        val ProfileRepoReleases = RepoReleases.inProfile()
-        val ProfileRepoSnapshots = RepoSnapshots.inProfile()
+        val ProfileRepoReleasesEnabled = RepoReleasesEnabled.inProfile()
+        val ProfileRepoReleasesUpdatePolicy = RepoReleasesUpdatePolicy.inProfile()
+        val ProfileRepoReleasesChecksumPolicy = RepoReleasesChecksumPolicy.inProfile()
+        val ProfileRepoSnapshotsEnabled = RepoSnapshotsEnabled.inProfile()
+        val ProfileRepoSnapshotsUpdatePolicy = RepoSnapshotsUpdatePolicy.inProfile()
+        val ProfileRepoSnapshotsChecksumPolicy = RepoSnapshotsChecksumPolicy.inProfile()
         val ProfileRepoId = RepoId.inProfile()
         val ProfileRepoName = RepoName.inProfile()
         val ProfileRepoUrl = RepoUrl.inProfile()
@@ -1656,6 +1827,14 @@ private abstract class XMLHandler(private val LOG: Logger, private val parsing:A
     protected fun characters(): String {
         // in default implementation trim() returns itself, so toString() returns itself
         return elementCharacters.trim().toString()
+    }
+
+    protected fun bool(defaultValue:Boolean):Boolean {
+        when {
+            elementCharacters.contains("true", ignoreCase = true) -> return true
+            elementCharacters.contains("false", ignoreCase = true) -> return false
+            else -> return defaultValue
+        }
     }
 
     final override fun characters(ch: CharArray, start: Int, length: Int) {
